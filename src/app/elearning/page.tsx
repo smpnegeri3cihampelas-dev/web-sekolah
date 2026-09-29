@@ -41,6 +41,10 @@ export default function ELearningPage() {
 
   // Modal detail view for Piket
   const [detailModalClassId, setDetailModalClassId] = useState<string | null>(null);
+  
+  // Piket Interactive Class Attendance State (so duty teacher can take / edit attendance for any class)
+  const [piketModalRecords, setPiketModalRecords] = useState<Record<string, AttendanceStatus>>({});
+  const [piketModalNotes, setPiketModalNotes] = useState<Record<string, string>>({});
 
   // Toast feedback
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' | 'warn' } | null>(null);
@@ -183,6 +187,81 @@ export default function ELearningPage() {
     saveStoredAttendance(updatedData);
     setAttendanceData(updatedData);
     showToast(`Status siswa berhasil diubah via Meja Piket & terupdate otomatis di kelas!`, 'success');
+  };
+
+  // Open class modal with interactive state for Piket
+  const handleOpenPiketClassModal = (classId: string) => {
+    setDetailModalClassId(classId);
+    const session = attendanceData[classId];
+    const studentsInClass = INITIAL_STUDENTS.filter(s => s.classId === classId);
+    const records: Record<string, AttendanceStatus> = {};
+    const notes: Record<string, string> = {};
+
+    studentsInClass.forEach(student => {
+      if (session?.records?.[student.id]) {
+        records[student.id] = session.records[student.id];
+        if (session.notes?.[student.id]) {
+          notes[student.id] = session.notes[student.id];
+        }
+      } else {
+        records[student.id] = 'H'; // Default hadir
+      }
+    });
+
+    setPiketModalRecords(records);
+    setPiketModalNotes(notes);
+  };
+
+  // Set single student status from Piket modal
+  const handleSetPiketStudentStatus = (studentId: string, status: AttendanceStatus) => {
+    setPiketModalRecords(prev => ({ ...prev, [studentId]: status }));
+  };
+
+  // Set single student note from Piket modal
+  const handleSetPiketStudentNote = (studentId: string, note: string) => {
+    setPiketModalNotes(prev => ({ ...prev, [studentId]: note }));
+  };
+
+  // Quick action: Set all students to Hadir from Piket modal
+  const handleSetPiketAllHadir = () => {
+    if (!detailModalClassId) return;
+    const students = INITIAL_STUDENTS.filter(s => s.classId === detailModalClassId);
+    const updated: Record<string, AttendanceStatus> = {};
+    students.forEach(s => {
+      updated[s.id] = 'H';
+    });
+    setPiketModalRecords(updated);
+    showToast('Seluruh siswa berhasil ditandai HADIR oleh Guru Piket', 'info');
+  };
+
+  // Save class attendance as Guru Piket / Inval
+  const handleSavePiketAttendance = () => {
+    if (!detailModalClassId) return;
+    const now = new Date();
+    const timeString = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB';
+    const today = now.toISOString().split('T')[0];
+
+    const currentSession = attendanceData[detailModalClassId];
+    const subject = currentSession?.subject || 'Jam Pertama (Inval)';
+
+    const updatedData = {
+      ...attendanceData,
+      [detailModalClassId]: {
+        classId: detailModalClassId,
+        date: today,
+        subject: subject,
+        teacherName: 'Dra. Siti Aminah, M.Pd (Guru Piket / Inval)',
+        teacherNip: '19780214 200501 2 008',
+        isSubmitted: true,
+        submittedAt: timeString,
+        records: piketModalRecords,
+        notes: piketModalNotes,
+      }
+    };
+
+    saveStoredAttendance(updatedData);
+    setAttendanceData(updatedData);
+    showToast(`Presensi Kelas ${detailModalClassId} berhasil disimpan & disahkan oleh Guru Piket!`, 'success');
   };
 
   // Calculate stats for Piket Dashboard
@@ -960,7 +1039,7 @@ export default function ELearningPage() {
                     return (
                       <div
                         key={cls.id}
-                        onClick={() => setDetailModalClassId(cls.id)}
+                        onClick={() => handleOpenPiketClassModal(cls.id)}
                         className={`p-4 rounded-2xl border transition cursor-pointer relative overflow-hidden group ${
                           isDone 
                             ? 'bg-[#0a1310] border-emerald-500/30 hover:border-emerald-400/60 shadow-lg shadow-emerald-950/20' 
@@ -990,8 +1069,8 @@ export default function ELearningPage() {
                         {isDone ? (
                           <div className="space-y-2">
                             <div className="flex items-center justify-between text-xs py-1.5 px-2 rounded-lg bg-black/40">
-                              <span className="text-stone-400">Guru Mapel:</span>
-                              <span className="font-semibold text-stone-200 truncate max-w-[120px]">
+                              <span className="text-stone-400">Guru:</span>
+                              <span className="font-semibold text-stone-200 truncate max-w-[130px]">
                                 {session.teacherName.split(',')[0]}
                               </span>
                             </div>
@@ -1013,20 +1092,33 @@ export default function ELearningPage() {
                             <div className="text-[10px] text-stone-400 text-right">
                               Diabsen jam: <span className="font-mono text-stone-300">{session.submittedAt}</span>
                             </div>
+                            <div className="pt-1 flex items-center justify-between text-[11px]">
+                              <span className="text-cyan-400 font-semibold group-hover:underline">
+                                ✏️ Periksa / Koreksi →
+                              </span>
+                            </div>
                           </div>
                         ) : (
-                          <div className="py-4 text-center">
-                            <span className="text-xs text-amber-400/80 font-medium block">
-                              Menunggu Guru Jam Ke-1...
+                          <div className="py-2 text-center space-y-2.5">
+                            <span className="text-xs text-amber-400/90 font-medium block">
+                              Guru Belum Hadir / Jam Kosong
                             </span>
-                            <span className="text-[10px] text-stone-400 mt-1 block">
-                              Piket bisa cek jika ada jam kosong
-                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenPiketClassModal(cls.id);
+                              }}
+                              className="w-full py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-bold text-xs transition shadow-md shadow-amber-500/20 flex items-center justify-center gap-1.5 cursor-pointer"
+                            >
+                              <span>📝</span>
+                              <span>Absenkan sbg Piket</span>
+                            </button>
                           </div>
                         )}
 
                         <div className="mt-2 pt-2 border-t border-white/5 text-[11px] text-center text-stone-400 group-hover:text-cyan-300 transition">
-                          Klik untuk lihat rincian siswa →
+                          Klik kartu untuk buka presensi kelas ini
                         </div>
                       </div>
                     );
@@ -1163,45 +1255,82 @@ export default function ELearningPage() {
 
             </div>
 
-            {/* MODAL DETAIL KELAS UNTUK GURU PIKET */}
+            {/* MODAL DETAIL & INPUT PRESENSI KELAS OLEH GURU PIKET */}
             {detailModalClassId && (
               <div 
                 data-lenis-prevent="true"
                 data-lenis-prevent-wheel="true"
                 data-lenis-prevent-touch="true"
-                className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in select-text"
+                className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-sm animate-fade-in select-text"
                 onClick={() => setDetailModalClassId(null)}
               >
                 <div 
                   data-lenis-prevent="true"
                   data-lenis-prevent-wheel="true"
                   data-lenis-prevent-touch="true"
-                  className="bg-[#0f141f] border border-white/20 rounded-2xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden"
+                  className="bg-[#0f141f] border border-white/20 rounded-2xl max-w-3xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden"
                   onClick={(e) => e.stopPropagation()}
                 >
                   
                   {/* Modal Header */}
-                  <div className="p-5 border-b border-white/10 flex items-center justify-between bg-white/[0.02] flex-shrink-0">
-                    <div>
-                      <h3 className="text-base font-bold text-white flex items-center gap-2">
-                        Rincian Kehadiran {detailModalClassId}
-                        <span className="text-xs px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
-                          {attendanceData[detailModalClassId]?.isSubmitted ? 'Sudah Diabsen' : 'Belum Diabsen'}
+                  <div className="p-5 border-b border-white/10 bg-white/[0.02] flex-shrink-0">
+                    <div className="flex items-center justify-between gap-3 mb-2">
+                      <div className="flex items-center gap-2.5">
+                        <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                          🏢 MODE PIKET
                         </span>
-                      </h3>
-                      <p className="text-xs text-stone-400 mt-0.5">
-                        Wali Kelas: {SCHOOL_CLASSES.find(c => c.id === detailModalClassId)?.waliKelas}
-                      </p>
+                        <h3 className="text-lg font-bold text-white">
+                          Presensi & Rincian {detailModalClassId}
+                        </h3>
+                        <span className={`text-xs px-2 py-0.5 rounded font-semibold ${
+                          attendanceData[detailModalClassId]?.isSubmitted 
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' 
+                            : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                        }`}>
+                          {attendanceData[detailModalClassId]?.isSubmitted ? 'Sudah Diabsen' : 'Belum Diabsen (Bisa Diabsenkan Piket)'}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => setDetailModalClassId(null)}
+                        className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 text-stone-400 hover:text-white flex items-center justify-center transition cursor-pointer"
+                      >
+                        ✕
+                      </button>
                     </div>
-                    <button
-                      onClick={() => setDetailModalClassId(null)}
-                      className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 text-stone-400 hover:text-white flex items-center justify-center transition cursor-pointer"
-                    >
-                      ✕
-                    </button>
+
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-stone-300 pt-1">
+                      <p>
+                        Wali Kelas: <span className="font-semibold text-white">{SCHOOL_CLASSES.find(c => c.id === detailModalClassId)?.waliKelas}</span>
+                        {attendanceData[detailModalClassId]?.teacherName && (
+                          <span> • Pengabsen sebelumnya: <span className="text-cyan-300">{attendanceData[detailModalClassId]?.teacherName}</span></span>
+                        )}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleSetPiketAllHadir}
+                        className="self-start sm:self-auto px-3 py-1 rounded-lg bg-white/10 hover:bg-white/15 border border-white/10 text-xs font-semibold text-stone-200 transition flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <span>⚡</span>
+                        <span>Tandai Semua Hadir</span>
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Modal Content */}
+                  {/* Petunjuk Guru Piket */}
+                  <div className="px-5 py-2.5 bg-black/40 border-b border-white/5 flex flex-wrap items-center justify-between gap-2 text-xs text-stone-400">
+                    <span className="text-emerald-300 font-medium">
+                      💡 Klik tombol status pada siswa jika ada yang Sakit/Izin/Alpa/Telat, lalu klik "Simpan Presensi".
+                    </span>
+                    <div className="flex items-center gap-1.5 font-bold text-[11px]">
+                      <span className="text-emerald-400">H: Hadir</span> •
+                      <span className="text-blue-400">S: Sakit</span> •
+                      <span className="text-amber-400">I: Izin</span> •
+                      <span className="text-rose-400">A: Alpa</span> •
+                      <span className="text-orange-400">T: Telat</span>
+                    </div>
+                  </div>
+
+                  {/* Modal Content (Daftar Siswa Interaktif untuk Piket) */}
                   <div 
                     data-lenis-prevent="true"
                     data-lenis-prevent-wheel="true"
@@ -1211,53 +1340,149 @@ export default function ELearningPage() {
                     className="p-5 overflow-y-auto overscroll-contain flex-1 min-h-0 space-y-3 divide-y divide-white/5 text-xs select-text [scrollbar-width:thin] [scrollbar-color:rgba(56,189,248,0.5)_rgba(255,255,255,0.04)] [&::-webkit-scrollbar]:w-2.5 [&::-webkit-scrollbar-track]:bg-white/[0.02] [&::-webkit-scrollbar-thumb]:bg-cyan-500/50 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-cyan-400"
                   >
                     {INITIAL_STUDENTS.filter(s => s.classId === detailModalClassId).map((student, idx) => {
-                      const session = attendanceData[detailModalClassId];
-                      const stStatus = session?.records?.[student.id] || (session?.isSubmitted ? 'H' : '-');
-                      const stNote = session?.notes?.[student.id] || '';
+                      const currentStatus = piketModalRecords[student.id] || 'H';
+                      const currentNote = piketModalNotes[student.id] || '';
 
                       return (
-                        <div key={student.id} className="pt-2.5 first:pt-0 flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-2.5">
+                        <div key={student.id} className="pt-3 first:pt-0 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                          {/* Nama Siswa */}
+                          <div className="flex items-center gap-2.5 min-w-[200px]">
                             <span className="w-5 text-stone-400 font-mono">{idx + 1}.</span>
                             <div>
-                              <span className="font-semibold text-stone-200">{student.name}</span>
-                              <span className="text-stone-400 text-[10px] ml-2 font-mono">({student.nisn})</span>
-                              {stNote && (
-                                <p className="text-[10px] text-amber-300/80 italic mt-0.5">
-                                  Catatan: {stNote}
-                                </p>
-                              )}
+                              <div className="font-semibold text-stone-200 flex items-center gap-1.5">
+                                <span>{student.name}</span>
+                                <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono ${
+                                  student.gender === 'L' ? 'bg-blue-500/10 text-blue-300' : 'bg-pink-500/10 text-pink-300'
+                                }`}>
+                                  {student.gender}
+                                </span>
+                              </div>
+                              <span className="text-stone-400 text-[10px] font-mono">NISN: {student.nisn}</span>
                             </div>
                           </div>
 
-                          <span className={`px-2.5 py-1 rounded-lg font-bold text-xs ${
-                            stStatus === 'H' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' :
-                            stStatus === 'S' ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' :
-                            stStatus === 'I' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
-                            stStatus === 'A' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' :
-                            stStatus === 'T' ? 'bg-orange-500/20 text-orange-300 border border-orange-500/30' :
-                            'bg-white/5 text-stone-400'
-                          }`}>
-                            {stStatus === 'H' ? 'Hadir' :
-                             stStatus === 'S' ? 'Sakit' :
-                             stStatus === 'I' ? 'Izin' :
-                             stStatus === 'A' ? 'Alpa' :
-                             stStatus === 'T' ? 'Terlambat' :
-                             'Belum Diabsen'}
-                          </span>
+                          {/* Tombol Status Interaktif untuk Piket */}
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {/* H */}
+                            <button
+                              type="button"
+                              onClick={() => handleSetPiketStudentStatus(student.id, 'H')}
+                              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer ${
+                                currentStatus === 'H'
+                                  ? 'bg-emerald-500 text-black shadow-md shadow-emerald-500/30 ring-2 ring-emerald-400'
+                                  : 'bg-white/5 text-stone-300 hover:bg-emerald-500/20 hover:text-emerald-300 border border-white/5'
+                              }`}
+                            >
+                              <span>Hadir</span>
+                              {currentStatus === 'H' && <span>✓</span>}
+                            </button>
+
+                            {/* S */}
+                            <button
+                              type="button"
+                              onClick={() => handleSetPiketStudentStatus(student.id, 'S')}
+                              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer ${
+                                currentStatus === 'S'
+                                  ? 'bg-blue-500 text-white shadow-md shadow-blue-500/30 ring-2 ring-blue-400'
+                                  : 'bg-white/5 text-stone-300 hover:bg-blue-500/20 hover:text-blue-300 border border-white/5'
+                              }`}
+                            >
+                              <span>Sakit</span>
+                              {currentStatus === 'S' && <span>✓</span>}
+                            </button>
+
+                            {/* I */}
+                            <button
+                              type="button"
+                              onClick={() => handleSetPiketStudentStatus(student.id, 'I')}
+                              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer ${
+                                currentStatus === 'I'
+                                  ? 'bg-amber-500 text-black shadow-md shadow-amber-500/30 ring-2 ring-amber-400'
+                                  : 'bg-white/5 text-stone-300 hover:bg-amber-500/20 hover:text-amber-300 border border-white/5'
+                              }`}
+                            >
+                              <span>Izin</span>
+                              {currentStatus === 'I' && <span>✓</span>}
+                            </button>
+
+                            {/* A */}
+                            <button
+                              type="button"
+                              onClick={() => handleSetPiketStudentStatus(student.id, 'A')}
+                              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer ${
+                                currentStatus === 'A'
+                                  ? 'bg-rose-500 text-white shadow-md shadow-rose-500/30 ring-2 ring-rose-400'
+                                  : 'bg-white/5 text-stone-300 hover:bg-rose-500/20 hover:text-rose-300 border border-white/5'
+                              }`}
+                            >
+                              <span>Alpa</span>
+                              {currentStatus === 'A' && <span>✓</span>}
+                            </button>
+
+                            {/* T */}
+                            <button
+                              type="button"
+                              onClick={() => handleSetPiketStudentStatus(student.id, 'T')}
+                              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer ${
+                                currentStatus === 'T'
+                                  ? 'bg-orange-500 text-black shadow-md shadow-orange-500/30 ring-2 ring-orange-400'
+                                  : 'bg-white/5 text-stone-300 hover:bg-orange-500/20 hover:text-orange-300 border border-white/5'
+                              }`}
+                            >
+                              <span>Telat</span>
+                              {currentStatus === 'T' && <span>✓</span>}
+                            </button>
+                          </div>
+
+                          {/* Kolom Catatan Piket */}
+                          <div className="w-full md:w-56">
+                            <input
+                              type="text"
+                              value={currentNote}
+                              onChange={(e) => handleSetPiketStudentNote(student.id, e.target.value)}
+                              placeholder={
+                                currentStatus === 'S' ? 'Catatan sakit...' :
+                                currentStatus === 'I' ? 'Catatan izin...' :
+                                currentStatus === 'T' ? 'Alasan telat...' :
+                                currentStatus === 'A' ? 'Tanpa kabar...' :
+                                'Catatan (opsional)...'
+                              }
+                              className={`w-full px-2.5 py-1.5 text-xs rounded-xl bg-black/40 border text-stone-200 focus:outline-none transition ${
+                                currentStatus !== 'H' 
+                                  ? 'border-white/20 focus:border-emerald-400 bg-white/[0.03]' 
+                                  : 'border-white/5 opacity-60 focus:opacity-100'
+                              }`}
+                            />
+                          </div>
+
                         </div>
                       );
                     })}
                   </div>
 
-                  {/* Modal Footer */}
-                  <div className="p-4 border-t border-white/10 bg-black/40 flex justify-end flex-shrink-0">
-                    <button
-                      onClick={() => setDetailModalClassId(null)}
-                      className="px-4 py-2 rounded-xl bg-white/10 text-white font-semibold text-xs hover:bg-white/20 transition cursor-pointer"
-                    >
-                      Tutup Rincian
-                    </button>
+                  {/* Modal Footer (Simpan oleh Guru Piket) */}
+                  <div className="p-4 border-t border-white/10 bg-black/50 flex flex-col sm:flex-row items-center justify-between gap-3 flex-shrink-0">
+                    <div className="text-xs text-stone-400 text-center sm:text-left">
+                      Petugas pengesah: <span className="text-emerald-300 font-semibold">Dra. Siti Aminah, M.Pd (Piket)</span>
+                    </div>
+
+                    <div className="flex items-center gap-2.5 w-full sm:w-auto">
+                      <button
+                        type="button"
+                        onClick={() => setDetailModalClassId(null)}
+                        className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-white/10 text-white font-semibold text-xs hover:bg-white/15 transition cursor-pointer"
+                      >
+                        Tutup
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleSavePiketAttendance}
+                        className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-black font-bold text-xs transition shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <span>💾 Simpan Presensi (sbg Guru Piket)</span>
+                      </button>
+                    </div>
                   </div>
 
                 </div>
