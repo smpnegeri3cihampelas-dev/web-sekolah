@@ -1165,11 +1165,23 @@ export default function ELearningPage() {
 
             {/* MODAL DETAIL KELAS UNTUK GURU PIKET */}
             {detailModalClassId && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-                <div className="bg-[#0f141f] border border-white/20 rounded-2xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+              <div 
+                data-lenis-prevent="true"
+                data-lenis-prevent-wheel="true"
+                data-lenis-prevent-touch="true"
+                className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in select-text"
+                onClick={() => setDetailModalClassId(null)}
+              >
+                <div 
+                  data-lenis-prevent="true"
+                  data-lenis-prevent-wheel="true"
+                  data-lenis-prevent-touch="true"
+                  className="bg-[#0f141f] border border-white/20 rounded-2xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   
                   {/* Modal Header */}
-                  <div className="p-5 border-b border-white/10 flex items-center justify-between bg-white/[0.02]">
+                  <div className="p-5 border-b border-white/10 flex items-center justify-between bg-white/[0.02] flex-shrink-0">
                     <div>
                       <h3 className="text-base font-bold text-white flex items-center gap-2">
                         Rincian Kehadiran {detailModalClassId}
@@ -1183,14 +1195,21 @@ export default function ELearningPage() {
                     </div>
                     <button
                       onClick={() => setDetailModalClassId(null)}
-                      className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 text-stone-400 hover:text-white flex items-center justify-center transition"
+                      className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 text-stone-400 hover:text-white flex items-center justify-center transition cursor-pointer"
                     >
                       ✕
                     </button>
                   </div>
 
                   {/* Modal Content */}
-                  <div className="p-5 overflow-y-auto flex-1 space-y-3 divide-y divide-white/5 text-xs">
+                  <div 
+                    data-lenis-prevent="true"
+                    data-lenis-prevent-wheel="true"
+                    data-lenis-prevent-touch="true"
+                    onWheel={(e) => e.stopPropagation()}
+                    onTouchMove={(e) => e.stopPropagation()}
+                    className="p-5 overflow-y-auto overscroll-contain flex-1 min-h-0 space-y-3 divide-y divide-white/5 text-xs select-text [scrollbar-width:thin] [scrollbar-color:rgba(56,189,248,0.5)_rgba(255,255,255,0.04)] [&::-webkit-scrollbar]:w-2.5 [&::-webkit-scrollbar-track]:bg-white/[0.02] [&::-webkit-scrollbar-thumb]:bg-cyan-500/50 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-cyan-400"
+                  >
                     {INITIAL_STUDENTS.filter(s => s.classId === detailModalClassId).map((student, idx) => {
                       const session = attendanceData[detailModalClassId];
                       const stStatus = session?.records?.[student.id] || (session?.isSubmitted ? 'H' : '-');
@@ -1232,10 +1251,10 @@ export default function ELearningPage() {
                   </div>
 
                   {/* Modal Footer */}
-                  <div className="p-4 border-t border-white/10 bg-black/40 flex justify-end">
+                  <div className="p-4 border-t border-white/10 bg-black/40 flex justify-end flex-shrink-0">
                     <button
                       onClick={() => setDetailModalClassId(null)}
-                      className="px-4 py-2 rounded-xl bg-white/10 text-white font-semibold text-xs hover:bg-white/20 transition"
+                      className="px-4 py-2 rounded-xl bg-white/10 text-white font-semibold text-xs hover:bg-white/20 transition cursor-pointer"
                     >
                       Tutup Rincian
                     </button>
