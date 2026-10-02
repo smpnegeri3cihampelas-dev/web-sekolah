@@ -59,7 +59,7 @@ export default function Navbar() {
       desc: 'Portal penilaian siswa khusus Dewan Guru',
       href: 'https://erapor.smpn3cihampelas.sch.id',
       isExternal: true,
-      badgeColor: 'bg-indigo-500/10 border-indigo-400/25 text-indigo-400 group-hover:bg-indigo-500/20 group-hover:border-indigo-400/40',
+      badgeColor: 'bg-indigo-50 border-indigo-200/80 text-indigo-700 group-hover:bg-indigo-600 group-hover:border-indigo-600 group-hover:text-white',
       icon: (
         <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
@@ -71,7 +71,7 @@ export default function Navbar() {
       desc: 'Presensi digital, bahan ajar, & CBT lab',
       href: '/elearning',
       isExternal: false,
-      badgeColor: 'bg-violet-500/10 border-violet-400/25 text-violet-400 group-hover:bg-violet-500/20 group-hover:border-violet-400/40',
+      badgeColor: 'bg-violet-50 border-violet-200/80 text-violet-700 group-hover:bg-violet-600 group-hover:border-violet-600 group-hover:text-white',
       icon: (
         <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M12 14l9-5-9-5-9 5 9 5z" strokeLinecap="round" strokeLinejoin="round" />
@@ -85,7 +85,7 @@ export default function Navbar() {
       desc: 'Kelola berita, pengumuman, & struktur organisasi',
       href: '/login',
       isExternal: false,
-      badgeColor: 'bg-sky-500/10 border-sky-400/25 text-sky-400 group-hover:bg-sky-500/20 group-hover:border-sky-400/40',
+      badgeColor: 'bg-sky-50 border-sky-200/80 text-sky-700 group-hover:bg-sky-600 group-hover:border-sky-600 group-hover:text-white',
       icon: (
         <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <rect x="3" y="11" width="18" height="11" rx="2" ry="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -187,44 +187,44 @@ export default function Navbar() {
               </svg>
             </button>
 
-            {/* Glassmorphism Luxury Dropdown Menu Container (pt-2 bertindak sebagai jembatan hover mulus tanpa jeda mati) */}
+            {/* Glassmorphism Luxury Dropdown Menu Container (Clean Frosted Glass) */}
             <div 
-              className={`absolute right-0 top-full pt-2 w-[330px] z-50 transition-all duration-300 transform origin-top-right ${
+              className={`absolute right-0 top-full pt-2 w-[340px] z-50 transition-all duration-300 transform origin-top-right ${
                 portalOpen 
                   ? 'opacity-100 scale-100 translate-y-0 pointer-events-auto' 
                   : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'
               }`}
             >
-              <div className="rounded-2xl bg-zinc-950/95 backdrop-blur-2xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.85)] p-2 overflow-hidden relative">
+              <div className="rounded-2xl bg-white/95 backdrop-blur-2xl border border-white/80 shadow-[0_20px_50px_rgba(0,0,0,0.18)] p-2.5 overflow-hidden relative">
                 {/* Subtle top ambient glow */}
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-40 h-8 bg-indigo-500/15 rounded-full blur-xl pointer-events-none" />
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-10 bg-indigo-100/60 rounded-full blur-xl pointer-events-none" />
 
-                <div className="px-3 py-2 border-b border-white/[0.06] mb-1 flex items-center justify-between">
-                  <span className="text-[10px] font-normal tracking-[0.2em] uppercase text-stone-400">
+                <div className="px-3 py-2 border-b border-indigo-100/80 mb-1.5 flex items-center justify-between">
+                  <span className="text-[10px] font-semibold tracking-[0.2em] uppercase text-indigo-700">
                     Portal Sistem Terpadu
                   </span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 shadow-[0_0_8px_#6366f1]" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 shadow-[0_0_8px_#6366f1]" />
                 </div>
 
                 <div className="flex flex-col gap-1">
                   {portalMenuItems.map((item, idx) => {
                     const content = (
-                      <div className="flex items-start gap-3 p-2.5 rounded-xl hover:bg-white/[0.06] border border-transparent hover:border-white/[0.08] transition-all duration-200 group">
-                        <div className={`w-9 h-9 rounded-xl border flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-105 ${item.badgeColor}`}>
+                      <div className="flex items-start gap-3 p-2.5 rounded-xl hover:bg-indigo-50/80 border border-transparent hover:border-indigo-100/80 transition-all duration-200 group cursor-pointer">
+                        <div className={`w-9 h-9 rounded-xl border flex items-center justify-center shrink-0 transition-all duration-200 group-hover:scale-105 shadow-sm ${item.badgeColor}`}>
                           {item.icon}
                         </div>
                         <div className="flex flex-col min-w-0 flex-1">
                           <div className="flex items-center justify-between">
-                            <span className="text-xs font-medium text-stone-200 group-hover:text-white transition-colors truncate">
+                            <span className="text-xs font-semibold text-slate-900 group-hover:text-indigo-900 transition-colors truncate">
                               {item.title}
                             </span>
                             {item.isExternal && (
-                              <span className="text-[10px] text-stone-500 group-hover:text-indigo-400 transition-colors ml-1">
+                              <span className="text-[10px] text-slate-400 group-hover:text-indigo-600 transition-colors ml-1 font-bold">
                                 ↗
                               </span>
                             )}
                           </div>
-                          <span className="text-[10px] text-stone-400/80 group-hover:text-stone-300 font-light leading-snug line-clamp-2 mt-0.5 transition-colors">
+                          <span className="text-[10px] text-slate-500 group-hover:text-slate-700 font-normal leading-snug line-clamp-2 mt-0.5 transition-colors">
                             {item.desc}
                           </span>
                         </div>
@@ -295,46 +295,46 @@ export default function Navbar() {
 
       {/* Mobile Glass Drawer */}
       {mobileMenuOpen && (
-        <div className="md:hidden mt-3 max-w-sm mx-auto p-5 rounded-3xl bg-black/90 backdrop-blur-2xl border border-white/10 shadow-2xl flex flex-col gap-3 text-sm font-medium text-stone-200 animate-[fadeIn_0.2s_ease-out]">
+        <div className="md:hidden mt-3 max-w-sm mx-auto p-5 rounded-3xl bg-white/95 backdrop-blur-2xl border border-white/80 shadow-2xl flex flex-col gap-2.5 text-sm font-semibold text-slate-800 animate-[fadeIn_0.2s_ease-out]">
           <a 
             href="#" 
             onClick={() => setMobileMenuOpen(false)} 
-            className="px-4 py-2.5 rounded-xl hover:bg-white/5 transition-colors"
+            className="px-4 py-2.5 rounded-xl hover:bg-indigo-50/80 hover:text-indigo-700 transition-colors"
           >
             Beranda
           </a>
           <a 
             href="#profil" 
             onClick={() => setMobileMenuOpen(false)} 
-            className="px-4 py-2.5 rounded-xl hover:bg-white/5 transition-colors"
+            className="px-4 py-2.5 rounded-xl hover:bg-indigo-50/80 hover:text-indigo-700 transition-colors"
           >
             Profil Sekolah
           </a>
           <a 
             href="#kurikulum" 
             onClick={() => setMobileMenuOpen(false)} 
-            className="px-4 py-2.5 rounded-xl hover:bg-white/5 transition-colors"
+            className="px-4 py-2.5 rounded-xl hover:bg-indigo-50/80 hover:text-indigo-700 transition-colors"
           >
             Program Unggulan
           </a>
           <a 
             href="#fasilitas" 
             onClick={() => setMobileMenuOpen(false)} 
-            className="px-4 py-2.5 rounded-xl hover:bg-white/5 transition-colors"
+            className="px-4 py-2.5 rounded-xl hover:bg-indigo-50/80 hover:text-indigo-700 transition-colors"
           >
             Fasilitas Smart Campus
           </a>
           <a 
             href="#kontak" 
             onClick={() => setMobileMenuOpen(false)} 
-            className="px-4 py-2.5 rounded-xl hover:bg-white/5 transition-colors"
+            className="px-4 py-2.5 rounded-xl hover:bg-indigo-50/80 hover:text-indigo-700 transition-colors"
           >
             Kontak & Lokasi
           </a>
 
           {/* Mobile Portal Links Section */}
-          <div className="pt-3 border-t border-white/10 flex flex-col gap-2">
-            <span className="text-[10px] uppercase tracking-wider text-stone-400 font-semibold px-2">
+          <div className="pt-3 border-t border-indigo-100/80 flex flex-col gap-2">
+            <span className="text-[10px] uppercase tracking-wider text-indigo-700 font-bold px-2">
               Akses Portal Sekolah
             </span>
             {portalMenuItems.map((item, idx) => (
@@ -345,18 +345,18 @@ export default function Navbar() {
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center gap-3 px-3 py-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-xs font-normal text-stone-200 transition-colors"
+                  className="flex items-center gap-3 px-3 py-2 rounded-xl bg-slate-50 hover:bg-indigo-50/80 text-xs font-medium text-slate-800 transition-colors"
                 >
                   <span className="text-base">{item.icon}</span>
                   <span className="truncate">{item.title}</span>
-                  <span className="text-stone-500 text-[10px] ml-auto">↗</span>
+                  <span className="text-slate-400 text-[10px] ml-auto font-bold">↗</span>
                 </a>
               ) : (
                 <Link
                   key={`m-${idx}`}
                   href={item.href}
                   onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center gap-3 px-3 py-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-xs font-normal text-stone-200 transition-colors"
+                  className="flex items-center gap-3 px-3 py-2 rounded-xl bg-slate-50 hover:bg-indigo-50/80 text-xs font-medium text-slate-800 transition-colors"
                 >
                   <span className="text-base">{item.icon}</span>
                   <span className="truncate">{item.title}</span>
