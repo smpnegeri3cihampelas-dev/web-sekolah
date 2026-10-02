@@ -16,6 +16,11 @@ const playfair = Playfair_Display({
 export const metadata: Metadata = {
   title: "SMP Negeri 3 Cihampelas — Smart Campus",
   description: "Website resmi SMP Negeri 3 Cihampelas. Pendidikan modern, inovatif, dan berkarakter siap menyongsong masa depan.",
+  icons: {
+    icon: "/logo.png",
+    shortcut: "/logo.png",
+    apple: "/logo.png",
+  },
 };
 
 export default function RootLayout({

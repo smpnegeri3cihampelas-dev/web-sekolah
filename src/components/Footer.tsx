@@ -17,12 +17,12 @@ export default function Footer() {
         <div className="lg:col-span-5 flex flex-col justify-between">
           <div>
             <div className="flex items-center space-x-3.5 mb-6">
-              <div className="relative w-12 h-12">
+              <div className="relative w-12 h-12 flex items-center justify-center">
                 <Image 
                   src="/logo.png" 
                   alt="Logo SMP Negeri 3 Cihampelas" 
                   fill
-                  className="rounded-full p-0.5 object-cover bg-white/10 border border-white/20 shadow-lg"
+                  className="object-contain drop-shadow-[0_4px_12px_rgba(0,0,0,0.3)]"
                 />
               </div>
               <div>

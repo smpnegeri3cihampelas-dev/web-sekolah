@@ -63,13 +63,14 @@ export default function LoginPage() {
           href="/" 
           className="flex items-center gap-2.5 group transition-opacity hover:opacity-80"
         >
-          <div className="w-8 h-8 rounded-full overflow-hidden border border-white/20 p-0.5 bg-black/60 shadow-lg">
+          <div className="relative w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center transition-transform group-hover:scale-105">
             <Image 
               src="/logo.png" 
               alt="Logo SMP Negeri 3 Cihampelas" 
-              width={32} 
-              height={32} 
-              className="w-full h-full object-cover rounded-full"
+              width={36} 
+              height={36} 
+              className="w-full h-full object-contain drop-shadow-[0_2px_8px_rgba(0,0,0,0.35)]"
+              priority
             />
           </div>
           <div className="flex items-center gap-2">

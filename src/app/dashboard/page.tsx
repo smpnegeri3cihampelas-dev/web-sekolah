@@ -630,13 +630,13 @@ export default function DashboardPage() {
                 className="flex items-center gap-3 group text-left cursor-pointer transition-transform active:scale-98"
                 title="Buka Ringkasan Dashboard"
               >
-                <div className="w-9 h-9 rounded-xl overflow-hidden border border-white/15 p-0.5 bg-black/60 shadow-lg group-hover:border-cyan-400/50 transition-colors">
+                <div className="relative w-9 h-9 flex items-center justify-center transition-transform group-hover:scale-105">
                   <Image 
                     src="/logo.png" 
                     alt="Logo SMPN 3 Cihampelas" 
                     width={36} 
                     height={36} 
-                    className="w-full h-full object-cover rounded-lg"
+                    className="w-full h-full object-contain drop-shadow-[0_2px_8px_rgba(0,0,0,0.35)]"
                   />
                 </div>
                 <div className="flex flex-col">

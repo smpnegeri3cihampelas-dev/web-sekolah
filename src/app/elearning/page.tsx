@@ -542,8 +542,8 @@ export default function ELearningPage() {
           {/* Logo & School Identity */}
           <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-start">
             <Link href="/" className="flex items-center gap-2.5 group">
-              <div className="relative w-9 h-9 rounded-lg overflow-hidden border border-white/10 group-hover:border-cyan-400/50 transition">
-                <Image src="/logo.jpg" alt="Logo SMPN 3 Cihampelas" fill className="object-cover" />
+              <div className="relative w-9 h-9 flex items-center justify-center transition-transform group-hover:scale-105">
+                <Image src="/logo.png" alt="Logo SMPN 3 Cihampelas" fill className="object-contain drop-shadow-[0_2px_8px_rgba(0,0,0,0.35)]" />
               </div>
               <div>
                 <div className="text-sm font-bold text-white tracking-wide group-hover:text-cyan-300 transition flex items-center gap-2">

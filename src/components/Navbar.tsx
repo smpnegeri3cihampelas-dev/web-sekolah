@@ -108,13 +108,14 @@ export default function Navbar() {
         {/* Brand (Left Column - 1fr) */}
         <div className="flex items-center justify-start">
           <a href="#" className="flex items-center gap-3 group">
-            <div className="relative w-8 h-8 rounded-full overflow-hidden border border-white/10 p-0.5 bg-black/60 shadow-lg group-hover:border-indigo-400/40 transition-colors">
+            <div className="relative w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center transition-transform duration-300 group-hover:scale-105">
               <Image 
                 src="/logo.png" 
                 alt="Logo SMP Negeri 3 Cihampelas" 
-                width={32} 
-                height={32} 
-                className="w-full h-full object-cover rounded-full opacity-90"
+                width={40} 
+                height={40} 
+                className="w-full h-full object-contain drop-shadow-[0_2px_8px_rgba(0,0,0,0.35)]"
+                priority
               />
             </div>
             <div className="flex flex-col">
