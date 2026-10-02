@@ -118,7 +118,7 @@ export default function Navbar() {
               />
             </div>
             <div className="flex flex-col">
-              <span className="text-sm sm:text-base font-normal tracking-tight text-stone-200 flex items-center gap-2 whitespace-nowrap">
+              <span className="text-sm sm:text-base font-semibold tracking-tight text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)] flex items-center gap-2 whitespace-nowrap">
                 SMPN 3 Cihampelas
                 <span className="inline-block w-1.5 h-1.5 rounded-full bg-indigo-400 shadow-[0_0_8px_#6366f1]" />
               </span>
@@ -126,24 +126,24 @@ export default function Navbar() {
           </a>
         </div>
 
-        {/* Center Floating Pill Menu (True Center between two equal 1fr columns - Never overlaps) */}
+        {/* Center Floating Pill Menu (Clean Frosted Glass Pill) */}
         <div className="flex items-center justify-center">
           <nav 
-            className="hidden md:flex items-center gap-4 lg:gap-6 px-5 lg:px-6 py-2 rounded-full glass-pill-nav text-xs sm:text-sm font-normal text-stone-400 hover:text-stone-300 transition-all duration-300 whitespace-nowrap"
+            className="hidden md:flex items-center gap-4 lg:gap-6 px-5 lg:px-6 py-2 rounded-full glass-pill-nav text-xs sm:text-sm font-medium text-white drop-shadow-[0_1px_4px_rgba(0,0,0,0.7)] transition-all duration-300 whitespace-nowrap"
           >
-            <a href="#" className="hover:text-white transition-colors">
+            <a href="#" className="hover:text-indigo-200 transition-colors">
               Beranda
             </a>
-            <a href="#profil" className="hover:text-white transition-colors">
+            <a href="#profil" className="hover:text-indigo-200 transition-colors">
               Profil
             </a>
-            <a href="#kurikulum" className="hover:text-white transition-colors">
+            <a href="#kurikulum" className="hover:text-indigo-200 transition-colors">
               Program
             </a>
-            <a href="#fasilitas" className="hover:text-white transition-colors">
+            <a href="#fasilitas" className="hover:text-indigo-200 transition-colors">
               Fasilitas
             </a>
-            <a href="#kontak" className="hover:text-white transition-colors">
+            <a href="#kontak" className="hover:text-indigo-200 transition-colors">
               Kontak
             </a>
           </nav>
@@ -152,7 +152,7 @@ export default function Navbar() {
         {/* Right Actions (Right Column - 1fr) */}
         <div className="flex items-center justify-end gap-2 sm:gap-3">
           
-          {/* Dropdown Portal Button */}
+          {/* Dropdown Portal Button (Clearly Visible Frosted Pill) */}
           <div 
             ref={portalRef}
             className="relative hidden sm:block"
@@ -165,10 +165,10 @@ export default function Navbar() {
                 if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
                 setPortalOpen(!portalOpen);
               }}
-              className={`px-4 lg:px-5 py-2 rounded-full glass-pill-btn text-xs sm:text-sm font-normal whitespace-nowrap transition-all duration-300 flex items-center gap-1.5 cursor-pointer ${
+              className={`px-4 lg:px-5 py-2 rounded-full glass-pill-btn text-xs sm:text-sm font-semibold whitespace-nowrap transition-all duration-300 flex items-center gap-1.5 cursor-pointer text-white drop-shadow-[0_1px_4px_rgba(0,0,0,0.7)] ${
                 portalOpen 
-                  ? 'text-white border-white/20 bg-white/[0.08] shadow-[0_0_15px_rgba(255,255,255,0.06)]' 
-                  : 'text-stone-400 hover:text-stone-100'
+                  ? 'bg-white/40 border-white/60 shadow-[0_0_20px_rgba(255,255,255,0.25)]' 
+                  : 'hover:bg-white/35'
               }`}
               aria-expanded={portalOpen}
               aria-haspopup="true"
@@ -176,12 +176,12 @@ export default function Navbar() {
               <span>Portal</span>
               <svg 
                 className={`w-3.5 h-3.5 transition-transform duration-300 ${
-                  portalOpen ? 'rotate-180 text-indigo-400' : 'text-stone-400'
+                  portalOpen ? 'rotate-180 text-white' : 'text-white'
                 }`}
                 viewBox="0 0 24 24" 
                 fill="none" 
                 stroke="currentColor" 
-                strokeWidth="2.2"
+                strokeWidth="2.5"
               >
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
               </svg>

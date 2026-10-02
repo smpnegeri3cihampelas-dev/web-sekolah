@@ -219,11 +219,11 @@ export default function Hero() {
             className="absolute inset-0 w-full h-full pointer-events-none block" 
           />
 
-          {/* Clean text readability contrast (subtle dark on left behind text) */}
-          <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-black/15 to-transparent pointer-events-none" />
+          {/* Clean text readability contrast (focused dark gradient specifically behind left text) */}
+          <div className="absolute inset-y-0 left-0 w-full sm:w-[680px] bg-gradient-to-r from-black/85 via-black/50 to-transparent pointer-events-none" />
           
           {/* Subtle top edge fade for navbar contrast */}
-          <div className="absolute top-0 inset-x-0 h-24 bg-gradient-to-b from-black/30 to-transparent pointer-events-none" />
+          <div className="absolute top-0 inset-x-0 h-24 bg-gradient-to-b from-black/40 to-transparent pointer-events-none" />
 
           {/* Clean White Cloud-Like Edge Mist (Tipis-tipis seperti awan) */}
           <div className="absolute bottom-0 inset-x-0 h-48 bg-gradient-to-t from-white/30 via-white/10 to-transparent pointer-events-none" />
@@ -238,20 +238,20 @@ export default function Hero() {
           <div className="absolute top-1/4 right-0 w-[500px] h-[500px] bg-indigo-600/[0.04] rounded-full blur-[160px] pointer-events-none" />
         </div>
 
-        {/* 2. Hero Editorial Content (Layout, Text, Buttons, Spacing, Colors 100% Preserved) */}
+        {/* 2. Hero Editorial Content (100% Sharp & Readable Typography) */}
         <div className="relative z-10 w-full max-w-7xl mx-auto px-5 sm:px-8 lg:px-12 pb-12 sm:pb-16 lg:pb-20 pt-32 sm:pt-40 flex flex-col items-start">
           
           {/* Headline + Subtext + 2 Minimalist CTA Buttons */}
           <div ref={contentRef} className="max-w-md sm:max-w-lg lg:max-w-xl flex flex-col items-start">
 
-            {/* Headline sized compactly to avoid covering background logo */}
-            <h1 className="font-sans text-2xl sm:text-3xl md:text-4xl lg:text-[2.65rem] xl:text-[2.85rem] tracking-tight leading-[1.15] mb-3.5 sm:mb-4">
-              <span className="font-light text-stone-300 block">SMPN 3 Cihampelas</span>
-              <span className="font-normal text-white block">Mencetak Generasi Unggul</span>
+            {/* Headline with drop shadow for 100% crisp readability */}
+            <h1 className="font-sans text-2xl sm:text-3xl md:text-4xl lg:text-[2.65rem] xl:text-[2.85rem] tracking-tight leading-[1.15] mb-3.5 sm:mb-4 drop-shadow-[0_2px_12px_rgba(0,0,0,0.9)]">
+              <span className="font-light text-slate-200 block drop-shadow-md">SMPN 3 Cihampelas</span>
+              <span className="font-bold text-white block drop-shadow-lg">Mencetak Generasi Unggul</span>
             </h1>
 
-            {/* Compact Minimalist Subheadline */}
-            <p className="text-xs sm:text-sm md:text-[15px] text-stone-400 font-light leading-relaxed max-w-sm sm:max-w-md mb-6 sm:mb-7 tracking-wide">
+            {/* High-Contrast Subheadline */}
+            <p className="text-xs sm:text-sm md:text-[15px] text-white/95 font-medium leading-relaxed max-w-sm sm:max-w-md mb-6 sm:mb-7 tracking-wide drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)]">
               Membina integritas, menguasai teknologi masa depan, dan mencetak pemimpin berwawasan global dalam ekosistem belajar modern.
             </p>
 
@@ -263,7 +263,7 @@ export default function Hero() {
                 href="https://ppdb.jabarprov.go.id" 
                 target="_blank"
                 rel="noopener noreferrer"
-                className="group inline-flex items-center justify-between sm:justify-start gap-4 px-6 sm:px-7 py-3 sm:py-3.5 rounded-full bg-white text-black font-medium text-xs sm:text-sm tracking-wide uppercase hover:bg-stone-200 hover:scale-[1.01] active:scale-95 transition-all duration-300 shadow-md shadow-white/5"
+                className="group inline-flex items-center justify-between sm:justify-start gap-4 px-6 sm:px-7 py-3 sm:py-3.5 rounded-full bg-white text-black font-semibold text-xs sm:text-sm tracking-wide uppercase hover:bg-stone-200 hover:scale-[1.01] active:scale-95 transition-all duration-300 shadow-xl shadow-black/40"
               >
                 <span>Daftar PPDB 2026</span>
                 <span className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-black text-white flex items-center justify-center text-xs font-normal group-hover:rotate-45 transition-transform duration-300 shrink-0">
@@ -271,10 +271,10 @@ export default function Hero() {
                 </span>
               </a>
 
-              {/* Secondary Frosted Glass Pill Button */}
+              {/* Secondary Frosted Glass Pill Button (Prominent & Clearly Visible) */}
               <a 
                 href="#profil" 
-                className="inline-flex items-center justify-center px-6 sm:px-7 py-3 sm:py-3.5 rounded-full border border-white/10 bg-white/[0.03] hover:bg-white/[0.08] hover:border-white/25 text-stone-300 hover:text-white font-normal text-xs sm:text-sm tracking-wide uppercase transition-all duration-300 active:scale-95"
+                className="inline-flex items-center justify-center px-6 sm:px-7 py-3 sm:py-3.5 rounded-full border border-white/40 bg-black/40 hover:bg-black/60 hover:border-white text-white font-semibold text-xs sm:text-sm tracking-wide uppercase transition-all duration-300 active:scale-95 backdrop-blur-md shadow-xl shadow-black/30"
               >
                 <span>Jelajahi Profil</span>
               </a>
