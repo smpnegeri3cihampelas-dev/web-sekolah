@@ -1,14 +1,14 @@
 import type { Metadata } from "next";
-import { Playfair_Display, Manrope } from "next/font/google";
+import { Plus_Jakarta_Sans, Inter } from "next/font/google";
 import "./globals.css";
 import SmoothScroll from "@/components/SmoothScroll";
 
-const manrope = Manrope({
+const inter = Inter({
   variable: "--font-sans",
   subsets: ["latin"],
 });
 
-const playfair = Playfair_Display({
+const plusJakarta = Plus_Jakarta_Sans({
   variable: "--font-display",
   subsets: ["latin"],
 });
@@ -29,7 +29,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="id" className={`${manrope.variable} ${playfair.variable} antialiased scroll-smooth`} suppressHydrationWarning>
+    <html lang="id" className={`${inter.variable} ${plusJakarta.variable} antialiased scroll-smooth`} suppressHydrationWarning>
       <body className="antialiased bg-zinc-950 text-stone-300 selection:bg-amber-600/30 selection:text-amber-100 overflow-x-hidden" suppressHydrationWarning>
         <SmoothScroll>
           {children}

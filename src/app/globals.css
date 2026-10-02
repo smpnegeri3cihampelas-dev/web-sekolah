@@ -25,13 +25,13 @@
 body {
   background: #f8fafc;
   color: #0f172a;
-  font-family: var(--font-sans), sans-serif;
+  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
 }
 
-.font-display {
-  font-family: var(--font-display), serif;
+h1, h2, h3, h4, h5, h6, .font-display {
+  font-family: var(--font-display), var(--font-sans), system-ui, sans-serif;
 }
 
 /* Marklab Midnight Floating Navbar Pill */
