@@ -37,7 +37,7 @@ const ELearningClock = React.memo(function ELearningClock() {
     return () => clearInterval(timer);
   }, []);
 
-  return <span className="font-mono text-stone-300 text-xs">{time || '...'}</span>;
+  return <span className="font-mono text-slate-700 font-semibold text-xs">{time || '...'}</span>;
 });
 
 export interface AuthUserSession {
@@ -517,7 +517,7 @@ export default function ELearningPage() {
   const currentClassSession = attendanceData[selectedClassId]?.date === todayStr ? attendanceData[selectedClassId] : null;
 
   return (
-    <div className="theme-marklab-app min-h-screen bg-[#f8fafc] text-slate-900 flex flex-col font-sans selection:bg-indigo-500/20 selection:text-indigo-900 relative">
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-indigo-500/20 selection:text-indigo-900 relative">
       
       {/* Background Ambient Glows */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
@@ -542,28 +542,28 @@ export default function ELearningPage() {
       )}
 
       {/* TOP NAVIGATION BAR */}
-      <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-xl border-b border-indigo-100 px-4 sm:px-6 py-3 relative z-10">
+      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-xl border-b border-indigo-100 px-4 sm:px-6 py-3 relative z-10 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
           
           {/* Logo & School Identity */}
           <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-start">
             <Link href="/" className="flex items-center gap-2.5 group">
               <div className="relative w-9 h-9 flex items-center justify-center transition-transform group-hover:scale-105">
-                <Image src="/logo.png" alt="Logo SMPN 3 Cihampelas" fill className="object-contain drop-shadow-[0_2px_8px_rgba(0,0,0,0.35)]" />
+                <Image src="/logo.png" alt="Logo SMPN 3 Cihampelas" fill className="object-contain drop-shadow-[0_2px_8px_rgba(0,0,0,0.15)]" />
               </div>
               <div>
-                <div className="text-sm font-bold text-white tracking-wide group-hover:text-cyan-300 transition flex items-center gap-2">
+                <div className="text-sm font-bold text-slate-900 tracking-wide group-hover:text-indigo-600 transition flex items-center gap-2">
                   SIAP SPENTIC
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 font-mono">PRESENSI</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 font-mono font-semibold">PRESENSI</span>
                 </div>
-                <div className="text-[11px] text-stone-400">SMP Negeri 3 Cihampelas</div>
+                <div className="text-[11px] text-slate-500 font-medium">SMP Negeri 3 Cihampelas</div>
               </div>
             </Link>
 
             {/* Back to Home Link (Mobile) */}
             <Link 
               href="/" 
-              className="sm:hidden text-xs text-stone-400 hover:text-white flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/5 border border-white/10"
+              className="sm:hidden text-xs text-slate-600 hover:text-indigo-600 flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200"
             >
               ← Web Utama
             </Link>
@@ -573,22 +573,22 @@ export default function ELearningPage() {
           {currentUser ? (
             <div className="flex items-center gap-2.5 sm:gap-3 w-full sm:w-auto justify-between sm:justify-end">
               {/* Active User Identity Pill */}
-              <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-white/[0.04] border border-white/10 shadow-sm">
+              <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-white border border-indigo-100 shadow-sm">
                 <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold ${
                   currentUser.role === 'guru_mapel' 
-                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                    ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
                     : currentUser.role === 'guru_piket'
-                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                    : 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                    : 'bg-purple-50 text-purple-700 border border-purple-200'
                 }`}>
                   {currentUser.role === 'guru_mapel' ? '👨‍🏫' : currentUser.role === 'guru_piket' ? '🏢' : '🎓'}
                 </div>
                 <div className="text-left">
-                  <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                  <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
                     <span className="truncate max-w-[130px] sm:max-w-[180px]">{currentUser.name}</span>
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" title="Akun Aktif" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" title="Akun Aktif" />
                   </div>
-                  <div className="text-[10px] text-stone-400">
+                  <div className="text-[10px] text-slate-500 font-medium">
                     {currentUser.role === 'guru_mapel' && (currentUser.subject || 'Guru Mata Pelajaran')}
                     {currentUser.role === 'guru_piket' && 'Stasiun Meja Piket'}
                     {currentUser.role === 'siswa' && `Peserta Didik (Kelas ${currentUser.classId || '7-A'})`}
@@ -597,8 +597,8 @@ export default function ELearningPage() {
               </div>
 
               {/* Digital WIB Clock (Desktop) */}
-              <div className="hidden md:flex items-center gap-1.5 bg-white/5 px-2.5 py-1.5 rounded-lg border border-white/5 text-xs">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+              <div className="hidden md:flex items-center gap-1.5 bg-slate-100 px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                 <ELearningClock />
               </div>
 
@@ -606,7 +606,7 @@ export default function ELearningPage() {
               <button
                 type="button"
                 onClick={handleLogout}
-                className="px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-300 hover:text-rose-200 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+                className="px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
                 title="Keluar dari akun ini"
               >
                 <span>🚪</span>
@@ -615,20 +615,20 @@ export default function ELearningPage() {
 
               <Link 
                 href="/" 
-                className="hidden lg:block text-xs text-stone-400 hover:text-cyan-400 transition font-medium"
+                className="hidden lg:block text-xs text-slate-600 hover:text-indigo-600 transition font-semibold"
               >
                 ← Web Utama
               </Link>
             </div>
           ) : (
             <div className="flex items-center gap-3 text-xs">
-              <div className="bg-white/5 px-2.5 py-1.5 rounded-lg border border-white/5 flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+              <div className="bg-slate-100 px-2.5 py-1.5 rounded-lg border border-slate-200 flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                 <ELearningClock />
               </div>
               <Link 
                 href="/" 
-                className="text-stone-400 hover:text-cyan-400 transition font-medium flex items-center gap-1"
+                className="text-slate-600 hover:text-indigo-600 transition font-semibold flex items-center gap-1"
               >
                 ← Kembali ke Web Utama
               </Link>
@@ -646,34 +646,34 @@ export default function ELearningPage() {
           <div className="max-w-2xl mx-auto my-4 sm:my-8 space-y-6">
             
             {/* Main Login Card */}
-            <div className="bg-[#0e131d] border border-white/15 rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden">
+            <div className="bg-white border border-indigo-100 rounded-3xl p-6 sm:p-8 shadow-xl shadow-indigo-500/5 relative overflow-hidden">
               {/* Ambient Glows */}
-              <div className="absolute top-0 right-0 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
-              <div className="absolute bottom-0 left-0 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-100/50 rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute bottom-0 left-0 w-80 h-80 bg-purple-100/40 rounded-full blur-3xl pointer-events-none" />
               
               {/* Institutional Header */}
               <div className="text-center mb-6 relative z-10">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[11px] text-stone-300 font-mono mb-3">
-                  <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-100 text-[11px] text-indigo-700 font-mono font-semibold mb-3">
+                  <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse" />
                   SISTEM INFORMASI AKADEMIK & PRESENSI (SIAP)
                 </div>
-                <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
                   Portal Masuk Terpadu
                 </h1>
-                <p className="text-xs sm:text-sm text-stone-400 mt-1 max-w-md mx-auto">
+                <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-md mx-auto">
                   SMP Negeri 3 Cihampelas — Layanan Presensi Digital & KBM Online TP. 2026/2027
                 </p>
               </div>
 
               {/* 3-Role Segmented Selector */}
-              <div className="grid grid-cols-3 gap-1.5 p-1.5 bg-black/60 rounded-2xl border border-white/10 mb-6 text-xs font-semibold relative z-10">
+              <div className="grid grid-cols-3 gap-1.5 p-1.5 bg-slate-100 rounded-2xl border border-slate-200 mb-6 text-xs font-semibold relative z-10">
                 <button 
                   type="button"
                   onClick={() => switchLoginTab('guru')}
                   className={`py-2.5 px-2 rounded-xl transition flex flex-col sm:flex-row items-center justify-center gap-1.5 cursor-pointer ${
                     loginRole === 'guru'
-                      ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-black font-bold shadow-lg shadow-cyan-500/20'
-                      : 'text-stone-400 hover:text-white hover:bg-white/5'
+                      ? 'bg-indigo-600 text-white font-bold shadow-md shadow-indigo-600/20'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
                   }`}
                 >
                   <span className="text-sm">👨‍🏫</span>
@@ -685,8 +685,8 @@ export default function ELearningPage() {
                   onClick={() => switchLoginTab('piket')}
                   className={`py-2.5 px-2 rounded-xl transition flex flex-col sm:flex-row items-center justify-center gap-1.5 cursor-pointer ${
                     loginRole === 'piket'
-                      ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-black font-bold shadow-lg shadow-emerald-500/20'
-                      : 'text-stone-400 hover:text-white hover:bg-white/5'
+                      ? 'bg-emerald-600 text-white font-bold shadow-md shadow-emerald-600/20'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
                   }`}
                 >
                   <span className="text-sm">🏢</span>
@@ -698,8 +698,8 @@ export default function ELearningPage() {
                   onClick={() => switchLoginTab('siswa')}
                   className={`py-2.5 px-2 rounded-xl transition flex flex-col sm:flex-row items-center justify-center gap-1.5 cursor-pointer ${
                     loginRole === 'siswa'
-                      ? 'bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-bold shadow-lg shadow-purple-500/20'
-                      : 'text-stone-400 hover:text-white hover:bg-white/5'
+                      ? 'bg-purple-600 text-white font-bold shadow-md shadow-purple-600/20'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
                   }`}
                 >
                   <span className="text-sm">🎓</span>
@@ -713,31 +713,31 @@ export default function ELearningPage() {
                 {loginRole === 'guru' && (
                   <>
                     <div>
-                      <label className="block text-xs font-medium text-stone-300 mb-1.5">
+                      <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                         Nomor Induk Pegawai (NIP) / NUPTK Guru
                       </label>
                       <input
                         type="text"
                         value={loginIdentifier}
                         onChange={(e) => setLoginIdentifier(e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl bg-black/60 border border-white/15 text-white text-sm focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition"
+                        className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition"
                         placeholder="Contoh: 19850615 201001 1 012"
                         required
                       />
-                      <span className="text-[11px] text-stone-400 mt-1 block">
+                      <span className="text-[11px] text-slate-500 mt-1 block font-medium">
                         *Akun terintegrasi otomatis dengan Data Pokok Pendidikan (Dapodik)
                       </span>
                     </div>
 
                     <div>
-                      <label className="block text-xs font-medium text-stone-300 mb-1.5">
+                      <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                         Kata Sandi Akun Guru
                       </label>
                       <input
                         type="password"
                         value={loginPassword}
                         onChange={(e) => setLoginPassword(e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl bg-black/60 border border-white/15 text-white text-sm focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition"
+                        className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition"
                         placeholder="Masukkan kata sandi..."
                         required
                       />
@@ -745,7 +745,7 @@ export default function ELearningPage() {
 
                     <button
                       type="submit"
-                      className="w-full py-3.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-black font-bold text-sm hover:opacity-95 transition shadow-lg shadow-cyan-500/25 flex items-center justify-center gap-2 cursor-pointer mt-2"
+                      className="w-full py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm transition shadow-lg shadow-indigo-600/25 flex items-center justify-center gap-2 cursor-pointer mt-2"
                     >
                       <span>Masuk ke Ruang Guru</span>
                       <span>→</span>
@@ -756,31 +756,31 @@ export default function ELearningPage() {
                 {loginRole === 'piket' && (
                   <>
                     <div>
-                      <label className="block text-xs font-medium text-stone-300 mb-1.5">
+                      <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                         ID Stasiun / Akun Pos Piket Sekolah
                       </label>
                       <input
                         type="text"
                         value={loginIdentifier}
                         onChange={(e) => setLoginIdentifier(e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl bg-black/60 border border-white/15 text-white text-sm focus:outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 transition font-mono"
+                        className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition font-mono"
                         placeholder="ID Stasiun Piket"
                         required
                       />
-                      <span className="text-[11px] text-stone-400 mt-1 block">
+                      <span className="text-[11px] text-slate-500 mt-1 block font-medium">
                         *Digunakan bersama di meja piket lobi utama untuk memantau 17 rombel
                       </span>
                     </div>
 
                     <div>
-                      <label className="block text-xs font-medium text-stone-300 mb-1.5">
+                      <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                         Kata Sandi Petugas Piket
                       </label>
                       <input
                         type="password"
                         value={loginPassword}
                         onChange={(e) => setLoginPassword(e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl bg-black/60 border border-white/15 text-white text-sm focus:outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 transition"
+                        className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition"
                         placeholder="Masukkan kata sandi stasiun..."
                         required
                       />
@@ -788,7 +788,7 @@ export default function ELearningPage() {
 
                     <button
                       type="submit"
-                      className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-black font-bold text-sm hover:opacity-95 transition shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2 cursor-pointer mt-2"
+                      className="w-full py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm transition shadow-lg shadow-emerald-600/25 flex items-center justify-center gap-2 cursor-pointer mt-2"
                     >
                       <span>Buka Stasiun Meja Piket</span>
                       <span>→</span>
@@ -799,31 +799,31 @@ export default function ELearningPage() {
                 {loginRole === 'siswa' && (
                   <>
                     <div>
-                      <label className="block text-xs font-medium text-stone-300 mb-1.5">
+                      <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                         Nomor Induk Siswa Nasional (NISN)
                       </label>
                       <input
                         type="text"
                         value={loginIdentifier}
                         onChange={(e) => setLoginIdentifier(e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl bg-black/60 border border-white/15 text-white text-sm focus:outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-400 transition font-mono"
+                        className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-purple-500 focus:bg-white focus:ring-2 focus:ring-purple-500/20 transition font-mono"
                         placeholder="Masukkan 10 digit NISN..."
                         required
                       />
-                      <span className="text-[11px] text-stone-400 mt-1 block">
+                      <span className="text-[11px] text-slate-500 mt-1 block font-medium">
                         *Tertera pada rapor atau kartu pelajar SMP Negeri 3 Cihampelas
                       </span>
                     </div>
 
                     <div>
-                      <label className="block text-xs font-medium text-stone-300 mb-1.5">
+                      <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                         Tanggal Lahir / Kata Sandi Siswa
                       </label>
                       <input
                         type="password"
                         value={loginPassword}
                         onChange={(e) => setLoginPassword(e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl bg-black/60 border border-white/15 text-white text-sm focus:outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-400 transition"
+                        className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-purple-500 focus:bg-white focus:ring-2 focus:ring-purple-500/20 transition"
                         placeholder="Format: TTTT-BB-HH atau sandi..."
                         required
                       />
@@ -831,7 +831,7 @@ export default function ELearningPage() {
 
                     <button
                       type="submit"
-                      className="w-full py-3.5 rounded-xl bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-bold text-sm hover:opacity-95 transition shadow-lg shadow-purple-500/25 flex items-center justify-center gap-2 cursor-pointer mt-2"
+                      className="w-full py-3.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-sm transition shadow-lg shadow-purple-600/25 flex items-center justify-center gap-2 cursor-pointer mt-2"
                     >
                       <span>Masuk Portal Peserta Didik</span>
                       <span>→</span>
@@ -842,13 +842,13 @@ export default function ELearningPage() {
               </form>
 
               {/* Official Testing Profiles Section */}
-              <div className="mt-8 pt-6 border-t border-white/10 relative z-10">
+              <div className="mt-8 pt-6 border-t border-slate-100 relative z-10">
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-bold text-stone-300 uppercase tracking-wider flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-cyan-400" />
+                  <span className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-indigo-600" />
                     Akses Cepat Pengujian Akun (Mode Evaluasi Resmi)
                   </span>
-                  <span className="text-[11px] text-stone-400 font-mono hidden sm:inline">1-Klik Otentikasi</span>
+                  <span className="text-[11px] text-slate-500 font-mono hidden sm:inline">1-Klik Otentikasi</span>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -862,15 +862,15 @@ export default function ELearningPage() {
                       subject: 'Bahasa Inggris',
                       classId: '7-A'
                     })}
-                    className="text-left p-3 rounded-xl bg-white/[0.03] hover:bg-cyan-500/10 border border-white/10 hover:border-cyan-400/40 transition group cursor-pointer"
+                    className="text-left p-3 rounded-xl bg-slate-50 hover:bg-indigo-50/70 border border-slate-200 hover:border-indigo-300 transition group cursor-pointer"
                   >
                     <div className="flex items-center justify-between">
-                      <div className="text-xs font-bold text-white group-hover:text-cyan-300">
+                      <div className="text-xs font-bold text-slate-900 group-hover:text-indigo-600">
                         👨‍🏫 Rohidin, S.Pd.
                       </div>
-                      <span className="text-[10px] text-cyan-400 font-mono group-hover:translate-x-0.5 transition">Masuk →</span>
+                      <span className="text-[10px] text-indigo-600 font-mono group-hover:translate-x-0.5 transition font-semibold">Masuk →</span>
                     </div>
-                    <div className="text-[11px] text-stone-400 mt-0.5">PKS Kurikulum / B. Inggris • NIP 19720412...</div>
+                    <div className="text-[11px] text-slate-500 mt-0.5 font-medium">PKS Kurikulum / B. Inggris • NIP 19720412...</div>
                   </button>
 
                   {/* Dedeh Komalasari, S.Pd. */}
@@ -883,15 +883,15 @@ export default function ELearningPage() {
                       subject: 'Ilmu Pengetahuan Alam (IPA)',
                       classId: '7-A'
                     })}
-                    className="text-left p-3 rounded-xl bg-white/[0.03] hover:bg-cyan-500/10 border border-white/10 hover:border-cyan-400/40 transition group cursor-pointer"
+                    className="text-left p-3 rounded-xl bg-slate-50 hover:bg-indigo-50/70 border border-slate-200 hover:border-indigo-300 transition group cursor-pointer"
                   >
                     <div className="flex items-center justify-between">
-                      <div className="text-xs font-bold text-white group-hover:text-cyan-300">
+                      <div className="text-xs font-bold text-slate-900 group-hover:text-indigo-600">
                         👩‍🏫 Dedeh Komalasari, S.Pd.
                       </div>
-                      <span className="text-[10px] text-cyan-400 font-mono group-hover:translate-x-0.5 transition">Masuk →</span>
+                      <span className="text-[10px] text-indigo-600 font-mono group-hover:translate-x-0.5 transition font-semibold">Masuk →</span>
                     </div>
-                    <div className="text-[11px] text-stone-400 mt-0.5">Ka. Lab / Guru IPA • NIP 19680315...</div>
+                    <div className="text-[11px] text-slate-500 mt-0.5 font-medium">Ka. Lab / Guru IPA • NIP 19680315...</div>
                   </button>
 
                   {/* Yulia M. Ahmad, S.Pd. */}
@@ -904,15 +904,15 @@ export default function ELearningPage() {
                       subject: 'Matematika',
                       classId: '7-A'
                     })}
-                    className="text-left p-3 rounded-xl bg-white/[0.03] hover:bg-cyan-500/10 border border-white/10 hover:border-cyan-400/40 transition group cursor-pointer"
+                    className="text-left p-3 rounded-xl bg-slate-50 hover:bg-indigo-50/70 border border-slate-200 hover:border-indigo-300 transition group cursor-pointer"
                   >
                     <div className="flex items-center justify-between">
-                      <div className="text-xs font-bold text-white group-hover:text-cyan-300">
+                      <div className="text-xs font-bold text-slate-900 group-hover:text-indigo-600">
                         👩‍🏫 Yulia M. Ahmad, S.Pd.
                       </div>
-                      <span className="text-[10px] text-cyan-400 font-mono group-hover:translate-x-0.5 transition">Masuk →</span>
+                      <span className="text-[10px] text-indigo-600 font-mono group-hover:translate-x-0.5 transition font-semibold">Masuk →</span>
                     </div>
-                    <div className="text-[11px] text-stone-400 mt-0.5">Guru Matematika • NIP 19850210...</div>
+                    <div className="text-[11px] text-slate-500 mt-0.5 font-medium">Guru Matematika • NIP 19850210...</div>
                   </button>
 
                   {/* Nunik Wahyuni, S.Pd. */}
@@ -925,15 +925,15 @@ export default function ELearningPage() {
                       subject: 'Bahasa Indonesia',
                       classId: '7-A'
                     })}
-                    className="text-left p-3 rounded-xl bg-white/[0.03] hover:bg-cyan-500/10 border border-white/10 hover:border-cyan-400/40 transition group cursor-pointer"
+                    className="text-left p-3 rounded-xl bg-slate-50 hover:bg-indigo-50/70 border border-slate-200 hover:border-indigo-300 transition group cursor-pointer"
                   >
                     <div className="flex items-center justify-between">
-                      <div className="text-xs font-bold text-white group-hover:text-cyan-300">
+                      <div className="text-xs font-bold text-slate-900 group-hover:text-indigo-600">
                         👩‍🏫 Nunik Wahyuni, S.Pd.
                       </div>
-                      <span className="text-[10px] text-cyan-400 font-mono group-hover:translate-x-0.5 transition">Masuk →</span>
+                      <span className="text-[10px] text-indigo-600 font-mono group-hover:translate-x-0.5 transition font-semibold">Masuk →</span>
                     </div>
-                    <div className="text-[11px] text-stone-400 mt-0.5">PKS Kesiswaan / B. Indonesia • NIP 19750918...</div>
+                    <div className="text-[11px] text-slate-500 mt-0.5 font-medium">PKS Kesiswaan / B. Indonesia • NIP 19750918...</div>
                   </button>
 
                   {/* Ichsanul Arifin, S.Kom. */}
@@ -946,15 +946,15 @@ export default function ELearningPage() {
                       subject: 'Informatika',
                       classId: '7-A'
                     })}
-                    className="text-left p-3 rounded-xl bg-white/[0.03] hover:bg-cyan-500/10 border border-white/10 hover:border-cyan-400/40 transition group cursor-pointer"
+                    className="text-left p-3 rounded-xl bg-slate-50 hover:bg-indigo-50/70 border border-slate-200 hover:border-indigo-300 transition group cursor-pointer"
                   >
                     <div className="flex items-center justify-between">
-                      <div className="text-xs font-bold text-white group-hover:text-cyan-300">
+                      <div className="text-xs font-bold text-slate-900 group-hover:text-indigo-600">
                         👨‍🏫 Ichsanul Arifin, S.Kom.
                       </div>
-                      <span className="text-[10px] text-cyan-400 font-mono group-hover:translate-x-0.5 transition">Masuk →</span>
+                      <span className="text-[10px] text-indigo-600 font-mono group-hover:translate-x-0.5 transition font-semibold">Masuk →</span>
                     </div>
-                    <div className="text-[11px] text-stone-400 mt-0.5">Guru Informatika • NIP 19930115...</div>
+                    <div className="text-[11px] text-slate-500 mt-0.5 font-medium">Guru Informatika • NIP 19930115...</div>
                   </button>
 
                   {/* Posko Meja Piket */}
@@ -966,15 +966,15 @@ export default function ELearningPage() {
                       nipOrNisn: 'POSKO-PIKET',
                       subject: 'Pusat Monitoring Rombel'
                     })}
-                    className="text-left p-3 rounded-xl bg-white/[0.03] hover:bg-emerald-500/10 border border-white/10 hover:border-emerald-400/40 transition group cursor-pointer"
+                    className="text-left p-3 rounded-xl bg-slate-50 hover:bg-emerald-50/70 border border-slate-200 hover:border-emerald-300 transition group cursor-pointer"
                   >
                     <div className="flex items-center justify-between">
-                      <div className="text-xs font-bold text-white group-hover:text-emerald-300">
+                      <div className="text-xs font-bold text-slate-900 group-hover:text-emerald-700">
                         🏢 Stasiun Meja Piket
                       </div>
-                      <span className="text-[10px] text-emerald-400 font-mono group-hover:translate-x-0.5 transition">Masuk →</span>
+                      <span className="text-[10px] text-emerald-600 font-mono group-hover:translate-x-0.5 transition font-semibold">Masuk →</span>
                     </div>
-                    <div className="text-[11px] text-stone-400 mt-0.5">Monitoring 17 Rombel & Gerbang</div>
+                    <div className="text-[11px] text-slate-500 mt-0.5 font-medium">Monitoring 17 Rombel & Gerbang</div>
                   </button>
 
                   {/* Abdul Hanan */}
@@ -986,15 +986,15 @@ export default function ELearningPage() {
                       nipOrNisn: '0133138158',
                       classId: '7-A'
                     })}
-                    className="text-left p-3 rounded-xl bg-white/[0.03] hover:bg-purple-500/10 border border-white/10 hover:border-purple-400/40 transition group cursor-pointer sm:col-span-2"
+                    className="text-left p-3 rounded-xl bg-slate-50 hover:bg-purple-50/70 border border-slate-200 hover:border-purple-300 transition group cursor-pointer sm:col-span-2"
                   >
                     <div className="flex items-center justify-between">
-                      <div className="text-xs font-bold text-white group-hover:text-purple-300">
+                      <div className="text-xs font-bold text-slate-900 group-hover:text-purple-700">
                         🎓 Abdul Hanan (Peserta Didik)
                       </div>
-                      <span className="text-[10px] text-purple-400 font-mono group-hover:translate-x-0.5 transition">Masuk →</span>
+                      <span className="text-[10px] text-purple-600 font-mono group-hover:translate-x-0.5 transition font-semibold">Masuk →</span>
                     </div>
-                    <div className="text-[11px] text-stone-400 mt-0.5">Kelas 7-A • NISN: 0133138158 • Cek Kehadiran Pribadi & Modul BSE</div>
+                    <div className="text-[11px] text-slate-500 mt-0.5 font-medium">Kelas 7-A • NISN: 0133138158 • Cek Kehadiran Pribadi & Modul BSE</div>
                   </button>
                 </div>
               </div>
@@ -1008,27 +1008,27 @@ export default function ELearningPage() {
           <div className="space-y-4">
             
             {/* Top Bar: Title & Sub-tabs */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/10">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-indigo-100">
               <div>
-                <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+                <h1 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
                   <span>Presensi KBM</span>
-                  <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-400/30">
+                  <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
                     {currentTeacher.subject}
                   </span>
                 </h1>
-                <p className="text-xs text-stone-400 mt-0.5">
-                  Pengampu: <span className="text-stone-200 font-semibold">{currentTeacher.name}</span> (NIP: {currentTeacher.nip}) • SMP Negeri 3 Cihampelas
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Pengampu: <span className="text-slate-800 font-semibold">{currentTeacher.name}</span> (NIP: {currentTeacher.nip}) • SMP Negeri 3 Cihampelas
                 </p>
               </div>
 
               {/* Sub-tabs: Presensi / Bahan Ajar / CBT */}
-              <div className="flex items-center gap-1 bg-black/40 p-1 rounded-xl border border-white/10 text-xs">
+              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs">
                 <button
                   onClick={() => setActiveMenu('presensi')}
                   className={`px-3 py-1.5 rounded-lg font-medium transition cursor-pointer ${
                     activeMenu === 'presensi' 
-                      ? 'bg-cyan-500 text-black font-bold' 
-                      : 'text-stone-400 hover:text-white'
+                      ? 'bg-indigo-600 text-white font-bold shadow-sm' 
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white'
                   }`}
                 >
                   Presensi
@@ -1037,8 +1037,8 @@ export default function ELearningPage() {
                   onClick={() => setActiveMenu('materi')}
                   className={`px-3 py-1.5 rounded-lg font-medium transition cursor-pointer ${
                     activeMenu === 'materi' 
-                      ? 'bg-cyan-500 text-black font-bold' 
-                      : 'text-stone-400 hover:text-white'
+                      ? 'bg-indigo-600 text-white font-bold shadow-sm' 
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white'
                   }`}
                 >
                   Bahan Ajar
@@ -1047,8 +1047,8 @@ export default function ELearningPage() {
                   onClick={() => setActiveMenu('cbt')}
                   className={`px-3 py-1.5 rounded-lg font-medium transition cursor-pointer ${
                     activeMenu === 'cbt' 
-                      ? 'bg-cyan-500 text-black font-bold' 
-                      : 'text-stone-400 hover:text-white'
+                      ? 'bg-indigo-600 text-white font-bold shadow-sm' 
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white'
                   }`}
                 >
                   Bank Soal
@@ -1061,39 +1061,39 @@ export default function ELearningPage() {
               <div className="space-y-4">
                 
                 {/* Clean Toolbar: Class Selector & Quick Action */}
-                <div className="bg-[#0c101a] border border-white/10 rounded-2xl p-3 sm:p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div className="bg-white border border-indigo-100 rounded-2xl p-3 sm:p-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
                   <div className="flex flex-wrap items-center gap-3">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-stone-400 font-medium">Pilih Rombel / Kelas:</span>
+                      <span className="text-xs text-slate-500 font-medium">Pilih Rombel / Kelas:</span>
                       <select
                         value={selectedClassId}
                         onChange={(e) => setSelectedClassId(e.target.value)}
-                        className="px-3 py-1.5 rounded-xl bg-black/60 border border-cyan-400/40 text-cyan-300 text-xs font-bold focus:outline-none focus:border-cyan-400 cursor-pointer shadow-sm"
+                        className="px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-indigo-700 text-xs font-bold focus:outline-none focus:border-indigo-500 cursor-pointer shadow-sm"
                       >
                         {SCHOOL_CLASSES.map(cls => (
-                          <option key={cls.id} value={cls.id} className="bg-stone-900 text-white">
+                          <option key={cls.id} value={cls.id} className="bg-white text-slate-900">
                             {cls.name} ({cls.totalStudents} Siswa)
                           </option>
                         ))}
                       </select>
                     </div>
 
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-xs">
-                      <span className="text-cyan-400 font-semibold">Pengampu:</span>
-                      <span className="text-white font-medium">{currentTeacher.name}</span>
-                      <span className="text-stone-400">({currentTeacher.subject})</span>
+                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-indigo-50 border border-indigo-100 text-xs">
+                      <span className="text-indigo-700 font-semibold">Pengampu:</span>
+                      <span className="text-slate-900 font-semibold">{currentTeacher.name}</span>
+                      <span className="text-slate-500">({currentTeacher.subject})</span>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-2.5">
                     {currentClassSession?.isSubmitted ? (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-medium">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                         Tersimpan ({currentClassSession.submittedAt})
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-medium">
-                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-xs font-medium">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
                         Belum Diabsen
                       </span>
                     )}
@@ -1101,7 +1101,7 @@ export default function ELearningPage() {
                     <button
                       type="button"
                       onClick={handleSetAllHadir}
-                      className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-medium text-stone-200 transition cursor-pointer"
+                      className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-xs font-semibold text-slate-700 transition cursor-pointer"
                       title="Tandai seluruh siswa menjadi HADIR"
                     >
                       ⚡ Semua Hadir
@@ -1110,17 +1110,17 @@ export default function ELearningPage() {
                 </div>
 
                 {/* Table Container */}
-                <div className="bg-[#0b0f17] border border-white/10 rounded-2xl overflow-hidden shadow-xl">
-                  <div className="px-4 py-3 bg-white/[0.02] border-b border-white/5 flex items-center justify-between text-xs text-stone-400">
-                    <span className="font-semibold text-white">
+                <div className="bg-white border border-indigo-100 rounded-2xl overflow-hidden shadow-sm">
+                  <div className="px-4 py-3 bg-slate-50 border-b border-indigo-50 flex items-center justify-between text-xs text-slate-500">
+                    <span className="font-bold text-slate-900">
                       Daftar Siswa {selectedClassId} ({currentClassStudents.length})
                     </span>
-                    <span className="hidden sm:inline font-mono text-[11px] text-stone-500">
-                      <span className="text-emerald-400">H: Hadir</span> · <span className="text-blue-400">S: Sakit</span> · <span className="text-amber-400">I: Izin</span> · <span className="text-rose-400">A: Alpa</span> · <span className="text-orange-400">T: Telat</span>
+                    <span className="hidden sm:inline font-mono text-[11px] text-slate-500 font-medium">
+                      <span className="text-emerald-700 font-bold">H: Hadir</span> · <span className="text-blue-700 font-bold">S: Sakit</span> · <span className="text-amber-700 font-bold">I: Izin</span> · <span className="text-rose-700 font-bold">A: Alpa</span> · <span className="text-orange-700 font-bold">T: Telat</span>
                     </span>
                   </div>
 
-                  <div className="divide-y divide-white/5">
+                  <div className="divide-y divide-slate-100">
                     {currentClassStudents.map((student, idx) => {
                       const currentStatus = workingRecords[student.id] || 'H';
                       const currentNote = workingNotes[student.id] || '';
@@ -1129,20 +1129,20 @@ export default function ELearningPage() {
                         <div 
                           key={student.id} 
                           className={`px-4 py-2.5 sm:py-3 flex flex-col md:flex-row md:items-center justify-between gap-2.5 transition ${
-                            currentStatus !== 'H' ? 'bg-white/[0.03]' : 'hover:bg-white/[0.01]'
+                            currentStatus !== 'H' ? 'bg-amber-50/25' : 'hover:bg-indigo-50/30'
                           }`}
                         >
                           {/* Student Identity */}
                           <div className="flex items-center gap-3 min-w-[220px]">
-                            <span className="w-6 font-mono text-xs text-stone-500 text-center">{idx + 1}</span>
+                            <span className="w-6 font-mono text-xs text-slate-400 text-center font-semibold">{idx + 1}</span>
                             <div>
-                              <div className="text-xs sm:text-sm font-medium text-white flex items-center gap-1.5">
+                              <div className="text-xs sm:text-sm font-semibold text-slate-900 flex items-center gap-1.5">
                                 <span>{student.name}</span>
                                 {student.gender && student.gender !== '-' && (
-                                  <span className="text-[10px] text-stone-500 font-mono">({student.gender})</span>
+                                  <span className="text-[10px] text-slate-400 font-mono">({student.gender})</span>
                                 )}
                               </div>
-                              <div className="text-[10px] text-stone-500 font-mono">
+                              <div className="text-[10px] text-slate-400 font-mono">
                                 NISN: {student.nisn}
                               </div>
                             </div>
@@ -1155,8 +1155,8 @@ export default function ELearningPage() {
                               onClick={() => handleSetStudentStatus(student.id, 'H')}
                               className={`w-8 h-8 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer ${
                                 currentStatus === 'H'
-                                  ? 'bg-emerald-500 text-black shadow-sm ring-2 ring-emerald-400'
-                                  : 'bg-white/5 text-stone-400 hover:bg-emerald-500/20 hover:text-emerald-300'
+                                  ? 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-400 font-bold'
+                                  : 'bg-slate-100 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 font-medium'
                               }`}
                               title="Hadir"
                             >
@@ -1167,8 +1167,8 @@ export default function ELearningPage() {
                               onClick={() => handleSetStudentStatus(student.id, 'S')}
                               className={`w-8 h-8 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer ${
                                 currentStatus === 'S'
-                                  ? 'bg-blue-500 text-white shadow-sm ring-2 ring-blue-400'
-                                  : 'bg-white/5 text-stone-400 hover:bg-blue-500/20 hover:text-blue-300'
+                                  ? 'bg-blue-600 text-white shadow-sm ring-2 ring-blue-400 font-bold'
+                                  : 'bg-slate-100 text-slate-600 hover:bg-blue-50 hover:text-blue-700 font-medium'
                               }`}
                               title="Sakit"
                             >
@@ -1179,8 +1179,8 @@ export default function ELearningPage() {
                               onClick={() => handleSetStudentStatus(student.id, 'I')}
                               className={`w-8 h-8 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer ${
                                 currentStatus === 'I'
-                                  ? 'bg-amber-500 text-black shadow-sm ring-2 ring-amber-400'
-                                  : 'bg-white/5 text-stone-400 hover:bg-amber-500/20 hover:text-amber-300'
+                                  ? 'bg-amber-500 text-white shadow-sm ring-2 ring-amber-400 font-bold'
+                                  : 'bg-slate-100 text-slate-600 hover:bg-amber-50 hover:text-amber-700 font-medium'
                               }`}
                               title="Izin"
                             >
@@ -1191,8 +1191,8 @@ export default function ELearningPage() {
                               onClick={() => handleSetStudentStatus(student.id, 'A')}
                               className={`w-8 h-8 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer ${
                                 currentStatus === 'A'
-                                  ? 'bg-rose-500 text-white shadow-sm ring-2 ring-rose-400'
-                                  : 'bg-white/5 text-stone-400 hover:bg-rose-500/20 hover:text-rose-300'
+                                  ? 'bg-rose-600 text-white shadow-sm ring-2 ring-rose-400 font-bold'
+                                  : 'bg-slate-100 text-slate-600 hover:bg-rose-50 hover:text-rose-700 font-medium'
                               }`}
                               title="Alpa"
                             >
@@ -1203,8 +1203,8 @@ export default function ELearningPage() {
                               onClick={() => handleSetStudentStatus(student.id, 'T')}
                               className={`w-8 h-8 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer ${
                                 currentStatus === 'T'
-                                  ? 'bg-orange-500 text-black shadow-sm ring-2 ring-orange-400'
-                                  : 'bg-white/5 text-stone-400 hover:bg-orange-500/20 hover:text-orange-300'
+                                  ? 'bg-orange-500 text-white shadow-sm ring-2 ring-orange-400 font-bold'
+                                  : 'bg-slate-100 text-slate-600 hover:bg-orange-50 hover:text-orange-700 font-medium'
                               }`}
                               title="Terlambat"
                             >
@@ -1225,11 +1225,11 @@ export default function ELearningPage() {
                                   currentStatus === 'T' ? 'Alasan terlambat...' :
                                   'Keterangan...'
                                 }
-                                className="w-full px-2.5 py-1 text-xs rounded-lg bg-white/[0.06] border border-white/20 text-white focus:outline-none focus:border-cyan-400 placeholder:text-stone-500 animate-[fadeIn_0.15s_ease-out]"
+                                className="w-full px-2.5 py-1 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-indigo-500 focus:bg-white placeholder:text-slate-400 animate-[fadeIn_0.15s_ease-out]"
                               />
                             ) : (
                               <div className="hidden md:block text-right">
-                                <span className="text-[11px] text-emerald-400/60 font-medium">Hadir</span>
+                                <span className="text-[11px] text-emerald-600 font-semibold">Hadir</span>
                               </div>
                             )}
                           </div>
@@ -1240,12 +1240,12 @@ export default function ELearningPage() {
                   </div>
 
                   {/* BOTTOM ACTION BAR */}
-                  <div className="p-3.5 sm:p-4 bg-[#090d15] border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3">
+                  <div className="p-3.5 sm:p-4 bg-slate-50 border-t border-indigo-100 flex flex-col sm:flex-row items-center justify-between gap-3">
                     <div className="flex items-center gap-2 w-full sm:w-auto">
                       <button
                         type="button"
                         onClick={handleExportSemesterExcel}
-                        className="px-3.5 py-2 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-400/30 text-cyan-300 font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer"
+                        className="px-3.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer"
                         title="Unduh Rekap 1 Semester (P1 s/d P16) untuk Nilai Rapor"
                       >
                         <span>📥</span>
@@ -1255,7 +1255,7 @@ export default function ELearningPage() {
                       <button
                         type="button"
                         onClick={handleExportMapelExcel}
-                        className="px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/15 text-stone-300 font-medium text-xs transition flex items-center justify-center gap-1.5 cursor-pointer"
+                        className="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 font-semibold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
                         title="Unduh presensi harian hari ini"
                       >
                         <span>📄</span>
@@ -1266,7 +1266,7 @@ export default function ELearningPage() {
                     <button
                       type="button"
                       onClick={handleSaveAttendance}
-                      className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-black font-extrabold text-xs sm:text-sm hover:opacity-95 transition shadow-lg shadow-cyan-500/25 flex items-center justify-center gap-2 cursor-pointer"
+                      className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs sm:text-sm transition shadow-lg shadow-indigo-600/25 flex items-center justify-center gap-2 cursor-pointer"
                     >
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
@@ -1282,17 +1282,17 @@ export default function ELearningPage() {
 
             {/* TAB: BAHAN AJAR / MODUL TAYANG PROYEKTOR */}
             {activeMenu === 'materi' && (
-              <div className="bg-[#0c101a] border border-white/10 rounded-2xl p-6 space-y-6">
-                <div className="flex items-center justify-between border-b border-white/10 pb-4">
+              <div className="bg-white border border-indigo-100 rounded-2xl p-6 shadow-sm space-y-6">
+                <div className="flex items-center justify-between border-b border-indigo-50 pb-4">
                   <div>
-                    <h2 className="text-lg font-bold text-white">Bahan Ajar & Modul Tayang Proyektor</h2>
-                    <p className="text-xs text-stone-400">
+                    <h2 className="text-lg font-bold text-slate-900">Bahan Ajar & Modul Tayang Proyektor</h2>
+                    <p className="text-xs text-slate-500 mt-0.5">
                       Tampilkan slide materi ini di layar proyektor kelas atau bagikan ke siswa untuk belajar di rumah.
                     </p>
                   </div>
                   <button 
                     onClick={() => showToast('Fitur unggah modul ajar baru siap dikembangkan!', 'info')}
-                    className="px-4 py-2 rounded-xl bg-cyan-500/10 border border-cyan-400/30 text-cyan-300 text-xs font-bold hover:bg-cyan-500/20 transition"
+                    className="px-4 py-2 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-bold hover:bg-indigo-100 transition cursor-pointer"
                   >
                     + Tambah Modul Baru
                   </button>
@@ -1322,19 +1322,19 @@ export default function ELearningPage() {
                       date: '10 Sep 2026',
                     }
                   ].map((m, i) => (
-                    <div key={i} className="p-4 rounded-xl bg-white/[0.03] border border-white/5 hover:border-cyan-400/30 transition flex flex-col justify-between space-y-3">
+                    <div key={i} className="p-4 rounded-xl bg-slate-50 border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/20 transition flex flex-col justify-between space-y-3">
                       <div>
-                        <span className="text-[10px] font-bold text-cyan-400 bg-cyan-400/10 px-2 py-0.5 rounded">
+                        <span className="text-[10px] font-bold text-indigo-700 bg-indigo-100/70 px-2 py-0.5 rounded">
                           {m.mapel}
                         </span>
-                        <h3 className="text-sm font-bold text-white mt-2">{m.title}</h3>
-                        <p className="text-xs text-stone-400 mt-1">{m.fileType}</p>
+                        <h3 className="text-sm font-bold text-slate-900 mt-2">{m.title}</h3>
+                        <p className="text-xs text-slate-500 mt-1">{m.fileType}</p>
                       </div>
-                      <div className="pt-2 border-t border-white/5 flex items-center justify-between text-xs">
-                        <span className="text-stone-400">{m.size}</span>
+                      <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-xs">
+                        <span className="text-slate-500 font-mono text-[11px]">{m.size}</span>
                         <button 
                           onClick={() => showToast('Membuka bahan ajar di mode layar penuh proyektor...', 'success')}
-                          className="text-cyan-400 hover:underline font-semibold"
+                          className="text-indigo-600 hover:underline font-bold cursor-pointer"
                         >
                           Tayangkan ↗
                         </button>
@@ -1347,16 +1347,16 @@ export default function ELearningPage() {
 
             {/* TAB: BANK SOAL & CBT */}
             {activeMenu === 'cbt' && (
-              <div className="bg-[#0c101a] border border-white/10 rounded-2xl p-6 text-center py-12 space-y-4">
-                <div className="w-16 h-16 rounded-full bg-cyan-500/10 border border-cyan-400/20 text-cyan-400 mx-auto flex items-center justify-center text-2xl">
+              <div className="bg-white border border-indigo-100 rounded-2xl p-6 text-center py-12 space-y-4 shadow-sm">
+                <div className="w-16 h-16 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-600 mx-auto flex items-center justify-center text-2xl">
                   💻
                 </div>
-                <h3 className="text-lg font-bold text-white">Bank Soal & Asesmen CBT Lab Komputer</h3>
-                <p className="text-xs text-stone-400 max-w-lg mx-auto leading-relaxed">
+                <h3 className="text-lg font-bold text-slate-900">Bank Soal & Asesmen CBT Lab Komputer</h3>
+                <p className="text-xs text-slate-500 max-w-lg mx-auto leading-relaxed">
                   Modul ini disiapkan untuk Asesmen Sumatif (STS/SAS) di Laboratorium Komputer sekolah. Siswa dapat login menggunakan NISN di komputer lab tanpa memerlukan handphone.
                 </p>
                 <div className="pt-2">
-                  <span className="px-3 py-1 rounded-full bg-cyan-500/10 text-cyan-300 text-xs font-semibold border border-cyan-500/20">
+                  <span className="px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-semibold border border-indigo-200">
                     Fase Berikutnya: Siap Terhubung ke Bank Soal
                   </span>
                 </div>
@@ -1371,29 +1371,29 @@ export default function ELearningPage() {
           <div className="space-y-6">
 
             {/* Piket Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/10">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-indigo-100">
               <div>
-                <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+                <h1 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
                   <span>Pusat Meja Piket</span>
-                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 font-medium">
+                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold">
                     Live Monitoring 17 Rombel
                   </span>
                 </h1>
-                <p className="text-xs text-stone-400 mt-0.5">
+                <p className="text-xs text-slate-500 mt-0.5">
                   Stasiun Meja Piket & Gerbang Utama • SMP Negeri 3 Cihampelas
                 </p>
               </div>
 
               <div className="flex flex-wrap items-center gap-2.5">
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-black/50 border border-emerald-500/30 text-xs">
-                  <span className="text-stone-400 font-medium">Petugas Jaga:</span>
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-xs shadow-sm">
+                  <span className="text-slate-500 font-medium">Petugas Jaga:</span>
                   <select
                     value={piketDutyTeacher}
                     onChange={(e) => setPiketDutyTeacher(e.target.value)}
-                    className="bg-transparent text-emerald-300 font-semibold focus:outline-none cursor-pointer max-w-[220px] truncate"
+                    className="bg-transparent text-emerald-700 font-bold focus:outline-none cursor-pointer max-w-[220px] truncate"
                   >
                     {DEMO_TEACHERS.map((teacher) => (
-                      <option key={teacher.nip} value={teacher.name} className="bg-stone-900 text-white">
+                      <option key={teacher.nip} value={teacher.name} className="bg-white text-slate-900">
                         {teacher.name} ({teacher.subject})
                       </option>
                     ))}
@@ -1403,7 +1403,7 @@ export default function ELearningPage() {
                 <button
                   type="button"
                   onClick={handleExportPiketExcel}
-                  className="px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/15 text-white font-medium text-xs transition flex items-center gap-1.5 cursor-pointer"
+                  className="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 font-semibold text-xs transition flex items-center gap-1.5 cursor-pointer shadow-sm"
                   title="Unduh seluruh rekap presensi hari ini (.xlsx)"
                 >
                   <span>📥</span>
@@ -1419,7 +1419,7 @@ export default function ELearningPage() {
                     setSessions(storedSess);
                     showToast('Data kehadiran diperbarui!', 'success');
                   }}
-                  className="px-3.5 py-2 rounded-xl bg-emerald-500 text-black font-bold text-xs hover:bg-emerald-400 transition shadow-md shadow-emerald-500/20 flex items-center gap-1.5 cursor-pointer"
+                  className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-md shadow-emerald-600/20 flex items-center gap-1.5 cursor-pointer"
                 >
                   <span>🔄 Refresh</span>
                 </button>
@@ -1428,34 +1428,34 @@ export default function ELearningPage() {
 
             {/* TOP STATS CARDS: CLEAN & MINIMALIST */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
-              <div className="p-3.5 rounded-xl bg-[#0c1017] border border-white/10">
-                <div className="text-[10px] font-semibold text-stone-400 uppercase tracking-wider">Total Siswa</div>
-                <div className="text-xl font-bold text-white mt-0.5">{INITIAL_STUDENTS.length}</div>
+              <div className="p-3.5 rounded-xl bg-white border border-slate-200 shadow-sm">
+                <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Total Siswa</div>
+                <div className="text-xl font-bold text-slate-900 mt-0.5">{INITIAL_STUDENTS.length}</div>
               </div>
 
-              <div className="p-3.5 rounded-xl bg-emerald-950/20 border border-emerald-500/30">
-                <div className="text-[10px] font-semibold text-emerald-400 uppercase tracking-wider">Hadir (H)</div>
-                <div className="text-xl font-bold text-emerald-300 mt-0.5">{schoolStats.hadir}</div>
+              <div className="p-3.5 rounded-xl bg-emerald-50/80 border border-emerald-200 shadow-sm">
+                <div className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">Hadir (H)</div>
+                <div className="text-xl font-black text-emerald-700 mt-0.5">{schoolStats.hadir}</div>
               </div>
 
-              <div className="p-3.5 rounded-xl bg-blue-950/20 border border-blue-500/30">
-                <div className="text-[10px] font-semibold text-blue-400 uppercase tracking-wider">Sakit (S)</div>
-                <div className="text-xl font-bold text-blue-300 mt-0.5">{schoolStats.sakit}</div>
+              <div className="p-3.5 rounded-xl bg-blue-50/80 border border-blue-200 shadow-sm">
+                <div className="text-[10px] font-bold text-blue-800 uppercase tracking-wider">Sakit (S)</div>
+                <div className="text-xl font-black text-blue-700 mt-0.5">{schoolStats.sakit}</div>
               </div>
 
-              <div className="p-3.5 rounded-xl bg-amber-950/20 border border-amber-500/30">
-                <div className="text-[10px] font-semibold text-amber-400 uppercase tracking-wider">Izin (I)</div>
-                <div className="text-xl font-bold text-amber-300 mt-0.5">{schoolStats.izin}</div>
+              <div className="p-3.5 rounded-xl bg-amber-50/80 border border-amber-200 shadow-sm">
+                <div className="text-[10px] font-bold text-amber-800 uppercase tracking-wider">Izin (I)</div>
+                <div className="text-xl font-black text-amber-700 mt-0.5">{schoolStats.izin}</div>
               </div>
 
-              <div className="p-3.5 rounded-xl bg-rose-950/20 border border-rose-500/30">
-                <div className="text-[10px] font-semibold text-rose-400 uppercase tracking-wider">Alpa (A)</div>
-                <div className="text-xl font-bold text-rose-300 mt-0.5">{schoolStats.alpa}</div>
+              <div className="p-3.5 rounded-xl bg-rose-50/80 border border-rose-200 shadow-sm">
+                <div className="text-[10px] font-bold text-rose-800 uppercase tracking-wider">Alpa (A)</div>
+                <div className="text-xl font-black text-rose-700 mt-0.5">{schoolStats.alpa}</div>
               </div>
 
-              <div className="p-3.5 rounded-xl bg-orange-950/20 border border-orange-500/30">
-                <div className="text-[10px] font-semibold text-orange-400 uppercase tracking-wider">Telat (T)</div>
-                <div className="text-xl font-bold text-orange-300 mt-0.5">{schoolStats.terlambat}</div>
+              <div className="p-3.5 rounded-xl bg-orange-50/80 border border-orange-200 shadow-sm">
+                <div className="text-[10px] font-bold text-orange-800 uppercase tracking-wider">Telat (T)</div>
+                <div className="text-xl font-black text-orange-700 mt-0.5">{schoolStats.terlambat}</div>
               </div>
             </div>
 
@@ -1465,16 +1465,16 @@ export default function ELearningPage() {
               {/* KOLOM KIRI (2/3): PETA KELAS (LIVE GRID MONITORING) */}
               <div className="lg:col-span-2 space-y-4">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-base font-bold text-white flex items-center gap-2">
+                  <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
                     <span>Peta Status Seluruh Rombel</span>
-                    <span className="text-xs font-normal text-stone-400">(Live Status Hari Ini)</span>
+                    <span className="text-xs font-normal text-slate-500">(Live Status Hari Ini)</span>
                   </h2>
-                  <div className="text-xs flex items-center gap-2">
-                    <span className="flex items-center gap-1 text-emerald-400 font-medium">
-                      <span className="w-2 h-2 rounded-full bg-emerald-400" /> Sudah Diabsen
+                  <div className="text-xs flex items-center gap-3">
+                    <span className="flex items-center gap-1.5 text-emerald-700 font-semibold">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" /> Sudah Diabsen
                     </span>
-                    <span className="flex items-center gap-1 text-amber-400 font-medium">
-                      <span className="w-2 h-2 rounded-full bg-amber-400" /> Belum Diabsen
+                    <span className="flex items-center gap-1.5 text-amber-700 font-semibold">
+                      <span className="w-2.5 h-2.5 rounded-full bg-amber-500" /> Belum Diabsen
                     </span>
                   </div>
                 </div>
@@ -1500,68 +1500,68 @@ export default function ELearningPage() {
                       <div
                         key={cls.id}
                         onClick={() => handleOpenPiketClassModal(cls.id)}
-                        className={`p-4 rounded-2xl border transition cursor-pointer relative overflow-hidden group ${
+                        className={`p-4 rounded-2xl border-2 transition cursor-pointer relative overflow-hidden group shadow-sm hover:shadow-md ${
                           isDone 
-                            ? 'bg-[#0a1310] border-emerald-500/30 hover:border-emerald-400/60 shadow-lg shadow-emerald-950/20' 
-                            : 'bg-[#15120a] border-amber-500/30 hover:border-amber-400/60'
+                            ? 'bg-white border-emerald-300 hover:border-emerald-500' 
+                            : 'bg-white border-amber-300 hover:border-amber-500'
                         }`}
                       >
                         <div className="flex items-center justify-between mb-2">
-                          <span className="text-base font-bold text-white group-hover:text-cyan-300 transition">
+                          <span className="text-base font-bold text-slate-900 group-hover:text-indigo-600 transition">
                             {cls.name}
                           </span>
                           {isDone ? (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
                               🟢 Selesai Diabsen
                             </span>
                           ) : (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 animate-pulse">
                               🟡 Belum Diabsen
                             </span>
                           )}
                         </div>
 
-                        <div className="text-[11px] text-stone-400 mb-3 flex items-center justify-between">
-                          <span>Total: <span className="text-stone-300 font-semibold">{cls.totalStudents} Siswa</span></span>
-                          <span className="text-[10px] text-stone-500 font-mono">2026/2027</span>
+                        <div className="text-[11px] text-slate-500 mb-3 flex items-center justify-between">
+                          <span>Total: <span className="text-slate-800 font-semibold">{cls.totalStudents} Siswa</span></span>
+                          <span className="text-[10px] text-slate-400 font-mono font-medium">2026/2027</span>
                         </div>
 
                         {/* Summary Numbers inside Class Card */}
                         {isDone ? (
                           <div className="space-y-2">
-                            <div className="flex items-center justify-between text-xs py-1.5 px-2 rounded-lg bg-black/40">
-                              <span className="text-stone-400">Guru:</span>
-                              <span className="font-semibold text-stone-200 truncate max-w-[130px]">
+                            <div className="flex items-center justify-between text-xs py-1.5 px-2 rounded-lg bg-slate-50 border border-slate-100">
+                              <span className="text-slate-500">Guru:</span>
+                              <span className="font-semibold text-slate-800 truncate max-w-[130px]">
                                 {session.teacherName.split(',')[0]}
                               </span>
                             </div>
 
                             <div className="grid grid-cols-4 gap-1 text-center font-mono text-[11px]">
-                              <div className="p-1 rounded bg-blue-500/10 text-blue-300 border border-blue-500/20">
+                              <div className="p-1 rounded bg-blue-50 text-blue-800 border border-blue-200 font-bold">
                                 S: {sick}
                               </div>
-                              <div className="p-1 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20">
+                              <div className="p-1 rounded bg-amber-50 text-amber-800 border border-amber-200 font-bold">
                                 I: {leave}
                               </div>
-                              <div className="p-1 rounded bg-rose-500/10 text-rose-300 border border-rose-500/20">
+                              <div className="p-1 rounded bg-rose-50 text-rose-800 border border-rose-200 font-bold">
                                 A: {absent}
                               </div>
-                              <div className="p-1 rounded bg-orange-500/10 text-orange-300 border border-orange-500/20">
+                              <div className="p-1 rounded bg-orange-50 text-orange-800 border border-orange-200 font-bold">
                                 T: {late}
                               </div>
                             </div>
-                            <div className="text-[10px] text-stone-400 text-right">
-                              Diabsen jam: <span className="font-mono text-stone-300">{session.submittedAt}</span>
+                            <div className="text-[10px] text-slate-500 text-right font-medium">
+                              Diabsen jam: <span className="font-mono text-slate-700 font-semibold">{session.submittedAt}</span>
                             </div>
                             <div className="pt-1 flex items-center justify-between text-[11px]">
-                              <span className="text-cyan-400 font-semibold group-hover:underline">
+                              <span className="text-indigo-600 font-bold group-hover:underline">
                                 ✏️ Periksa / Koreksi →
                               </span>
                             </div>
                           </div>
                         ) : (
                           <div className="py-2 text-center space-y-2.5">
-                            <span className="text-xs text-amber-400/90 font-medium block">
+                            <span className="text-xs text-amber-700 font-semibold block">
                               Guru Belum Hadir / Jam Kosong
                             </span>
                             <button
@@ -1570,7 +1570,7 @@ export default function ELearningPage() {
                                 e.stopPropagation();
                                 handleOpenPiketClassModal(cls.id);
                               }}
-                              className="w-full py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-bold text-xs transition shadow-md shadow-amber-500/20 flex items-center justify-center gap-1.5 cursor-pointer"
+                              className="w-full py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs transition shadow-md shadow-amber-500/20 flex items-center justify-center gap-1.5 cursor-pointer"
                             >
                               <span>📝</span>
                               <span>Absenkan sbg Piket</span>
@@ -1578,7 +1578,7 @@ export default function ELearningPage() {
                           </div>
                         )}
 
-                        <div className="mt-2 pt-2 border-t border-white/5 text-[11px] text-center text-stone-400 group-hover:text-cyan-300 transition">
+                        <div className="mt-2 pt-2 border-t border-slate-100 text-[11px] text-center text-slate-400 group-hover:text-indigo-600 transition">
                           Klik kartu untuk buka presensi kelas ini
                         </div>
                       </div>
@@ -1589,20 +1589,20 @@ export default function ELearningPage() {
 
               {/* KOLOM KANAN (1/3): POS MEJA PIKET (AKSI SISWA TELAT & SURAT IZIN) */}
               <div className="space-y-4">
-                <div className="bg-[#0e131d] border border-white/10 rounded-2xl p-5 shadow-xl">
-                  <div className="flex items-center gap-2 mb-3 pb-2 border-b border-white/10">
-                    <span className="w-7 h-7 rounded-lg bg-orange-500/20 text-orange-300 flex items-center justify-center font-bold text-xs">
+                <div className="bg-white border border-indigo-100 rounded-2xl p-5 shadow-sm">
+                  <div className="flex items-center gap-2 mb-3 pb-2 border-b border-indigo-50">
+                    <span className="w-7 h-7 rounded-lg bg-orange-50 text-orange-600 border border-orange-200 flex items-center justify-center font-bold text-xs">
                       ⏱️
                     </span>
                     <div>
-                      <h3 className="text-sm font-bold text-white">Pos Gerbang / Piket</h3>
-                      <p className="text-[11px] text-stone-400">Catat Siswa Telat atau Izin</p>
+                      <h3 className="text-sm font-bold text-slate-900">Pos Gerbang / Piket</h3>
+                      <p className="text-[11px] text-slate-500">Catat Siswa Telat atau Izin</p>
                     </div>
                   </div>
 
                   <form onSubmit={handlePiketActionSubmit} className="space-y-3 text-xs">
                     <div>
-                      <label className="block text-stone-300 font-semibold mb-1">
+                      <label className="block text-slate-700 font-semibold mb-1">
                         1. Pilih Kelas Siswa:
                       </label>
                       <select
@@ -1612,7 +1612,7 @@ export default function ELearningPage() {
                           const firstStudent = INITIAL_STUDENTS.find(s => s.classId === e.target.value);
                           if (firstStudent) setPiketSelectedStudentId(firstStudent.id);
                         }}
-                        className="w-full px-3 py-2 rounded-xl bg-black/50 border border-white/10 text-white focus:outline-none focus:border-emerald-400 transition"
+                        className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-indigo-500 focus:bg-white transition"
                       >
                         {SCHOOL_CLASSES.map(c => (
                           <option key={c.id} value={c.id}>{c.name} ({c.totalStudents} Siswa)</option>
@@ -1621,13 +1621,13 @@ export default function ELearningPage() {
                     </div>
 
                     <div>
-                      <label className="block text-stone-300 font-semibold mb-1">
+                      <label className="block text-slate-700 font-semibold mb-1">
                         2. Pilih Nama Siswa:
                       </label>
                       <select
                         value={piketSelectedStudentId}
                         onChange={(e) => setPiketSelectedStudentId(e.target.value)}
-                        className="w-full px-3 py-2 rounded-xl bg-black/50 border border-white/10 text-white focus:outline-none focus:border-emerald-400 transition"
+                        className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-indigo-500 focus:bg-white transition"
                       >
                         {INITIAL_STUDENTS.filter(s => s.classId === piketSelectedClass).map(s => (
                           <option key={s.id} value={s.id}>{s.name} ({s.gender})</option>
@@ -1636,17 +1636,17 @@ export default function ELearningPage() {
                     </div>
 
                     <div>
-                      <label className="block text-stone-300 font-semibold mb-1">
+                      <label className="block text-slate-700 font-semibold mb-1">
                         3. Status yang Dicatat:
                       </label>
                       <div className="grid grid-cols-3 gap-1.5">
                         <button
                           type="button"
                           onClick={() => { setPiketActionStatus('T'); setPiketActionNote('Terlambat sampai gerbang'); }}
-                          className={`py-2 rounded-lg font-bold text-center border transition ${
+                          className={`py-2 rounded-lg font-bold text-center border transition cursor-pointer ${
                             piketActionStatus === 'T'
-                              ? 'bg-orange-500 text-black border-orange-400 shadow-md shadow-orange-500/20'
-                              : 'bg-white/5 text-stone-300 border-white/5 hover:bg-white/10'
+                              ? 'bg-orange-500 text-white border-orange-500 shadow-md shadow-orange-500/20'
+                              : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
                           }`}
                         >
                           Terlambat (T)
@@ -1654,10 +1654,10 @@ export default function ELearningPage() {
                         <button
                           type="button"
                           onClick={() => { setPiketActionStatus('S'); setPiketActionNote('Surat dokter diserahkan ke piket'); }}
-                          className={`py-2 rounded-lg font-bold text-center border transition ${
+                          className={`py-2 rounded-lg font-bold text-center border transition cursor-pointer ${
                             piketActionStatus === 'S'
-                              ? 'bg-blue-500 text-white border-blue-400 shadow-md shadow-blue-500/20'
-                              : 'bg-white/5 text-stone-300 border-white/5 hover:bg-white/10'
+                              ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-500/20'
+                              : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
                           }`}
                         >
                           Sakit (S)
@@ -1665,10 +1665,10 @@ export default function ELearningPage() {
                         <button
                           type="button"
                           onClick={() => { setPiketActionStatus('I'); setPiketActionNote('Surat izin dari orang tua'); }}
-                          className={`py-2 rounded-lg font-bold text-center border transition ${
+                          className={`py-2 rounded-lg font-bold text-center border transition cursor-pointer ${
                             piketActionStatus === 'I'
-                              ? 'bg-amber-500 text-black border-amber-400 shadow-md shadow-amber-500/20'
-                              : 'bg-white/5 text-stone-300 border-white/5 hover:bg-white/10'
+                              ? 'bg-amber-500 text-white border-amber-500 shadow-md shadow-amber-500/20'
+                              : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
                           }`}
                         >
                           Izin (I)
@@ -1677,7 +1677,7 @@ export default function ELearningPage() {
                     </div>
 
                     <div>
-                      <label className="block text-stone-300 font-semibold mb-1">
+                      <label className="block text-slate-700 font-semibold mb-1">
                         4. Catatan Piket:
                       </label>
                       <input
@@ -1685,13 +1685,13 @@ export default function ELearningPage() {
                         value={piketActionNote}
                         onChange={(e) => setPiketActionNote(e.target.value)}
                         placeholder="Contoh: Terlambat karena kendaraan mogok..."
-                        className="w-full px-3 py-2 rounded-xl bg-black/50 border border-white/10 text-white focus:outline-none focus:border-emerald-400 transition"
+                        className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-indigo-500 focus:bg-white transition"
                       />
                     </div>
 
                     <button
                       type="submit"
-                      className="w-full py-2.5 rounded-xl bg-emerald-500 text-black font-bold text-xs hover:bg-emerald-400 transition shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-1.5 cursor-pointer"
+                      className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                       <span>Update Status via Meja Piket</span>
                       <span>→</span>
@@ -1700,11 +1700,11 @@ export default function ELearningPage() {
                 </div>
 
                 {/* Info Card for Duty Teachers */}
-                <div className="p-4 rounded-2xl bg-cyan-950/20 border border-cyan-500/30 text-xs space-y-2">
-                  <div className="font-bold text-cyan-300 flex items-center gap-1.5">
+                <div className="p-4 rounded-2xl bg-indigo-50/70 border border-indigo-200 text-xs space-y-2">
+                  <div className="font-bold text-indigo-900 flex items-center gap-1.5">
                     <span>💡 Tips Efisiensi Jam Piket:</span>
                   </div>
-                  <p className="text-stone-300 text-[11px] leading-relaxed">
+                  <p className="text-slate-600 text-[11px] leading-relaxed">
                     Jika ada kelas yang masih berwarna kuning setelah jam 07.30, guru piket bisa langsung mengonfirmasi ketua kelas atau menugaskan guru pengganti (inval).
                   </p>
                 </div>
@@ -1718,54 +1718,54 @@ export default function ELearningPage() {
                 data-lenis-prevent="true"
                 data-lenis-prevent-wheel="true"
                 data-lenis-prevent-touch="true"
-                className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-sm animate-fade-in select-text"
+                className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in select-text"
                 onClick={() => setDetailModalClassId(null)}
               >
                 <div 
                   data-lenis-prevent="true"
                   data-lenis-prevent-wheel="true"
                   data-lenis-prevent-touch="true"
-                  className="bg-[#0f141f] border border-white/20 rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden"
+                  className="bg-white border border-indigo-100 rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden"
                   onClick={(e) => e.stopPropagation()}
                 >
                   
                   {/* Modal Header */}
-                  <div className="p-5 border-b border-white/10 bg-white/[0.02] flex-shrink-0">
+                  <div className="p-5 border-b border-indigo-100 bg-slate-50 flex-shrink-0">
                     <div className="flex items-center justify-between gap-3 mb-2">
                       <div className="flex items-center gap-2.5">
-                        <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                        <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
                           🏢 MODE PIKET
                         </span>
-                        <h3 className="text-lg font-bold text-white">
+                        <h3 className="text-lg font-bold text-slate-900">
                           Presensi & Rincian {detailModalClassId}
                         </h3>
                         <span className={`text-xs px-2 py-0.5 rounded font-semibold ${
                           attendanceData[detailModalClassId]?.isSubmitted 
-                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' 
-                            : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                            ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' 
+                            : 'bg-amber-50 text-amber-800 border border-amber-200'
                         }`}>
                           {attendanceData[detailModalClassId]?.isSubmitted ? 'Sudah Diabsen' : 'Belum Diabsen (Bisa Diabsenkan Piket)'}
                         </span>
                       </div>
                       <button
                         onClick={() => setDetailModalClassId(null)}
-                        className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 text-stone-400 hover:text-white flex items-center justify-center transition cursor-pointer"
+                        className="w-8 h-8 rounded-full bg-slate-200/80 hover:bg-slate-300 text-slate-600 hover:text-slate-900 flex items-center justify-center transition cursor-pointer font-bold"
                       >
                         ✕
                       </button>
                     </div>
 
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-stone-300 pt-1">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-slate-600 pt-1">
                       <p>
-                        Total: <span className="font-semibold text-white">{activeStudents.filter(s => s.classId === detailModalClassId).length} Siswa</span>
+                        Total: <span className="font-semibold text-slate-900">{activeStudents.filter(s => s.classId === detailModalClassId).length} Siswa</span>
                         {attendanceData[detailModalClassId]?.teacherName && (
-                          <span> • Pengabsen sebelumnya: <span className="text-cyan-300">{attendanceData[detailModalClassId]?.teacherName}</span></span>
+                          <span> • Pengabsen sebelumnya: <span className="text-indigo-700 font-semibold">{attendanceData[detailModalClassId]?.teacherName}</span></span>
                         )}
                       </p>
                       <button
                         type="button"
                         onClick={handleSetPiketAllHadir}
-                        className="self-start sm:self-auto px-3 py-1 rounded-lg bg-white/10 hover:bg-white/15 border border-white/10 text-xs font-semibold text-stone-200 transition flex items-center gap-1.5 cursor-pointer"
+                        className="self-start sm:self-auto px-3 py-1 rounded-lg bg-white hover:bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-700 transition flex items-center gap-1.5 cursor-pointer shadow-sm"
                       >
                         <span>⚡</span>
                         <span>Tandai Semua Hadir</span>
@@ -1774,16 +1774,16 @@ export default function ELearningPage() {
                   </div>
 
                   {/* Petunjuk Guru Piket */}
-                  <div className="px-5 py-2.5 bg-black/40 border-b border-white/5 flex flex-wrap items-center justify-between gap-2 text-xs text-stone-400">
-                    <span className="text-emerald-300 font-medium">
+                  <div className="px-5 py-2.5 bg-emerald-50/50 border-b border-emerald-100 flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <span className="text-emerald-900 font-medium">
                       💡 Klik tombol status pada siswa jika ada yang Sakit/Izin/Alpa/Telat, lalu klik "Simpan Presensi".
                     </span>
                     <div className="flex items-center gap-1.5 font-bold text-[11px]">
-                      <span className="text-emerald-400">H: Hadir</span> •
-                      <span className="text-blue-400">S: Sakit</span> •
-                      <span className="text-amber-400">I: Izin</span> •
-                      <span className="text-rose-400">A: Alpa</span> •
-                      <span className="text-orange-400">T: Telat</span>
+                      <span className="text-emerald-700">H: Hadir</span> •
+                      <span className="text-blue-700">S: Sakit</span> •
+                      <span className="text-amber-700">I: Izin</span> •
+                      <span className="text-rose-700">A: Alpa</span> •
+                      <span className="text-orange-700">T: Telat</span>
                     </div>
                   </div>
 
@@ -1794,7 +1794,7 @@ export default function ELearningPage() {
                     data-lenis-prevent-touch="true"
                     onWheel={(e) => e.stopPropagation()}
                     onTouchMove={(e) => e.stopPropagation()}
-                    className="p-5 overflow-y-auto overscroll-contain flex-1 min-h-0 space-y-3 divide-y divide-white/5 text-xs select-text [scrollbar-width:thin] [scrollbar-color:rgba(56,189,248,0.5)_rgba(255,255,255,0.04)] [&::-webkit-scrollbar]:w-2.5 [&::-webkit-scrollbar-track]:bg-white/[0.02] [&::-webkit-scrollbar-thumb]:bg-cyan-500/50 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-cyan-400"
+                    className="p-5 overflow-y-auto overscroll-contain flex-1 min-h-0 space-y-3 divide-y divide-slate-100 text-xs select-text [scrollbar-width:thin]"
                   >
                     {activeStudents.filter(s => s.classId === detailModalClassId).map((student, idx) => {
                       const currentStatus = piketModalRecords[student.id] || 'H';
@@ -1804,19 +1804,19 @@ export default function ELearningPage() {
                         <div key={student.id} className="pt-3 first:pt-0 flex flex-col md:flex-row md:items-center justify-between gap-3">
                           {/* Nama Siswa */}
                           <div className="flex items-center gap-2.5 min-w-[200px]">
-                            <span className="w-5 text-stone-400 font-mono">{idx + 1}.</span>
+                            <span className="w-5 text-slate-400 font-mono font-semibold">{idx + 1}.</span>
                             <div>
-                              <div className="font-semibold text-stone-200 flex items-center gap-1.5">
+                              <div className="font-semibold text-slate-900 flex items-center gap-1.5">
                                 <span>{student.name}</span>
                                 {student.gender && student.gender !== '-' && (
                                   <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono ${
-                                    student.gender === 'L' ? 'bg-blue-500/10 text-blue-300' : 'bg-pink-500/10 text-pink-300'
+                                    student.gender === 'L' ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-pink-50 text-pink-700 border border-pink-200'
                                   }`}>
                                     {student.gender}
                                   </span>
                                 )}
                               </div>
-                              <span className="text-stone-400 text-[10px] font-mono">
+                              <span className="text-slate-400 text-[10px] font-mono">
                                 NISN: {student.nisn} {student.nis ? `• NIS: ${student.nis}` : ''}
                               </span>
                             </div>
@@ -1829,8 +1829,8 @@ export default function ELearningPage() {
                               onClick={() => handleSetPiketStudentStatus(student.id, 'H')}
                               className={`w-8 h-8 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer ${
                                 currentStatus === 'H'
-                                  ? 'bg-emerald-500 text-black shadow-sm ring-2 ring-emerald-400'
-                                  : 'bg-white/5 text-stone-400 hover:bg-emerald-500/20 hover:text-emerald-300'
+                                  ? 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-400 font-bold'
+                                  : 'bg-slate-100 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 font-medium'
                               }`}
                               title="Hadir"
                             >
@@ -1842,8 +1842,8 @@ export default function ELearningPage() {
                               onClick={() => handleSetPiketStudentStatus(student.id, 'S')}
                               className={`w-8 h-8 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer ${
                                 currentStatus === 'S'
-                                  ? 'bg-blue-500 text-white shadow-sm ring-2 ring-blue-400'
-                                  : 'bg-white/5 text-stone-400 hover:bg-blue-500/20 hover:text-blue-300'
+                                  ? 'bg-blue-600 text-white shadow-sm ring-2 ring-blue-400 font-bold'
+                                  : 'bg-slate-100 text-slate-600 hover:bg-blue-50 hover:text-blue-700 font-medium'
                               }`}
                               title="Sakit"
                             >
@@ -1855,8 +1855,8 @@ export default function ELearningPage() {
                               onClick={() => handleSetPiketStudentStatus(student.id, 'I')}
                               className={`w-8 h-8 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer ${
                                 currentStatus === 'I'
-                                  ? 'bg-amber-500 text-black shadow-sm ring-2 ring-amber-400'
-                                  : 'bg-white/5 text-stone-400 hover:bg-amber-500/20 hover:text-amber-300'
+                                  ? 'bg-amber-500 text-white shadow-sm ring-2 ring-amber-400 font-bold'
+                                  : 'bg-slate-100 text-slate-600 hover:bg-amber-50 hover:text-amber-700 font-medium'
                               }`}
                               title="Izin"
                             >
@@ -1868,8 +1868,8 @@ export default function ELearningPage() {
                               onClick={() => handleSetPiketStudentStatus(student.id, 'A')}
                               className={`w-8 h-8 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer ${
                                 currentStatus === 'A'
-                                  ? 'bg-rose-500 text-white shadow-sm ring-2 ring-rose-400'
-                                  : 'bg-white/5 text-stone-400 hover:bg-rose-500/20 hover:text-rose-300'
+                                  ? 'bg-rose-600 text-white shadow-sm ring-2 ring-rose-400 font-bold'
+                                  : 'bg-slate-100 text-slate-600 hover:bg-rose-50 hover:text-rose-700 font-medium'
                               }`}
                               title="Alpa"
                             >
@@ -1881,8 +1881,8 @@ export default function ELearningPage() {
                               onClick={() => handleSetPiketStudentStatus(student.id, 'T')}
                               className={`w-8 h-8 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer ${
                                 currentStatus === 'T'
-                                  ? 'bg-orange-500 text-black shadow-sm ring-2 ring-orange-400'
-                                  : 'bg-white/5 text-stone-400 hover:bg-orange-500/20 hover:text-orange-300'
+                                  ? 'bg-orange-500 text-white shadow-sm ring-2 ring-orange-400 font-bold'
+                                  : 'bg-slate-100 text-slate-600 hover:bg-orange-50 hover:text-orange-700 font-medium'
                               }`}
                               title="Terlambat"
                             >
@@ -1903,11 +1903,11 @@ export default function ELearningPage() {
                                   currentStatus === 'T' ? 'Alasan telat...' :
                                   'Keterangan...'
                                 }
-                                className="w-full px-2.5 py-1 text-xs rounded-lg bg-white/[0.06] border border-white/20 text-white focus:outline-none focus:border-emerald-400 placeholder:text-stone-500 animate-[fadeIn_0.15s_ease-out]"
+                                className="w-full px-2.5 py-1 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white placeholder:text-slate-400 animate-[fadeIn_0.15s_ease-out]"
                               />
                             ) : (
                               <div className="hidden md:block text-right">
-                                <span className="text-[11px] text-emerald-400/60 font-medium">Hadir</span>
+                                <span className="text-[11px] text-emerald-700 font-semibold">Hadir</span>
                               </div>
                             )}
                           </div>
@@ -1918,16 +1918,16 @@ export default function ELearningPage() {
                   </div>
 
                   {/* Modal Footer (Simpan oleh Guru Piket) */}
-                  <div className="p-4 border-t border-white/10 bg-black/50 flex flex-col sm:flex-row items-center justify-between gap-3 flex-shrink-0">
-                    <div className="text-xs text-stone-400 text-center sm:text-left">
-                      Petugas pengesah: <span className="text-emerald-300 font-semibold">{piketDutyTeacher} (Piket)</span>
+                  <div className="p-4 border-t border-indigo-100 bg-slate-50 flex flex-col sm:flex-row items-center justify-between gap-3 flex-shrink-0">
+                    <div className="text-xs text-slate-500 text-center sm:text-left">
+                      Petugas pengesah: <span className="text-slate-900 font-semibold">{piketDutyTeacher} (Piket)</span>
                     </div>
 
                     <div className="flex items-center gap-2.5 w-full sm:w-auto">
                       <button
                         type="button"
                         onClick={() => setDetailModalClassId(null)}
-                        className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-white/10 text-white font-semibold text-xs hover:bg-white/15 transition cursor-pointer"
+                        className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 font-semibold text-xs hover:bg-slate-100 transition cursor-pointer shadow-sm"
                       >
                         Tutup
                       </button>
@@ -1935,7 +1935,7 @@ export default function ELearningPage() {
                       <button
                         type="button"
                         onClick={handleSavePiketAttendance}
-                        className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-black font-bold text-xs transition shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-1.5 cursor-pointer"
+                        className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-lg shadow-emerald-600/25 flex items-center justify-center gap-1.5 cursor-pointer"
                       >
                         <span>💾 Simpan Presensi (sbg Guru Piket)</span>
                       </button>
@@ -1954,27 +1954,27 @@ export default function ELearningPage() {
           <div className="space-y-6 max-w-4xl mx-auto">
             
             {/* Student Profile Card */}
-            <div className="bg-gradient-to-r from-purple-950/40 via-[#160d24] to-[#0d0a17] border border-purple-500/30 rounded-2xl p-5 sm:p-6 shadow-xl relative overflow-hidden">
+            <div className="bg-gradient-to-r from-purple-50 via-white to-indigo-50 border border-purple-200/80 rounded-2xl p-5 sm:p-6 shadow-sm relative overflow-hidden">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-2xl bg-purple-500/20 border border-purple-400/30 flex items-center justify-center text-2xl font-bold text-purple-300">
+                  <div className="w-14 h-14 rounded-2xl bg-purple-100 border border-purple-200 flex items-center justify-center text-2xl font-bold text-purple-700">
                     🎓
                   </div>
                   <div>
                     <div className="flex items-center gap-2 mb-0.5">
-                      <span className="px-2 py-0.5 text-[10px] font-bold rounded-md bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                      <span className="px-2 py-0.5 text-[10px] font-bold rounded-md bg-purple-100 text-purple-800 border border-purple-200">
                         PESERTA DIDIK AKTIF
                       </span>
-                      <span className="text-xs text-stone-400">Kelas {currentUser.classId || '7-A'} • Semester Ganjil 2026/2027</span>
+                      <span className="text-xs text-slate-500 font-medium">Kelas {currentUser.classId || '7-A'} • Semester Ganjil 2026/2027</span>
                     </div>
-                    <h1 className="text-xl font-bold text-white">{currentUser.name}</h1>
-                    <p className="text-xs text-stone-300 font-mono">NISN: {currentUser.nipOrNisn} • SMP Negeri 3 Cihampelas</p>
+                    <h1 className="text-xl font-bold text-slate-900">{currentUser.name}</h1>
+                    <p className="text-xs text-slate-600 font-mono">NISN: {currentUser.nipOrNisn} • SMP Negeri 3 Cihampelas</p>
                   </div>
                 </div>
 
-                <div className="px-4 py-2 rounded-xl bg-black/40 border border-white/10 text-right">
-                  <div className="text-[10px] text-stone-400 uppercase tracking-wider font-semibold">Kehadiran Kamu</div>
-                  <div className="text-lg font-black text-emerald-300">98.5% (Sangat Baik)</div>
+                <div className="px-4 py-2 rounded-xl bg-white border border-slate-200 text-right shadow-sm">
+                  <div className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Kehadiran Kamu</div>
+                  <div className="text-lg font-black text-emerald-600">98.5% (Sangat Baik)</div>
                 </div>
               </div>
             </div>
@@ -1983,35 +1983,35 @@ export default function ELearningPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               
               {/* Card Kehadiran Hari Ini */}
-              <div className="p-5 rounded-2xl bg-[#0c101a] border border-white/10 space-y-3">
-                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <div className="p-5 rounded-2xl bg-white border border-indigo-100 shadow-sm space-y-3">
+                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                   <span>📅 Status Kehadiran Hari Ini</span>
                 </h3>
-                <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs space-y-1">
-                  <div className="font-bold text-emerald-300 flex items-center gap-1.5">
+                <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs space-y-1">
+                  <div className="font-bold text-emerald-800 flex items-center gap-1.5">
                     <span>✓</span> Terdaftar HADIR di Jam Pelajaran
                   </div>
-                  <p className="text-stone-300 text-[11px]">
+                  <p className="text-slate-600 text-[11px]">
                     Diabsen oleh Bpk. Rohidin, S.Pd. (Mapel Bahasa Inggris) dan tersinkron ke buku piket sekolah.
                   </p>
                 </div>
-                <div className="text-[11px] text-stone-400">
+                <div className="text-[11px] text-slate-500 font-medium">
                   Total semester ini: Hadir 42x • Sakit 1x • Izin 0x • Alpa 0x
                 </div>
               </div>
 
               {/* Card Bahan Ajar Mandiri di Rumah */}
-              <div className="p-5 rounded-2xl bg-[#0c101a] border border-white/10 space-y-3">
-                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <div className="p-5 rounded-2xl bg-white border border-indigo-100 shadow-sm space-y-3">
+                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                   <span>📖 Buku & Modul Pelajaran</span>
                 </h3>
-                <p className="text-xs text-stone-300 leading-relaxed">
+                <p className="text-xs text-slate-600 leading-relaxed">
                   Buku Sekolah Elektronik (BSE) Kurikulum Merdeka resmi dapat diakses dan diunduh gratis untuk belajar di rumah bersama orang tua.
                 </p>
                 <div className="pt-1">
                   <button 
                     onClick={() => showToast('Membuka koleksi buku digital Kurikulum Merdeka...', 'info')}
-                    className="w-full py-2.5 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-purple-200 text-xs font-bold transition flex items-center justify-center gap-2"
+                    className="w-full py-2.5 rounded-xl bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer"
                   >
                     <span>📚 Buka Perpustakaan Digital</span>
                     <span>→</span>
@@ -2022,23 +2022,23 @@ export default function ELearningPage() {
             </div>
 
             {/* Jadwal Pelajaran Hari Ini */}
-            <div className="bg-[#0b0f17] border border-white/10 rounded-2xl p-5 space-y-3">
-              <h3 className="text-sm font-bold text-white">Jadwal Pelajaran Kelas {currentUser.classId || '7-A'} Hari Ini</h3>
+            <div className="bg-white border border-indigo-100 rounded-2xl p-5 shadow-sm space-y-3">
+              <h3 className="text-sm font-bold text-slate-900">Jadwal Pelajaran Kelas {currentUser.classId || '7-A'} Hari Ini</h3>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5">
-                  <span className="text-[10px] text-stone-400 font-mono">07.15 - 08.35 WIB</span>
-                  <div className="font-bold text-white mt-1">Bahasa Inggris</div>
-                  <div className="text-[11px] text-stone-400">Rohidin, S.Pd.</div>
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                  <span className="text-[10px] text-slate-500 font-mono font-medium">07.15 - 08.35 WIB</span>
+                  <div className="font-bold text-slate-900 mt-1">Bahasa Inggris</div>
+                  <div className="text-[11px] text-slate-500">Rohidin, S.Pd.</div>
                 </div>
-                <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5">
-                  <span className="text-[10px] text-stone-400 font-mono">08.35 - 09.55 WIB</span>
-                  <div className="font-bold text-white mt-1">Ilmu Pengetahuan Alam</div>
-                  <div className="text-[11px] text-stone-400">Dedeh Komalasari, S.Pd.</div>
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                  <span className="text-[10px] text-slate-500 font-mono font-medium">08.35 - 09.55 WIB</span>
+                  <div className="font-bold text-slate-900 mt-1">Ilmu Pengetahuan Alam</div>
+                  <div className="text-[11px] text-slate-500">Dedeh Komalasari, S.Pd.</div>
                 </div>
-                <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5">
-                  <span className="text-[10px] text-stone-400 font-mono">10.15 - 11.35 WIB</span>
-                  <div className="font-bold text-white mt-1">Matematika</div>
-                  <div className="text-[11px] text-stone-400">Yulia M. Ahmad, S.Pd.</div>
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                  <span className="text-[10px] text-slate-500 font-mono font-medium">10.15 - 11.35 WIB</span>
+                  <div className="font-bold text-slate-900 mt-1">Matematika</div>
+                  <div className="text-[11px] text-slate-500">Yulia M. Ahmad, S.Pd.</div>
                 </div>
               </div>
             </div>
@@ -2049,15 +2049,15 @@ export default function ELearningPage() {
       </main>
 
       {/* FOOTER */}
-      <footer className="mt-auto border-t border-white/5 bg-[#05070a] px-4 py-4 text-center text-xs text-stone-400">
+      <footer className="mt-auto border-t border-indigo-100 bg-white px-4 py-4 text-center text-xs text-slate-500">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
           <span>© 2026 SMP Negeri 3 Cihampelas. Sistem Terpadu E-Learning & Presensi Sekolah.</span>
           <div className="flex items-center gap-3">
-            <span className="text-cyan-400 font-medium">Buku Piket Digital</span>
+            <span className="text-indigo-600 font-semibold">Buku Piket Digital</span>
             <span>•</span>
-            <span className="text-emerald-400 font-medium">CBT Lab Komputer</span>
+            <span className="text-emerald-700 font-semibold">CBT Lab Komputer</span>
             <span>•</span>
-            <span className="text-purple-400 font-medium">Kurikulum Merdeka</span>
+            <span className="text-purple-700 font-semibold">Kurikulum Merdeka</span>
           </div>
         </div>
       </footer>
