@@ -31,11 +31,10 @@ export default function Hero() {
     let rafId: number | null = null;
     let lastRenderedIndex = -1;
 
-    // 1. Retina / DPR responsive canvas sizing with mobile performance optimization
+    // 1. Retina / DPR responsive canvas sizing
     const handleResize = () => {
       if (!canvas) return;
-      const isMobile = window.innerWidth < 768;
-      const dpr = isMobile ? 1 : Math.min(window.devicePixelRatio || 1, 2);
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
       const width = window.innerWidth;
       const height = window.innerHeight;
 
@@ -86,7 +85,7 @@ export default function Hero() {
       const drawX = (width - drawW) / 2;
       const drawY = (height - drawH) / 2;
 
-      ctx.fillStyle = '#080b20';
+      ctx.fillStyle = '#000000';
       ctx.fillRect(0, 0, width, height);
       ctx.drawImage(img, drawX, drawY, drawW, drawH);
     };
@@ -206,7 +205,7 @@ export default function Hero() {
   return (
     <section 
       ref={containerRef}
-      className="relative w-full h-[420vh] bg-[#080b20] selection:bg-indigo-500/30 selection:text-indigo-200"
+      className="relative w-full h-[420vh] bg-black selection:bg-cyan-500/25 selection:text-cyan-200"
     >
       {/* Full-screen Sticky Viewport */}
       <div 
@@ -220,23 +219,22 @@ export default function Hero() {
             className="absolute inset-0 w-full h-full pointer-events-none block" 
           />
 
-          {/* Marklab Electric Indigo & Royal Violet Atmospheric Overlays */}
-          <div className="absolute inset-0 bg-gradient-to-t from-[#080b20] via-[#080b20]/40 to-[#080b20]/80 pointer-events-none" />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#080b20]/90 via-[#080b20]/20 to-[#080b20]/40 pointer-events-none" />
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-transparent via-[#080b20]/30 to-[#080b20] pointer-events-none" />
+          {/* Deep Gold / Dark Luxury Atmospheric Overlays for Seamless Edges */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/35 to-black/75 pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/15 to-black/35 pointer-events-none" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-transparent via-black/25 to-black pointer-events-none" />
           
           {/* Seamless Edge Softening Gradients */}
-          <div className="absolute top-0 inset-x-0 h-32 bg-gradient-to-b from-[#080b20] to-transparent pointer-events-none" />
-          {/* Bottom transition into light canvas (#f8fafc) */}
-          <div className="absolute bottom-0 inset-x-0 h-44 bg-gradient-to-t from-[#f8fafc] via-[#080b20]/60 to-transparent pointer-events-none" />
+          <div className="absolute top-0 inset-x-0 h-32 bg-gradient-to-b from-black to-transparent pointer-events-none" />
+          <div className="absolute bottom-0 inset-x-0 h-40 bg-gradient-to-t from-black to-transparent pointer-events-none" />
 
-          {/* Marklab Atmospheric Glow Tints */}
-          <div className="absolute inset-0 bg-indigo-950/[0.12] mix-blend-color pointer-events-none" />
-          <div className="absolute -bottom-20 left-1/4 w-[650px] h-[550px] bg-indigo-600/[0.18] rounded-full blur-[140px] pointer-events-none" />
-          <div className="absolute top-1/4 -right-20 w-[550px] h-[550px] bg-violet-600/[0.14] rounded-full blur-[140px] pointer-events-none" />
+          {/* Deep gold luxury atmospheric ambient tint */}
+          <div className="absolute inset-0 bg-amber-950/[0.06] mix-blend-color pointer-events-none" />
+          <div className="absolute -bottom-32 -left-20 w-[550px] h-[550px] bg-amber-600/[0.04] rounded-full blur-[160px] pointer-events-none" />
+          <div className="absolute top-1/4 right-0 w-[500px] h-[500px] bg-amber-500/[0.03] rounded-full blur-[160px] pointer-events-none" />
         </div>
 
-        {/* 2. Hero Editorial Content (Layout, Text, Buttons, Spacing 100% PRESERVED) */}
+        {/* 2. Hero Editorial Content (Layout, Text, Buttons, Spacing, Colors 100% Preserved) */}
         <div className="relative z-10 w-full max-w-7xl mx-auto px-5 sm:px-8 lg:px-12 pb-12 sm:pb-16 lg:pb-20 pt-32 sm:pt-40 flex flex-col items-start">
           
           {/* Headline + Subtext + 2 Minimalist CTA Buttons */}
@@ -249,7 +247,7 @@ export default function Hero() {
             </h1>
 
             {/* Compact Minimalist Subheadline */}
-            <p className="text-xs sm:text-sm md:text-[15px] text-stone-300/80 font-light leading-relaxed max-w-sm sm:max-w-md mb-6 sm:mb-7 tracking-wide">
+            <p className="text-xs sm:text-sm md:text-[15px] text-stone-400 font-light leading-relaxed max-w-sm sm:max-w-md mb-6 sm:mb-7 tracking-wide">
               Membina integritas, menguasai teknologi masa depan, dan mencetak pemimpin berwawasan global dalam ekosistem belajar modern.
             </p>
 
@@ -272,7 +270,7 @@ export default function Hero() {
               {/* Secondary Frosted Glass Pill Button */}
               <a 
                 href="#profil" 
-                className="inline-flex items-center justify-center px-6 sm:px-7 py-3 sm:py-3.5 rounded-full border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] hover:border-white/25 text-stone-200 hover:text-white font-normal text-xs sm:text-sm tracking-wide uppercase transition-all duration-300 active:scale-95 backdrop-blur-md"
+                className="inline-flex items-center justify-center px-6 sm:px-7 py-3 sm:py-3.5 rounded-full border border-white/10 bg-white/[0.03] hover:bg-white/[0.08] hover:border-white/25 text-stone-300 hover:text-white font-normal text-xs sm:text-sm tracking-wide uppercase transition-all duration-300 active:scale-95"
               >
                 <span>Jelajahi Profil</span>
               </a>
@@ -284,7 +282,7 @@ export default function Hero() {
         </div>
 
         {/* Ultra-subtle hairline bottom divider */}
-        <div className="w-full h-px bg-white/[0.08]" />
+        <div className="w-full h-px bg-white/[0.06]" />
       </div>
     </section>
   );

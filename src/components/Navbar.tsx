@@ -59,7 +59,7 @@ export default function Navbar() {
       desc: 'Portal penilaian siswa khusus Dewan Guru',
       href: 'https://erapor.smpn3cihampelas.sch.id',
       isExternal: true,
-      badgeColor: 'bg-indigo-500/10 border-indigo-400/25 text-indigo-300 group-hover:bg-indigo-500/20 group-hover:border-indigo-400/40',
+      badgeColor: 'bg-cyan-500/10 border-cyan-400/25 text-cyan-400 group-hover:bg-cyan-500/20 group-hover:border-cyan-400/40',
       icon: (
         <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
@@ -71,7 +71,7 @@ export default function Navbar() {
       desc: 'Presensi digital, bahan ajar, & CBT lab',
       href: '/elearning',
       isExternal: false,
-      badgeColor: 'bg-violet-500/10 border-violet-400/25 text-violet-300 group-hover:bg-violet-500/20 group-hover:border-violet-400/40',
+      badgeColor: 'bg-purple-500/10 border-purple-400/25 text-purple-400 group-hover:bg-purple-500/20 group-hover:border-purple-400/40',
       icon: (
         <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M12 14l9-5-9-5-9 5 9 5z" strokeLinecap="round" strokeLinejoin="round" />
@@ -85,7 +85,7 @@ export default function Navbar() {
       desc: 'Kelola berita, pengumuman, & struktur organisasi',
       href: '/login',
       isExternal: false,
-      badgeColor: 'bg-indigo-500/10 border-indigo-400/25 text-indigo-300 group-hover:bg-indigo-500/20 group-hover:border-indigo-400/40',
+      badgeColor: 'bg-amber-500/10 border-amber-400/25 text-amber-400 group-hover:bg-amber-500/20 group-hover:border-amber-400/40',
       icon: (
         <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <rect x="3" y="11" width="18" height="11" rx="2" ry="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -108,7 +108,7 @@ export default function Navbar() {
         {/* Brand (Left Column - 1fr) */}
         <div className="flex items-center justify-start">
           <a href="#" className="flex items-center gap-3 group">
-            <div className="relative w-8 h-8 rounded-full overflow-hidden border border-white/15 p-0.5 bg-[#080b20] shadow-lg group-hover:border-indigo-400/50 transition-colors">
+            <div className="relative w-8 h-8 rounded-full overflow-hidden border border-white/10 p-0.5 bg-black/60 shadow-lg group-hover:border-cyan-400/40 transition-colors">
               <Image 
                 src="/logo.png" 
                 alt="Logo SMP Negeri 3 Cihampelas" 
@@ -118,9 +118,9 @@ export default function Navbar() {
               />
             </div>
             <div className="flex flex-col">
-              <span className="text-sm sm:text-base font-normal tracking-tight text-white flex items-center gap-2 whitespace-nowrap">
+              <span className="text-sm sm:text-base font-normal tracking-tight text-stone-200 flex items-center gap-2 whitespace-nowrap">
                 SMPN 3 Cihampelas
-                <span className="inline-block w-1.5 h-1.5 rounded-full bg-indigo-400 shadow-[0_0_8px_#818cf8]" />
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-cyan-400/90 shadow-[0_0_8px_#38bdf8]" />
               </span>
             </div>
           </a>
@@ -129,7 +129,7 @@ export default function Navbar() {
         {/* Center Floating Pill Menu (True Center between two equal 1fr columns - Never overlaps) */}
         <div className="flex items-center justify-center">
           <nav 
-            className="hidden md:flex items-center gap-4 lg:gap-6 px-5 lg:px-6 py-2 rounded-full glass-pill-nav text-xs sm:text-sm font-normal text-indigo-200/80 hover:text-white transition-all duration-300 whitespace-nowrap shadow-xl shadow-indigo-950/30"
+            className="hidden md:flex items-center gap-4 lg:gap-6 px-5 lg:px-6 py-2 rounded-full glass-pill-nav text-xs sm:text-sm font-normal text-stone-400 hover:text-stone-300 transition-all duration-300 whitespace-nowrap"
           >
             <a href="#" className="hover:text-white transition-colors">
               Beranda
@@ -176,7 +176,7 @@ export default function Navbar() {
               <span>Portal</span>
               <svg 
                 className={`w-3.5 h-3.5 transition-transform duration-300 ${
-                  portalOpen ? 'rotate-180 text-indigo-400' : 'text-stone-400'
+                  portalOpen ? 'rotate-180 text-cyan-400' : 'text-stone-400'
                 }`}
                 viewBox="0 0 24 24" 
                 fill="none" 
@@ -195,21 +195,21 @@ export default function Navbar() {
                   : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'
               }`}
             >
-              <div className="rounded-2xl bg-[#080b20]/95 backdrop-blur-2xl border border-white/15 shadow-[0_20px_50px_rgba(8,11,32,0.85)] p-2 overflow-hidden relative">
+              <div className="rounded-2xl bg-zinc-950/95 backdrop-blur-2xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.85)] p-2 overflow-hidden relative">
                 {/* Subtle top ambient glow */}
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-40 h-8 bg-indigo-500/20 rounded-full blur-xl pointer-events-none" />
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-40 h-8 bg-cyan-500/10 rounded-full blur-xl pointer-events-none" />
 
-                <div className="px-3 py-2 border-b border-white/[0.08] mb-1 flex items-center justify-between">
-                  <span className="text-[10px] font-normal tracking-[0.2em] uppercase text-indigo-200/80">
+                <div className="px-3 py-2 border-b border-white/[0.06] mb-1 flex items-center justify-between">
+                  <span className="text-[10px] font-normal tracking-[0.2em] uppercase text-stone-400">
                     Portal Sistem Terpadu
                   </span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 shadow-[0_0_8px_#818cf8]" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_8px_#38bdf8]" />
                 </div>
 
                 <div className="flex flex-col gap-1">
                   {portalMenuItems.map((item, idx) => {
                     const content = (
-                      <div className="flex items-start gap-3 p-2.5 rounded-xl hover:bg-white/[0.08] border border-transparent hover:border-white/[0.1] transition-all duration-200 group">
+                      <div className="flex items-start gap-3 p-2.5 rounded-xl hover:bg-white/[0.06] border border-transparent hover:border-white/[0.08] transition-all duration-200 group">
                         <div className={`w-9 h-9 rounded-xl border flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-105 ${item.badgeColor}`}>
                           {item.icon}
                         </div>
@@ -219,7 +219,7 @@ export default function Navbar() {
                               {item.title}
                             </span>
                             {item.isExternal && (
-                              <span className="text-[10px] text-indigo-300 group-hover:text-white transition-colors ml-1">
+                              <span className="text-[10px] text-stone-500 group-hover:text-cyan-400 transition-colors ml-1">
                                 ↗
                               </span>
                             )}
@@ -270,7 +270,7 @@ export default function Navbar() {
             href="https://ppdb.jabarprov.go.id" 
             target="_blank"
             rel="noopener noreferrer"
-            className="px-4 lg:px-5 py-2 rounded-full bg-white text-[#080b20] text-xs sm:text-sm font-medium whitespace-nowrap hover:bg-indigo-50 hover:shadow-[0_4px_15px_rgba(255,255,255,0.25)] hover:scale-[1.01] active:scale-95 transition-all duration-300 shadow-md shadow-indigo-950/30"
+            className="px-4 lg:px-5 py-2 rounded-full bg-white text-black text-xs sm:text-sm font-medium whitespace-nowrap hover:bg-stone-200 hover:scale-[1.01] active:scale-95 transition-all duration-300 shadow-md"
           >
             PPDB Online
           </a>
@@ -295,11 +295,11 @@ export default function Navbar() {
 
       {/* Mobile Glass Drawer */}
       {mobileMenuOpen && (
-        <div className="md:hidden mt-3 max-w-sm mx-auto p-5 rounded-3xl bg-[#080b20]/95 backdrop-blur-2xl border border-white/15 shadow-2xl shadow-indigo-950/50 flex flex-col gap-3 text-sm font-medium text-indigo-100 animate-[fadeIn_0.2s_ease-out]">
+        <div className="md:hidden mt-3 max-w-sm mx-auto p-5 rounded-3xl bg-black/90 backdrop-blur-2xl border border-white/10 shadow-2xl flex flex-col gap-3 text-sm font-medium text-stone-200 animate-[fadeIn_0.2s_ease-out]">
           <a 
             href="#" 
             onClick={() => setMobileMenuOpen(false)} 
-            className="px-4 py-2.5 rounded-xl hover:bg-white/10 transition-colors"
+            className="px-4 py-2.5 rounded-xl hover:bg-white/5 transition-colors"
           >
             Beranda
           </a>
