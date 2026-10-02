@@ -614,13 +614,13 @@ export default function DashboardPage() {
         {/* SIDEBAR NAVIGATION */}
         {/* ========================================================================= */}
         <aside 
-          className={`fixed inset-y-0 left-0 z-40 w-64 sm:w-72 bg-black/90 backdrop-blur-2xl border-r border-white/[0.08] flex flex-col justify-between transition-transform duration-300 lg:static lg:translate-x-0 ${
-            mobileSidebarOpen ? 'translate-x-0 shadow-2xl shadow-black' : '-translate-x-full'
+          className={`fixed inset-y-0 left-0 z-40 w-64 sm:w-72 bg-white/95 backdrop-blur-2xl border-r border-indigo-100 flex flex-col justify-between transition-transform duration-300 lg:static lg:translate-x-0 ${
+            mobileSidebarOpen ? 'translate-x-0 shadow-2xl shadow-slate-900/10' : '-translate-x-full'
           }`}
         >
           {/* Top Brand Identity */}
           <div>
-            <div className="p-5 sm:p-6 border-b border-white/[0.07] flex items-center justify-between">
+            <div className="p-5 sm:p-6 border-b border-indigo-50 flex items-center justify-between">
               <button 
                 type="button"
                 onClick={() => {
@@ -636,15 +636,15 @@ export default function DashboardPage() {
                     alt="Logo SMPN 3 Cihampelas" 
                     width={36} 
                     height={36} 
-                    className="w-full h-full object-contain drop-shadow-[0_2px_8px_rgba(0,0,0,0.35)]"
+                    className="w-full h-full object-contain drop-shadow-sm"
                   />
                 </div>
                 <div className="flex flex-col">
-                  <span className="text-sm font-medium tracking-tight text-white flex items-center gap-1.5 group-hover:text-cyan-200 transition-colors">
+                  <span className="text-sm font-bold tracking-tight text-slate-900 flex items-center gap-1.5 group-hover:text-indigo-600 transition-colors">
                     SMPN 3 Cihampelas
                   </span>
-                  <span className="text-[10px] font-mono text-cyan-400/90 tracking-wider uppercase flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                  <span className="text-[10px] font-mono text-indigo-600 font-bold tracking-wider uppercase flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 animate-pulse" />
                     Admin Portal
                   </span>
                 </div>
@@ -653,7 +653,7 @@ export default function DashboardPage() {
               {/* Close button for mobile */}
               <button 
                 onClick={() => setMobileSidebarOpen(false)}
-                className="lg:hidden p-1.5 rounded-lg text-stone-400 hover:text-white hover:bg-white/[0.05]"
+                className="lg:hidden p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
               >
                 ✕
               </button>
@@ -764,20 +764,24 @@ export default function DashboardPage() {
                     setActiveTab(item.id as any);
                     setMobileSidebarOpen(false);
                   }}
-                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-normal tracking-wide transition-all cursor-pointer ${
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold tracking-wide transition-all cursor-pointer ${
                     activeTab === item.id
-                      ? 'bg-cyan-500/15 text-cyan-200 border border-cyan-400/30 shadow-lg shadow-cyan-950/20'
-                      : 'text-stone-400 hover:text-stone-200 hover:bg-white/[0.04] border border-transparent'
+                      ? 'bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-transparent'
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <span className={activeTab === item.id ? 'text-cyan-400' : 'text-stone-400'}>
+                    <span className={activeTab === item.id ? 'text-indigo-600' : 'text-slate-400'}>
                       {item.icon}
                     </span>
                     <span>{item.label}</span>
                   </div>
                   {item.badge && (
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-white/[0.08] text-stone-300 border border-white/10">
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border ${
+                      activeTab === item.id
+                        ? 'bg-indigo-100 text-indigo-800 border-indigo-200'
+                        : 'bg-slate-100 text-slate-700 border-slate-200'
+                    }`}>
                       {item.badge}
                     </span>
                   )}
@@ -787,22 +791,22 @@ export default function DashboardPage() {
           </div>
 
           {/* Bottom Admin User Capsule & Logout */}
-          <div className="p-4 border-t border-white/[0.07] bg-white/[0.01]">
-            <div className="flex items-center justify-between gap-3 p-2.5 rounded-2xl bg-white/[0.03] border border-white/[0.06] mb-2.5">
+          <div className="p-4 border-t border-indigo-50 bg-slate-50/50">
+            <div className="flex items-center justify-between gap-3 p-2.5 rounded-2xl bg-white border border-slate-200 shadow-xs mb-2.5">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-cyan-500/30 to-purple-600/30 border border-cyan-400/30 flex items-center justify-center text-cyan-300 font-semibold text-xs">
+                <div className="w-8 h-8 rounded-xl bg-indigo-600 border border-indigo-500 flex items-center justify-center text-white font-bold text-xs shadow-xs">
                   AD
                 </div>
                 <div className="flex flex-col text-left">
-                  <span className="text-xs font-medium text-white">Administrator</span>
-                  <span className="text-[10px] text-stone-400 font-mono">admin@smpn3.sch.id</span>
+                  <span className="text-xs font-bold text-slate-900">Administrator</span>
+                  <span className="text-[10px] text-slate-500 font-mono">admin@smpn3.sch.id</span>
                 </div>
               </div>
             </div>
 
             <button
               onClick={handleLogout}
-              className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-300 text-xs font-normal transition-all cursor-pointer"
+              className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 text-xs font-bold transition-all cursor-pointer shadow-xs"
             >
               <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
@@ -818,7 +822,7 @@ export default function DashboardPage() {
         {mobileSidebarOpen && (
           <div 
             onClick={() => setMobileSidebarOpen(false)}
-            className="fixed inset-0 z-30 bg-black/80 backdrop-blur-sm lg:hidden"
+            className="fixed inset-0 z-30 bg-slate-900/40 backdrop-blur-xs lg:hidden"
           />
         )}
 
@@ -828,13 +832,13 @@ export default function DashboardPage() {
         <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
 
           {/* Top Header Bar */}
-          <header className="sticky top-0 z-20 w-full h-16 bg-[#070709]/80 backdrop-blur-xl border-b border-white/[0.07] px-4 sm:px-8 flex items-center justify-between gap-4">
+          <header className="sticky top-0 z-20 w-full h-16 bg-white/90 backdrop-blur-xl border-b border-indigo-100 px-4 sm:px-8 flex items-center justify-between gap-4 shadow-xs">
             
             {/* Left Header: Mobile Toggle & Page Title */}
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setMobileSidebarOpen(true)}
-                className="lg:hidden p-2 rounded-xl bg-white/[0.04] border border-white/10 text-stone-300"
+                className="lg:hidden p-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 hover:bg-slate-200"
                 aria-label="Buka Menu"
               >
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -845,7 +849,7 @@ export default function DashboardPage() {
               </button>
 
               <div className="flex items-center gap-2">
-                <span className="text-xs sm:text-sm font-medium text-white capitalize">
+                <span className="text-xs sm:text-sm font-bold text-slate-900 capitalize">
                   {activeTab === 'overview' && 'Ringkasan Sistem & Konten'}
                   {activeTab === 'warta' && 'Manajemen Warta & Berita'}
                   {activeTab === 'siswa' && 'Manajemen Data Siswa & Rombel'}
@@ -855,7 +859,7 @@ export default function DashboardPage() {
                   {activeTab === 'pesan' && 'Kotak Pesan Masuk Wali Murid'}
                   {activeTab === 'pengaturan' && 'Pengaturan Profil & Website'}
                 </span>
-                <span className="hidden sm:inline-block px-2 py-0.5 rounded-full text-[10px] font-mono text-cyan-300 border border-cyan-400/30 bg-cyan-500/10">
+                <span className="hidden sm:inline-block px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold text-emerald-700 border border-emerald-200 bg-emerald-50">
                   v1.0 Live
                 </span>
               </div>
@@ -865,8 +869,8 @@ export default function DashboardPage() {
             <div className="flex items-center gap-2 sm:gap-4">
               
               {/* Live Clock Indicator */}
-              <div className="hidden md:flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/[0.03] border border-white/[0.07] text-[11px] font-mono text-stone-400">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+              <div className="hidden md:flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-[11px] font-mono text-slate-700 font-semibold">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                 <DashboardClock />
               </div>
 
@@ -874,10 +878,10 @@ export default function DashboardPage() {
               <Link
                 href="/"
                 target="_blank"
-                className="flex items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-full bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 text-xs text-stone-200 transition-all hover:border-cyan-400/30"
+                className="flex items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-full bg-white hover:bg-slate-50 border border-slate-200 text-xs font-bold text-slate-700 transition-all hover:border-indigo-300 hover:text-indigo-600 shadow-xs"
               >
                 <span>Lihat Website</span>
-                <span className="text-[10px] text-cyan-400">↗</span>
+                <span className="text-[10px] text-indigo-600">↗</span>
               </Link>
             </div>
           </header>
@@ -899,43 +903,39 @@ export default function DashboardPage() {
                       value: `${newsList.length}`,
                       desc: '+2 minggu ini',
                       icon: '📰',
-                      borderColor: 'hover:border-cyan-400/40'
                     },
                     {
                       label: 'Pimpinan & Guru',
                       value: `${leadersList.length + teachersList.length}`,
                       desc: `${leadersList.length} Pimpinan · ${teachersList.length} Guru Aktif`,
                       icon: '👨‍🏫',
-                      borderColor: 'hover:border-purple-400/40'
                     },
                     {
                       label: 'Agenda Sekolah',
                       value: `${agendaList.length}`,
                       desc: '2 aktif bulan ini',
                       icon: '📅',
-                      borderColor: 'hover:border-emerald-400/40'
                     },
                     {
                       label: 'Pesan Masuk',
                       value: `${messagesList.length}`,
                       desc: `${messagesList.filter(m => !m.read).length} belum dibaca`,
                       icon: '💬',
-                      borderColor: 'hover:border-amber-400/40'
                     }
                   ].map((stat, i) => (
                     <div 
                       key={i}
-                      className={`p-5 rounded-2xl bg-white/[0.025] border border-white/[0.08] backdrop-blur-xl shadow-lg transition-all ${stat.borderColor}`}
+                      className="p-5 rounded-2xl bg-white border border-indigo-100 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all"
                     >
                       <div className="flex items-center justify-between mb-3">
-                        <span className="text-xs font-normal text-stone-400">{stat.label}</span>
-                        <span className="text-lg">{stat.icon}</span>
+                        <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">{stat.label}</span>
+                        <span className="text-xl">{stat.icon}</span>
                       </div>
-                      <div className="text-3xl font-light text-white tracking-tight mb-1">
+                      <div className="text-3xl font-black text-slate-900 tracking-tight mb-1">
                         {stat.value}
                       </div>
-                      <div className="text-[11px] font-mono text-cyan-400/90 flex items-center gap-1.5">
-                        <span className="w-1 h-1 rounded-full bg-cyan-400" />
+                      <div className="text-xs font-bold text-indigo-600 flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-600" />
                         <span>{stat.desc}</span>
                       </div>
                     </div>
@@ -943,33 +943,33 @@ export default function DashboardPage() {
                 </div>
 
                 {/* Quick Actions Row */}
-                <div className="p-5 rounded-2xl bg-white/[0.02] border border-white/[0.07] backdrop-blur-xl flex flex-wrap items-center justify-between gap-4">
+                <div className="p-5 sm:p-6 rounded-2xl bg-white border border-indigo-100 shadow-sm flex flex-wrap items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-400/20 flex items-center justify-center text-cyan-300">
+                    <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-600 text-lg">
                       ⚡
                     </div>
                     <div>
-                      <h3 className="text-sm font-medium text-white">Aksi Cepat Pengelolaan</h3>
-                      <p className="text-xs text-stone-400 font-light">Perbarui konten website langsung dari panel di bawah</p>
+                      <h3 className="text-sm font-bold text-slate-900">Aksi Cepat Pengelolaan</h3>
+                      <p className="text-xs text-slate-600 font-medium">Perbarui konten website langsung dari panel di bawah</p>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-2.5 flex-wrap">
                     <button
                       onClick={() => setIsNewsModalOpen(true)}
-                      className="px-3.5 py-2 rounded-xl bg-cyan-500 text-black text-xs font-medium hover:bg-cyan-400 transition-all flex items-center gap-1.5 cursor-pointer shadow-lg shadow-cyan-500/20"
+                      className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-md shadow-indigo-600/20 transition-all flex items-center gap-1.5 cursor-pointer"
                     >
                       <span>+ Tulis Warta Baru</span>
                     </button>
                     <button
                       onClick={() => setActiveTab('pimpinan')}
-                      className="px-3.5 py-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 text-white text-xs font-normal transition-all flex items-center gap-1.5 cursor-pointer"
+                      className="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
                     >
                       <span>👨‍🏫 Kelola Pimpinan & Guru</span>
                     </button>
                     <button
                       onClick={() => setIsAgendaModalOpen(true)}
-                      className="px-3.5 py-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 text-white text-xs font-normal transition-all flex items-center gap-1.5 cursor-pointer"
+                      className="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
                     >
                       <span>+ Tambah Agenda</span>
                     </button>
@@ -980,15 +980,15 @@ export default function DashboardPage() {
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                   
                   {/* Left Column: Recent News (7 Cols) */}
-                  <div className="lg:col-span-7 rounded-2xl bg-white/[0.025] border border-white/[0.08] backdrop-blur-xl p-5 sm:p-6 shadow-xl space-y-4">
-                    <div className="flex items-center justify-between pb-3 border-b border-white/[0.07]">
+                  <div className="lg:col-span-7 rounded-2xl bg-white border border-indigo-100 p-5 sm:p-6 shadow-sm space-y-4">
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                       <div>
-                        <h3 className="text-sm font-medium text-white">Warta & Berita Tayang</h3>
-                        <p className="text-xs text-stone-400 font-light">Status artikel di halaman bento grid</p>
+                        <h3 className="text-sm font-bold text-slate-900">Warta & Berita Tayang</h3>
+                        <p className="text-xs text-slate-600 font-medium">Status artikel di halaman bento grid</p>
                       </div>
                       <button 
                         onClick={() => setActiveTab('warta')}
-                        className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors"
+                        className="text-xs font-bold text-indigo-600 hover:text-indigo-700 transition-colors"
                       >
                         Lihat Semua →
                       </button>
@@ -998,25 +998,25 @@ export default function DashboardPage() {
                       {newsList.slice(0, 3).map((item) => (
                         <div 
                           key={item.id}
-                          className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.05] hover:border-white/15 transition-all flex items-center justify-between gap-3"
+                          className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 hover:border-indigo-200 hover:bg-white transition-all flex items-center justify-between gap-3 shadow-xs"
                         >
                           <div className="flex items-center gap-3 min-w-0">
-                            <div className="w-12 h-12 rounded-lg overflow-hidden relative flex-shrink-0 bg-stone-900 border border-white/10">
+                            <div className="w-12 h-12 rounded-lg overflow-hidden relative flex-shrink-0 bg-slate-100 border border-slate-200">
                               <Image src={item.src} alt={item.title} fill className="object-cover" />
                             </div>
                             <div className="min-w-0">
                               <div className="flex items-center gap-2 mb-1">
-                                <span className="px-2 py-0.5 rounded-full text-[9px] font-mono text-cyan-300 border border-cyan-400/30 bg-cyan-500/10">
+                                <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-bold text-indigo-700 border border-indigo-200 bg-indigo-50">
                                   {item.category}
                                 </span>
-                                <span className="text-[10px] text-stone-400 font-mono">{item.date}</span>
+                                <span className="text-[10px] text-slate-500 font-mono font-semibold">{item.date}</span>
                               </div>
-                              <h4 className="text-xs font-normal text-white truncate max-w-sm">
+                              <h4 className="text-xs font-bold text-slate-900 truncate max-w-sm">
                                 {item.title}
                               </h4>
                             </div>
                           </div>
-                          <span className="flex-shrink-0 px-2 py-1 rounded-full text-[10px] font-mono bg-emerald-500/10 text-emerald-300 border border-emerald-400/30">
+                          <span className="flex-shrink-0 px-2 py-1 rounded-full text-[10px] font-mono font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
                             {item.status}
                           </span>
                         </div>
@@ -1028,12 +1028,12 @@ export default function DashboardPage() {
                   <div className="lg:col-span-5 space-y-6">
                     
                     {/* Agenda Card */}
-                    <div className="rounded-2xl bg-white/[0.025] border border-white/[0.08] backdrop-blur-xl p-5 sm:p-6 shadow-xl space-y-4">
-                      <div className="flex items-center justify-between pb-3 border-b border-white/[0.07]">
-                        <h3 className="text-sm font-medium text-white">Agenda Akademik Terdekat</h3>
+                    <div className="rounded-2xl bg-white border border-indigo-100 p-5 sm:p-6 shadow-sm space-y-4">
+                      <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                        <h3 className="text-sm font-bold text-slate-900">Agenda Akademik Terdekat</h3>
                         <button 
                           onClick={() => setActiveTab('agenda')}
-                          className="text-xs text-cyan-400 hover:text-cyan-300"
+                          className="text-xs font-bold text-indigo-600 hover:text-indigo-700"
                         >
                           Kelola →
                         </button>
@@ -1041,12 +1041,12 @@ export default function DashboardPage() {
 
                       <div className="space-y-3">
                         {agendaList.slice(0, 3).map((agenda) => (
-                          <div key={agenda.id} className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] flex items-center justify-between">
+                          <div key={agenda.id} className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between shadow-xs">
                             <div>
-                              <h5 className="text-xs text-white font-normal mb-1">{agenda.name}</h5>
-                              <p className="text-[10px] font-mono text-cyan-400">{agenda.date}</p>
+                              <h5 className="text-xs text-slate-900 font-bold mb-1">{agenda.name}</h5>
+                              <p className="text-[10px] font-mono font-bold text-indigo-600">{agenda.date}</p>
                             </div>
-                            <span className="text-[10px] font-mono text-stone-400 px-2 py-0.5 rounded-full bg-white/[0.04]">
+                            <span className="text-[10px] font-mono font-bold text-slate-700 px-2 py-0.5 rounded-full bg-white border border-slate-200">
                               {agenda.category}
                             </span>
                           </div>
@@ -1055,17 +1055,17 @@ export default function DashboardPage() {
                     </div>
 
                     {/* System Server Health */}
-                    <div className="p-5 rounded-2xl bg-white/[0.02] border border-white/[0.07] backdrop-blur-xl flex items-center justify-between">
+                    <div className="p-5 rounded-2xl bg-white border border-indigo-100 shadow-sm flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-400/30 flex items-center justify-center text-emerald-400 text-xs">
+                        <div className="w-8 h-8 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 text-xs font-bold">
                           ●
                         </div>
                         <div>
-                          <p className="text-xs font-medium text-white">Sistem Sekolah Berjalan Normal</p>
-                          <p className="text-[10px] text-stone-400 font-mono">Next.js 16 (App Router) · Turbopack</p>
+                          <p className="text-xs font-bold text-slate-900">Sistem Sekolah Berjalan Normal</p>
+                          <p className="text-[10px] text-slate-500 font-mono font-medium">Next.js 16 (App Router) · Turbopack</p>
                         </div>
                       </div>
-                      <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-400/20">
+                      <span className="text-[10px] font-mono font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
                         99.9% Uptime
                       </span>
                     </div>
@@ -1083,16 +1083,16 @@ export default function DashboardPage() {
               <div className="space-y-6 animate-[fadeIn_0.3s_ease-out]">
                 
                 {/* CMS Header & Search */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-white/[0.025] border border-white/[0.08] backdrop-blur-xl">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 sm:p-6 rounded-2xl bg-white border border-indigo-100 shadow-sm">
                   <div>
-                    <h2 className="text-lg font-light text-white tracking-tight">Manajemen Warta & Berita</h2>
-                    <p className="text-xs text-stone-400 font-light">Kelola artikel warta yang tampil pada Bento Grid halaman utama</p>
+                    <h2 className="text-lg font-bold text-slate-900 tracking-tight">Manajemen Warta & Berita</h2>
+                    <p className="text-xs text-slate-600 font-medium mt-0.5">Kelola artikel warta yang tampil pada Bento Grid halaman utama</p>
                   </div>
 
                   <div className="flex items-center gap-2.5">
                     <button
                       onClick={() => setIsNewsModalOpen(true)}
-                      className="px-4 py-2.5 rounded-xl bg-cyan-500 text-black text-xs font-medium hover:bg-cyan-400 transition-all flex items-center gap-1.5 cursor-pointer shadow-lg shadow-cyan-500/20"
+                      className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-indigo-600/20"
                     >
                       <span>+ Tulis Warta Baru</span>
                     </button>
@@ -1106,10 +1106,10 @@ export default function DashboardPage() {
                       <button
                         key={cat}
                         onClick={() => setNewsFilter(cat)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-mono transition-all cursor-pointer whitespace-nowrap ${
+                        className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer whitespace-nowrap ${
                           newsFilter === cat
-                            ? 'bg-cyan-500/20 text-cyan-200 border border-cyan-400/30'
-                            : 'bg-white/[0.03] text-stone-400 border border-white/[0.06] hover:text-stone-200'
+                            ? 'bg-indigo-600 text-white shadow-xs'
+                            : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
                         }`}
                       >
                         {cat}
@@ -1123,19 +1123,19 @@ export default function DashboardPage() {
                       value={newsSearch}
                       onChange={(e) => setNewsSearch(e.target.value)}
                       placeholder="Cari judul warta..."
-                      className="w-full sm:w-64 pl-8 pr-4 py-1.5 rounded-xl bg-white/[0.04] border border-white/10 text-xs text-stone-200 placeholder-stone-500 focus:outline-none focus:border-cyan-400/50"
+                      className="w-full sm:w-64 pl-8 pr-4 py-2 rounded-xl bg-white border border-slate-200 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 shadow-xs"
                     />
-                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-500 text-xs">
+                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs">
                       🔍
                     </span>
                   </div>
                 </div>
 
                 {/* Table of Articles */}
-                <div className="rounded-2xl bg-white/[0.025] border border-white/[0.08] backdrop-blur-xl overflow-hidden shadow-xl">
+                <div className="rounded-2xl bg-white border border-slate-200 overflow-hidden shadow-sm">
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs">
-                      <thead className="bg-white/[0.03] text-stone-400 font-mono uppercase text-[10px] tracking-wider border-b border-white/[0.06]">
+                      <thead className="bg-slate-50 text-slate-700 font-mono uppercase text-[10px] tracking-wider border-b border-slate-200 font-bold">
                         <tr>
                           <th className="py-3.5 px-4 sm:px-6">Artikel</th>
                           <th className="py-3.5 px-4">Kategori</th>
@@ -1144,30 +1144,30 @@ export default function DashboardPage() {
                           <th className="py-3.5 px-4 text-right">Aksi</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-white/[0.04] text-stone-300">
+                      <tbody className="divide-y divide-slate-100 text-slate-700">
                         {filteredNews.map((item) => (
-                          <tr key={item.id} className="hover:bg-white/[0.02] transition-colors">
+                          <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
                             <td className="py-3.5 px-4 sm:px-6">
                               <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-lg overflow-hidden relative flex-shrink-0 bg-stone-900 border border-white/10">
+                                <div className="w-10 h-10 rounded-lg overflow-hidden relative flex-shrink-0 bg-slate-100 border border-slate-200">
                                   <Image src={item.src} alt={item.title} fill className="object-cover" />
                                 </div>
-                                <span className="font-normal text-white max-w-md truncate">
+                                <span className="font-bold text-slate-900 max-w-md truncate">
                                   {item.title}
                                 </span>
                               </div>
                             </td>
                             <td className="py-3.5 px-4">
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono text-cyan-300 border border-cyan-400/30 bg-cyan-500/10">
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold text-indigo-700 border border-indigo-200 bg-indigo-50">
                                 {item.category}
                               </span>
                             </td>
-                            <td className="py-3.5 px-4 text-stone-400 font-mono">{item.date}</td>
+                            <td className="py-3.5 px-4 text-slate-500 font-mono font-medium">{item.date}</td>
                             <td className="py-3.5 px-4">
-                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
                                 item.status === 'Published'
-                                  ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-400/30'
-                                  : 'bg-amber-500/10 text-amber-300 border border-amber-400/30'
+                                  ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                                  : 'bg-amber-50 text-amber-800 border border-amber-200'
                               }`}>
                                 {item.status}
                               </span>
@@ -1176,14 +1176,14 @@ export default function DashboardPage() {
                               <div className="flex items-center justify-end gap-2">
                                 <button
                                   onClick={() => showToast(`Fitur edit "${item.title.substring(0, 20)}..." dibuka.`)}
-                                  className="p-1.5 rounded-lg bg-white/[0.04] hover:bg-white/10 text-stone-300 transition-colors"
+                                  className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
                                   title="Edit Warta"
                                 >
                                   ✏️
                                 </button>
                                 <button
                                   onClick={() => handleDeleteNews(item.id)}
-                                  className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-300 transition-colors"
+                                  className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-colors"
                                   title="Hapus Warta"
                                 >
                                   🗑️
@@ -1197,7 +1197,7 @@ export default function DashboardPage() {
                   </div>
 
                   {filteredNews.length === 0 && (
-                    <div className="py-12 text-center text-stone-500 text-xs">
+                    <div className="py-12 text-center text-slate-500 text-xs font-medium">
                       Tidak ada artikel yang cocok dengan pencarian.
                     </div>
                   )}
@@ -1213,16 +1213,16 @@ export default function DashboardPage() {
               <div className="space-y-6 animate-[fadeIn_0.3s_ease-out]">
                 
                 {/* Header Action Card */}
-                <div className="p-5 sm:p-6 rounded-2xl bg-white/[0.025] border border-white/[0.08] backdrop-blur-xl flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div className="p-5 sm:p-6 rounded-2xl bg-white border border-indigo-100 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                   <div>
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-400/30 text-cyan-300 text-[10px] font-mono uppercase mb-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 text-[10px] font-mono font-bold uppercase mb-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 animate-pulse" />
                       Database Peserta Didik
                     </div>
-                    <h2 className="text-xl font-light text-white tracking-tight">
-                      Data Siswa & Rombongan Belajar <span className="font-normal text-stone-300">(2026/2027)</span>
+                    <h2 className="text-xl font-bold text-slate-900 tracking-tight">
+                      Data Siswa & Rombongan Belajar <span className="font-semibold text-slate-500">(2026/2027)</span>
                     </h2>
-                    <p className="text-xs text-stone-400 font-light mt-0.5">
+                    <p className="text-xs text-slate-600 font-medium mt-0.5">
                       Kelola daftar resmi peserta didik. Seluruh data di sini otomatis tersinkronisasi ke modul Presensi & E-Learning kelas.
                     </p>
                   </div>
@@ -1242,7 +1242,7 @@ export default function DashboardPage() {
                     <button
                       type="button"
                       onClick={downloadStudentTemplateExcel}
-                      className="px-3.5 py-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 text-stone-200 text-xs font-medium transition-all flex items-center gap-2 cursor-pointer shadow-lg"
+                      className="px-3.5 py-2.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-xs"
                       title="Unduh format tabel Excel kosong untuk diisi data siswa baru"
                     >
                       <span>📥</span>
@@ -1253,7 +1253,7 @@ export default function DashboardPage() {
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-black text-xs font-bold hover:opacity-95 transition-all flex items-center gap-2 cursor-pointer shadow-lg shadow-emerald-500/20"
+                      className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-md shadow-emerald-600/20"
                       title="Upload file Excel daftar siswa baru (.xlsx)"
                     >
                       <span>📤</span>
@@ -1264,7 +1264,7 @@ export default function DashboardPage() {
                     <button
                       type="button"
                       onClick={() => setIsAddStudentModalOpen(true)}
-                      className="px-4 py-2.5 rounded-xl bg-cyan-500 text-black text-xs font-bold hover:bg-cyan-400 transition-all flex items-center gap-1.5 cursor-pointer shadow-lg shadow-cyan-500/20"
+                      className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-indigo-600/20"
                     >
                       <span>+ Tambah Siswa</span>
                     </button>
@@ -1273,7 +1273,7 @@ export default function DashboardPage() {
                     <button
                       type="button"
                       onClick={handleResetStudents}
-                      className="p-2.5 rounded-xl bg-white/[0.03] hover:bg-rose-500/10 hover:text-rose-300 text-stone-500 border border-white/5 transition-all text-xs cursor-pointer"
+                      className="p-2.5 rounded-xl bg-white hover:bg-rose-50 hover:text-rose-600 text-slate-400 border border-slate-200 transition-all text-xs cursor-pointer shadow-xs"
                       title="Reset kembali ke data 535 siswa awal"
                     >
                       🔄
@@ -1283,36 +1283,36 @@ export default function DashboardPage() {
 
                 {/* 3 Metric Cards */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="p-4 rounded-xl bg-white/[0.025] border border-white/[0.08] backdrop-blur-xl">
-                    <div className="text-[11px] font-semibold text-stone-400 uppercase tracking-wider">Total Siswa Terdaftar</div>
-                    <div className="text-2xl font-black text-white mt-1">{studentsList.length}</div>
-                    <div className="text-[10px] text-stone-400 mt-0.5">Siswa Aktif Dapodik & Presensi</div>
+                  <div className="p-4 rounded-xl bg-white border border-indigo-100 shadow-sm">
+                    <div className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Total Siswa Terdaftar</div>
+                    <div className="text-2xl font-black text-slate-900 mt-1">{studentsList.length}</div>
+                    <div className="text-[10px] text-slate-500 mt-0.5 font-medium">Siswa Aktif Dapodik & Presensi</div>
                   </div>
 
-                  <div className="p-4 rounded-xl bg-white/[0.025] border border-white/[0.08] backdrop-blur-xl">
-                    <div className="text-[11px] font-semibold text-stone-400 uppercase tracking-wider">Rombongan Belajar</div>
-                    <div className="text-2xl font-black text-cyan-300 mt-1">{SCHOOL_CLASSES.length} Kelas</div>
-                    <div className="text-[10px] text-stone-400 mt-0.5">7-A s/d 7-F, 8-A s/d 8-F, 9-A s/d 9-E</div>
+                  <div className="p-4 rounded-xl bg-white border border-indigo-100 shadow-sm">
+                    <div className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Rombongan Belajar</div>
+                    <div className="text-2xl font-black text-indigo-600 mt-1">{SCHOOL_CLASSES.length} Kelas</div>
+                    <div className="text-[10px] text-slate-500 mt-0.5 font-medium">7-A s/d 7-F, 8-A s/d 8-F, 9-A s/d 9-E</div>
                   </div>
 
-                  <div className="p-4 rounded-xl bg-white/[0.025] border border-white/[0.08] backdrop-blur-xl">
-                    <div className="text-[11px] font-semibold text-stone-400 uppercase tracking-wider">Status Sinkronisasi</div>
-                    <div className="text-2xl font-black text-emerald-400 mt-1">Live Aktif</div>
-                    <div className="text-[10px] text-emerald-400/80 mt-0.5">Terhubung ke Portal Presensi E-Learning</div>
+                  <div className="p-4 rounded-xl bg-white border border-indigo-100 shadow-sm">
+                    <div className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Status Sinkronisasi</div>
+                    <div className="text-2xl font-black text-emerald-600 mt-1">Live Aktif</div>
+                    <div className="text-[10px] text-emerald-700 mt-0.5 font-medium">Terhubung ke Portal Presensi E-Learning</div>
                   </div>
                 </div>
 
                 {/* Filter & Search Bar */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-4 rounded-2xl bg-white/[0.025] border border-white/[0.08]">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-4 rounded-2xl bg-white border border-slate-200 shadow-xs">
                   {/* Select Class Filter */}
                   <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0">
-                    <span className="text-xs font-semibold text-stone-400 uppercase tracking-wider mr-1 whitespace-nowrap">
+                    <span className="text-xs font-bold text-slate-700 uppercase tracking-wider mr-1 whitespace-nowrap">
                       Pilih Kelas:
                     </span>
                     <select
                       value={studentClassFilter}
                       onChange={(e) => setStudentClassFilter(e.target.value)}
-                      className="px-3 py-1.5 rounded-xl bg-black/60 border border-white/20 text-white text-xs font-bold focus:outline-none focus:border-cyan-400 cursor-pointer"
+                      className="px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 text-xs font-bold focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 cursor-pointer shadow-xs"
                     >
                       <option value="ALL">Semua Kelas ({studentsList.length} Siswa)</option>
                       {SCHOOL_CLASSES.map(cls => (
@@ -1330,22 +1330,22 @@ export default function DashboardPage() {
                       value={studentSearch}
                       onChange={(e) => setStudentSearch(e.target.value)}
                       placeholder="Cari nama siswa atau NISN..."
-                      className="w-full md:w-72 pl-8 pr-4 py-2 rounded-xl bg-white/[0.04] border border-white/10 text-xs text-stone-200 placeholder-stone-500 focus:outline-none focus:border-cyan-400/50"
+                      className="w-full md:w-72 pl-8 pr-4 py-2 rounded-xl bg-white border border-slate-200 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 shadow-xs"
                     />
-                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-500 text-xs">
+                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs">
                       🔍
                     </span>
                   </div>
                 </div>
 
                 {/* Students Table */}
-                <div className="rounded-2xl bg-white/[0.025] border border-white/[0.08] backdrop-blur-xl overflow-hidden shadow-xl">
-                  <div className="p-3.5 bg-white/[0.02] border-b border-white/[0.06] flex items-center justify-between text-xs text-stone-400">
+                <div className="rounded-2xl bg-white border border-slate-200 overflow-hidden shadow-sm">
+                  <div className="p-3.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs text-slate-600 font-medium">
                     <span>
-                      Menampilkan <span className="font-semibold text-white">{filteredStudents.length}</span> dari {studentsList.length} siswa
+                      Menampilkan <span className="font-bold text-slate-900">{filteredStudents.length}</span> dari {studentsList.length} siswa
                     </span>
                     {studentClassFilter !== 'ALL' && (
-                      <span className="px-2 py-0.5 rounded font-mono text-[10px] bg-cyan-500/10 text-cyan-300 border border-cyan-400/30">
+                      <span className="px-2 py-0.5 rounded font-mono font-bold text-[10px] bg-indigo-50 text-indigo-700 border border-indigo-200">
                         Filter: Kelas {studentClassFilter}
                       </span>
                     )}
@@ -1353,7 +1353,7 @@ export default function DashboardPage() {
 
                   <div className="overflow-x-auto max-h-[600px] overflow-y-auto [scrollbar-width:thin]">
                     <table className="w-full text-left text-xs">
-                      <thead className="bg-white/[0.03] text-stone-400 font-mono uppercase text-[10px] tracking-wider border-b border-white/[0.06] sticky top-0 backdrop-blur-md">
+                      <thead className="bg-slate-50 text-slate-700 font-mono uppercase text-[10px] tracking-wider border-b border-slate-200 sticky top-0 font-bold backdrop-blur-md">
                         <tr>
                           <th className="py-3 px-4 w-12 text-center">No</th>
                           <th className="py-3 px-4 w-32">NISN</th>
@@ -1363,17 +1363,17 @@ export default function DashboardPage() {
                           <th className="py-3 px-4 w-20 text-center">Aksi</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-white/[0.04]">
+                      <tbody className="divide-y divide-slate-100">
                         {paginatedStudents.map((st, idx) => {
                           const absoluteIndex = (studentPage - 1) * STUDENTS_PER_PAGE + idx + 1;
                           return (
-                            <tr key={st.id} className="hover:bg-white/[0.02] transition-colors">
-                              <td className="py-2.5 px-4 text-center font-mono text-stone-500">{absoluteIndex}</td>
-                              <td className="py-2.5 px-4 font-mono text-cyan-400">{st.nisn}</td>
-                              <td className="py-2.5 px-4 font-mono text-stone-400">{st.nis || '-'}</td>
-                              <td className="py-2.5 px-4 font-medium text-white">{st.name}</td>
+                            <tr key={st.id} className="hover:bg-slate-50/80 transition-colors">
+                              <td className="py-2.5 px-4 text-center font-mono text-slate-500 font-medium">{absoluteIndex}</td>
+                              <td className="py-2.5 px-4 font-mono font-bold text-indigo-600">{st.nisn}</td>
+                              <td className="py-2.5 px-4 font-mono text-slate-600">{st.nis || '-'}</td>
+                              <td className="py-2.5 px-4 font-bold text-slate-900">{st.name}</td>
                               <td className="py-2.5 px-4">
-                                <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-white/5 border border-white/10 text-stone-300 font-mono">
+                                <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-indigo-50 border border-indigo-200 text-indigo-700 font-mono">
                                   {st.classId}
                                 </span>
                               </td>
@@ -1381,7 +1381,7 @@ export default function DashboardPage() {
                                 <button
                                   type="button"
                                   onClick={() => handleDeleteStudent(st.id, st.name)}
-                                  className="p-1 rounded-lg hover:bg-rose-500/20 text-stone-500 hover:text-rose-300 transition cursor-pointer"
+                                  className="p-1 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition cursor-pointer"
                                   title="Hapus siswa"
                                 >
                                   🗑️
@@ -1395,9 +1395,9 @@ export default function DashboardPage() {
                   </div>
 
                   {filteredStudents.length > 0 && (
-                    <div className="p-3 bg-white/[0.01] border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-stone-400">
+                    <div className="p-3 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600 font-medium">
                       <div>
-                        Menampilkan <span className="text-white font-semibold">{(studentPage - 1) * STUDENTS_PER_PAGE + 1}</span> - <span className="text-white font-semibold">{Math.min(studentPage * STUDENTS_PER_PAGE, filteredStudents.length)}</span> dari <span className="text-white font-semibold">{filteredStudents.length}</span> siswa
+                        Menampilkan <span className="text-slate-900 font-bold">{(studentPage - 1) * STUDENTS_PER_PAGE + 1}</span> - <span className="text-slate-900 font-bold">{Math.min(studentPage * STUDENTS_PER_PAGE, filteredStudents.length)}</span> dari <span className="text-slate-900 font-bold">{filteredStudents.length}</span> siswa
                       </div>
 
                       <div className="flex items-center gap-1.5">
@@ -1405,18 +1405,18 @@ export default function DashboardPage() {
                           type="button"
                           disabled={studentPage <= 1}
                           onClick={() => setStudentPage(p => Math.max(1, p - 1))}
-                          className="px-3 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] disabled:opacity-30 disabled:cursor-not-allowed border border-white/10 text-stone-300 text-xs font-medium transition cursor-pointer"
+                          className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed border border-slate-200 text-slate-700 text-xs font-bold transition cursor-pointer shadow-xs"
                         >
                           ◀ Sebelumnya
                         </button>
-                        <span className="px-3 py-1.5 rounded-lg bg-black/40 border border-white/10 text-stone-300 font-mono text-xs">
+                        <span className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-800 font-mono font-bold text-xs shadow-xs">
                           Hal {studentPage} / {totalStudentPages}
                         </span>
                         <button
                           type="button"
                           disabled={studentPage >= totalStudentPages}
                           onClick={() => setStudentPage(p => Math.min(totalStudentPages, p + 1))}
-                          className="px-3 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] disabled:opacity-30 disabled:cursor-not-allowed border border-white/10 text-stone-300 text-xs font-medium transition cursor-pointer"
+                          className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed border border-slate-200 text-slate-700 text-xs font-bold transition cursor-pointer shadow-xs"
                         >
                           Berikutnya ▶
                         </button>
@@ -1425,7 +1425,7 @@ export default function DashboardPage() {
                   )}
 
                   {filteredStudents.length === 0 && (
-                    <div className="py-16 text-center text-stone-500 text-xs">
+                    <div className="py-16 text-center text-slate-500 text-xs font-medium">
                       Tidak ada siswa yang cocok dengan filter atau kata kunci pencarian.
                     </div>
                   )}
@@ -1441,16 +1441,16 @@ export default function DashboardPage() {
               <div className="space-y-8 animate-[fadeIn_0.3s_ease-out]">
                 
                 {/* Header Section */}
-                <div className="p-5 sm:p-6 rounded-2xl bg-white/[0.025] border border-white/[0.08] backdrop-blur-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="p-5 sm:p-6 rounded-2xl bg-white border border-indigo-100 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div>
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-400/30 text-cyan-300 text-[10px] font-mono uppercase mb-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 text-[10px] font-mono font-bold uppercase mb-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 animate-pulse" />
                       Manajemen Personalia Sekolah
                     </div>
-                    <h2 className="text-xl font-light text-white tracking-tight">
-                      Pimpinan & Dewan Guru <span className="font-normal text-stone-300">(GTK)</span>
+                    <h2 className="text-xl font-bold text-slate-900 tracking-tight">
+                      Pimpinan & Dewan Guru <span className="font-semibold text-slate-500">(GTK)</span>
                     </h2>
-                    <p className="text-xs text-stone-400 font-light mt-0.5">
+                    <p className="text-xs text-slate-600 font-medium mt-0.5">
                       Kelola data Kepala Sekolah, para Wakasek, dewan guru pendidik, dan pembaruan data pokok sekolah yang tampil di website.
                     </p>
                   </div>
@@ -1458,7 +1458,7 @@ export default function DashboardPage() {
                   <div className="flex items-center gap-2.5 flex-wrap">
                     <button
                       onClick={() => setIsTeacherModalOpen(true)}
-                      className="px-4 py-2.5 rounded-xl bg-cyan-500 text-black text-xs font-medium hover:bg-cyan-400 transition-all flex items-center gap-1.5 cursor-pointer shadow-lg shadow-cyan-500/20"
+                      className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-indigo-600/20"
                     >
                       <span>+ Tambah Guru / Pendidik</span>
                     </button>
@@ -1469,13 +1469,13 @@ export default function DashboardPage() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="text-sm font-medium text-white flex items-center gap-2">
+                      <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                         <span>Pimpinan Utama & Wakil Kepala Sekolah</span>
-                        <span className="text-[10px] font-mono text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded-full border border-cyan-400/30">
+                        <span className="text-[10px] font-mono font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
                           {leadersList.length} Pimpinan
                         </span>
                       </h3>
-                      <p className="text-xs text-stone-400 font-light">Data ini langsung disinkronkan ke tab "Pimpinan" pada halaman Profil depan.</p>
+                      <p className="text-xs text-slate-600 font-medium">Data ini langsung disinkronkan ke tab "Pimpinan" pada halaman Profil depan.</p>
                     </div>
                   </div>
 
@@ -1483,39 +1483,39 @@ export default function DashboardPage() {
                     {leadersList.map((leader) => (
                       <div 
                         key={leader.id}
-                        className="p-5 rounded-2xl bg-white/[0.025] border border-white/[0.08] backdrop-blur-xl hover:border-cyan-400/40 transition-all flex flex-col justify-between gap-4 shadow-xl group relative overflow-hidden"
+                        className="p-5 rounded-2xl bg-white border border-indigo-100 hover:border-indigo-300 transition-all flex flex-col justify-between gap-4 shadow-sm group relative overflow-hidden"
                       >
                         <div className="flex items-start gap-4">
                           <img 
                             src={leader.photo || '/teachers/default_avatar.svg'} 
                             alt={leader.name}
-                            className="w-14 h-14 rounded-2xl object-cover border border-cyan-400/30 flex-shrink-0 shadow-lg"
+                            className="w-14 h-14 rounded-2xl object-cover border border-slate-200 flex-shrink-0 shadow-xs"
                           />
 
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap mb-1">
-                              <h4 className="text-sm font-medium text-white truncate">{leader.name}</h4>
-                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono border ${leader.badgeColor}`}>
+                              <h4 className="text-sm font-bold text-slate-900 truncate">{leader.name}</h4>
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border border-indigo-200 bg-indigo-50 text-indigo-800">
                                 {leader.role}
                               </span>
                             </div>
-                            <p className="text-[11px] font-mono text-stone-400 mb-2">NIP/Gol: {leader.nip}</p>
-                            <p className="text-xs text-stone-300/90 font-light leading-relaxed italic bg-white/[0.02] p-2.5 rounded-xl border border-white/[0.04]">
+                            <p className="text-[11px] font-mono text-slate-500 mb-2 font-medium">NIP/Gol: {leader.nip}</p>
+                            <p className="text-xs text-slate-700 font-normal leading-relaxed italic bg-slate-50 p-3 rounded-xl border border-slate-200">
                               "{leader.quote}"
                             </p>
                           </div>
                         </div>
 
                         {/* Leader Actions */}
-                        <div className="pt-3 border-t border-white/[0.06] flex items-center justify-between">
-                          <span className="text-[10px] font-mono text-emerald-400 flex items-center gap-1.5">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                        <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+                          <span className="text-[10px] font-mono font-bold text-emerald-700 flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                             {leader.status}
                           </span>
 
                           <button
                             onClick={() => handleOpenEditLeader(leader)}
-                            className="px-3 py-1.5 rounded-xl bg-white/[0.05] hover:bg-cyan-500/20 hover:text-cyan-200 border border-white/10 text-xs font-normal text-stone-300 transition-all flex items-center gap-1.5 cursor-pointer"
+                            className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-xs font-bold text-slate-700 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
                           >
                             <span>✏️ Ubah Profil / Ganti Pimpinan</span>
                           </button>
@@ -1526,15 +1526,15 @@ export default function DashboardPage() {
                 </div>
 
                 {/* --- BAGIAN 2: PEMBARUAN DATA POKOK PENDIDIKAN --- */}
-                <div className="p-6 rounded-2xl bg-white/[0.025] border border-white/[0.08] backdrop-blur-xl space-y-4">
-                  <div className="flex items-center justify-between pb-3 border-b border-white/[0.07]">
+                <div className="p-6 rounded-2xl bg-white border border-indigo-100 shadow-sm space-y-4">
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                     <div>
-                      <h3 className="text-sm font-medium text-white">Statistik Data Pokok Pendidikan</h3>
-                      <p className="text-xs text-stone-400 font-light">Angka metrik ini tampil pada kartu Data Pokok di halaman profil utama</p>
+                      <h3 className="text-sm font-bold text-slate-900">Statistik Data Pokok Pendidikan</h3>
+                      <p className="text-xs text-slate-600 font-medium">Angka metrik ini tampil pada kartu Data Pokok di halaman profil utama</p>
                     </div>
                     <button
                       onClick={handleSaveDataPokok}
-                      className="px-3.5 py-1.5 rounded-xl bg-cyan-500 text-black text-xs font-medium hover:bg-cyan-400 transition-all cursor-pointer shadow-md shadow-cyan-500/20"
+                      className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all cursor-pointer shadow-sm"
                     >
                       Simpan Data Pokok
                     </button>
@@ -1542,39 +1542,39 @@ export default function DashboardPage() {
 
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
                     <div>
-                      <label className="text-stone-400 block mb-1">Siswa Aktif</label>
+                      <label className="text-slate-700 font-bold block mb-1">Siswa Aktif</label>
                       <input 
                         type="text" 
                         value={dataPokok.siswa}
                         onChange={(e) => setDataPokok({ ...dataPokok, siswa: e.target.value })}
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.03] border border-white/10 text-white font-mono text-sm focus:outline-none focus:border-cyan-400/50"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-900 font-mono text-sm font-bold focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 shadow-xs"
                       />
                     </div>
                     <div>
-                      <label className="text-stone-400 block mb-1">Rombongan Belajar</label>
+                      <label className="text-slate-700 font-bold block mb-1">Rombongan Belajar</label>
                       <input 
                         type="text" 
                         value={dataPokok.rombel}
                         onChange={(e) => setDataPokok({ ...dataPokok, rombel: e.target.value })}
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.03] border border-white/10 text-white font-mono text-sm focus:outline-none focus:border-cyan-400/50"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-900 font-mono text-sm font-bold focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 shadow-xs"
                       />
                     </div>
                     <div>
-                      <label className="text-stone-400 block mb-1">Dewan Guru</label>
+                      <label className="text-slate-700 font-bold block mb-1">Dewan Guru</label>
                       <input 
                         type="text" 
                         value={dataPokok.guru}
                         onChange={(e) => setDataPokok({ ...dataPokok, guru: e.target.value })}
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.03] border border-white/10 text-white font-mono text-sm focus:outline-none focus:border-cyan-400/50"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-900 font-mono text-sm font-bold focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 shadow-xs"
                       />
                     </div>
                     <div>
-                      <label className="text-stone-400 block mb-1">Tenaga Kependidikan</label>
+                      <label className="text-slate-700 font-bold block mb-1">Tenaga Kependidikan</label>
                       <input 
                         type="text" 
                         value={dataPokok.staf}
                         onChange={(e) => setDataPokok({ ...dataPokok, staf: e.target.value })}
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.03] border border-white/10 text-white font-mono text-sm focus:outline-none focus:border-cyan-400/50"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-900 font-mono text-sm font-bold focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 shadow-xs"
                       />
                     </div>
                   </div>
@@ -1584,13 +1584,13 @@ export default function DashboardPage() {
                 <div className="space-y-4">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
-                      <h3 className="text-sm font-medium text-white flex items-center gap-2">
+                      <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                         <span>Daftar Guru & Tenaga Kependidikan</span>
-                        <span className="text-[10px] font-mono text-stone-400 bg-white/[0.05] px-2 py-0.5 rounded-full border border-white/10">
+                        <span className="text-[10px] font-mono font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
                           {teachersList.length} Pendidik Terdaftar
                         </span>
                       </h3>
-                      <p className="text-xs text-stone-400 font-light">Status keaktifan guru dapat diubah jika ada yang mutasi atau purnabakti.</p>
+                      <p className="text-xs text-slate-600 font-medium">Status keaktifan guru dapat diubah jika ada yang mutasi atau purnabakti.</p>
                     </div>
 
                     <div className="relative">
@@ -1599,19 +1599,19 @@ export default function DashboardPage() {
                         value={teacherSearch}
                         onChange={(e) => setTeacherSearch(e.target.value)}
                         placeholder="Cari nama guru / mapel..."
-                        className="w-full sm:w-64 pl-8 pr-4 py-1.5 rounded-xl bg-white/[0.04] border border-white/10 text-xs text-stone-200 placeholder-stone-500 focus:outline-none focus:border-cyan-400/50"
+                        className="w-full sm:w-64 pl-8 pr-4 py-2 rounded-xl bg-white border border-slate-200 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 shadow-xs"
                       />
-                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-500 text-xs">
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs">
                         🔍
                       </span>
                     </div>
                   </div>
 
                   {/* Teachers Table */}
-                  <div className="rounded-2xl bg-white/[0.025] border border-white/[0.08] backdrop-blur-xl overflow-hidden shadow-xl">
+                  <div className="rounded-2xl bg-white border border-slate-200 overflow-hidden shadow-sm">
                     <div className="w-full overflow-x-auto">
                       <table className="w-full text-left text-xs table-auto">
-                        <thead className="bg-white/[0.03] text-stone-400 font-mono uppercase text-[10px] tracking-wider border-b border-white/[0.06]">
+                        <thead className="bg-slate-50 text-slate-700 font-mono uppercase text-[10px] tracking-wider border-b border-slate-200 font-bold">
                           <tr>
                             <th className="py-3.5 px-4 sm:px-5">Guru & Tenaga Pendidik</th>
                             <th className="py-3.5 px-3 sm:px-4">Mata Pelajaran / Tugas</th>
@@ -1620,20 +1620,20 @@ export default function DashboardPage() {
                             <th className="py-3.5 px-4 text-right">Aksi</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-white/[0.04] text-stone-300">
+                        <tbody className="divide-y divide-slate-100 text-slate-700">
                           {filteredTeachers.map((teacher) => (
-                            <tr key={teacher.id} className="hover:bg-white/[0.02] transition-colors">
+                            <tr key={teacher.id} className="hover:bg-slate-50/80 transition-colors">
                               {/* Kolom 1: Foto + Nama + NIP di bawahnya */}
                               <td className="py-3.5 px-4 sm:px-5">
                                 <div className="flex items-center gap-3">
                                   <img 
                                     src={teacher.photo || '/teachers/default_avatar.svg'} 
                                     alt={teacher.name}
-                                    className="w-10 h-10 rounded-xl object-cover border border-white/10 flex-shrink-0 shadow-sm"
+                                    className="w-10 h-10 rounded-xl object-cover border border-slate-200 flex-shrink-0 shadow-xs"
                                   />
                                   <div className="min-w-0">
-                                    <span className="block font-medium text-white truncate text-xs sm:text-sm">{teacher.name}</span>
-                                    <span className="block text-[11px] font-mono text-stone-400 truncate mt-0.5">
+                                    <span className="block font-bold text-slate-900 truncate text-xs sm:text-sm">{teacher.name}</span>
+                                    <span className="block text-[11px] font-mono text-slate-500 truncate mt-0.5 font-medium">
                                       {teacher.nip && teacher.nip !== '-' ? `NIP/Gol. ${teacher.nip}` : teacher.status}
                                     </span>
                                   </div>
@@ -1641,35 +1641,35 @@ export default function DashboardPage() {
                               </td>
 
                               {/* Kolom 2: Mata Pelajaran */}
-                              <td className="py-3.5 px-3 sm:px-4 text-stone-200">
-                                <span className="font-normal leading-relaxed">{teacher.subject}</span>
+                              <td className="py-3.5 px-3 sm:px-4 text-slate-800">
+                                <span className="font-medium leading-relaxed">{teacher.subject}</span>
                               </td>
 
                               {/* Kolom 3: Status Kepegawaian */}
                               <td className="py-3.5 px-3 whitespace-nowrap">
-                                <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-mono bg-white/[0.04] text-stone-300 border border-white/10">
+                                <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-slate-100 text-slate-700 border border-slate-200">
                                   {teacher.status}
                                 </span>
                               </td>
 
-                              {/* Kolom 4: Status Keaktifan (Non-wrapping, modern glowing dot, direct toggle) */}
+                              {/* Kolom 4: Status Keaktifan */}
                               <td className="py-3.5 px-3 whitespace-nowrap">
                                 <button
                                   type="button"
                                   onClick={() => handleToggleTeacherActive(teacher.id)}
                                   title={teacher.active ? 'Klik untuk mengubah status jadi Mutasi / Nonaktif' : 'Klik untuk mengaktifkan kembali mengajar'}
-                                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium transition-all cursor-pointer border select-none group shadow-sm ${
+                                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold transition-all cursor-pointer border select-none group shadow-xs ${
                                     teacher.active 
-                                      ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border-emerald-400/30 hover:border-emerald-400/60 shadow-emerald-950/20' 
-                                      : 'bg-zinc-800/80 hover:bg-zinc-800 text-stone-400 border-white/10 hover:border-white/20'
+                                      ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-200' 
+                                      : 'bg-slate-100 hover:bg-slate-200 text-slate-600 border-slate-200'
                                   }`}
                                 >
-                                  <span className={`w-1.5 h-1.5 rounded-full transition-transform group-hover:scale-125 ${
+                                  <span className={`w-1.5 h-1.5 rounded-full ${
                                     teacher.active 
-                                      ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse' 
-                                      : 'bg-stone-500'
+                                      ? 'bg-emerald-500 animate-pulse' 
+                                      : 'bg-slate-400'
                                   }`} />
-                                  <span className="font-sans font-normal">
+                                  <span className="font-sans">
                                     {teacher.active ? 'Aktif' : 'Nonaktif'}
                                   </span>
                                   <span className="text-[10px] opacity-40 group-hover:opacity-100 transition-opacity">
@@ -1683,7 +1683,7 @@ export default function DashboardPage() {
                                 <div className="flex items-center justify-end gap-1.5">
                                   <button
                                     onClick={() => handleOpenEditTeacher(teacher)}
-                                    className="p-1.5 sm:p-2 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-400/20 transition-all cursor-pointer shadow-sm"
+                                    className="p-1.5 sm:p-2 rounded-xl bg-white hover:bg-slate-100 text-indigo-600 border border-slate-200 transition-all cursor-pointer shadow-xs"
                                     title="Ubah Data & Foto Guru"
                                   >
                                     <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -1692,10 +1692,10 @@ export default function DashboardPage() {
                                   </button>
                                   <button
                                     onClick={() => handleToggleTeacherActive(teacher.id)}
-                                    className={`p-1.5 sm:p-2 rounded-xl border transition-all cursor-pointer shadow-sm ${
+                                    className={`p-1.5 sm:p-2 rounded-xl border transition-all cursor-pointer shadow-xs ${
                                       teacher.active 
-                                        ? 'bg-white/[0.03] hover:bg-amber-500/10 text-stone-400 hover:text-amber-300 border-white/10 hover:border-amber-400/30' 
-                                        : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border-emerald-400/30'
+                                        ? 'bg-white hover:bg-amber-50 text-slate-500 hover:text-amber-700 border-slate-200' 
+                                        : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
                                     }`}
                                     title={teacher.active ? 'Ubah jadi Mutasi / Nonaktif' : 'Aktifkan Kembali Mengajar'}
                                   >
@@ -1708,7 +1708,7 @@ export default function DashboardPage() {
                                   </button>
                                   <button
                                     onClick={() => handleDeleteTeacher(teacher.id)}
-                                    className="p-1.5 sm:p-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/20 transition-all cursor-pointer shadow-sm"
+                                    className="p-1.5 sm:p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-all cursor-pointer shadow-xs"
                                     title="Hapus Guru dari Sistem"
                                   >
                                     <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -1737,15 +1737,15 @@ export default function DashboardPage() {
               <div className="space-y-6 animate-[fadeIn_0.3s_ease-out]">
                 
                 {/* Header */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-white/[0.025] border border-white/[0.08] backdrop-blur-xl">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 sm:p-6 rounded-2xl bg-white border border-indigo-100 shadow-sm">
                   <div>
-                    <h2 className="text-lg font-light text-white tracking-tight">Manajemen Kalender & Agenda</h2>
-                    <p className="text-xs text-stone-400 font-light">Jadwal pelaksanaan kegiatan akademik, ujian CBT, dan agenda resmi</p>
+                    <h2 className="text-lg font-bold text-slate-900 tracking-tight">Manajemen Kalender & Agenda</h2>
+                    <p className="text-xs text-slate-600 font-medium mt-0.5">Jadwal pelaksanaan kegiatan akademik, ujian CBT, dan agenda resmi</p>
                   </div>
 
                   <button
                     onClick={() => setIsAgendaModalOpen(true)}
-                    className="px-4 py-2.5 rounded-xl bg-cyan-500 text-black text-xs font-medium hover:bg-cyan-400 transition-all flex items-center gap-1.5 cursor-pointer shadow-lg shadow-cyan-500/20"
+                    className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-indigo-600/20"
                   >
                     <span>+ Tambah Agenda Baru</span>
                   </button>
@@ -1756,21 +1756,23 @@ export default function DashboardPage() {
                   {agendaList.map((agenda) => (
                     <div 
                       key={agenda.id}
-                      className="p-5 rounded-2xl bg-white/[0.025] border border-white/[0.08] backdrop-blur-xl hover:border-cyan-400/30 transition-all flex items-start justify-between gap-4 shadow-xl"
+                      className="p-5 rounded-2xl bg-white border border-indigo-100 hover:border-indigo-300 transition-all flex items-start justify-between gap-4 shadow-sm"
                     >
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-mono text-cyan-300 border border-cyan-400/30 bg-cyan-500/10">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold text-indigo-700 border border-indigo-200 bg-indigo-50">
                             {agenda.category}
                           </span>
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
-                            agenda.status === 'Berlangsung' ? 'text-amber-300 bg-amber-500/10' : 'text-stone-400 bg-white/[0.03]'
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
+                            agenda.status === 'Berlangsung' 
+                              ? 'text-amber-800 bg-amber-50 border border-amber-200' 
+                              : 'text-slate-600 bg-slate-100 border border-slate-200'
                           }`}>
                             {agenda.status}
                           </span>
                         </div>
-                        <h4 className="text-sm font-normal text-white">{agenda.name}</h4>
-                        <p className="text-xs font-mono text-cyan-400 flex items-center gap-1.5">
+                        <h4 className="text-sm font-bold text-slate-900">{agenda.name}</h4>
+                        <p className="text-xs font-mono font-bold text-indigo-600 flex items-center gap-1.5">
                           <span>🗓️</span>
                           <span>{agenda.date}</span>
                         </p>
@@ -1778,7 +1780,7 @@ export default function DashboardPage() {
 
                       <button
                         onClick={() => handleDeleteAgenda(agenda.id)}
-                        className="p-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-300 transition-colors"
+                        className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-colors shadow-xs"
                         title="Hapus Agenda"
                       >
                         🗑️
@@ -1797,15 +1799,15 @@ export default function DashboardPage() {
               <div className="space-y-6 animate-[fadeIn_0.3s_ease-out]">
                 
                 {/* Header */}
-                <div className="p-5 rounded-2xl bg-white/[0.025] border border-white/[0.08] backdrop-blur-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="p-5 sm:p-6 rounded-2xl bg-white border border-indigo-100 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div>
-                    <h2 className="text-lg font-light text-white tracking-tight">Manajemen Galeri & Fasilitas</h2>
-                    <p className="text-xs text-stone-400 font-light">Foto dokumentasi kegiatan belajar dan sarana kampus terpadu</p>
+                    <h2 className="text-lg font-bold text-slate-900 tracking-tight">Manajemen Galeri & Fasilitas</h2>
+                    <p className="text-xs text-slate-600 font-medium mt-0.5">Foto dokumentasi kegiatan belajar dan sarana kampus terpadu</p>
                   </div>
 
                   <button
                     onClick={() => showToast('Pilih file foto dari komputer Anda untuk diunggah.')}
-                    className="px-4 py-2.5 rounded-xl bg-cyan-500 text-black text-xs font-medium hover:bg-cyan-400 transition-all flex items-center gap-1.5 cursor-pointer shadow-lg shadow-cyan-500/20"
+                    className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-indigo-600/20"
                   >
                     <span>+ Unggah Media Baru</span>
                   </button>
@@ -1814,13 +1816,13 @@ export default function DashboardPage() {
                 {/* Upload Drag & Drop Simulation Area */}
                 <div 
                   onClick={() => showToast('Simulasi unggah: foto siap dihubungkan ke Supabase Storage.')}
-                  className="p-8 rounded-2xl border-2 border-dashed border-white/10 hover:border-cyan-400/40 bg-white/[0.015] hover:bg-white/[0.03] transition-all text-center cursor-pointer flex flex-col items-center justify-center gap-2"
+                  className="p-8 rounded-2xl border-2 border-dashed border-indigo-200 hover:border-indigo-400 bg-white hover:bg-indigo-50/20 transition-all text-center cursor-pointer flex flex-col items-center justify-center gap-2 shadow-xs"
                 >
-                  <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-400/20 flex items-center justify-center text-cyan-300 text-xl">
+                  <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-600 text-xl">
                     📁
                   </div>
-                  <p className="text-xs sm:text-sm font-medium text-white">Tarik & lepas foto ke sini, atau klik untuk memilih berkas</p>
-                  <p className="text-[11px] text-stone-500 font-mono">Format didukung: JPG, PNG, WebP (Maks. 5 MB/foto)</p>
+                  <p className="text-xs sm:text-sm font-bold text-slate-900">Tarik & lepas foto ke sini, atau klik untuk memilih berkas</p>
+                  <p className="text-[11px] text-slate-500 font-mono font-medium">Format didukung: JPG, PNG, WebP (Maks. 5 MB/foto)</p>
                 </div>
 
                 {/* Photo Grid */}
@@ -1828,23 +1830,23 @@ export default function DashboardPage() {
                   {galleryList.map((photo) => (
                     <div 
                       key={photo.id}
-                      className="group relative aspect-[4/3] rounded-2xl overflow-hidden border border-white/10 bg-white/[0.02] shadow-xl"
+                      className="group relative aspect-[4/3] rounded-2xl overflow-hidden border border-slate-200 bg-slate-100 shadow-sm"
                     >
                       <Image src={photo.src} alt={photo.title} fill className="object-cover group-hover:scale-105 transition-transform duration-500" />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent p-4 flex flex-col justify-between">
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/30 to-transparent p-4 flex flex-col justify-between">
                         <div className="flex justify-between items-start">
-                          <span className="px-2 py-0.5 rounded-full text-[9px] font-mono text-cyan-300 border border-cyan-400/30 bg-black/60 backdrop-blur-md">
+                          <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-bold text-white border border-white/20 bg-slate-900/70 backdrop-blur-md">
                             {photo.category}
                           </span>
                           <button
                             onClick={() => handleDeleteGallery(photo.id)}
-                            className="p-1.5 rounded-lg bg-red-600/80 hover:bg-red-600 text-white text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="p-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs opacity-0 group-hover:opacity-100 transition-opacity"
                             title="Hapus Foto"
                           >
                             🗑️
                           </button>
                         </div>
-                        <h4 className="text-xs font-normal text-white line-clamp-2">{photo.title}</h4>
+                        <h4 className="text-xs font-bold text-white line-clamp-2">{photo.title}</h4>
                       </div>
                     </div>
                   ))}
@@ -1860,9 +1862,9 @@ export default function DashboardPage() {
               <div className="space-y-6 animate-[fadeIn_0.3s_ease-out]">
                 
                 {/* Header */}
-                <div className="p-5 rounded-2xl bg-white/[0.025] border border-white/[0.08] backdrop-blur-xl">
-                  <h2 className="text-lg font-light text-white tracking-tight">Kotak Pesan Masuk (Kontak & Aduan)</h2>
-                  <p className="text-xs text-stone-400 font-light">Pesan dan pertanyaan resmi dari masyarakat dan wali murid via website</p>
+                <div className="p-5 sm:p-6 rounded-2xl bg-white border border-indigo-100 shadow-sm">
+                  <h2 className="text-lg font-bold text-slate-900 tracking-tight">Kotak Pesan Masuk (Kontak & Aduan)</h2>
+                  <p className="text-xs text-slate-600 font-medium mt-0.5">Pesan dan pertanyaan resmi dari masyarakat dan wali murid via website</p>
                 </div>
 
                 {/* Message Cards */}
@@ -1872,34 +1874,34 @@ export default function DashboardPage() {
                       key={msg.id}
                       className={`p-5 rounded-2xl border transition-all ${
                         msg.read 
-                          ? 'bg-white/[0.02] border-white/[0.06]' 
-                          : 'bg-cyan-950/15 border-cyan-400/30 shadow-lg'
+                          ? 'bg-white border-slate-200 shadow-xs' 
+                          : 'bg-indigo-50/40 border-indigo-200 shadow-sm'
                       }`}
                     >
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
                         <div className="flex items-center gap-2.5">
-                          <span className="w-2 h-2 rounded-full bg-cyan-400" />
-                          <h4 className="text-sm font-medium text-white">{msg.sender}</h4>
-                          <span className="text-[11px] text-stone-400 font-mono">({msg.contact})</span>
+                          <span className={`w-2 h-2 rounded-full ${msg.read ? 'bg-slate-400' : 'bg-indigo-600 animate-pulse'}`} />
+                          <h4 className="text-sm font-bold text-slate-900">{msg.sender}</h4>
+                          <span className="text-[11px] text-slate-500 font-mono font-medium">({msg.contact})</span>
                         </div>
-                        <span className="text-[10px] font-mono text-stone-400">{msg.date}</span>
+                        <span className="text-[10px] font-mono text-slate-500 font-medium">{msg.date}</span>
                       </div>
 
-                      <h5 className="text-xs font-semibold text-cyan-300 mb-1.5">{msg.subject}</h5>
-                      <p className="text-xs text-stone-300 font-light leading-relaxed mb-4">{msg.message}</p>
+                      <h5 className="text-xs font-bold text-indigo-700 mb-1.5">{msg.subject}</h5>
+                      <p className="text-xs text-slate-700 font-normal leading-relaxed mb-4">{msg.message}</p>
 
                       <div className="flex items-center gap-2">
                         <a
                           href={`https://wa.me/?text=Halo%20${encodeURIComponent(msg.sender)}`}
                           target="_blank"
                           rel="noreferrer"
-                          className="px-3 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/30 text-emerald-300 text-xs font-normal transition-all"
+                          className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs"
                         >
                           Balas via WhatsApp
                         </a>
                         <button
                           onClick={() => handleDeleteMessage(msg.id)}
-                          className="px-3 py-1.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-300 text-xs font-normal transition-all"
+                          className="px-3.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 text-xs font-bold transition-all shadow-xs"
                         >
                           Hapus Pesan
                         </button>
@@ -1918,101 +1920,101 @@ export default function DashboardPage() {
               <div className="space-y-6 animate-[fadeIn_0.3s_ease-out]">
                 
                 {/* School Master Data */}
-                <div className="p-6 rounded-2xl bg-white/[0.025] border border-white/[0.08] backdrop-blur-xl space-y-4">
-                  <h3 className="text-sm font-medium text-white pb-3 border-b border-white/[0.07]">
+                <div className="p-6 rounded-2xl bg-white border border-indigo-100 shadow-sm space-y-4">
+                  <h3 className="text-sm font-bold text-slate-900 pb-3 border-b border-slate-100">
                     Identitas Resmi Sekolah
                   </h3>
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                     <div>
-                      <label className="text-stone-400 block mb-1">Nama Satuan Pendidikan</label>
+                      <label className="text-slate-700 font-bold block mb-1">Nama Satuan Pendidikan</label>
                       <input 
                         type="text" 
                         defaultValue="SMP Negeri 3 Cihampelas" 
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.03] border border-white/10 text-white focus:outline-none focus:border-cyan-400/50"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-900 font-medium focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 shadow-xs"
                       />
                     </div>
                     <div>
-                      <label className="text-stone-400 block mb-1">NPSN</label>
+                      <label className="text-slate-700 font-bold block mb-1">NPSN</label>
                       <input 
                         type="text" 
                         defaultValue="20224133" 
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.03] border border-white/10 text-white focus:outline-none focus:border-cyan-400/50"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-900 font-medium focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 shadow-xs"
                       />
                     </div>
                     <div>
-                      <label className="text-stone-400 block mb-1">Status Akreditasi</label>
+                      <label className="text-slate-700 font-bold block mb-1">Status Akreditasi</label>
                       <input 
                         type="text" 
                         defaultValue="A (Unggul) - BAN S/M" 
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.03] border border-white/10 text-white focus:outline-none focus:border-cyan-400/50"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-900 font-medium focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 shadow-xs"
                       />
                     </div>
                     <div>
-                      <label className="text-stone-400 block mb-1">Kecamatan / Kabupaten</label>
+                      <label className="text-slate-700 font-bold block mb-1">Kecamatan / Kabupaten</label>
                       <input 
                         type="text" 
                         defaultValue="Cihampelas, Kab. Bandung Barat" 
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.03] border border-white/10 text-white focus:outline-none focus:border-cyan-400/50"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-900 font-medium focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 shadow-xs"
                       />
                     </div>
                   </div>
 
                   <button
                     onClick={() => showToast('Identitas sekolah berhasil diperbarui!')}
-                    className="px-4 py-2 rounded-xl bg-cyan-500 text-black text-xs font-medium hover:bg-cyan-400 transition-all cursor-pointer"
+                    className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all cursor-pointer shadow-sm"
                   >
                     Simpan Perubahan
                   </button>
                 </div>
 
                 {/* Password Change */}
-                <div className="p-6 rounded-2xl bg-white/[0.025] border border-white/[0.08] backdrop-blur-xl space-y-4">
-                  <h3 className="text-sm font-medium text-white pb-3 border-b border-white/[0.07]">
+                <div className="p-6 rounded-2xl bg-white border border-indigo-100 shadow-sm space-y-4">
+                  <h3 className="text-sm font-bold text-slate-900 pb-3 border-b border-slate-100">
                     Keamanan & Kata Sandi Admin
                   </h3>
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                     <div>
-                      <label className="text-stone-400 block mb-1">Kata Sandi Baru</label>
+                      <label className="text-slate-700 font-bold block mb-1">Kata Sandi Baru</label>
                       <input 
                         type="password" 
                         placeholder="••••••••" 
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.03] border border-white/10 text-white focus:outline-none focus:border-cyan-400/50"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-900 font-medium focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 shadow-xs"
                       />
                     </div>
                     <div>
-                      <label className="text-stone-400 block mb-1">Konfirmasi Kata Sandi</label>
+                      <label className="text-slate-700 font-bold block mb-1">Konfirmasi Kata Sandi</label>
                       <input 
                         type="password" 
                         placeholder="••••••••" 
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.03] border border-white/10 text-white focus:outline-none focus:border-cyan-400/50"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-900 font-medium focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 shadow-xs"
                       />
                     </div>
                   </div>
 
                   <button
                     onClick={() => showToast('Kata sandi admin berhasil diperbarui!')}
-                    className="px-4 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] border border-white/10 text-white text-xs font-normal transition-all cursor-pointer"
+                    className="px-4 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 text-xs font-bold transition-all cursor-pointer shadow-xs"
                   >
                     Perbarui Kata Sandi
                   </button>
                 </div>
 
                 {/* Synchronization & Data Reset */}
-                <div className="p-6 rounded-2xl bg-white/[0.025] border border-white/[0.08] backdrop-blur-xl space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-white/[0.07] gap-2">
+                <div className="p-6 rounded-2xl bg-white border border-indigo-100 shadow-sm space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-2">
                     <div>
-                      <h3 className="text-sm font-medium text-white">Sinkronisasi & Reset Data Sekolah</h3>
-                      <p className="text-xs text-stone-400 font-light">Data pimpinan, direktori guru, dan data pokok tersimpan otomatis di LocalStorage browser.</p>
+                      <h3 className="text-sm font-bold text-slate-900">Sinkronisasi & Reset Data Sekolah</h3>
+                      <p className="text-xs text-slate-600 font-medium">Data pimpinan, direktori guru, dan data pokok tersimpan otomatis di LocalStorage browser.</p>
                     </div>
-                    <span className="self-start sm:self-auto px-2.5 py-1 rounded-full text-[10px] font-mono bg-emerald-500/10 text-emerald-300 border border-emerald-400/30 flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="self-start sm:self-auto px-2.5 py-1 rounded-full text-[10px] font-mono font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                       Tersinkronisasi Realtime
                     </span>
                   </div>
 
-                  <p className="text-xs text-stone-300/80 leading-relaxed font-light">
+                  <p className="text-xs text-slate-700 leading-relaxed font-normal">
                     Semua perubahan yang Anda simpan di Admin Dashboard langsung terhubung dan otomatis mengubah tampilan di halaman publik (Landing Page). Jika Anda ingin mengembalikan seluruh data pimpinan dan guru ke setelan awal pabrik, gunakan tombol reset di bawah:
                   </p>
 
@@ -2023,7 +2025,7 @@ export default function DashboardPage() {
                         showToast('🔄 Seluruh data berhasil direset ke setelan awal!');
                       }
                     }}
-                    className="px-4 py-2 rounded-xl bg-red-500/15 hover:bg-red-500/25 border border-red-500/30 text-red-300 text-xs font-normal transition-all cursor-pointer flex items-center gap-2"
+                    className="px-4 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 text-xs font-bold transition-all cursor-pointer flex items-center gap-2 shadow-xs"
                   >
                     <span>🔄 Reset Data ke Setelan Awal</span>
                   </button>
@@ -2045,19 +2047,19 @@ export default function DashboardPage() {
           data-lenis-prevent="true"
           data-lenis-prevent-wheel="true"
           data-lenis-prevent-touch="true"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-[fadeIn_0.2s_ease-out]"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]"
         >
           <div 
             data-lenis-prevent="true"
             data-lenis-prevent-wheel="true"
             data-lenis-prevent-touch="true"
-            className="w-full max-w-lg rounded-[2rem] bg-[#0c0d11] border border-white/15 p-6 sm:p-7 shadow-2xl relative max-h-[90vh] overflow-y-auto"
+            className="w-full max-w-lg rounded-3xl bg-white border border-slate-200 p-6 sm:p-7 shadow-2xl relative max-h-[90vh] overflow-y-auto"
           >
-            <div className="flex items-center justify-between pb-4 border-b border-white/[0.08] mb-5">
-              <h3 className="text-base font-normal text-white">Tulis Warta Baru</h3>
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-5">
+              <h3 className="text-base font-bold text-slate-900">Tulis Warta Baru</h3>
               <button 
                 onClick={() => setIsNewsModalOpen(false)}
-                className="text-stone-400 hover:text-white text-sm p-1 cursor-pointer"
+                className="text-slate-400 hover:text-slate-700 text-base font-bold p-1 cursor-pointer"
               >
                 ✕
               </button>
@@ -2065,24 +2067,24 @@ export default function DashboardPage() {
 
             <form onSubmit={handleAddNews} className="space-y-4 text-xs">
               <div>
-                <label className="text-stone-300 block mb-1.5 font-medium">Judul Warta</label>
+                <label className="text-slate-700 block mb-1.5 font-bold">Judul Warta</label>
                 <input
                   type="text"
                   required
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
                   placeholder="Contoh: Tim Robotika Meraih Medali Emas..."
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.04] border border-white/10 text-white focus:outline-none focus:border-cyan-400"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-300 text-slate-900 font-medium focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 shadow-xs"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-stone-300 block mb-1.5 font-medium">Kategori</label>
+                  <label className="text-slate-700 block mb-1.5 font-bold">Kategori</label>
                   <select
                     value={newCategory}
                     onChange={(e) => setNewCategory(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-xl bg-[#14151b] border border-white/10 text-white focus:outline-none focus:border-cyan-400 cursor-pointer"
+                    className="w-full px-3 py-2.5 rounded-xl bg-white border border-slate-300 text-slate-900 font-medium focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 cursor-pointer shadow-xs"
                   >
                     <option value="Prestasi">Prestasi</option>
                     <option value="Pengumuman">Pengumuman</option>
@@ -2091,11 +2093,11 @@ export default function DashboardPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-stone-300 block mb-1.5 font-medium">Pilih Foto Sampul</label>
+                  <label className="text-slate-700 block mb-1.5 font-bold">Pilih Foto Sampul</label>
                   <select
                     value={newImage}
                     onChange={(e) => setNewImage(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-xl bg-[#14151b] border border-white/10 text-white focus:outline-none focus:border-cyan-400 cursor-pointer"
+                    className="w-full px-3 py-2.5 rounded-xl bg-white border border-slate-300 text-slate-900 font-medium focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 cursor-pointer shadow-xs"
                   >
                     <option value="/gallery_2.jpg">Foto Basket (Juara)</option>
                     <option value="/slide1.jpeg">Foto Upacara Bendera</option>
@@ -2107,13 +2109,13 @@ export default function DashboardPage() {
               </div>
 
               <div>
-                <label className="text-stone-300 block mb-1.5 font-medium">Ringkasan / Kutipan</label>
+                <label className="text-slate-700 block mb-1.5 font-bold">Ringkasan / Kutipan</label>
                 <textarea
                   rows={3}
                   value={newExcerpt}
                   onChange={(e) => setNewExcerpt(e.target.value)}
                   placeholder="Kutipan singkat berita untuk cuplikan depan..."
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.04] border border-white/10 text-white focus:outline-none focus:border-cyan-400 resize-none"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-300 text-slate-900 font-medium focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 resize-none shadow-xs"
                 />
               </div>
 
@@ -2121,13 +2123,13 @@ export default function DashboardPage() {
                 <button
                   type="button"
                   onClick={() => setIsNewsModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-stone-300 cursor-pointer"
+                  className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold cursor-pointer shadow-xs"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-medium cursor-pointer shadow-lg shadow-cyan-500/20"
+                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold cursor-pointer shadow-md shadow-indigo-600/20"
                 >
                   Terbitkan Sekarang
                 </button>
@@ -2145,19 +2147,19 @@ export default function DashboardPage() {
           data-lenis-prevent="true"
           data-lenis-prevent-wheel="true"
           data-lenis-prevent-touch="true"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-[fadeIn_0.2s_ease-out]"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]"
         >
           <div 
             data-lenis-prevent="true"
             data-lenis-prevent-wheel="true"
             data-lenis-prevent-touch="true"
-            className="w-full max-w-md rounded-[2rem] bg-[#0c0d11] border border-white/15 p-6 shadow-2xl relative"
+            className="w-full max-w-md rounded-3xl bg-white border border-slate-200 p-6 shadow-2xl relative"
           >
-            <div className="flex items-center justify-between pb-4 border-b border-white/[0.08] mb-5">
-              <h3 className="text-base font-normal text-white">Tambah Agenda Akademik</h3>
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-5">
+              <h3 className="text-base font-bold text-slate-900">Tambah Agenda Akademik</h3>
               <button 
                 onClick={() => setIsAgendaModalOpen(false)}
-                className="text-stone-400 hover:text-white text-sm p-1 cursor-pointer"
+                className="text-slate-400 hover:text-slate-700 text-base font-bold p-1 cursor-pointer"
               >
                 ✕
               </button>
@@ -2165,35 +2167,35 @@ export default function DashboardPage() {
 
             <form onSubmit={handleAddAgenda} className="space-y-4 text-xs">
               <div>
-                <label className="text-stone-300 block mb-1.5 font-medium">Nama Kegiatan</label>
+                <label className="text-slate-700 block mb-1.5 font-bold">Nama Kegiatan</label>
                 <input
                   type="text"
                   required
                   value={newAgendaName}
                   onChange={(e) => setNewAgendaName(e.target.value)}
                   placeholder="Contoh: Ujian Asesmen Akhir Semester..."
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.04] border border-white/10 text-white focus:outline-none focus:border-cyan-400"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-300 text-slate-900 font-medium focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 shadow-xs"
                 />
               </div>
 
               <div>
-                <label className="text-stone-300 block mb-1.5 font-medium">Rentang Tanggal</label>
+                <label className="text-slate-700 block mb-1.5 font-bold">Rentang Tanggal</label>
                 <input
                   type="text"
                   required
                   value={newAgendaDate}
                   onChange={(e) => setNewAgendaDate(e.target.value)}
                   placeholder="Contoh: 12 - 18 Desember 2026"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.04] border border-white/10 text-white focus:outline-none focus:border-cyan-400"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-300 text-slate-900 font-medium focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 shadow-xs"
                 />
               </div>
 
               <div>
-                <label className="text-stone-300 block mb-1.5 font-medium">Kategori</label>
+                <label className="text-slate-700 block mb-1.5 font-bold">Kategori</label>
                 <select
                   value={newAgendaCategory}
                   onChange={(e) => setNewAgendaCategory(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl bg-[#14151b] border border-white/10 text-white focus:outline-none focus:border-cyan-400 cursor-pointer"
+                  className="w-full px-3 py-2.5 rounded-xl bg-white border border-slate-300 text-slate-900 font-medium focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 cursor-pointer shadow-xs"
                 >
                   <option value="Akademik">Akademik</option>
                   <option value="Ujian CBT">Ujian CBT</option>
@@ -2207,13 +2209,13 @@ export default function DashboardPage() {
                 <button
                   type="button"
                   onClick={() => setIsAgendaModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-stone-300 cursor-pointer"
+                  className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold cursor-pointer shadow-xs"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-medium cursor-pointer shadow-lg shadow-cyan-500/20"
+                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold cursor-pointer shadow-md shadow-indigo-600/20"
                 >
                   Simpan Agenda
                 </button>
@@ -2231,22 +2233,22 @@ export default function DashboardPage() {
           data-lenis-prevent="true"
           data-lenis-prevent-wheel="true"
           data-lenis-prevent-touch="true"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-[fadeIn_0.2s_ease-out]"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]"
         >
           <div 
             data-lenis-prevent="true"
             data-lenis-prevent-wheel="true"
             data-lenis-prevent-touch="true"
-            className="w-full max-w-lg rounded-[2rem] bg-[#0c0d11] border border-white/15 p-6 sm:p-7 shadow-2xl relative max-h-[90vh] overflow-y-auto"
+            className="w-full max-w-lg rounded-3xl bg-white border border-slate-200 p-6 sm:p-7 shadow-2xl relative max-h-[90vh] overflow-y-auto"
           >
-            <div className="flex items-center justify-between pb-4 border-b border-white/[0.08] mb-5">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-5">
               <div>
-                <h3 className="text-base font-normal text-white">Ubah Data / Ganti Pimpinan</h3>
-                <p className="text-xs text-stone-400 font-light mt-0.5">Jabatan: {selectedLeader.role}</p>
+                <h3 className="text-base font-bold text-slate-900">Ubah Data / Ganti Pimpinan</h3>
+                <p className="text-xs text-slate-500 font-medium mt-0.5">Jabatan: {selectedLeader.role}</p>
               </div>
               <button 
                 onClick={() => setIsLeaderModalOpen(false)}
-                className="text-stone-400 hover:text-white text-sm p-1 cursor-pointer"
+                className="text-slate-400 hover:text-slate-700 text-base font-bold p-1 cursor-pointer"
               >
                 ✕
               </button>
@@ -2255,12 +2257,12 @@ export default function DashboardPage() {
             <form onSubmit={handleSaveLeader} className="space-y-4 text-xs">
               {/* Photo Selector */}
               <div>
-                <label className="text-stone-300 block mb-1.5 font-medium">Foto Profil Pimpinan</label>
+                <label className="text-slate-700 block mb-1.5 font-bold">Foto Profil Pimpinan</label>
                 <div className="flex items-center gap-3 mb-2.5">
                   <img 
                     src={leaderFormPhoto || '/teachers/default_avatar.svg'} 
                     alt="Preview" 
-                    className="w-14 h-14 rounded-2xl object-cover border border-cyan-400/40 shadow-md flex-shrink-0"
+                    className="w-14 h-14 rounded-2xl object-cover border border-slate-200 shadow-xs flex-shrink-0"
                   />
                   <div className="flex-1">
                     <input
@@ -2268,13 +2270,13 @@ export default function DashboardPage() {
                       value={leaderFormPhoto}
                       onChange={(e) => setLeaderFormPhoto(e.target.value)}
                       placeholder="URL foto pimpinan..."
-                      className="w-full px-3.5 py-2 rounded-xl bg-white/[0.04] border border-white/10 text-white font-mono text-xs focus:outline-none focus:border-cyan-400"
+                      className="w-full px-3.5 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 font-mono text-xs focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 shadow-xs"
                     />
-                    <p className="text-[10px] text-stone-500 mt-1">Bisa gunakan link gambar atau pilih foto preset di bawah.</p>
+                    <p className="text-[10px] text-slate-500 mt-1">Bisa gunakan link gambar atau pilih foto preset di bawah.</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-[10px] text-stone-400">Pilihan Cepat:</span>
+                  <span className="text-[10px] text-slate-500 font-medium">Pilihan Cepat:</span>
                   {PHOTO_PRESETS.map((p) => (
                     <button
                       key={p.src}
@@ -2282,8 +2284,8 @@ export default function DashboardPage() {
                       onClick={() => setLeaderFormPhoto(p.src)}
                       className={`px-2.5 py-1 rounded-lg border text-[11px] flex items-center gap-1.5 transition-all cursor-pointer ${
                         leaderFormPhoto === p.src
-                          ? 'border-cyan-400 bg-cyan-400/15 text-cyan-200'
-                          : 'border-white/10 bg-white/[0.02] text-stone-400 hover:text-white'
+                          ? 'border-indigo-500 bg-indigo-50 text-indigo-700 font-bold'
+                          : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
                       }`}
                     >
                       <img src={p.src} alt={p.label} className="w-4 h-4 rounded-full object-cover" />
@@ -2294,48 +2296,48 @@ export default function DashboardPage() {
               </div>
 
               <div>
-                <label className="text-stone-300 block mb-1.5 font-medium">Nama Lengkap & Gelar Pimpinan</label>
+                <label className="text-slate-700 block mb-1.5 font-bold">Nama Lengkap & Gelar Pimpinan</label>
                 <input
                   type="text"
                   required
                   value={leaderFormName}
                   onChange={(e) => setLeaderFormName(e.target.value)}
                   placeholder="Contoh: Dr. H. Ahmad Fauzi, M.Pd."
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.04] border border-white/10 text-white focus:outline-none focus:border-cyan-400"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-300 text-slate-900 font-medium focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 shadow-xs"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-stone-300 block mb-1.5 font-medium">Jabatan Pimpinan</label>
+                  <label className="text-slate-700 block mb-1.5 font-bold">Jabatan Pimpinan</label>
                   <input
                     type="text"
                     required
                     value={leaderFormRole}
                     onChange={(e) => setLeaderFormRole(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.04] border border-white/10 text-white focus:outline-none focus:border-cyan-400"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-300 text-slate-900 font-medium focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 shadow-xs"
                   />
                 </div>
                 <div>
-                  <label className="text-stone-300 block mb-1.5 font-medium">NIP / NUPTK</label>
+                  <label className="text-slate-700 block mb-1.5 font-bold">NIP / NUPTK</label>
                   <input
                     type="text"
                     value={leaderFormNip}
                     onChange={(e) => setLeaderFormNip(e.target.value)}
                     placeholder="19740512..."
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.04] border border-white/10 text-white focus:outline-none focus:border-cyan-400 font-mono"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-900 font-mono focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 shadow-xs"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="text-stone-300 block mb-1.5 font-medium">Kutipan Visi / Pesan Pimpinan</label>
+                <label className="text-slate-700 block mb-1.5 font-bold">Kutipan Visi / Pesan Pimpinan</label>
                 <textarea
                   rows={3}
                   value={leaderFormQuote}
                   onChange={(e) => setLeaderFormQuote(e.target.value)}
                   placeholder="Kutipan arahan pimpinan yang tampil pada website..."
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.04] border border-white/10 text-white focus:outline-none focus:border-cyan-400 resize-none"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-300 text-slate-900 font-medium focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 resize-none shadow-xs"
                 />
               </div>
 
@@ -2343,13 +2345,13 @@ export default function DashboardPage() {
                 <button
                   type="button"
                   onClick={() => setIsLeaderModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-stone-300 cursor-pointer"
+                  className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold cursor-pointer shadow-xs"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-medium cursor-pointer shadow-lg shadow-cyan-500/20"
+                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold cursor-pointer shadow-md shadow-indigo-600/20"
                 >
                   Simpan Perubahan Pimpinan
                 </button>
@@ -2367,22 +2369,22 @@ export default function DashboardPage() {
           data-lenis-prevent="true"
           data-lenis-prevent-wheel="true"
           data-lenis-prevent-touch="true"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-[fadeIn_0.2s_ease-out]"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]"
         >
           <div 
             data-lenis-prevent="true"
             data-lenis-prevent-wheel="true"
             data-lenis-prevent-touch="true"
-            className="w-full max-w-md rounded-[2rem] bg-[#0c0d11] border border-white/15 p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto"
+            className="w-full max-w-md rounded-3xl bg-white border border-slate-200 p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto"
           >
-            <div className="flex items-center justify-between pb-4 border-b border-white/[0.08] mb-5">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-5">
               <div>
-                <h3 className="text-base font-normal text-white">Tambah Guru / Pendidik Baru</h3>
-                <p className="text-xs text-stone-400 font-light mt-0.5">Daftarkan guru baru ke database sekolah</p>
+                <h3 className="text-base font-bold text-slate-900">Tambah Guru / Pendidik Baru</h3>
+                <p className="text-xs text-slate-500 font-medium mt-0.5">Daftarkan guru baru ke database sekolah</p>
               </div>
               <button 
                 onClick={() => setIsTeacherModalOpen(false)}
-                className="text-stone-400 hover:text-white text-sm p-1 cursor-pointer"
+                className="text-slate-400 hover:text-slate-700 text-base font-bold p-1 cursor-pointer"
               >
                 ✕
               </button>
@@ -2391,12 +2393,12 @@ export default function DashboardPage() {
             <form onSubmit={handleAddTeacher} className="space-y-4 text-xs">
               {/* Photo Selector */}
               <div>
-                <label className="text-stone-300 block mb-1.5 font-medium">Foto Profil Guru</label>
+                <label className="text-slate-700 block mb-1.5 font-bold">Foto Profil Guru</label>
                 <div className="flex items-center gap-3 mb-2.5">
                   <img 
                     src={newTeacherPhoto || '/teachers/default_avatar.svg'} 
                     alt="Preview" 
-                    className="w-12 h-12 rounded-xl object-cover border border-cyan-400/40 shadow-md flex-shrink-0"
+                    className="w-12 h-12 rounded-xl object-cover border border-slate-200 shadow-xs flex-shrink-0"
                   />
                   <div className="flex-1">
                     <input
@@ -2404,12 +2406,12 @@ export default function DashboardPage() {
                       value={newTeacherPhoto}
                       onChange={(e) => setNewTeacherPhoto(e.target.value)}
                       placeholder="URL foto..."
-                      className="w-full px-3.5 py-2 rounded-xl bg-white/[0.04] border border-white/10 text-white font-mono text-xs focus:outline-none focus:border-cyan-400"
+                      className="w-full px-3.5 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 font-mono text-xs focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 shadow-xs"
                     />
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-[10px] text-stone-400">Preset Foto:</span>
+                  <span className="text-[10px] text-slate-500 font-medium">Preset Foto:</span>
                   {PHOTO_PRESETS.map((p) => (
                     <button
                       key={p.src}
@@ -2417,8 +2419,8 @@ export default function DashboardPage() {
                       onClick={() => setNewTeacherPhoto(p.src)}
                       className={`px-2 py-1 rounded-lg border text-[11px] flex items-center gap-1.5 transition-all cursor-pointer ${
                         newTeacherPhoto === p.src
-                          ? 'border-cyan-400 bg-cyan-400/15 text-cyan-200'
-                          : 'border-white/10 bg-white/[0.02] text-stone-400 hover:text-white'
+                          ? 'border-indigo-500 bg-indigo-50 text-indigo-700 font-bold'
+                          : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
                       }`}
                     >
                       <img src={p.src} alt={p.label} className="w-4 h-4 rounded-full object-cover" />
@@ -2429,46 +2431,46 @@ export default function DashboardPage() {
               </div>
 
               <div>
-                <label className="text-stone-300 block mb-1.5 font-medium">Nama Lengkap & Gelar</label>
+                <label className="text-slate-700 block mb-1.5 font-bold">Nama Lengkap & Gelar</label>
                 <input
                   type="text"
                   required
                   value={newTeacherName}
                   onChange={(e) => setNewTeacherName(e.target.value)}
                   placeholder="Contoh: Hendra Gunawan, S.Pd., M.M."
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.04] border border-white/10 text-white focus:outline-none focus:border-cyan-400"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-300 text-slate-900 font-medium focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 shadow-xs"
                 />
               </div>
 
               <div>
-                <label className="text-stone-300 block mb-1.5 font-medium">Mata Pelajaran / Tugas</label>
+                <label className="text-slate-700 block mb-1.5 font-bold">Mata Pelajaran / Tugas</label>
                 <input
                   type="text"
                   required
                   value={newTeacherSubject}
                   onChange={(e) => setNewTeacherSubject(e.target.value)}
                   placeholder="Contoh: Ilmu Pengetahuan Sosial (IPS)"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.04] border border-white/10 text-white focus:outline-none focus:border-cyan-400"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-300 text-slate-900 font-medium focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 shadow-xs"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-stone-300 block mb-1.5 font-medium">NIP / NUPTK</label>
+                  <label className="text-slate-700 block mb-1.5 font-bold">NIP / NUPTK</label>
                   <input
                     type="text"
                     value={newTeacherNip}
                     onChange={(e) => setNewTeacherNip(e.target.value)}
                     placeholder="Boleh kosong jika GTT"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.04] border border-white/10 text-white focus:outline-none focus:border-cyan-400 font-mono"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-900 font-mono focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 shadow-xs"
                   />
                 </div>
                 <div>
-                  <label className="text-stone-300 block mb-1.5 font-medium">Status Kepegawaian</label>
+                  <label className="text-slate-700 block mb-1.5 font-bold">Status Kepegawaian</label>
                   <select
                     value={newTeacherStatus}
                     onChange={(e) => setNewTeacherStatus(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-xl bg-[#14151b] border border-white/10 text-white focus:outline-none focus:border-cyan-400 cursor-pointer"
+                    className="w-full px-3 py-2.5 rounded-xl bg-white border border-slate-300 text-slate-900 font-medium focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 cursor-pointer shadow-xs"
                   >
                     <option value="PNS">PNS</option>
                     <option value="PPPK">PPPK</option>
@@ -2482,13 +2484,13 @@ export default function DashboardPage() {
                 <button
                   type="button"
                   onClick={() => setIsTeacherModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-stone-300 cursor-pointer"
+                  className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold cursor-pointer shadow-xs"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-medium cursor-pointer shadow-lg shadow-cyan-500/20"
+                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold cursor-pointer shadow-md shadow-indigo-600/20"
                 >
                   Simpan Guru Baru
                 </button>
@@ -2506,22 +2508,22 @@ export default function DashboardPage() {
           data-lenis-prevent="true"
           data-lenis-prevent-wheel="true"
           data-lenis-prevent-touch="true"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-[fadeIn_0.2s_ease-out]"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]"
         >
           <div 
             data-lenis-prevent="true"
             data-lenis-prevent-wheel="true"
             data-lenis-prevent-touch="true"
-            className="w-full max-w-md rounded-[2rem] bg-[#0c0d11] border border-white/15 p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto"
+            className="w-full max-w-md rounded-3xl bg-white border border-slate-200 p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto"
           >
-            <div className="flex items-center justify-between pb-4 border-b border-white/[0.08] mb-5">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-5">
               <div>
-                <h3 className="text-base font-normal text-white">Ubah Data & Foto Guru</h3>
-                <p className="text-xs text-stone-400 font-light mt-0.5">Kelola identitas pendidik</p>
+                <h3 className="text-base font-bold text-slate-900">Ubah Data & Foto Guru</h3>
+                <p className="text-xs text-slate-500 font-medium mt-0.5">Kelola identitas pendidik</p>
               </div>
               <button 
                 onClick={() => setIsEditTeacherModalOpen(false)}
-                className="text-stone-400 hover:text-white text-sm p-1 cursor-pointer"
+                className="text-slate-400 hover:text-slate-700 text-base font-bold p-1 cursor-pointer"
               >
                 ✕
               </button>
@@ -2530,12 +2532,12 @@ export default function DashboardPage() {
             <form onSubmit={handleSaveEditTeacher} className="space-y-4 text-xs">
               {/* Photo Selector */}
               <div>
-                <label className="text-stone-300 block mb-1.5 font-medium">Foto Profil Guru</label>
+                <label className="text-slate-700 block mb-1.5 font-bold">Foto Profil Guru</label>
                 <div className="flex items-center gap-3 mb-2.5">
                   <img 
                     src={editTeacherPhoto || '/teachers/default_avatar.svg'} 
                     alt="Preview" 
-                    className="w-14 h-14 rounded-2xl object-cover border border-cyan-400/40 shadow-md flex-shrink-0"
+                    className="w-14 h-14 rounded-2xl object-cover border border-slate-200 shadow-xs flex-shrink-0"
                   />
                   <div className="flex-1">
                     <input
@@ -2543,13 +2545,13 @@ export default function DashboardPage() {
                       value={editTeacherPhoto}
                       onChange={(e) => setEditTeacherPhoto(e.target.value)}
                       placeholder="URL foto..."
-                      className="w-full px-3.5 py-2 rounded-xl bg-white/[0.04] border border-white/10 text-white font-mono text-xs focus:outline-none focus:border-cyan-400"
+                      className="w-full px-3.5 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 font-mono text-xs focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 shadow-xs"
                     />
-                    <p className="text-[10px] text-stone-500 mt-1">Ganti dengan URL gambar atau pilih foto preset.</p>
+                    <p className="text-[10px] text-slate-500 mt-1">Ganti dengan URL gambar atau pilih foto preset.</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-[10px] text-stone-400">Pilihan Cepat:</span>
+                  <span className="text-[10px] text-slate-500 font-medium">Pilihan Cepat:</span>
                   {PHOTO_PRESETS.map((p) => (
                     <button
                       key={p.src}
@@ -2557,8 +2559,8 @@ export default function DashboardPage() {
                       onClick={() => setEditTeacherPhoto(p.src)}
                       className={`px-2 py-1 rounded-lg border text-[11px] flex items-center gap-1.5 transition-all cursor-pointer ${
                         editTeacherPhoto === p.src
-                          ? 'border-cyan-400 bg-cyan-400/15 text-cyan-200'
-                          : 'border-white/10 bg-white/[0.02] text-stone-400 hover:text-white'
+                          ? 'border-indigo-500 bg-indigo-50 text-indigo-700 font-bold'
+                          : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
                       }`}
                     >
                       <img src={p.src} alt={p.label} className="w-4 h-4 rounded-full object-cover" />
@@ -2569,34 +2571,34 @@ export default function DashboardPage() {
               </div>
 
               <div>
-                <label className="text-stone-300 block mb-1.5 font-medium">Nama Lengkap & Gelar</label>
+                <label className="text-slate-700 block mb-1.5 font-bold">Nama Lengkap & Gelar</label>
                 <input
                   type="text"
                   required
                   value={editTeacherName}
                   onChange={(e) => setEditTeacherName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.04] border border-white/10 text-white focus:outline-none focus:border-cyan-400"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-300 text-slate-900 font-medium focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 shadow-xs"
                 />
               </div>
 
               <div>
-                <label className="text-stone-300 block mb-1.5 font-medium">Mata Pelajaran / Tugas</label>
+                <label className="text-slate-700 block mb-1.5 font-bold">Mata Pelajaran / Tugas</label>
                 <input
                   type="text"
                   required
                   value={editTeacherSubject}
                   onChange={(e) => setEditTeacherSubject(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.04] border border-white/10 text-white focus:outline-none focus:border-cyan-400"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-300 text-slate-900 font-medium focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 shadow-xs"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-stone-300 block mb-1.5 font-medium">Status Kepegawaian</label>
+                  <label className="text-slate-700 block mb-1.5 font-bold">Status Kepegawaian</label>
                   <select
                     value={editTeacherStatus}
                     onChange={(e) => setEditTeacherStatus(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-xl bg-[#14151b] border border-white/10 text-white focus:outline-none focus:border-cyan-400 cursor-pointer"
+                    className="w-full px-3 py-2.5 rounded-xl bg-white border border-slate-300 text-slate-900 font-medium focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 cursor-pointer shadow-xs"
                   >
                     <option value="PNS">PNS</option>
                     <option value="PPPK">PPPK</option>
@@ -2605,11 +2607,11 @@ export default function DashboardPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-stone-300 block mb-1.5 font-medium">Status Keaktifan</label>
+                  <label className="text-slate-700 block mb-1.5 font-bold">Status Keaktifan</label>
                   <select
                     value={editTeacherActive ? 'true' : 'false'}
                     onChange={(e) => setEditTeacherActive(e.target.value === 'true')}
-                    className="w-full px-3 py-2.5 rounded-xl bg-[#14151b] border border-white/10 text-white focus:outline-none focus:border-cyan-400 cursor-pointer"
+                    className="w-full px-3 py-2.5 rounded-xl bg-white border border-slate-300 text-slate-900 font-medium focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 cursor-pointer shadow-xs"
                   >
                     <option value="true">● Aktif Mengajar</option>
                     <option value="false">○ Mutasi / Nonaktif</option>
@@ -2621,13 +2623,13 @@ export default function DashboardPage() {
                 <button
                   type="button"
                   onClick={() => setIsEditTeacherModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-stone-300 cursor-pointer"
+                  className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold cursor-pointer shadow-xs"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-medium cursor-pointer shadow-lg shadow-cyan-500/20"
+                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold cursor-pointer shadow-md shadow-indigo-600/20"
                 >
                   Simpan Perubahan Guru
                 </button>
@@ -2639,13 +2641,13 @@ export default function DashboardPage() {
 
       {/* Modal Tambah Siswa Manual */}
       {isAddStudentModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]">
-          <div className="bg-[#10121a] border border-white/10 rounded-2xl max-w-md w-full p-6 shadow-2xl relative">
-            <div className="flex items-center justify-between pb-4 border-b border-white/10 mb-4">
-              <h3 className="text-base font-bold text-white">Tambah Siswa Baru</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]">
+          <div className="bg-white border border-slate-200 rounded-3xl max-w-md w-full p-6 shadow-2xl relative">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
+              <h3 className="text-base font-bold text-slate-900">Tambah Siswa Baru</h3>
               <button
                 onClick={() => setIsAddStudentModalOpen(false)}
-                className="text-stone-400 hover:text-white"
+                className="text-slate-400 hover:text-slate-700 text-base font-bold p-1 cursor-pointer"
               >
                 ✕
               </button>
@@ -2653,46 +2655,46 @@ export default function DashboardPage() {
 
             <form onSubmit={handleAddStudentManual} className="space-y-4 text-xs">
               <div>
-                <label className="text-stone-300 block mb-1 font-semibold">Nama Lengkap Siswa *</label>
+                <label className="text-slate-700 block mb-1 font-bold">Nama Lengkap Siswa *</label>
                 <input
                   type="text"
                   required
                   placeholder="Contoh: Muhammad Rizky Pratama"
                   value={newStudentData.name}
                   onChange={(e) => setNewStudentData({ ...newStudentData, name: e.target.value })}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.04] border border-white/10 text-white focus:outline-none focus:border-cyan-400"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-300 text-slate-900 font-medium focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 shadow-xs"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-stone-300 block mb-1 font-semibold">NISN (10 Digit)</label>
+                  <label className="text-slate-700 block mb-1 font-bold">NISN (10 Digit)</label>
                   <input
                     type="text"
                     placeholder="Contoh: 0134567890"
                     value={newStudentData.nisn}
                     onChange={(e) => setNewStudentData({ ...newStudentData, nisn: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.04] border border-white/10 text-white focus:outline-none focus:border-cyan-400 font-mono"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-900 font-mono focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 shadow-xs"
                   />
                 </div>
                 <div>
-                  <label className="text-stone-300 block mb-1 font-semibold">NIS Sekolah</label>
+                  <label className="text-slate-700 block mb-1 font-bold">NIS Sekolah</label>
                   <input
                     type="text"
                     placeholder="Contoh: 262707050"
                     value={newStudentData.nis}
                     onChange={(e) => setNewStudentData({ ...newStudentData, nis: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.04] border border-white/10 text-white focus:outline-none focus:border-cyan-400 font-mono"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-900 font-mono focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 shadow-xs"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="text-stone-300 block mb-1 font-semibold">Kelas / Rombongan Belajar *</label>
+                <label className="text-slate-700 block mb-1 font-bold">Kelas / Rombongan Belajar *</label>
                 <select
                   value={newStudentData.classId}
                   onChange={(e) => setNewStudentData({ ...newStudentData, classId: e.target.value })}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#14151b] border border-white/10 text-white focus:outline-none focus:border-cyan-400 cursor-pointer"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-300 text-slate-900 font-medium focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 cursor-pointer shadow-xs"
                 >
                   {SCHOOL_CLASSES.map(cls => (
                     <option key={cls.id} value={cls.id}>
@@ -2706,13 +2708,13 @@ export default function DashboardPage() {
                 <button
                   type="button"
                   onClick={() => setIsAddStudentModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-stone-300 cursor-pointer"
+                  className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold cursor-pointer shadow-xs"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-bold cursor-pointer shadow-lg shadow-cyan-500/20"
+                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold cursor-pointer shadow-md shadow-indigo-600/20"
                 >
                   Simpan Siswa
                 </button>
