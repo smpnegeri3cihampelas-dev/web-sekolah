@@ -2,151 +2,293 @@
 
 import { useEffect, useRef } from 'react';
 import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+
+gsap.registerPlugin(ScrollTrigger);
+
+const TOTAL_FRAMES = 26;
+const LERP_FACTOR = 0.08;
 
 export default function Hero() {
   const containerRef = useRef<HTMLDivElement>(null);
+  const stickyRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
-  const badgeRef = useRef<HTMLDivElement>(null);
+
+  const imagesRef = useRef<(HTMLImageElement | null)[]>(new Array(TOTAL_FRAMES).fill(null));
+  const targetFrameRef = useRef<number>(0);
+  const currentFrameRef = useRef<number>(0);
+  const needsRedrawRef = useRef<boolean>(true);
 
   useEffect(() => {
-    if (!containerRef.current) return;
+    if (!containerRef.current || !canvasRef.current) return;
 
-    const ctx = gsap.context(() => {
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d', { alpha: false });
+    if (!ctx) return;
+
+    let isDestroyed = false;
+    let rafId: number | null = null;
+    let lastRenderedIndex = -1;
+
+    // 1. Retina / DPR responsive canvas sizing with mobile performance optimization
+    const handleResize = () => {
+      if (!canvas) return;
+      const isMobile = window.innerWidth < 768;
+      const dpr = isMobile ? 1 : Math.min(window.devicePixelRatio || 1, 2);
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+
+      canvas.width = Math.floor(width * dpr);
+      canvas.height = Math.floor(height * dpr);
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.scale(dpr, dpr);
+      needsRedrawRef.current = true;
+    };
+
+    handleResize();
+    window.addEventListener('resize', handleResize, { passive: true });
+
+    // 2. Draw Frame onto canvas (Aspect-ratio Cover)
+    const drawFrame = (frameIndex: number) => {
+      if (isDestroyed || !ctx) return;
+
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+
+      // Find target frame or nearest available loaded frame
+      let img = imagesRef.current[frameIndex];
+      if (!img || !img.complete || img.naturalWidth === 0) {
+        for (let offset = 1; offset < TOTAL_FRAMES; offset++) {
+          const down = frameIndex - offset;
+          const up = frameIndex + offset;
+          if (down >= 0 && imagesRef.current[down]?.complete && imagesRef.current[down]!.naturalWidth > 0) {
+            img = imagesRef.current[down];
+            break;
+          }
+          if (up < TOTAL_FRAMES && imagesRef.current[up]?.complete && imagesRef.current[up]!.naturalWidth > 0) {
+            img = imagesRef.current[up];
+            break;
+          }
+        }
+      }
+
+      if (!img || !img.complete || img.naturalWidth === 0) return;
+
+      const hRatio = width / img.width;
+      const vRatio = height / img.height;
+      const ratio = Math.max(hRatio, vRatio);
+      const drawW = img.width * ratio;
+      const drawH = img.height * ratio;
+      const drawX = (width - drawW) / 2;
+      const drawY = (height - drawH) / 2;
+
+      ctx.fillStyle = '#080b20';
+      ctx.fillRect(0, 0, width, height);
+      ctx.drawImage(img, drawX, drawY, drawW, drawH);
+    };
+
+    // 3. Progressive Image Preloading (Frame 1 instant, then remaining frames)
+    const preloadFrames = () => {
+      const loadFrame = (index: number) => {
+        if (imagesRef.current[index]) return;
+        const img = new Image();
+        const frameNumber = String(index + 1).padStart(3, '0');
+        img.src = `/frames_26/frame-${frameNumber}.png`;
+        img.onload = () => {
+          if (isDestroyed) return;
+          imagesRef.current[index] = img;
+          if (index === 0 || Math.round(currentFrameRef.current) === index) {
+            needsRedrawRef.current = true;
+          }
+        };
+      };
+
+      // Load first frame immediately
+      loadFrame(0);
+
+      // Progressively load remaining frames
+      for (let i = 1; i < TOTAL_FRAMES; i++) {
+        loadFrame(i);
+      }
+    };
+
+    preloadFrames();
+
+    // 4. Scroll progress mapping: 0% scroll -> frame 1 (index 0), 100% scroll -> frame 26 (index 25)
+    const updateScrollProgress = () => {
+      if (!containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const maxScroll = containerRef.current.offsetHeight - window.innerHeight;
+      if (maxScroll <= 0) return;
+      const currentScroll = Math.max(0, Math.min(maxScroll, -rect.top));
+      const progress = currentScroll / maxScroll;
+      targetFrameRef.current = progress * (TOTAL_FRAMES - 1);
+    };
+
+    window.addEventListener('scroll', updateScrollProgress, { passive: true });
+    updateScrollProgress();
+
+    // GSAP ScrollTrigger synchronization
+    const st = ScrollTrigger.create({
+      trigger: containerRef.current,
+      start: 'top top',
+      end: 'bottom bottom',
+      scrub: true,
+      onUpdate: (self) => {
+        targetFrameRef.current = self.progress * (TOTAL_FRAMES - 1);
+      }
+    });
+
+    // 5. Persistent Animation Loop with smooth Lerp interpolation
+    const renderLoop = () => {
+      if (isDestroyed) return;
+
+      const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      if (prefersReduced) {
+        currentFrameRef.current = targetFrameRef.current;
+      } else {
+        currentFrameRef.current += (targetFrameRef.current - currentFrameRef.current) * LERP_FACTOR;
+      }
+
+      const frameIndex = Math.round(currentFrameRef.current);
+      const clampedIndex = Math.max(0, Math.min(TOTAL_FRAMES - 1, frameIndex));
+
+      if (clampedIndex !== lastRenderedIndex || needsRedrawRef.current) {
+        drawFrame(clampedIndex);
+        lastRenderedIndex = clampedIndex;
+        needsRedrawRef.current = false;
+      }
+
+      rafId = requestAnimationFrame(renderLoop);
+    };
+
+    rafId = requestAnimationFrame(renderLoop);
+
+    // 6. Foreground UI animations
+    const ctxAnim = gsap.context(() => {
       const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
 
       tl.fromTo(
         contentRef.current?.children ? Array.from(contentRef.current.children) : [],
-        { opacity: 0, y: 32 },
-        { opacity: 1, y: 0, duration: 1.1, stagger: 0.12 }
+        { opacity: 0, y: 30 },
+        { opacity: 1, y: 0, duration: 1.2, stagger: 0.12 }
       );
 
-      if (badgeRef.current) {
-        gsap.fromTo(
-          badgeRef.current,
-          { opacity: 0, scale: 0.8, y: 20 },
-          { opacity: 1, scale: 1, y: 0, duration: 1.2, delay: 0.4, ease: 'back.out(1.5)' }
-        );
-      }
+      // Smoothly fade out foreground text toward the end of the scroll
+      gsap.to(contentRef.current, {
+        y: -40,
+        opacity: 0,
+        ease: 'none',
+        scrollTrigger: {
+          trigger: containerRef.current,
+          start: '75% top',
+          end: '95% top',
+          scrub: true,
+        }
+      });
     }, containerRef);
 
-    return () => ctx.revert();
+    return () => {
+      isDestroyed = true;
+      if (rafId) cancelAnimationFrame(rafId);
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('scroll', updateScrollProgress);
+      st.kill();
+      ctxAnim.revert();
+    };
   }, []);
 
   return (
     <section 
       ref={containerRef}
-      className="relative w-full min-h-[92vh] sm:min-h-screen bg-[#080b20] overflow-hidden flex flex-col justify-between pt-32 sm:pt-40 select-none"
+      className="relative w-full h-[420vh] bg-[#080b20] selection:bg-indigo-500/30 selection:text-indigo-200"
     >
-      {/* 1. Exact Marklab Atmospheric Gradient Lights */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
-        
-        {/* Dominant Left/Center Electric Indigo Bloom */}
-        <div 
-          className="absolute -top-20 left-[-10%] sm:left-[5%] w-[600px] sm:w-[850px] h-[600px] sm:h-[750px] rounded-full opacity-80"
-          style={{
-            background: 'radial-gradient(circle, rgba(67, 56, 202, 0.65) 0%, rgba(79, 70, 229, 0.45) 30%, rgba(99, 102, 241, 0.2) 55%, transparent 75%)',
-            filter: 'blur(60px)',
-          }}
-        />
+      {/* Full-screen Sticky Viewport */}
+      <div 
+        ref={stickyRef}
+        className="sticky top-0 w-full h-screen overflow-hidden flex flex-col justify-end"
+      >
+        {/* 1. Full-screen Sticky HTML5 Canvas */}
+        <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+          <canvas 
+            ref={canvasRef} 
+            className="absolute inset-0 w-full h-full pointer-events-none block" 
+          />
 
-        {/* Right Secondary Royal Violet Highlight */}
-        <div 
-          className="absolute top-10 right-[-15%] sm:right-[5%] w-[500px] sm:w-[700px] h-[500px] sm:h-[650px] rounded-full opacity-70"
-          style={{
-            background: 'radial-gradient(circle, rgba(124, 58, 237, 0.5) 0%, rgba(99, 102, 241, 0.3) 35%, rgba(67, 56, 202, 0.15) 60%, transparent 75%)',
-            filter: 'blur(60px)',
-          }}
-        />
-
-        {/* Deep Midnight Backdrop Softener */}
-        <div className="absolute inset-0 bg-[#080b20]/30 backdrop-blur-[1px]" />
-
-        {/* Vertical subtle glass stripes on the right (matching Marklab aesthetic) */}
-        <div className="hidden lg:flex absolute right-12 top-28 bottom-28 w-44 gap-3 opacity-20 pointer-events-none">
-          <div className="flex-1 bg-white/[0.04] rounded-full border border-white/[0.06]" />
-          <div className="flex-1 bg-white/[0.06] rounded-full border border-white/[0.08]" />
-          <div className="flex-1 bg-white/[0.04] rounded-full border border-white/[0.06]" />
-        </div>
-      </div>
-
-      {/* 2. Main Centered Hero Content */}
-      <div className="relative z-10 w-full max-w-6xl mx-auto px-5 sm:px-8 py-8 sm:py-16 flex flex-col items-center text-center">
-        
-        <div ref={contentRef} className="flex flex-col items-center max-w-4xl">
+          {/* Marklab Electric Indigo & Royal Violet Atmospheric Overlays */}
+          <div className="absolute inset-0 bg-gradient-to-t from-[#080b20] via-[#080b20]/40 to-[#080b20]/80 pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#080b20]/90 via-[#080b20]/20 to-[#080b20]/40 pointer-events-none" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-transparent via-[#080b20]/30 to-[#080b20] pointer-events-none" />
           
-          {/* Eyebrow Badge Pill */}
-          <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-white/10 hover:bg-white/15 border border-white/20 backdrop-blur-xl text-xs font-normal text-indigo-100 mb-8 transition-all duration-300 shadow-sm">
-            <span className="w-2 h-2 rounded-full bg-indigo-300 shadow-[0_0_10px_#a5b4fc] animate-pulse" />
-            <span className="tracking-wide">SMP Negeri 3 Cihampelas • Smart Campus RIGAS</span>
-          </div>
+          {/* Seamless Edge Softening Gradients */}
+          <div className="absolute top-0 inset-x-0 h-32 bg-gradient-to-b from-[#080b20] to-transparent pointer-events-none" />
+          {/* Bottom transition into light canvas (#f8fafc) */}
+          <div className="absolute bottom-0 inset-x-0 h-44 bg-gradient-to-t from-[#f8fafc] via-[#080b20]/60 to-transparent pointer-events-none" />
 
-          {/* Signature Headline matching Marklab typography & italic serif accent */}
-          <h1 className="font-sans text-4xl sm:text-6xl md:text-7xl lg:text-[5rem] tracking-tight leading-[1.08] text-white font-light mb-6">
-            Mencetak Generasi <br />
-            <span className="font-serif italic font-normal text-transparent bg-clip-text bg-gradient-to-r from-white via-indigo-100 to-indigo-200">
-              Unggul &amp; Berkarakter
-            </span>
-          </h1>
+          {/* Marklab Atmospheric Glow Tints */}
+          <div className="absolute inset-0 bg-indigo-950/[0.12] mix-blend-color pointer-events-none" />
+          <div className="absolute -bottom-20 left-1/4 w-[650px] h-[550px] bg-indigo-600/[0.18] rounded-full blur-[140px] pointer-events-none" />
+          <div className="absolute top-1/4 -right-20 w-[550px] h-[550px] bg-violet-600/[0.14] rounded-full blur-[140px] pointer-events-none" />
+        </div>
 
-          {/* Clean modern subheadline */}
-          <p className="text-sm sm:text-base md:text-lg text-indigo-200/85 font-light leading-relaxed max-w-2xl mb-10 tracking-wide">
-            Membina integritas moral, menguasai sains &amp; teknologi masa depan, serta melahirkan insan pembelajar yang Religius, Inovatif, Gesit, Aktif, dan Santun (RIGAS).
-          </p>
+        {/* 2. Hero Editorial Content (Layout, Text, Buttons, Spacing 100% PRESERVED) */}
+        <div className="relative z-10 w-full max-w-7xl mx-auto px-5 sm:px-8 lg:px-12 pb-12 sm:pb-16 lg:pb-20 pt-32 sm:pt-40 flex flex-col items-start">
+          
+          {/* Headline + Subtext + 2 Minimalist CTA Buttons */}
+          <div ref={contentRef} className="max-w-md sm:max-w-lg lg:max-w-xl flex flex-col items-start">
 
-          {/* Action Row matching Marklab Buttons */}
-          <div className="relative flex flex-wrap items-center justify-center gap-4 sm:gap-6 w-full">
-            
-            {/* Primary Pill Button (White with Dark Arrow Circle) */}
-            <a 
-              href="https://ppdb.jabarprov.go.id" 
-              target="_blank"
-              rel="noopener noreferrer"
-              className="group inline-flex items-center gap-3.5 px-7 sm:px-8 py-3.5 sm:py-4 rounded-full bg-white text-[#080b20] font-medium text-xs sm:text-sm tracking-wide uppercase hover:bg-indigo-50 hover:shadow-[0_10px_35px_rgba(255,255,255,0.3)] hover:scale-[1.02] active:scale-95 transition-all duration-300 shadow-xl shadow-indigo-950/40 cursor-pointer"
-            >
-              <span>Daftar PPDB 2026</span>
-              <span className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-[#080b20] text-white flex items-center justify-center text-xs font-normal group-hover:rotate-45 transition-transform duration-300 shrink-0">
-                ↗
-              </span>
-            </a>
+            {/* Headline sized compactly to avoid covering background logo */}
+            <h1 className="font-sans text-2xl sm:text-3xl md:text-4xl lg:text-[2.65rem] xl:text-[2.85rem] tracking-tight leading-[1.15] mb-3.5 sm:mb-4">
+              <span className="font-light text-stone-300 block">SMPN 3 Cihampelas</span>
+              <span className="font-normal text-white block">Mencetak Generasi Unggul</span>
+            </h1>
 
-            {/* Secondary Transparent Pill Button */}
-            <a 
-              href="#profil" 
-              className="inline-flex items-center gap-2.5 px-6 sm:px-7 py-3.5 sm:py-4 rounded-full border border-white/20 bg-white/[0.06] hover:bg-white/[0.14] hover:border-white/35 text-white font-normal text-xs sm:text-sm tracking-wide transition-all duration-300 active:scale-95 backdrop-blur-md group"
-            >
-              <span>Jelajahi Profil</span>
-              <span className="text-xs group-hover:translate-x-0.5 transition-transform duration-200">↗</span>
-            </a>
+            {/* Compact Minimalist Subheadline */}
+            <p className="text-xs sm:text-sm md:text-[15px] text-stone-300/80 font-light leading-relaxed max-w-sm sm:max-w-md mb-6 sm:mb-7 tracking-wide">
+              Membina integritas, menguasai teknologi masa depan, dan mencetak pemimpin berwawasan global dalam ekosistem belajar modern.
+            </p>
 
-            {/* Floating 3D Mascot / Smart Bell Element (matching the 3D bell in Marklab) */}
-            <div 
-              ref={badgeRef}
-              className="hidden md:flex absolute -right-4 sm:-right-8 -bottom-4 items-center gap-2 px-3 py-2 rounded-2xl bg-gradient-to-br from-indigo-500/25 to-purple-600/20 border border-white/20 backdrop-blur-xl shadow-xl shadow-indigo-950/40 animate-[bounce_5s_ease-in-out_infinite]"
-            >
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-400 to-indigo-500 flex items-center justify-center shadow-md shadow-indigo-500/30 text-white font-bold text-sm">
-                🔔
-              </div>
-              <div className="text-left pr-1">
-                <p className="text-[11px] font-semibold text-white leading-tight">Bel KBM Aktif</p>
-                <p className="text-[9px] text-indigo-200/80 font-mono">Tahun Ajaran 2026/2027</p>
-              </div>
+            {/* 2 Minimalist CTA Buttons */}
+            <div className="flex flex-wrap items-center gap-3 sm:gap-4 w-full sm:w-auto">
+              
+              {/* Primary Pill Button (Clean White Pill with dark arrow circle) */}
+              <a 
+                href="https://ppdb.jabarprov.go.id" 
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group inline-flex items-center justify-between sm:justify-start gap-4 px-6 sm:px-7 py-3 sm:py-3.5 rounded-full bg-white text-black font-medium text-xs sm:text-sm tracking-wide uppercase hover:bg-stone-200 hover:scale-[1.01] active:scale-95 transition-all duration-300 shadow-md shadow-white/5"
+              >
+                <span>Daftar PPDB 2026</span>
+                <span className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-black text-white flex items-center justify-center text-xs font-normal group-hover:rotate-45 transition-transform duration-300 shrink-0">
+                  ↗
+                </span>
+              </a>
+
+              {/* Secondary Frosted Glass Pill Button */}
+              <a 
+                href="#profil" 
+                className="inline-flex items-center justify-center px-6 sm:px-7 py-3 sm:py-3.5 rounded-full border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] hover:border-white/25 text-stone-200 hover:text-white font-normal text-xs sm:text-sm tracking-wide uppercase transition-all duration-300 active:scale-95 backdrop-blur-md"
+              >
+                <span>Jelajahi Profil</span>
+              </a>
+
             </div>
 
           </div>
 
         </div>
 
-      </div>
-
-      {/* 3. The Signature Marklab Ethereal Mist Transition into Light Section */}
-      <div className="relative w-full h-28 sm:h-36 pointer-events-none z-10">
-        <div 
-          className="w-full h-full"
-          style={{
-            background: 'linear-gradient(to bottom, transparent 0%, rgba(224, 231, 255, 0.35) 45%, rgba(238, 242, 255, 0.75) 75%, #f8fafc 100%)',
-          }}
-        />
+        {/* Ultra-subtle hairline bottom divider */}
+        <div className="w-full h-px bg-white/[0.08]" />
       </div>
     </section>
   );
 }
+
+
+
