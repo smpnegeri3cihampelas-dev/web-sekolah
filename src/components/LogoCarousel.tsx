@@ -129,20 +129,19 @@ export default function LogoCarousel() {
   const listBottom = [...rowBottom, ...rowBottom, ...rowBottom, ...rowBottom];
 
   return (
-    <section id="kemitraan" className="relative w-full py-14 sm:py-18 bg-black overflow-hidden select-none border-b border-white/[0.06]">
-      {/* Dark Cosmic Background Ambient Lighting */}
+    <section id="kemitraan" className="relative w-full py-12 sm:py-16 bg-[#f8fafc] overflow-hidden select-none border-b border-indigo-100/70">
+      {/* Subtle soft lavender glow */}
       <div className="absolute inset-0 z-0 pointer-events-none">
-        <div className="absolute top-1/2 left-1/4 -translate-y-1/2 w-[600px] h-[300px] bg-purple-900/[0.06] rounded-full blur-[140px]" />
-        <div className="absolute top-1/2 right-1/4 -translate-y-1/2 w-[600px] h-[300px] bg-cyan-900/[0.05] rounded-full blur-[140px]" />
+        <div className="absolute top-1/2 left-1/3 -translate-y-1/2 w-[600px] h-[250px] bg-indigo-100/40 rounded-full blur-[120px]" />
       </div>
 
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-8 mb-8 sm:mb-10 text-center">
-        <div className="inline-flex items-center gap-2.5 px-3.5 py-1 rounded-full bg-white/[0.03] border border-white/10 text-stone-400 text-[11px] font-normal tracking-[0.2em] uppercase mb-2.5 backdrop-blur-md">
-          <span className="w-1.5 h-1.5 rounded-full bg-cyan-400/90 shadow-[0_0_8px_#38bdf8]" />
+        <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-indigo-50/80 border border-indigo-200/60 text-indigo-700 text-[11px] font-medium tracking-[0.15em] uppercase mb-2.5 shadow-sm">
+          <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shadow-[0_0_6px_#6366f1]" />
           <span>Kemitraan & Ekosistem Terpadu</span>
         </div>
-        <h2 className="text-xl sm:text-2xl font-light text-stone-300 tracking-tight">
-          Didukung Institusi & Platform Teknologi Terpercaya
+        <h2 className="text-xl sm:text-2xl font-light text-slate-800 tracking-tight">
+          Didukung Institusi &amp; Platform Pendidikan Terpercaya
         </h2>
       </div>
 
@@ -154,26 +153,26 @@ export default function LogoCarousel() {
           WebkitMaskImage: 'linear-gradient(to right, transparent, black 12%, black 88%, transparent)'
         }}
       >
-        {/* ROW 1: Moves continuous RIGHT → LEFT (Unboxed, Grayscale by default, Full Color on hover) */}
+        {/* ROW 1: Moves continuous RIGHT → LEFT */}
         <div className="animate-marquee-left flex items-center gap-6 sm:gap-10">
           {listTop.map((item, index) => (
             <div 
               key={`top-${index}`}
-              className="group shrink-0 inline-flex items-center gap-3 sm:gap-3.5 px-3 sm:px-5 py-2 cursor-pointer filter grayscale opacity-40 hover:grayscale-0 hover:opacity-100 hover:scale-105 transition-all duration-300"
+              className="group shrink-0 inline-flex items-center gap-3 sm:gap-3.5 px-4 py-2 rounded-xl bg-white/70 hover:bg-white border border-indigo-100/60 hover:border-indigo-300 shadow-sm hover:shadow-md hover:shadow-indigo-500/5 cursor-pointer opacity-75 hover:opacity-100 hover:scale-[1.03] transition-all duration-300"
             >
               <div className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-300">
                 {item.icon}
               </div>
               <div className="flex flex-col text-left">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm sm:text-base font-medium text-stone-300 group-hover:text-white transition-colors whitespace-nowrap">
+                  <span className="text-sm sm:text-base font-medium text-slate-800 group-hover:text-indigo-600 transition-colors whitespace-nowrap">
                     {item.name}
                   </span>
-                  <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-white/[0.06] text-stone-400 group-hover:text-cyan-300 group-hover:bg-cyan-950/40 transition-colors">
+                  <span className="text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100 font-medium">
                     {item.tag}
                   </span>
                 </div>
-                <span className="text-[11px] text-stone-500 group-hover:text-stone-300 font-light whitespace-nowrap transition-colors">
+                <span className="text-[11px] text-slate-500 group-hover:text-slate-700 font-light whitespace-nowrap transition-colors">
                   {item.desc}
                 </span>
               </div>
@@ -181,26 +180,26 @@ export default function LogoCarousel() {
           ))}
         </div>
 
-        {/* ROW 2: Moves continuous LEFT → RIGHT (Unboxed, Grayscale by default, Full Color on hover) */}
+        {/* ROW 2: Moves continuous LEFT → RIGHT */}
         <div className="animate-marquee-right flex items-center gap-6 sm:gap-10">
           {listBottom.map((item, index) => (
             <div 
               key={`bottom-${index}`}
-              className="group shrink-0 inline-flex items-center gap-3 sm:gap-3.5 px-3 sm:px-5 py-2 cursor-pointer filter grayscale opacity-40 hover:grayscale-0 hover:opacity-100 hover:scale-105 transition-all duration-300"
+              className="group shrink-0 inline-flex items-center gap-3 sm:gap-3.5 px-4 py-2 rounded-xl bg-white/70 hover:bg-white border border-indigo-100/60 hover:border-indigo-300 shadow-sm hover:shadow-md hover:shadow-indigo-500/5 cursor-pointer opacity-75 hover:opacity-100 hover:scale-[1.03] transition-all duration-300"
             >
               <div className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-300">
                 {item.icon}
               </div>
               <div className="flex flex-col text-left">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm sm:text-base font-medium text-stone-300 group-hover:text-white transition-colors whitespace-nowrap">
+                  <span className="text-sm sm:text-base font-medium text-slate-800 group-hover:text-indigo-600 transition-colors whitespace-nowrap">
                     {item.name}
                   </span>
-                  <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-white/[0.06] text-stone-400 group-hover:text-purple-300 group-hover:bg-purple-950/40 transition-colors">
+                  <span className="text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100 font-medium">
                     {item.tag}
                   </span>
                 </div>
-                <span className="text-[11px] text-stone-500 group-hover:text-stone-300 font-light whitespace-nowrap transition-colors">
+                <span className="text-[11px] text-slate-500 group-hover:text-slate-700 font-light whitespace-nowrap transition-colors">
                   {item.desc}
                 </span>
               </div>

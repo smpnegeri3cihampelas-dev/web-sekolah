@@ -1,18 +1,41 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useSchoolData, Leader, Teacher, DataPokok } from '@/lib/schoolData';
+import { 
+  Student, 
+  SCHOOL_CLASSES, 
+  INITIAL_STUDENTS, 
+  getStoredStudents, 
+  saveStoredStudents 
+} from '@/lib/elearningData';
+import { downloadStudentTemplateExcel } from '@/lib/elearningExport';
+
+// Isolated Clock Component to prevent whole dashboard re-renders every 1000ms
+const DashboardClock = React.memo(function DashboardClock() {
+  const [time, setTime] = useState('');
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      setTime(now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' WIB');
+    };
+    updateTime();
+    const interval = setInterval(updateTime, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return <span>{time || 'Memuat...'}</span>;
+});
 
 export default function DashboardPage() {
   const router = useRouter();
 
   // Navigation State
-  const [activeTab, setActiveTab] = useState<'overview' | 'warta' | 'pimpinan' | 'agenda' | 'galeri' | 'pesan' | 'pengaturan'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'warta' | 'siswa' | 'pimpinan' | 'agenda' | 'galeri' | 'pesan' | 'pengaturan'>('overview');
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const [currentTime, setCurrentTime] = useState('');
 
   // Toast Notification
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -21,18 +44,33 @@ export default function DashboardPage() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  // Clock
+  // --- MOCK DATA STATES ---
+  // --- STUDENTS & CLASS MANAGEMENT STATE ---
+  const [studentsList, setStudentsList] = useState<Student[]>([]);
+  const [studentSearch, setStudentSearch] = useState('');
+  const [studentClassFilter, setStudentClassFilter] = useState('ALL');
+  const [studentPage, setStudentPage] = useState(1);
+  const STUDENTS_PER_PAGE = 25;
+  const [isAddStudentModalOpen, setIsAddStudentModalOpen] = useState(false);
+  const [newStudentData, setNewStudentData] = useState({
+    name: '',
+    nisn: '',
+    nis: '',
+    classId: '7-A'
+  });
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
-    const updateTime = () => {
-      const now = new Date();
-      setCurrentTime(now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' WIB');
-    };
-    updateTime();
-    const interval = setInterval(updateTime, 1000);
-    return () => clearInterval(interval);
+    setStudentsList(getStoredStudents());
+    const handleUpdate = () => setStudentsList(getStoredStudents());
+    window.addEventListener('elearningStudentsUpdated', handleUpdate);
+    return () => window.removeEventListener('elearningStudentsUpdated', handleUpdate);
   }, []);
 
-  // --- MOCK DATA STATES ---
+  useEffect(() => {
+    setStudentPage(1);
+  }, [studentSearch, studentClassFilter]);
+
   const [newsList, setNewsList] = useState([
     {
       id: 1,
@@ -385,11 +423,173 @@ export default function DashboardPage() {
     return matchCategory && matchSearch;
   });
 
-  // Filtered teachers
-  const filteredTeachers = teachersList.filter(t => 
-    t.name.toLowerCase().includes(teacherSearch.toLowerCase()) || 
-    t.subject.toLowerCase().includes(teacherSearch.toLowerCase())
-  );
+  // --- HANDLERS FOR STUDENT MANAGEMENT ---
+  const handleExcelFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const XLSX = await import('xlsx');
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        try {
+          const bstr = evt.target?.result;
+          const workbook = XLSX.read(bstr, { type: 'binary' });
+        
+        let allImported: Student[] = [];
+
+        workbook.SheetNames.forEach(sheetName => {
+          const worksheet = workbook.Sheets[sheetName];
+          const rawJson: any[] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+          if (rawJson.length < 2) return;
+
+          let headerRowIndex = 0;
+          let colNISN = -1, colNIS = -1, colName = -1, colClass = -1;
+
+          for (let r = 0; r < Math.min(rawJson.length, 6); r++) {
+            const row = rawJson[r];
+            if (!Array.isArray(row)) continue;
+            row.forEach((cell: any, cIdx: number) => {
+              const cellStr = String(cell || '').toLowerCase().trim();
+              if (cellStr.includes('nisn')) colNISN = cIdx;
+              else if (cellStr === 'nis') colNIS = cIdx;
+              else if (cellStr.includes('nama')) colName = cIdx;
+              else if (cellStr.includes('kelas') || cellStr.includes('rombel')) colClass = cIdx;
+            });
+            if (colName !== -1) {
+              headerRowIndex = r;
+              break;
+            }
+          }
+
+          if (colName === -1) {
+            colNISN = 1;
+            colNIS = 2;
+            colName = 3;
+            colClass = 4;
+          }
+
+          for (let r = headerRowIndex + 1; r < rawJson.length; r++) {
+            const row = rawJson[r];
+            if (!row || !row[colName]) continue;
+
+            const rawName = String(row[colName] || '').trim();
+            if (!rawName || rawName.toLowerCase() === 'nama siswa' || rawName.toLowerCase() === 'nama') continue;
+
+            const rawNisn = String(row[colNISN] || '').replace(/[^0-9]/g, '').trim() || `01${Math.floor(10000000 + Math.random() * 90000000)}`;
+            const rawNis = colNIS !== -1 && row[colNIS] ? String(row[colNIS]).trim() : '';
+            
+            let rawClass = colClass !== -1 && row[colClass] ? String(row[colClass]).toUpperCase().trim() : '';
+            if (!rawClass) {
+              rawClass = sheetName.toUpperCase().trim();
+            }
+            rawClass = rawClass.replace(/KELAS\s*/i, '').replace(/\s+/g, '');
+            if (/^[789][A-F]$/.test(rawClass)) {
+              rawClass = `${rawClass[0]}-${rawClass[1]}`;
+            }
+            if (!rawClass || !rawClass.includes('-')) {
+              rawClass = '7-A';
+            }
+
+            allImported.push({
+              id: `${rawClass.replace('-', '')}-${String(allImported.length + 1).padStart(2, '0')}`,
+              nisn: rawNisn,
+              nis: rawNis,
+              name: rawName,
+              classId: rawClass,
+              gender: '-'
+            });
+          }
+        });
+
+        if (allImported.length === 0) {
+          showToast('Tidak ada data siswa yang valid ditemukan di file Excel!');
+          return;
+        }
+
+        saveStoredStudents(allImported);
+        setStudentsList(allImported);
+        showToast(`Alhamdulillah! Berhasil mengimpor ${allImported.length} siswa baru ke sistem!`);
+      } catch (err: any) {
+        console.error('Import error:', err);
+        showToast('Gagal memproses file Excel: ' + (err.message || 'Format tidak sesuai'));
+      } finally {
+        if (e.target) e.target.value = '';
+      }
+    };
+      reader.readAsBinaryString(file);
+    } catch (err: any) {
+      console.error('Import module error:', err);
+      showToast('Gagal memuat modul Excel: ' + (err.message || 'Error'));
+    }
+  };
+
+  const handleAddStudentManual = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newStudentData.name.trim()) {
+      showToast('Nama siswa wajib diisi!');
+      return;
+    }
+    const newStudent: Student = {
+      id: `${newStudentData.classId.replace('-', '')}-${String(studentsList.length + 1).padStart(2, '0')}`,
+      name: newStudentData.name.trim(),
+      nisn: newStudentData.nisn.trim() || `01${Math.floor(10000000 + Math.random() * 90000000)}`,
+      nis: newStudentData.nis.trim() || '',
+      classId: newStudentData.classId,
+      gender: '-'
+    };
+    const updated = [newStudent, ...studentsList];
+    saveStoredStudents(updated);
+    setStudentsList(updated);
+    setIsAddStudentModalOpen(false);
+    setNewStudentData({ name: '', nisn: '', nis: '', classId: '7-A' });
+    showToast(`Siswa "${newStudent.name}" berhasil ditambahkan ke ${newStudent.classId}!`);
+  };
+
+  const handleDeleteStudent = (studentId: string, studentName: string) => {
+    if (!confirm(`Yakin ingin menghapus data siswa "${studentName}"?`)) return;
+    const updated = studentsList.filter(s => s.id !== studentId);
+    saveStoredStudents(updated);
+    setStudentsList(updated);
+    showToast(`Data siswa "${studentName}" berhasil dihapus.`);
+  };
+
+  const handleResetStudents = () => {
+    if (!confirm('Yakin ingin mereset seluruh data kembali ke daftar 535 siswa awal 2026/2027?')) return;
+    saveStoredStudents(INITIAL_STUDENTS);
+    setStudentsList(INITIAL_STUDENTS);
+    showToast('Data siswa berhasil direset ke 535 siswa awal!');
+  };
+
+  // Filtered Students (Memoized for optimal responsive performance)
+  const filteredStudents = useMemo(() => {
+    const q = studentSearch.toLowerCase().trim();
+    return studentsList.filter(s => {
+      const matchClass = studentClassFilter === 'ALL' || s.classId === studentClassFilter;
+      const matchSearch = !q || 
+        s.name.toLowerCase().includes(q) || 
+        s.nisn.includes(q) || 
+        (s.nis && s.nis.includes(q));
+      return matchClass && matchSearch;
+    });
+  }, [studentsList, studentClassFilter, studentSearch]);
+
+  const totalStudentPages = Math.max(1, Math.ceil(filteredStudents.length / STUDENTS_PER_PAGE));
+  const paginatedStudents = useMemo(() => {
+    const start = (studentPage - 1) * STUDENTS_PER_PAGE;
+    return filteredStudents.slice(start, start + STUDENTS_PER_PAGE);
+  }, [filteredStudents, studentPage]);
+
+  // Filtered teachers (Memoized)
+  const filteredTeachers = useMemo(() => {
+    const q = teacherSearch.toLowerCase().trim();
+    if (!q) return teachersList;
+    return teachersList.filter(t => 
+      t.name.toLowerCase().includes(q) || 
+      t.subject.toLowerCase().includes(q)
+    );
+  }, [teachersList, teacherSearch]);
 
   return (
     <div className="min-h-screen bg-[#070709] text-stone-100 flex flex-col antialiased selection:bg-cyan-500/25 selection:text-cyan-200">
@@ -485,6 +685,19 @@ export default function DashboardPage() {
                     </svg>
                   ),
                   badge: `${newsList.length}`
+                },
+                {
+                  id: 'siswa',
+                  label: 'Data Siswa & Rombel',
+                  icon: (
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                      <circle cx="9" cy="7" r="4" />
+                      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                    </svg>
+                  ),
+                  badge: `${studentsList.length}`
                 },
                 {
                   id: 'pimpinan',
@@ -635,6 +848,7 @@ export default function DashboardPage() {
                 <span className="text-xs sm:text-sm font-medium text-white capitalize">
                   {activeTab === 'overview' && 'Ringkasan Sistem & Konten'}
                   {activeTab === 'warta' && 'Manajemen Warta & Berita'}
+                  {activeTab === 'siswa' && 'Manajemen Data Siswa & Rombel'}
                   {activeTab === 'pimpinan' && 'Manajemen Pimpinan & Guru (GTK)'}
                   {activeTab === 'agenda' && 'Kalender & Agenda Akademik'}
                   {activeTab === 'galeri' && 'Manajemen Galeri & Fasilitas'}
@@ -653,7 +867,7 @@ export default function DashboardPage() {
               {/* Live Clock Indicator */}
               <div className="hidden md:flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/[0.03] border border-white/[0.07] text-[11px] font-mono text-stone-400">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                <span>{currentTime || 'Loading...'}</span>
+                <DashboardClock />
               </div>
 
               {/* View Public Website */}
@@ -985,6 +1199,234 @@ export default function DashboardPage() {
                   {filteredNews.length === 0 && (
                     <div className="py-12 text-center text-stone-500 text-xs">
                       Tidak ada artikel yang cocok dengan pencarian.
+                    </div>
+                  )}
+                </div>
+
+              </div>
+            )}
+
+            {/* ========================================================================= */}
+            {/* TAB: DATA SISWA & ROMBEL (STUDENT MANAGEMENT & EXCEL IMPORT) */}
+            {/* ========================================================================= */}
+            {activeTab === 'siswa' && (
+              <div className="space-y-6 animate-[fadeIn_0.3s_ease-out]">
+                
+                {/* Header Action Card */}
+                <div className="p-5 sm:p-6 rounded-2xl bg-white/[0.025] border border-white/[0.08] backdrop-blur-xl flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                  <div>
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-400/30 text-cyan-300 text-[10px] font-mono uppercase mb-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                      Database Peserta Didik
+                    </div>
+                    <h2 className="text-xl font-light text-white tracking-tight">
+                      Data Siswa & Rombongan Belajar <span className="font-normal text-stone-300">(2026/2027)</span>
+                    </h2>
+                    <p className="text-xs text-stone-400 font-light mt-0.5">
+                      Kelola daftar resmi peserta didik. Seluruh data di sini otomatis tersinkronisasi ke modul Presensi & E-Learning kelas.
+                    </p>
+                  </div>
+
+                  {/* Actions: Download Template, Upload Excel, Add Student, Reset */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* Hidden File Input */}
+                    <input 
+                      type="file" 
+                      ref={fileInputRef} 
+                      accept=".xlsx,.xls" 
+                      onChange={handleExcelFileUpload} 
+                      className="hidden" 
+                    />
+
+                    {/* Download Template */}
+                    <button
+                      type="button"
+                      onClick={downloadStudentTemplateExcel}
+                      className="px-3.5 py-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 text-stone-200 text-xs font-medium transition-all flex items-center gap-2 cursor-pointer shadow-lg"
+                      title="Unduh format tabel Excel kosong untuk diisi data siswa baru"
+                    >
+                      <span>📥</span>
+                      <span>Format Template Excel</span>
+                    </button>
+
+                    {/* Import Excel */}
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-black text-xs font-bold hover:opacity-95 transition-all flex items-center gap-2 cursor-pointer shadow-lg shadow-emerald-500/20"
+                      title="Upload file Excel daftar siswa baru (.xlsx)"
+                    >
+                      <span>📤</span>
+                      <span>Import File Excel (.xlsx)</span>
+                    </button>
+
+                    {/* Add Manual */}
+                    <button
+                      type="button"
+                      onClick={() => setIsAddStudentModalOpen(true)}
+                      className="px-4 py-2.5 rounded-xl bg-cyan-500 text-black text-xs font-bold hover:bg-cyan-400 transition-all flex items-center gap-1.5 cursor-pointer shadow-lg shadow-cyan-500/20"
+                    >
+                      <span>+ Tambah Siswa</span>
+                    </button>
+
+                    {/* Reset */}
+                    <button
+                      type="button"
+                      onClick={handleResetStudents}
+                      className="p-2.5 rounded-xl bg-white/[0.03] hover:bg-rose-500/10 hover:text-rose-300 text-stone-500 border border-white/5 transition-all text-xs cursor-pointer"
+                      title="Reset kembali ke data 535 siswa awal"
+                    >
+                      🔄
+                    </button>
+                  </div>
+                </div>
+
+                {/* 3 Metric Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="p-4 rounded-xl bg-white/[0.025] border border-white/[0.08] backdrop-blur-xl">
+                    <div className="text-[11px] font-semibold text-stone-400 uppercase tracking-wider">Total Siswa Terdaftar</div>
+                    <div className="text-2xl font-black text-white mt-1">{studentsList.length}</div>
+                    <div className="text-[10px] text-stone-400 mt-0.5">Siswa Aktif Dapodik & Presensi</div>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-white/[0.025] border border-white/[0.08] backdrop-blur-xl">
+                    <div className="text-[11px] font-semibold text-stone-400 uppercase tracking-wider">Rombongan Belajar</div>
+                    <div className="text-2xl font-black text-cyan-300 mt-1">{SCHOOL_CLASSES.length} Kelas</div>
+                    <div className="text-[10px] text-stone-400 mt-0.5">7-A s/d 7-F, 8-A s/d 8-F, 9-A s/d 9-E</div>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-white/[0.025] border border-white/[0.08] backdrop-blur-xl">
+                    <div className="text-[11px] font-semibold text-stone-400 uppercase tracking-wider">Status Sinkronisasi</div>
+                    <div className="text-2xl font-black text-emerald-400 mt-1">Live Aktif</div>
+                    <div className="text-[10px] text-emerald-400/80 mt-0.5">Terhubung ke Portal Presensi E-Learning</div>
+                  </div>
+                </div>
+
+                {/* Filter & Search Bar */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-4 rounded-2xl bg-white/[0.025] border border-white/[0.08]">
+                  {/* Select Class Filter */}
+                  <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0">
+                    <span className="text-xs font-semibold text-stone-400 uppercase tracking-wider mr-1 whitespace-nowrap">
+                      Pilih Kelas:
+                    </span>
+                    <select
+                      value={studentClassFilter}
+                      onChange={(e) => setStudentClassFilter(e.target.value)}
+                      className="px-3 py-1.5 rounded-xl bg-black/60 border border-white/20 text-white text-xs font-bold focus:outline-none focus:border-cyan-400 cursor-pointer"
+                    >
+                      <option value="ALL">Semua Kelas ({studentsList.length} Siswa)</option>
+                      {SCHOOL_CLASSES.map(cls => (
+                        <option key={cls.id} value={cls.id}>
+                          {cls.name} ({studentsList.filter(s => s.classId === cls.id).length} Siswa)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Search Input */}
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={studentSearch}
+                      onChange={(e) => setStudentSearch(e.target.value)}
+                      placeholder="Cari nama siswa atau NISN..."
+                      className="w-full md:w-72 pl-8 pr-4 py-2 rounded-xl bg-white/[0.04] border border-white/10 text-xs text-stone-200 placeholder-stone-500 focus:outline-none focus:border-cyan-400/50"
+                    />
+                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-500 text-xs">
+                      🔍
+                    </span>
+                  </div>
+                </div>
+
+                {/* Students Table */}
+                <div className="rounded-2xl bg-white/[0.025] border border-white/[0.08] backdrop-blur-xl overflow-hidden shadow-xl">
+                  <div className="p-3.5 bg-white/[0.02] border-b border-white/[0.06] flex items-center justify-between text-xs text-stone-400">
+                    <span>
+                      Menampilkan <span className="font-semibold text-white">{filteredStudents.length}</span> dari {studentsList.length} siswa
+                    </span>
+                    {studentClassFilter !== 'ALL' && (
+                      <span className="px-2 py-0.5 rounded font-mono text-[10px] bg-cyan-500/10 text-cyan-300 border border-cyan-400/30">
+                        Filter: Kelas {studentClassFilter}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="overflow-x-auto max-h-[600px] overflow-y-auto [scrollbar-width:thin]">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-white/[0.03] text-stone-400 font-mono uppercase text-[10px] tracking-wider border-b border-white/[0.06] sticky top-0 backdrop-blur-md">
+                        <tr>
+                          <th className="py-3 px-4 w-12 text-center">No</th>
+                          <th className="py-3 px-4 w-32">NISN</th>
+                          <th className="py-3 px-4 w-28">NIS</th>
+                          <th className="py-3 px-4">Nama Lengkap Siswa</th>
+                          <th className="py-3 px-4 w-24">Kelas</th>
+                          <th className="py-3 px-4 w-20 text-center">Aksi</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/[0.04]">
+                        {paginatedStudents.map((st, idx) => {
+                          const absoluteIndex = (studentPage - 1) * STUDENTS_PER_PAGE + idx + 1;
+                          return (
+                            <tr key={st.id} className="hover:bg-white/[0.02] transition-colors">
+                              <td className="py-2.5 px-4 text-center font-mono text-stone-500">{absoluteIndex}</td>
+                              <td className="py-2.5 px-4 font-mono text-cyan-400">{st.nisn}</td>
+                              <td className="py-2.5 px-4 font-mono text-stone-400">{st.nis || '-'}</td>
+                              <td className="py-2.5 px-4 font-medium text-white">{st.name}</td>
+                              <td className="py-2.5 px-4">
+                                <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-white/5 border border-white/10 text-stone-300 font-mono">
+                                  {st.classId}
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-4 text-center">
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteStudent(st.id, st.name)}
+                                  className="p-1 rounded-lg hover:bg-rose-500/20 text-stone-500 hover:text-rose-300 transition cursor-pointer"
+                                  title="Hapus siswa"
+                                >
+                                  🗑️
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {filteredStudents.length > 0 && (
+                    <div className="p-3 bg-white/[0.01] border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-stone-400">
+                      <div>
+                        Menampilkan <span className="text-white font-semibold">{(studentPage - 1) * STUDENTS_PER_PAGE + 1}</span> - <span className="text-white font-semibold">{Math.min(studentPage * STUDENTS_PER_PAGE, filteredStudents.length)}</span> dari <span className="text-white font-semibold">{filteredStudents.length}</span> siswa
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          disabled={studentPage <= 1}
+                          onClick={() => setStudentPage(p => Math.max(1, p - 1))}
+                          className="px-3 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] disabled:opacity-30 disabled:cursor-not-allowed border border-white/10 text-stone-300 text-xs font-medium transition cursor-pointer"
+                        >
+                          ◀ Sebelumnya
+                        </button>
+                        <span className="px-3 py-1.5 rounded-lg bg-black/40 border border-white/10 text-stone-300 font-mono text-xs">
+                          Hal {studentPage} / {totalStudentPages}
+                        </span>
+                        <button
+                          type="button"
+                          disabled={studentPage >= totalStudentPages}
+                          onClick={() => setStudentPage(p => Math.min(totalStudentPages, p + 1))}
+                          className="px-3 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] disabled:opacity-30 disabled:cursor-not-allowed border border-white/10 text-stone-300 text-xs font-medium transition cursor-pointer"
+                        >
+                          Berikutnya ▶
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {filteredStudents.length === 0 && (
+                    <div className="py-16 text-center text-stone-500 text-xs">
+                      Tidak ada siswa yang cocok dengan filter atau kata kunci pencarian.
                     </div>
                   )}
                 </div>
@@ -2188,6 +2630,91 @@ export default function DashboardPage() {
                   className="px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-medium cursor-pointer shadow-lg shadow-cyan-500/20"
                 >
                   Simpan Perubahan Guru
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Tambah Siswa Manual */}
+      {isAddStudentModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]">
+          <div className="bg-[#10121a] border border-white/10 rounded-2xl max-w-md w-full p-6 shadow-2xl relative">
+            <div className="flex items-center justify-between pb-4 border-b border-white/10 mb-4">
+              <h3 className="text-base font-bold text-white">Tambah Siswa Baru</h3>
+              <button
+                onClick={() => setIsAddStudentModalOpen(false)}
+                className="text-stone-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleAddStudentManual} className="space-y-4 text-xs">
+              <div>
+                <label className="text-stone-300 block mb-1 font-semibold">Nama Lengkap Siswa *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Contoh: Muhammad Rizky Pratama"
+                  value={newStudentData.name}
+                  onChange={(e) => setNewStudentData({ ...newStudentData, name: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.04] border border-white/10 text-white focus:outline-none focus:border-cyan-400"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-stone-300 block mb-1 font-semibold">NISN (10 Digit)</label>
+                  <input
+                    type="text"
+                    placeholder="Contoh: 0134567890"
+                    value={newStudentData.nisn}
+                    onChange={(e) => setNewStudentData({ ...newStudentData, nisn: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.04] border border-white/10 text-white focus:outline-none focus:border-cyan-400 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="text-stone-300 block mb-1 font-semibold">NIS Sekolah</label>
+                  <input
+                    type="text"
+                    placeholder="Contoh: 262707050"
+                    value={newStudentData.nis}
+                    onChange={(e) => setNewStudentData({ ...newStudentData, nis: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.04] border border-white/10 text-white focus:outline-none focus:border-cyan-400 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-stone-300 block mb-1 font-semibold">Kelas / Rombongan Belajar *</label>
+                <select
+                  value={newStudentData.classId}
+                  onChange={(e) => setNewStudentData({ ...newStudentData, classId: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#14151b] border border-white/10 text-white focus:outline-none focus:border-cyan-400 cursor-pointer"
+                >
+                  {SCHOOL_CLASSES.map(cls => (
+                    <option key={cls.id} value={cls.id}>
+                      {cls.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setIsAddStudentModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-stone-300 cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-bold cursor-pointer shadow-lg shadow-cyan-500/20"
+                >
+                  Simpan Siswa
                 </button>
               </div>
             </form>

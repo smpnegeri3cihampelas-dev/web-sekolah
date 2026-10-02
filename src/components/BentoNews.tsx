@@ -4,12 +4,11 @@ import React from 'react';
 
 export default function BentoNews() {
   return (
-    <section id="berita" className="relative w-full py-20 sm:py-28 bg-[#101013] text-stone-100 overflow-hidden select-none border-b border-white/[0.06]">
+    <section id="berita" className="relative w-full py-20 sm:py-28 bg-[#f8fafc] text-slate-900 overflow-hidden select-none border-b border-indigo-100/70">
       {/* Subtle Studio Backdrop Ambient Glow */}
       <div className="absolute inset-0 z-0 pointer-events-none">
-        <div className="absolute top-1/3 left-1/4 -translate-y-1/2 w-[700px] h-[500px] bg-sky-950/[0.12] rounded-full blur-[160px]" />
-        <div className="absolute bottom-1/4 right-1/4 w-[600px] h-[500px] bg-purple-950/[0.1] rounded-full blur-[160px]" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(255,255,255,0.03),_transparent_70%)]" />
+        <div className="absolute top-1/3 left-1/4 -translate-y-1/2 w-[700px] h-[500px] bg-indigo-100/40 rounded-full blur-[160px]" />
+        <div className="absolute bottom-1/4 right-1/4 w-[600px] h-[500px] bg-purple-100/30 rounded-full blur-[160px]" />
       </div>
 
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-8">
@@ -17,20 +16,20 @@ export default function BentoNews() {
         {/* Section Header */}
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 sm:mb-14 gap-4">
           <div>
-            <div className="inline-flex items-center gap-2.5 px-3.5 py-1 rounded-full bg-white/[0.04] border border-white/10 text-stone-300 text-[11px] font-normal tracking-[0.2em] uppercase mb-3 backdrop-blur-md">
-              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_8px_#38bdf8]" />
+            <div className="inline-flex items-center gap-2.5 px-3.5 py-1 rounded-full bg-indigo-50/80 border border-indigo-200/70 text-indigo-700 text-[11px] font-medium tracking-[0.15em] uppercase mb-3 shadow-sm">
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shadow-[0_0_8px_#6366f1]" />
               <span>Warta & Pengumuman Sekolah</span>
             </div>
-            <h2 className="text-3xl sm:text-4xl md:text-5xl font-light text-white tracking-tight leading-[1.12]">
-              Informasi Terpadu <span className="font-normal text-stone-200">& Prestasi Terkini</span>
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-light text-slate-900 tracking-tight leading-[1.12]">
+              Informasi Terpadu <span className="font-semibold text-indigo-900">&amp; Prestasi Terkini</span>
             </h2>
           </div>
           <a
             href="#arsip-berita"
-            className="group inline-flex items-center gap-2.5 px-5 py-2.5 rounded-full bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 hover:border-white/20 text-xs sm:text-sm font-medium text-stone-300 hover:text-white backdrop-blur-xl transition-all duration-300 shadow-sm self-start md:self-end"
+            className="group inline-flex items-center gap-2.5 px-5 py-2.5 rounded-full bg-white hover:bg-indigo-50 border border-indigo-200/80 text-xs sm:text-sm font-medium text-slate-700 hover:text-indigo-700 transition-all duration-300 shadow-sm self-start md:self-end"
           >
             <span>Lihat Selengkapnya</span>
-            <span className="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center text-xs group-hover:translate-x-0.5 group-hover:bg-cyan-400 group-hover:text-black transition-all duration-300">
+            <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs group-hover:translate-x-0.5 group-hover:bg-indigo-600 group-hover:text-white transition-all duration-300">
               →
             </span>
           </a>
@@ -46,19 +45,19 @@ export default function BentoNews() {
           {/* ============================================================== */}
           <div className="lg:col-span-6 flex flex-col gap-6">
             
-            {/* CARD 1: Top Left Brand Hero (Soft Powder Blue Card) */}
-            <div className="rounded-[2.2rem] p-8 sm:p-10 flex flex-col items-center justify-center text-center h-[260px] bg-gradient-to-br from-[#dfe9f7] via-[#ebf3fd] to-[#d4e4f9] text-[#0f172a] shadow-xl shadow-black/25 border border-white/60 relative overflow-hidden group hover:shadow-2xl transition-all duration-500">
+            {/* CARD 1: Top Left Brand Hero (Soft Lavender Card matching Marklab) */}
+            <div className="rounded-[2.2rem] p-8 sm:p-10 flex flex-col items-center justify-center text-center h-[260px] bg-gradient-to-br from-[#e0e7ff] via-[#eef2ff] to-[#f5f3ff] text-[#0f172a] shadow-md shadow-indigo-950/5 border border-indigo-200/80 relative overflow-hidden group hover:shadow-xl transition-all duration-500">
               {/* Subtle light reflex */}
-              <div className="absolute top-0 right-0 w-64 h-64 bg-white/40 rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute top-0 right-0 w-64 h-64 bg-white/60 rounded-full blur-3xl pointer-events-none" />
               
               <div className="relative z-10 flex flex-col items-center">
-                <span className="inline-block px-3 py-1 rounded-full bg-white/60 border border-white/70 text-[10px] tracking-[0.2em] font-medium text-slate-700 uppercase mb-3 shadow-sm">
+                <span className="inline-block px-3 py-1 rounded-full bg-white/80 border border-indigo-200/70 text-[10px] tracking-[0.2em] font-semibold text-indigo-700 uppercase mb-3 shadow-sm">
                   Official School Portal
                 </span>
                 <h3 className="text-5xl sm:text-6xl md:text-7xl font-semibold tracking-[-0.04em] text-[#0f172a] leading-none mb-1 group-hover:scale-[1.02] transition-transform duration-300">
                   SMPN 3
                 </h3>
-                <span className="text-xs sm:text-sm font-medium tracking-[0.3em] uppercase text-slate-500 mt-2">
+                <span className="text-xs sm:text-sm font-medium tracking-[0.3em] uppercase text-indigo-600/80 mt-2">
                   Cihampelas · Rigas
                 </span>
               </div>
@@ -187,12 +186,12 @@ export default function BentoNews() {
               <div className="flex flex-col gap-6">
                 
                 {/* CARD 3: Top Right (Dark Obsidian Stat Card with Bar Chart - Exact 166px) */}
-                <div className="rounded-[2.2rem] h-[166px] bg-[#161619] border border-white/10 text-white p-5 sm:p-6 shadow-xl shadow-black/40 flex flex-col justify-between group hover:border-white/20 transition-all shrink-0">
+                <div className="rounded-[2.2rem] h-[166px] bg-[#080b20] border border-indigo-500/20 text-white p-5 sm:p-6 shadow-xl shadow-indigo-950/30 flex flex-col justify-between group hover:border-indigo-400/40 transition-all shrink-0">
                   <div>
                     <h4 className="text-sm sm:text-base font-medium text-white tracking-tight">
                       Tingkat Kelulusan
                     </h4>
-                    <span className="inline-block px-2 py-0.5 rounded-full bg-white/[0.08] text-[9px] text-stone-300 font-light mt-0.5">
+                    <span className="inline-block px-2 py-0.5 rounded-full bg-white/[0.1] text-[9px] text-indigo-200 font-light mt-0.5">
                       5 Tahun Terakhir
                     </span>
                   </div>
@@ -200,15 +199,15 @@ export default function BentoNews() {
                   {/* Frequency Histogram Bars (matching reference graphic) */}
                   <div className="flex items-end justify-between pt-1">
                     <div className="flex items-end gap-1.5 h-9">
-                      <div className="w-1.5 h-4 rounded-full bg-stone-700" />
-                      <div className="w-1.5 h-5 rounded-full bg-stone-600" />
-                      <div className="w-1.5 h-6 rounded-full bg-stone-500" />
-                      <div className="w-1.5 h-8 rounded-full bg-stone-400" />
+                      <div className="w-1.5 h-4 rounded-full bg-indigo-900/60" />
+                      <div className="w-1.5 h-5 rounded-full bg-indigo-800" />
+                      <div className="w-1.5 h-6 rounded-full bg-indigo-600" />
+                      <div className="w-1.5 h-8 rounded-full bg-indigo-400" />
                       <div className="w-1.5 h-9 rounded-full bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)]" />
                     </div>
                     <div className="flex flex-col items-end">
                       <span className="text-xl sm:text-2xl font-semibold text-white tracking-tight leading-none">100%</span>
-                      <span className="text-[10px] text-emerald-400 font-medium mt-1">Lulus Paripurna</span>
+                      <span className="text-[10px] text-indigo-300 font-medium mt-1">Lulus Paripurna</span>
                     </div>
                   </div>
                 </div>

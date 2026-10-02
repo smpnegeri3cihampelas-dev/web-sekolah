@@ -12,22 +12,109 @@ import {
   AttendanceStatus, 
   getStoredAttendance, 
   saveStoredAttendance,
+  getStoredSessions,
+  saveSubjectSession,
+  getStoredStudents,
+  SubjectSession,
   Student
 } from '@/lib/elearningData';
+import {
+  exportMapelAttendanceToExcel,
+  exportSemesterAttendanceToExcel,
+  exportSchoolDailyAttendanceToExcel
+} from '@/lib/elearningExport';
+
+// Isolated Clock to keep re-renders local and lightweight
+const ELearningClock = React.memo(function ELearningClock() {
+  const [time, setTime] = useState<string>('');
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      setTime(now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB');
+    };
+    updateTime();
+    const timer = setInterval(updateTime, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  return <span className="font-mono text-stone-300 text-xs">{time || '...'}</span>;
+});
+
+export interface AuthUserSession {
+  role: 'guru_mapel' | 'guru_piket' | 'siswa';
+  name: string;
+  nipOrNisn: string;
+  subject?: string;
+  classId?: string;
+  gender?: string;
+}
 
 export default function ELearningPage() {
-  // Current user role state: 'login' | 'guru_mapel' | 'guru_piket' | 'siswa'
-  const [currentRole, setCurrentRole] = useState<'login' | 'guru_mapel' | 'guru_piket' | 'siswa'>('guru_mapel');
-  
+  // Active Authenticated User Session (null = show official login portal)
+  const [currentUser, setCurrentUser] = useState<AuthUserSession | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
+
+  // Read saved session from localStorage on initial mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('spentic_elearning_session_v2');
+      if (saved) {
+        const parsed: AuthUserSession = JSON.parse(saved);
+        if (parsed && parsed.role) {
+          setCurrentUser(parsed);
+          if (parsed.classId) {
+            setSelectedClassId(parsed.classId);
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Failed reading session', e);
+    } finally {
+      setIsAuthLoading(false);
+    }
+  }, []);
+
+  // Login Form Local State
+  const [loginRole, setLoginRole] = useState<'guru' | 'piket' | 'siswa'>('guru');
+  const [loginIdentifier, setLoginIdentifier] = useState<string>('19720412 199703 1 002');
+  const [loginPassword, setLoginPassword] = useState<string>('spentic2026');
+
   // Realtime Attendance State (synced via localStorage)
   const [attendanceData, setAttendanceData] = useState<Record<string, ClassSessionAttendance>>({});
   
-  // Active Tab inside Teacher / Piket view
+  // Active Tab inside Teacher view
   const [activeMenu, setActiveMenu] = useState<'presensi' | 'materi' | 'cbt'>('presensi');
   
-  // Mapel Teacher State
+  // Mapel Teacher & Class State
   const [selectedClassId, setSelectedClassId] = useState<string>('7-A');
-  const [selectedSubject, setSelectedSubject] = useState<string>('Ilmu Pengetahuan Alam (IPA)');
+  
+  // Current active teacher derived from logged-in session, with graceful fallback
+  const currentTeacher = currentUser && currentUser.role === 'guru_mapel'
+    ? {
+        nip: currentUser.nipOrNisn,
+        name: currentUser.name,
+        role: 'mapel' as const,
+        subject: currentUser.subject || 'Bahasa Inggris',
+        classes: ['7-A', '7-B', '8-A', '9-A']
+      }
+    : DEMO_TEACHERS[0];
+
+  // Duty officer at Pos Meja Piket for the day (from official roster)
+  const [piketDutyTeacher, setPiketDutyTeacher] = useState<string>('Rohidin, S.Pd.');
+  
+  // Stored Subject Sessions (for multi-session per mapel logging & exports)
+  const [sessions, setSessions] = useState<SubjectSession[]>([]);
+  
+  // Students List (dynamic, synced with getStoredStudents and dashboard imports)
+  const [allStudents, setAllStudents] = useState<Student[]>([]);
+  useEffect(() => {
+    setAllStudents(getStoredStudents());
+    const handleStudentsUpdate = () => setAllStudents(getStoredStudents());
+    window.addEventListener('elearningStudentsUpdated', handleStudentsUpdate);
+    return () => window.removeEventListener('elearningStudentsUpdated', handleStudentsUpdate);
+  }, []);
+
+  const activeStudents = allStudents.length > 0 ? allStudents : INITIAL_STUDENTS;
   
   // Temporary working records for the selected class (before clicking save)
   const [workingRecords, setWorkingRecords] = useState<Record<string, AttendanceStatus>>({});
@@ -41,6 +128,10 @@ export default function ELearningPage() {
 
   // Modal detail view for Piket
   const [detailModalClassId, setDetailModalClassId] = useState<string | null>(null);
+  
+  // Piket Interactive Class Attendance State (so duty teacher can take / edit attendance for any class)
+  const [piketModalRecords, setPiketModalRecords] = useState<Record<string, AttendanceStatus>>({});
+  const [piketModalNotes, setPiketModalNotes] = useState<Record<string, string>>({});
 
   // Toast feedback
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' | 'warn' } | null>(null);
@@ -49,59 +140,116 @@ export default function ELearningPage() {
     setTimeout(() => setToast(null), 3500);
   };
 
-  // Clock
-  const [currentTime, setCurrentTime] = useState<string>('');
-  useEffect(() => {
-    const updateTime = () => {
-      const now = new Date();
-      setCurrentTime(
-        now.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) +
-        ' • ' +
-        now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' WIB'
-      );
-    };
-    updateTime();
-    const timer = setInterval(updateTime, 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  // Load attendance data from storage
+  // Load attendance data and sessions from storage
   useEffect(() => {
     const loadData = () => {
       const stored = getStoredAttendance();
       setAttendanceData(stored);
+      const storedSess = getStoredSessions();
+      setSessions(storedSess);
     };
     loadData();
 
-    const handleDataUpdate = () => {
-      loadData();
-    };
+    const handleDataUpdate = () => loadData();
     window.addEventListener('elearningAttendanceUpdated', handleDataUpdate);
-    return () => window.removeEventListener('elearningAttendanceUpdated', handleDataUpdate);
+    window.addEventListener('elearningSessionsUpdated', handleDataUpdate);
+    return () => {
+      window.removeEventListener('elearningAttendanceUpdated', handleDataUpdate);
+      window.removeEventListener('elearningSessionsUpdated', handleDataUpdate);
+    };
   }, []);
 
   // Sync working records when selected class changes
   useEffect(() => {
+    const todayStr = new Date().toISOString().split('T')[0];
     const classSession = attendanceData[selectedClassId];
-    const studentsInClass = INITIAL_STUDENTS.filter(s => s.classId === selectedClassId);
+    const isTodaySession = classSession && classSession.date === todayStr;
+    const studentsInClass = activeStudents.filter(s => s.classId === selectedClassId);
     
     const records: Record<string, AttendanceStatus> = {};
     const notes: Record<string, string> = {};
 
     studentsInClass.forEach(student => {
-      if (classSession?.records?.[student.id]) {
+      if (isTodaySession && classSession?.records?.[student.id]) {
         records[student.id] = classSession.records[student.id];
         if (classSession.notes?.[student.id]) {
           notes[student.id] = classSession.notes[student.id];
         }
       } else {
-        records[student.id] = 'H'; // Default hadir
+        records[student.id] = 'H'; // Default setiap hari baru: otomatis HADIR
       }
     });
 
     setWorkingRecords(records);
     setWorkingNotes(notes);
   }, [selectedClassId, attendanceData]);
+
+  // Authentication & Session Management
+  const handleLogin = (user: AuthUserSession) => {
+    setCurrentUser(user);
+    if (user.classId) {
+      setSelectedClassId(user.classId);
+    }
+    try {
+      localStorage.setItem('spentic_elearning_session_v2', JSON.stringify(user));
+    } catch (e) {
+      console.error(e);
+    }
+    showToast(`Selamat datang di SIAP SPENTIC, ${user.name}!`, 'success');
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    try {
+      localStorage.removeItem('spentic_elearning_session_v2');
+    } catch (e) {
+      console.error(e);
+    }
+    showToast('Sesi Anda telah berhasil diakhiri.', 'info');
+  };
+
+  const switchLoginTab = (tab: 'guru' | 'piket' | 'siswa') => {
+    setLoginRole(tab);
+    if (tab === 'guru') {
+      setLoginIdentifier('19720412 199703 1 002'); // Rohidin, S.Pd.
+    } else if (tab === 'piket') {
+      setLoginIdentifier('piketspentic');
+    } else {
+      setLoginIdentifier('0133138158');
+    }
+  };
+
+  const handleFormLoginSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (loginRole === 'guru') {
+      const cleanId = loginIdentifier.replace(/\s+/g, '');
+      const teacher = DEMO_TEACHERS.find(t => t.nip.replace(/\s+/g, '') === cleanId) || DEMO_TEACHERS[0];
+      handleLogin({
+        role: 'guru_mapel',
+        name: teacher ? teacher.name : 'Dewan Guru SPENTIC',
+        nipOrNisn: loginIdentifier,
+        subject: teacher ? teacher.subject : 'Bahasa Inggris',
+        classId: '7-A'
+      });
+    } else if (loginRole === 'piket') {
+      handleLogin({
+        role: 'guru_piket',
+        name: 'Stasiun Meja Piket Utama',
+        nipOrNisn: 'POSKO-PIKET',
+        subject: 'Pusat Monitoring Rombel'
+      });
+    } else if (loginRole === 'siswa') {
+      const cleanId = loginIdentifier.trim();
+      const student = activeStudents.find(s => s.nisn === cleanId) || activeStudents[0];
+      handleLogin({
+        role: 'siswa',
+        name: student ? student.name : 'Abdul Hanan',
+        nipOrNisn: student ? student.nisn : cleanId,
+        classId: student ? student.classId : '7-A'
+      });
+    }
+  };
 
   // Update a single student status
   const handleSetStudentStatus = (studentId: string, status: AttendanceStatus) => {
@@ -115,7 +263,7 @@ export default function ELearningPage() {
 
   // Quick Action: Set all students to Hadir
   const handleSetAllHadir = () => {
-    const studentsInClass = INITIAL_STUDENTS.filter(s => s.classId === selectedClassId);
+    const studentsInClass = activeStudents.filter(s => s.classId === selectedClassId);
     const updated: Record<string, AttendanceStatus> = {};
     studentsInClass.forEach(s => {
       updated[s.id] = 'H';
@@ -124,7 +272,7 @@ export default function ELearningPage() {
     showToast('Seluruh siswa berhasil ditandai HADIR (H)', 'info');
   };
 
-  // Save attendance from Guru Mapel
+  // Save attendance from Guru Mapel (Saves to both Active Daily Attendance & Subject Sessions Log)
   const handleSaveAttendance = () => {
     const now = new Date();
     const timeString = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB';
@@ -134,9 +282,9 @@ export default function ELearningPage() {
     updatedData[selectedClassId] = {
       classId: selectedClassId,
       date: today,
-      subject: selectedSubject,
-      teacherName: 'Hendra Gunawan, S.Pd',
-      teacherNip: '19850615 201001 1 012',
+      subject: currentTeacher.subject,
+      teacherName: currentTeacher.name,
+      teacherNip: currentTeacher.nip,
       isSubmitted: true,
       submittedAt: timeString,
       records: workingRecords,
@@ -145,7 +293,77 @@ export default function ELearningPage() {
 
     saveStoredAttendance(updatedData);
     setAttendanceData(updatedData);
-    showToast(`Presensi ${selectedClassId} berhasil disimpan & disinkronkan ke Meja Piket (${timeString})!`, 'success');
+
+    // Save individual session log for this teacher & mapel
+    const newSession: SubjectSession = {
+      id: `${today}_${selectedClassId}_${encodeURIComponent(currentTeacher.subject)}`,
+      classId: selectedClassId,
+      date: today,
+      subject: currentTeacher.subject,
+      teacherName: currentTeacher.name,
+      teacherNip: currentTeacher.nip,
+      submittedAt: timeString,
+      records: { ...workingRecords },
+      notes: { ...workingNotes }
+    };
+    saveSubjectSession(newSession);
+
+    showToast(`Presensi ${currentTeacher.subject} kelas ${selectedClassId} berhasil disimpan (${timeString})!`, 'success');
+  };
+
+  // Export Mapel Attendance to Excel (.xlsx) - Jurnal Harian
+  const handleExportMapelExcel = () => {
+    const studentsInClass = activeStudents.filter(s => s.classId === selectedClassId);
+    const cls = SCHOOL_CLASSES.find(c => c.id === selectedClassId);
+    const today = new Date().toISOString().split('T')[0];
+
+    exportMapelAttendanceToExcel({
+      classId: selectedClassId,
+      className: cls?.name || `Kelas ${selectedClassId}`,
+      subject: currentTeacher.subject,
+      teacherName: currentTeacher.name,
+      teacherNip: currentTeacher.nip,
+      date: today,
+      students: studentsInClass,
+      records: workingRecords,
+      notes: workingNotes
+    });
+
+    showToast(`File Excel Jurnal Presensi ${currentTeacher.subject} (${selectedClassId}) berhasil diunduh!`, 'success');
+  };
+
+  // Export Semester Attendance Recap (P1 - P16) to Excel (.xlsx)
+  const handleExportSemesterExcel = () => {
+    const studentsInClass = activeStudents.filter(s => s.classId === selectedClassId);
+    const cls = SCHOOL_CLASSES.find(c => c.id === selectedClassId);
+
+    exportSemesterAttendanceToExcel({
+      classId: selectedClassId,
+      className: cls?.name || `Kelas ${selectedClassId}`,
+      subject: currentTeacher.subject,
+      teacherName: currentTeacher.name,
+      teacherNip: currentTeacher.nip,
+      semesterName: 'Semester Ganjil TP. 2026/2027',
+      students: studentsInClass,
+      currentRecords: workingRecords,
+      sessions: sessions
+    });
+
+    showToast(`File Rekap Semester (P1-P16) ${currentTeacher.subject} (${selectedClassId}) berhasil diunduh!`, 'success');
+  };
+
+  // Export School Daily Attendance to Excel (.xlsx) for Meja Piket
+  const handleExportPiketExcel = () => {
+    const today = new Date().toISOString().split('T')[0];
+    exportSchoolDailyAttendanceToExcel({
+      date: today,
+      classes: SCHOOL_CLASSES,
+      attendanceData: attendanceData,
+      students: activeStudents,
+      sessions: sessions
+    });
+
+    showToast(`File Rekap Harian Sekolah (.xlsx) berhasil diunduh!`, 'success');
   };
 
   // Piket action: Update student status (e.g. Terlambat at the gate)
@@ -167,7 +385,7 @@ export default function ELearningPage() {
     };
 
     const updatedRecords = { ...currentSession.records, [piketSelectedStudentId]: piketActionStatus };
-    const updatedNotes = { ...currentSession.notes, [piketSelectedStudentId]: `${piketActionNote} (via Meja Piket jam ${timeString})` };
+    const updatedNotes = { ...currentSession.notes, [piketSelectedStudentId]: `${piketActionNote} (via Meja Piket jam ${timeString} - Petugas: ${piketDutyTeacher})` };
 
     const updatedData = {
       ...attendanceData,
@@ -185,6 +403,84 @@ export default function ELearningPage() {
     showToast(`Status siswa berhasil diubah via Meja Piket & terupdate otomatis di kelas!`, 'success');
   };
 
+  // Open class modal with interactive state for Piket
+  const handleOpenPiketClassModal = (classId: string) => {
+    setDetailModalClassId(classId);
+    const todayStr = new Date().toISOString().split('T')[0];
+    const session = attendanceData[classId];
+    const isTodaySession = session && session.date === todayStr;
+    const studentsInClass = INITIAL_STUDENTS.filter(s => s.classId === classId);
+    const records: Record<string, AttendanceStatus> = {};
+    const notes: Record<string, string> = {};
+
+    studentsInClass.forEach(student => {
+      if (isTodaySession && session?.records?.[student.id]) {
+        records[student.id] = session.records[student.id];
+        if (session.notes?.[student.id]) {
+          notes[student.id] = session.notes[student.id];
+        }
+      } else {
+        records[student.id] = 'H'; // Default setiap hari baru: otomatis HADIR
+      }
+    });
+
+    setPiketModalRecords(records);
+    setPiketModalNotes(notes);
+  };
+
+  // Set single student status from Piket modal
+  const handleSetPiketStudentStatus = (studentId: string, status: AttendanceStatus) => {
+    setPiketModalRecords(prev => ({ ...prev, [studentId]: status }));
+  };
+
+  // Set single student note from Piket modal
+  const handleSetPiketStudentNote = (studentId: string, note: string) => {
+    setPiketModalNotes(prev => ({ ...prev, [studentId]: note }));
+  };
+
+  // Quick action: Set all students to Hadir from Piket modal
+  const handleSetPiketAllHadir = () => {
+    if (!detailModalClassId) return;
+    const students = INITIAL_STUDENTS.filter(s => s.classId === detailModalClassId);
+    const updated: Record<string, AttendanceStatus> = {};
+    students.forEach(s => {
+      updated[s.id] = 'H';
+    });
+    setPiketModalRecords(updated);
+    showToast('Seluruh siswa berhasil ditandai HADIR oleh Guru Piket', 'info');
+  };
+
+  // Save class attendance as Guru Piket / Inval
+  const handleSavePiketAttendance = () => {
+    if (!detailModalClassId) return;
+    const now = new Date();
+    const timeString = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB';
+    const today = now.toISOString().split('T')[0];
+
+    const currentSession = attendanceData[detailModalClassId];
+    const subject = currentSession?.subject || 'Jam Pertama (Inval)';
+
+    const updatedData = {
+      ...attendanceData,
+      [detailModalClassId]: {
+        classId: detailModalClassId,
+        date: today,
+        subject: subject,
+        teacherName: `${piketDutyTeacher} (Guru Piket / Inval)`,
+        teacherNip: '19780214 200501 2 008',
+        isSubmitted: true,
+        submittedAt: timeString,
+        records: piketModalRecords,
+        notes: piketModalNotes,
+      }
+    };
+
+    saveStoredAttendance(updatedData);
+    setAttendanceData(updatedData);
+    showToast(`Presensi Kelas ${detailModalClassId} berhasil disimpan & disahkan oleh ${piketDutyTeacher}!`, 'success');
+    setDetailModalClassId(null); // Tutup pop-up otomatis setelah berhasil simpan
+  };
+
   // Calculate stats for Piket Dashboard
   const calculateSchoolStats = () => {
     let totalAssigned = 0;
@@ -194,28 +490,31 @@ export default function ELearningPage() {
     let alpa = 0;
     let terlambat = 0;
 
+    const todayStr = new Date().toISOString().split('T')[0];
     SCHOOL_CLASSES.forEach(cls => {
       const session = attendanceData[cls.id];
-      const students = INITIAL_STUDENTS.filter(s => s.classId === cls.id);
+      const isTodaySession = session && session.date === todayStr && session.isSubmitted;
+      const students = activeStudents.filter(s => s.classId === cls.id);
       
       students.forEach(st => {
         totalAssigned++;
-        const status = session?.records?.[st.id] || (session?.isSubmitted ? 'H' : null);
+        const status = isTodaySession ? (session?.records?.[st.id] || 'H') : null;
         if (status === 'H') hadir++;
         else if (status === 'S') sakit++;
         else if (status === 'I') izin++;
         else if (status === 'A') alpa++;
         else if (status === 'T') terlambat++;
-        else hadir++; // Assume default present if not yet fully marked
+        else hadir++; // Default hadir jika belum ada laporan absen
       });
     });
 
     return { totalAssigned, hadir, sakit, izin, alpa, terlambat };
   };
 
+  const todayStr = new Date().toISOString().split('T')[0];
   const schoolStats = calculateSchoolStats();
-  const currentClassStudents = INITIAL_STUDENTS.filter(s => s.classId === selectedClassId);
-  const currentClassSession = attendanceData[selectedClassId];
+  const currentClassStudents = activeStudents.filter(s => s.classId === selectedClassId);
+  const currentClassSession = attendanceData[selectedClassId]?.date === todayStr ? attendanceData[selectedClassId] : null;
 
   return (
     <div className="min-h-screen bg-[#07090e] text-stone-200 flex flex-col font-sans selection:bg-cyan-500/20 selection:text-cyan-200">
@@ -237,19 +536,19 @@ export default function ELearningPage() {
       )}
 
       {/* TOP NAVIGATION BAR */}
-      <header className="sticky top-0 z-40 bg-[#0c1017]/90 backdrop-blur-xl border-b border-white/[0.08] px-4 sm:px-6 py-3">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3">
+      <header className="sticky top-0 z-40 bg-[#0c1017]/95 backdrop-blur-xl border-b border-white/[0.08] px-4 sm:px-6 py-3">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
           
           {/* Logo & School Identity */}
-          <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-start">
+          <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-start">
             <Link href="/" className="flex items-center gap-2.5 group">
               <div className="relative w-9 h-9 rounded-lg overflow-hidden border border-white/10 group-hover:border-cyan-400/50 transition">
                 <Image src="/logo.jpg" alt="Logo SMPN 3 Cihampelas" fill className="object-cover" />
               </div>
               <div>
                 <div className="text-sm font-bold text-white tracking-wide group-hover:text-cyan-300 transition flex items-center gap-2">
-                  PORTAL E-LEARNING
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 font-mono">SPENTIC</span>
+                  SIAP SPENTIC
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 font-mono">PRESENSI</span>
                 </div>
                 <div className="text-[11px] text-stone-400">SMP Negeri 3 Cihampelas</div>
               </div>
@@ -258,79 +557,77 @@ export default function ELearningPage() {
             {/* Back to Home Link (Mobile) */}
             <Link 
               href="/" 
-              className="md:hidden text-xs text-stone-400 hover:text-white flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/5 border border-white/10"
+              className="sm:hidden text-xs text-stone-400 hover:text-white flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/5 border border-white/10"
             >
               ← Web Utama
             </Link>
           </div>
 
-          {/* Quick Demo Switcher Bar (Crucial for the user to try different roles easily!) */}
-          <div className="flex items-center gap-1.5 bg-black/40 p-1 rounded-xl border border-white/10 overflow-x-auto max-w-full">
-            <span className="text-[11px] font-semibold text-stone-400 px-2 uppercase tracking-wider hidden sm:inline">
-              Mode Uji Coba:
-            </span>
-            
-            <button
-              onClick={() => { setCurrentRole('guru_mapel'); setActiveMenu('presensi'); showToast('Beralih ke: Pak Hendra (Guru Mapel IPA)', 'info'); }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1.5 whitespace-nowrap ${
-                currentRole === 'guru_mapel'
-                  ? 'bg-cyan-500 text-black font-semibold shadow-lg shadow-cyan-500/20'
-                  : 'text-stone-300 hover:bg-white/5'
-              }`}
-            >
-              <span>👨‍🏫</span>
-              <span>Guru Mapel (IPA)</span>
-            </button>
+          {/* Right Header Navigation: Differentiates Logged In vs Logged Out */}
+          {currentUser ? (
+            <div className="flex items-center gap-2.5 sm:gap-3 w-full sm:w-auto justify-between sm:justify-end">
+              {/* Active User Identity Pill */}
+              <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-white/[0.04] border border-white/10 shadow-sm">
+                <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold ${
+                  currentUser.role === 'guru_mapel' 
+                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                    : currentUser.role === 'guru_piket'
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                    : 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                }`}>
+                  {currentUser.role === 'guru_mapel' ? '👨‍🏫' : currentUser.role === 'guru_piket' ? '🏢' : '🎓'}
+                </div>
+                <div className="text-left">
+                  <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <span className="truncate max-w-[130px] sm:max-w-[180px]">{currentUser.name}</span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" title="Akun Aktif" />
+                  </div>
+                  <div className="text-[10px] text-stone-400">
+                    {currentUser.role === 'guru_mapel' && (currentUser.subject || 'Guru Mata Pelajaran')}
+                    {currentUser.role === 'guru_piket' && 'Stasiun Meja Piket'}
+                    {currentUser.role === 'siswa' && `Peserta Didik (Kelas ${currentUser.classId || '7-A'})`}
+                  </div>
+                </div>
+              </div>
 
-            <button
-              onClick={() => { setCurrentRole('guru_piket'); showToast('Beralih ke: Ibu Siti (Pusat Meja Piket)', 'info'); }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1.5 whitespace-nowrap ${
-                currentRole === 'guru_piket'
-                  ? 'bg-emerald-500 text-black font-semibold shadow-lg shadow-emerald-500/20'
-                  : 'text-stone-300 hover:bg-white/5'
-              }`}
-            >
-              <span>🏢</span>
-              <span>Meja Piket (Kontrol)</span>
-            </button>
+              {/* Digital WIB Clock (Desktop) */}
+              <div className="hidden md:flex items-center gap-1.5 bg-white/5 px-2.5 py-1.5 rounded-lg border border-white/5 text-xs">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                <ELearningClock />
+              </div>
 
-            <button
-              onClick={() => { setCurrentRole('siswa'); showToast('Beralih ke: Aditia Pratama (Siswa 8-A)', 'info'); }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1.5 whitespace-nowrap ${
-                currentRole === 'siswa'
-                  ? 'bg-purple-500 text-white font-semibold shadow-lg shadow-purple-500/20'
-                  : 'text-stone-300 hover:bg-white/5'
-              }`}
-            >
-              <span>🎓</span>
-              <span>Siswa (Aditia 8A)</span>
-            </button>
+              {/* Red Official Logout Button */}
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-300 hover:text-rose-200 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+                title="Keluar dari akun ini"
+              >
+                <span>🚪</span>
+                <span className="hidden sm:inline">Keluar</span>
+              </button>
 
-            <button
-              onClick={() => { setCurrentRole('login'); showToast('Beralih ke Formulir Login', 'info'); }}
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1 whitespace-nowrap ${
-                currentRole === 'login'
-                  ? 'bg-amber-500 text-black font-semibold'
-                  : 'text-stone-400 hover:text-stone-200 hover:bg-white/5'
-              }`}
-            >
-              <span>🔑</span>
-              <span>Layar Login</span>
-            </button>
-          </div>
-
-          {/* Clock & Back link (Desktop) */}
-          <div className="hidden lg:flex items-center gap-4 text-xs">
-            <span className="text-stone-400 font-mono bg-white/5 px-2.5 py-1 rounded-md border border-white/5">
-              {currentTime}
-            </span>
-            <Link 
-              href="/" 
-              className="text-stone-300 hover:text-cyan-400 transition flex items-center gap-1 font-medium"
-            >
-              ← Kembali ke Web Sekolah
-            </Link>
-          </div>
+              <Link 
+                href="/" 
+                className="hidden lg:block text-xs text-stone-400 hover:text-cyan-400 transition font-medium"
+              >
+                ← Web Utama
+              </Link>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 text-xs">
+              <div className="bg-white/5 px-2.5 py-1.5 rounded-lg border border-white/5 flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                <ELearningClock />
+              </div>
+              <Link 
+                href="/" 
+                className="text-stone-400 hover:text-cyan-400 transition font-medium flex items-center gap-1"
+              >
+                ← Kembali ke Web Utama
+              </Link>
+            </div>
+          )}
 
         </div>
       </header>
@@ -338,117 +635,360 @@ export default function ELearningPage() {
       {/* MAIN CONTENT AREA */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
 
-        {/* ----------------- 1. VIEW: LAYAR LOGIN ----------------- */}
-        {currentRole === 'login' && (
-          <div className="max-w-md mx-auto my-8">
-            <div className="bg-[#0f141f] border border-white/10 rounded-2xl p-6 sm:p-8 shadow-2xl relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-48 h-48 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+        {/* ----------------- 1. VIEW: OFFICIAL LOGIN PORTAL (WHEN NOT LOGGED IN) ----------------- */}
+        {!currentUser && (
+          <div className="max-w-2xl mx-auto my-4 sm:my-8 space-y-6">
+            
+            {/* Main Login Card */}
+            <div className="bg-[#0e131d] border border-white/15 rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden">
+              {/* Ambient Glows */}
+              <div className="absolute top-0 right-0 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute bottom-0 left-0 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
               
-              <div className="text-center mb-6">
-                <div className="inline-flex p-3 rounded-2xl bg-cyan-500/10 border border-cyan-400/20 text-cyan-400 mb-3">
-                  <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 14l9-5-9-5-9 5 9 5z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
-                  </svg>
+              {/* Institutional Header */}
+              <div className="text-center mb-6 relative z-10">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[11px] text-stone-300 font-mono mb-3">
+                  <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+                  SISTEM INFORMASI AKADEMIK & PRESENSI (SIAP)
                 </div>
-                <h1 className="text-xl font-bold text-white">Masuk E-Learning & Presensi</h1>
-                <p className="text-xs text-stone-400 mt-1">SMP Negeri 3 Cihampelas (SPENTIC)</p>
+                <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                  Portal Masuk Terpadu
+                </h1>
+                <p className="text-xs sm:text-sm text-stone-400 mt-1 max-w-md mx-auto">
+                  SMP Negeri 3 Cihampelas — Layanan Presensi Digital & KBM Online TP. 2026/2027
+                </p>
               </div>
 
-              {/* Login Method Tabs */}
-              <div className="grid grid-cols-2 gap-1.5 p-1 bg-black/40 rounded-xl border border-white/5 mb-6 text-xs font-semibold">
+              {/* 3-Role Segmented Selector */}
+              <div className="grid grid-cols-3 gap-1.5 p-1.5 bg-black/60 rounded-2xl border border-white/10 mb-6 text-xs font-semibold relative z-10">
                 <button 
-                  onClick={() => setCurrentRole('guru_mapel')}
-                  className="py-2 rounded-lg bg-cyan-500 text-black shadow transition text-center"
+                  type="button"
+                  onClick={() => switchLoginTab('guru')}
+                  className={`py-2.5 px-2 rounded-xl transition flex flex-col sm:flex-row items-center justify-center gap-1.5 cursor-pointer ${
+                    loginRole === 'guru'
+                      ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-black font-bold shadow-lg shadow-cyan-500/20'
+                      : 'text-stone-400 hover:text-white hover:bg-white/5'
+                  }`}
                 >
-                  Dewan Guru (NIP)
+                  <span className="text-sm">👨‍🏫</span>
+                  <span>Dewan Guru</span>
                 </button>
+
                 <button 
-                  onClick={() => setCurrentRole('siswa')}
-                  className="py-2 rounded-lg text-stone-300 hover:text-white transition text-center"
+                  type="button"
+                  onClick={() => switchLoginTab('piket')}
+                  className={`py-2.5 px-2 rounded-xl transition flex flex-col sm:flex-row items-center justify-center gap-1.5 cursor-pointer ${
+                    loginRole === 'piket'
+                      ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-black font-bold shadow-lg shadow-emerald-500/20'
+                      : 'text-stone-400 hover:text-white hover:bg-white/5'
+                  }`}
                 >
-                  Siswa (NISN)
+                  <span className="text-sm">🏢</span>
+                  <span>Pos Meja Piket</span>
+                </button>
+
+                <button 
+                  type="button"
+                  onClick={() => switchLoginTab('siswa')}
+                  className={`py-2.5 px-2 rounded-xl transition flex flex-col sm:flex-row items-center justify-center gap-1.5 cursor-pointer ${
+                    loginRole === 'siswa'
+                      ? 'bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-bold shadow-lg shadow-purple-500/20'
+                      : 'text-stone-400 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  <span className="text-sm">🎓</span>
+                  <span>Peserta Didik</span>
                 </button>
               </div>
 
-              <form onSubmit={(e) => { e.preventDefault(); setCurrentRole('guru_mapel'); }} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-medium text-stone-300 mb-1.5">
-                    Nomor Induk Pegawai (NIP) / NISN
-                  </label>
-                  <input
-                    type="text"
-                    defaultValue="19850615 201001 1 012"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-black/50 border border-white/10 text-white text-sm focus:outline-none focus:border-cyan-400 transition"
-                    placeholder="Masukkan NIP atau NISN"
-                  />
-                  <span className="text-[11px] text-stone-400 mt-1 block">
-                    *Akun terintegrasi otomatis dari data pokok Dapodik
-                  </span>
-                </div>
+              {/* Login Form */}
+              <form onSubmit={handleFormLoginSubmit} className="space-y-4 relative z-10">
+                
+                {loginRole === 'guru' && (
+                  <>
+                    <div>
+                      <label className="block text-xs font-medium text-stone-300 mb-1.5">
+                        Nomor Induk Pegawai (NIP) / NUPTK Guru
+                      </label>
+                      <input
+                        type="text"
+                        value={loginIdentifier}
+                        onChange={(e) => setLoginIdentifier(e.target.value)}
+                        className="w-full px-4 py-3 rounded-xl bg-black/60 border border-white/15 text-white text-sm focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition"
+                        placeholder="Contoh: 19850615 201001 1 012"
+                        required
+                      />
+                      <span className="text-[11px] text-stone-400 mt-1 block">
+                        *Akun terintegrasi otomatis dengan Data Pokok Pendidikan (Dapodik)
+                      </span>
+                    </div>
 
-                <div>
-                  <label className="block text-xs font-medium text-stone-300 mb-1.5">
-                    Kata Sandi
-                  </label>
-                  <input
-                    type="password"
-                    defaultValue="••••••••"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-black/50 border border-white/10 text-white text-sm focus:outline-none focus:border-cyan-400 transition"
-                  />
-                </div>
+                    <div>
+                      <label className="block text-xs font-medium text-stone-300 mb-1.5">
+                        Kata Sandi Akun Guru
+                      </label>
+                      <input
+                        type="password"
+                        value={loginPassword}
+                        onChange={(e) => setLoginPassword(e.target.value)}
+                        className="w-full px-4 py-3 rounded-xl bg-black/60 border border-white/15 text-white text-sm focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition"
+                        placeholder="Masukkan kata sandi..."
+                        required
+                      />
+                    </div>
 
-                <button
-                  type="submit"
-                  className="w-full py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-black font-bold text-sm hover:opacity-90 transition shadow-lg shadow-cyan-500/25 mt-2"
-                >
-                  Masuk ke Portal
-                </button>
+                    <button
+                      type="submit"
+                      className="w-full py-3.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-black font-bold text-sm hover:opacity-95 transition shadow-lg shadow-cyan-500/25 flex items-center justify-center gap-2 cursor-pointer mt-2"
+                    >
+                      <span>Masuk ke Ruang Guru</span>
+                      <span>→</span>
+                    </button>
+                  </>
+                )}
+
+                {loginRole === 'piket' && (
+                  <>
+                    <div>
+                      <label className="block text-xs font-medium text-stone-300 mb-1.5">
+                        ID Stasiun / Akun Pos Piket Sekolah
+                      </label>
+                      <input
+                        type="text"
+                        value={loginIdentifier}
+                        onChange={(e) => setLoginIdentifier(e.target.value)}
+                        className="w-full px-4 py-3 rounded-xl bg-black/60 border border-white/15 text-white text-sm focus:outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 transition font-mono"
+                        placeholder="ID Stasiun Piket"
+                        required
+                      />
+                      <span className="text-[11px] text-stone-400 mt-1 block">
+                        *Digunakan bersama di meja piket lobi utama untuk memantau 17 rombel
+                      </span>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-stone-300 mb-1.5">
+                        Kata Sandi Petugas Piket
+                      </label>
+                      <input
+                        type="password"
+                        value={loginPassword}
+                        onChange={(e) => setLoginPassword(e.target.value)}
+                        className="w-full px-4 py-3 rounded-xl bg-black/60 border border-white/15 text-white text-sm focus:outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 transition"
+                        placeholder="Masukkan kata sandi stasiun..."
+                        required
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-black font-bold text-sm hover:opacity-95 transition shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2 cursor-pointer mt-2"
+                    >
+                      <span>Buka Stasiun Meja Piket</span>
+                      <span>→</span>
+                    </button>
+                  </>
+                )}
+
+                {loginRole === 'siswa' && (
+                  <>
+                    <div>
+                      <label className="block text-xs font-medium text-stone-300 mb-1.5">
+                        Nomor Induk Siswa Nasional (NISN)
+                      </label>
+                      <input
+                        type="text"
+                        value={loginIdentifier}
+                        onChange={(e) => setLoginIdentifier(e.target.value)}
+                        className="w-full px-4 py-3 rounded-xl bg-black/60 border border-white/15 text-white text-sm focus:outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-400 transition font-mono"
+                        placeholder="Masukkan 10 digit NISN..."
+                        required
+                      />
+                      <span className="text-[11px] text-stone-400 mt-1 block">
+                        *Tertera pada rapor atau kartu pelajar SMP Negeri 3 Cihampelas
+                      </span>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-stone-300 mb-1.5">
+                        Tanggal Lahir / Kata Sandi Siswa
+                      </label>
+                      <input
+                        type="password"
+                        value={loginPassword}
+                        onChange={(e) => setLoginPassword(e.target.value)}
+                        className="w-full px-4 py-3 rounded-xl bg-black/60 border border-white/15 text-white text-sm focus:outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-400 transition"
+                        placeholder="Format: TTTT-BB-HH atau sandi..."
+                        required
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full py-3.5 rounded-xl bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-bold text-sm hover:opacity-95 transition shadow-lg shadow-purple-500/25 flex items-center justify-center gap-2 cursor-pointer mt-2"
+                    >
+                      <span>Masuk Portal Peserta Didik</span>
+                      <span>→</span>
+                    </button>
+                  </>
+                )}
+
               </form>
 
-              {/* Quick Jump Box */}
-              <div className="mt-8 pt-6 border-t border-white/10">
-                <p className="text-xs font-semibold text-stone-400 mb-3 text-center uppercase tracking-wider">
-                  ⚡ Atau Masuk Cepat (Klik Salah Satu):
-                </p>
-                <div className="space-y-2">
+              {/* Official Testing Profiles Section */}
+              <div className="mt-8 pt-6 border-t border-white/10 relative z-10">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs font-bold text-stone-300 uppercase tracking-wider flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-cyan-400" />
+                    Akses Cepat Pengujian Akun (Mode Evaluasi Resmi)
+                  </span>
+                  <span className="text-[11px] text-stone-400 font-mono hidden sm:inline">1-Klik Otentikasi</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {/* Rohidin, S.Pd. */}
                   <button
-                    onClick={() => setCurrentRole('guru_mapel')}
-                    className="w-full text-left p-2.5 rounded-xl bg-white/5 hover:bg-cyan-500/10 border border-white/5 hover:border-cyan-500/30 transition flex items-center justify-between group"
+                    type="button"
+                    onClick={() => handleLogin({
+                      role: 'guru_mapel',
+                      name: 'Rohidin, S.Pd.',
+                      nipOrNisn: '19720412 199703 1 002',
+                      subject: 'Bahasa Inggris',
+                      classId: '7-A'
+                    })}
+                    className="text-left p-3 rounded-xl bg-white/[0.03] hover:bg-cyan-500/10 border border-white/10 hover:border-cyan-400/40 transition group cursor-pointer"
                   >
-                    <div>
-                      <div className="text-xs font-semibold text-stone-200 group-hover:text-cyan-300">
-                        👨‍🏫 Pak Hendra (Guru Mapel IPA)
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs font-bold text-white group-hover:text-cyan-300">
+                        👨‍🏫 Rohidin, S.Pd.
                       </div>
-                      <div className="text-[11px] text-stone-400">Untuk mengabsen kelas & tayang modul</div>
+                      <span className="text-[10px] text-cyan-400 font-mono group-hover:translate-x-0.5 transition">Masuk →</span>
                     </div>
-                    <span className="text-xs text-cyan-400 font-mono">Buka →</span>
+                    <div className="text-[11px] text-stone-400 mt-0.5">PKS Kurikulum / B. Inggris • NIP 19720412...</div>
                   </button>
 
+                  {/* Dedeh Komalasari, S.Pd. */}
                   <button
-                    onClick={() => setCurrentRole('guru_piket')}
-                    className="w-full text-left p-2.5 rounded-xl bg-white/5 hover:bg-emerald-500/10 border border-white/5 hover:border-emerald-500/30 transition flex items-center justify-between group"
+                    type="button"
+                    onClick={() => handleLogin({
+                      role: 'guru_mapel',
+                      name: 'Dedeh Komalasari, S.Pd.',
+                      nipOrNisn: '19680315 199412 2 001',
+                      subject: 'Ilmu Pengetahuan Alam (IPA)',
+                      classId: '7-A'
+                    })}
+                    className="text-left p-3 rounded-xl bg-white/[0.03] hover:bg-cyan-500/10 border border-white/10 hover:border-cyan-400/40 transition group cursor-pointer"
                   >
-                    <div>
-                      <div className="text-xs font-semibold text-stone-200 group-hover:text-emerald-300">
-                        🏢 Ibu Siti (Pusat Meja Piket)
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs font-bold text-white group-hover:text-cyan-300">
+                        👩‍🏫 Dedeh Komalasari, S.Pd.
                       </div>
-                      <div className="text-[11px] text-stone-400">Pantau seluruh kelas tanpa keliling</div>
+                      <span className="text-[10px] text-cyan-400 font-mono group-hover:translate-x-0.5 transition">Masuk →</span>
                     </div>
-                    <span className="text-xs text-emerald-400 font-mono">Buka →</span>
+                    <div className="text-[11px] text-stone-400 mt-0.5">Ka. Lab / Guru IPA • NIP 19680315...</div>
                   </button>
 
+                  {/* Yulia M. Ahmad, S.Pd. */}
                   <button
-                    onClick={() => setCurrentRole('siswa')}
-                    className="w-full text-left p-2.5 rounded-xl bg-white/5 hover:bg-purple-500/10 border border-white/5 hover:border-purple-500/30 transition flex items-center justify-between group"
+                    type="button"
+                    onClick={() => handleLogin({
+                      role: 'guru_mapel',
+                      name: 'Yulia M. Ahmad, S.Pd.',
+                      nipOrNisn: '19850210 200902 2 008',
+                      subject: 'Matematika',
+                      classId: '7-A'
+                    })}
+                    className="text-left p-3 rounded-xl bg-white/[0.03] hover:bg-cyan-500/10 border border-white/10 hover:border-cyan-400/40 transition group cursor-pointer"
                   >
-                    <div>
-                      <div className="text-xs font-semibold text-stone-200 group-hover:text-purple-300">
-                        🎓 Aditia Pratama (Siswa Kelas 8-A)
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs font-bold text-white group-hover:text-cyan-300">
+                        👩‍🏫 Yulia M. Ahmad, S.Pd.
                       </div>
-                      <div className="text-[11px] text-stone-400">Lihat status kehadiran & bahan ajar</div>
+                      <span className="text-[10px] text-cyan-400 font-mono group-hover:translate-x-0.5 transition">Masuk →</span>
                     </div>
-                    <span className="text-xs text-purple-400 font-mono">Buka →</span>
+                    <div className="text-[11px] text-stone-400 mt-0.5">Guru Matematika • NIP 19850210...</div>
+                  </button>
+
+                  {/* Nunik Wahyuni, S.Pd. */}
+                  <button
+                    type="button"
+                    onClick={() => handleLogin({
+                      role: 'guru_mapel',
+                      name: 'Nunik Wahyuni, S.Pd.',
+                      nipOrNisn: '19750918 200003 2 002',
+                      subject: 'Bahasa Indonesia',
+                      classId: '7-A'
+                    })}
+                    className="text-left p-3 rounded-xl bg-white/[0.03] hover:bg-cyan-500/10 border border-white/10 hover:border-cyan-400/40 transition group cursor-pointer"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs font-bold text-white group-hover:text-cyan-300">
+                        👩‍🏫 Nunik Wahyuni, S.Pd.
+                      </div>
+                      <span className="text-[10px] text-cyan-400 font-mono group-hover:translate-x-0.5 transition">Masuk →</span>
+                    </div>
+                    <div className="text-[11px] text-stone-400 mt-0.5">PKS Kesiswaan / B. Indonesia • NIP 19750918...</div>
+                  </button>
+
+                  {/* Ichsanul Arifin, S.Kom. */}
+                  <button
+                    type="button"
+                    onClick={() => handleLogin({
+                      role: 'guru_mapel',
+                      name: 'Ichsanul Arifin, S.Kom.',
+                      nipOrNisn: '19930115 201903 1 008',
+                      subject: 'Informatika',
+                      classId: '7-A'
+                    })}
+                    className="text-left p-3 rounded-xl bg-white/[0.03] hover:bg-cyan-500/10 border border-white/10 hover:border-cyan-400/40 transition group cursor-pointer"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs font-bold text-white group-hover:text-cyan-300">
+                        👨‍🏫 Ichsanul Arifin, S.Kom.
+                      </div>
+                      <span className="text-[10px] text-cyan-400 font-mono group-hover:translate-x-0.5 transition">Masuk →</span>
+                    </div>
+                    <div className="text-[11px] text-stone-400 mt-0.5">Guru Informatika • NIP 19930115...</div>
+                  </button>
+
+                  {/* Posko Meja Piket */}
+                  <button
+                    type="button"
+                    onClick={() => handleLogin({
+                      role: 'guru_piket',
+                      name: 'Stasiun Meja Piket Utama',
+                      nipOrNisn: 'POSKO-PIKET',
+                      subject: 'Pusat Monitoring Rombel'
+                    })}
+                    className="text-left p-3 rounded-xl bg-white/[0.03] hover:bg-emerald-500/10 border border-white/10 hover:border-emerald-400/40 transition group cursor-pointer"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs font-bold text-white group-hover:text-emerald-300">
+                        🏢 Stasiun Meja Piket
+                      </div>
+                      <span className="text-[10px] text-emerald-400 font-mono group-hover:translate-x-0.5 transition">Masuk →</span>
+                    </div>
+                    <div className="text-[11px] text-stone-400 mt-0.5">Monitoring 17 Rombel & Gerbang</div>
+                  </button>
+
+                  {/* Abdul Hanan */}
+                  <button
+                    type="button"
+                    onClick={() => handleLogin({
+                      role: 'siswa',
+                      name: 'Abdul Hanan',
+                      nipOrNisn: '0133138158',
+                      classId: '7-A'
+                    })}
+                    className="text-left p-3 rounded-xl bg-white/[0.03] hover:bg-purple-500/10 border border-white/10 hover:border-purple-400/40 transition group cursor-pointer sm:col-span-2"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs font-bold text-white group-hover:text-purple-300">
+                        🎓 Abdul Hanan (Peserta Didik)
+                      </div>
+                      <span className="text-[10px] text-purple-400 font-mono group-hover:translate-x-0.5 transition">Masuk →</span>
+                    </div>
+                    <div className="text-[11px] text-stone-400 mt-0.5">Kelas 7-A • NISN: 0133138158 • Cek Kehadiran Pribadi & Modul BSE</div>
                   </button>
                 </div>
               </div>
@@ -458,149 +998,120 @@ export default function ELearningPage() {
         )}
 
         {/* ----------------- 2. VIEW: GURU MATA PELAJARAN (Presensi Kelas) ----------------- */}
-        {currentRole === 'guru_mapel' && (
-          <div className="space-y-6">
+        {currentUser?.role === 'guru_mapel' && (
+          <div className="space-y-4">
             
-            {/* Header Greeting & Session Card */}
-            <div className="bg-gradient-to-r from-cyan-950/40 via-[#0d1424] to-[#0a0f1d] border border-cyan-500/20 rounded-2xl p-5 sm:p-6 shadow-xl relative overflow-hidden">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="px-2 py-0.5 text-[11px] font-bold rounded-md bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
-                      GURU MATA PELAJARAN
-                    </span>
-                    <span className="text-xs text-stone-400">NIP: 19850615 201001 1 012</span>
-                  </div>
-                  <h1 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
-                    Selamat Mengajar, Pak Hendra Gunawan, S.Pd
-                  </h1>
-                  <p className="text-xs sm:text-sm text-stone-300 mt-1">
-                    Mata Pelajaran: <span className="text-cyan-300 font-medium">{selectedSubject}</span> • SMPN 3 Cihampelas
-                  </p>
-                </div>
+            {/* Top Bar: Title & Sub-tabs */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/10">
+              <div>
+                <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+                  <span>Presensi KBM</span>
+                  <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-400/30">
+                    {currentTeacher.subject}
+                  </span>
+                </h1>
+                <p className="text-xs text-stone-400 mt-0.5">
+                  Pengampu: <span className="text-stone-200 font-semibold">{currentTeacher.name}</span> (NIP: {currentTeacher.nip}) • SMP Negeri 3 Cihampelas
+                </p>
+              </div>
 
-                {/* Sub-menu tabs for Guru */}
-                <div className="flex items-center gap-2 bg-black/40 p-1.5 rounded-xl border border-white/10 self-start md:self-auto">
-                  <button
-                    onClick={() => setActiveMenu('presensi')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1.5 ${
-                      activeMenu === 'presensi' 
-                        ? 'bg-cyan-500 text-black font-semibold' 
-                        : 'text-stone-300 hover:bg-white/5'
-                    }`}
-                  >
-                    <span>📋</span>
-                    <span>Presensi Kelas</span>
-                  </button>
-                  <button
-                    onClick={() => setActiveMenu('materi')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1.5 ${
-                      activeMenu === 'materi' 
-                        ? 'bg-cyan-500 text-black font-semibold' 
-                        : 'text-stone-300 hover:bg-white/5'
-                    }`}
-                  >
-                    <span>📚</span>
-                    <span>Bahan Ajar (Proyektor)</span>
-                  </button>
-                  <button
-                    onClick={() => setActiveMenu('cbt')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1.5 ${
-                      activeMenu === 'cbt' 
-                        ? 'bg-cyan-500 text-black font-semibold' 
-                        : 'text-stone-300 hover:bg-white/5'
-                    }`}
-                  >
-                    <span>💻</span>
-                    <span>Bank Soal CBT</span>
-                  </button>
-                </div>
+              {/* Sub-tabs: Presensi / Bahan Ajar / CBT */}
+              <div className="flex items-center gap-1 bg-black/40 p-1 rounded-xl border border-white/10 text-xs">
+                <button
+                  onClick={() => setActiveMenu('presensi')}
+                  className={`px-3 py-1.5 rounded-lg font-medium transition cursor-pointer ${
+                    activeMenu === 'presensi' 
+                      ? 'bg-cyan-500 text-black font-bold' 
+                      : 'text-stone-400 hover:text-white'
+                  }`}
+                >
+                  Presensi
+                </button>
+                <button
+                  onClick={() => setActiveMenu('materi')}
+                  className={`px-3 py-1.5 rounded-lg font-medium transition cursor-pointer ${
+                    activeMenu === 'materi' 
+                      ? 'bg-cyan-500 text-black font-bold' 
+                      : 'text-stone-400 hover:text-white'
+                  }`}
+                >
+                  Bahan Ajar
+                </button>
+                <button
+                  onClick={() => setActiveMenu('cbt')}
+                  className={`px-3 py-1.5 rounded-lg font-medium transition cursor-pointer ${
+                    activeMenu === 'cbt' 
+                      ? 'bg-cyan-500 text-black font-bold' 
+                      : 'text-stone-400 hover:text-white'
+                  }`}
+                >
+                  Bank Soal
+                </button>
               </div>
             </div>
 
             {/* TAB: PRESENSI KELAS */}
             {activeMenu === 'presensi' && (
-              <div className="space-y-6">
+              <div className="space-y-4">
                 
-                {/* Selector Bar: Pilih Kelas & Status Sync */}
-                <div className="bg-[#0c101a] border border-white/10 rounded-2xl p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                  
-                  {/* Select Rombel */}
+                {/* Clean Toolbar: Class Selector & Quick Action */}
+                <div className="bg-[#0c101a] border border-white/10 rounded-2xl p-3 sm:p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
                   <div className="flex flex-wrap items-center gap-3">
-                    <label className="text-xs font-bold text-stone-300 uppercase tracking-wider">
-                      Pilih Kelas / Rombel:
-                    </label>
-                    <div className="flex items-center gap-1.5 bg-black/40 p-1 rounded-xl border border-white/10">
-                      {['7-A', '7-B', '8-A', '9-A'].map(clsId => (
-                        <button
-                          key={clsId}
-                          onClick={() => setSelectedClassId(clsId)}
-                          className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
-                            selectedClassId === clsId
-                              ? 'bg-cyan-500 text-black shadow-md shadow-cyan-500/20'
-                              : 'text-stone-400 hover:text-white hover:bg-white/5'
-                          }`}
-                        >
-                          Kelas {clsId}
-                        </button>
-                      ))}
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-stone-400 font-medium">Pilih Rombel / Kelas:</span>
+                      <select
+                        value={selectedClassId}
+                        onChange={(e) => setSelectedClassId(e.target.value)}
+                        className="px-3 py-1.5 rounded-xl bg-black/60 border border-cyan-400/40 text-cyan-300 text-xs font-bold focus:outline-none focus:border-cyan-400 cursor-pointer shadow-sm"
+                      >
+                        {SCHOOL_CLASSES.map(cls => (
+                          <option key={cls.id} value={cls.id} className="bg-stone-900 text-white">
+                            {cls.name} ({cls.totalStudents} Siswa)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-xs">
+                      <span className="text-cyan-400 font-semibold">Pengampu:</span>
+                      <span className="text-white font-medium">{currentTeacher.name}</span>
+                      <span className="text-stone-400">({currentTeacher.subject})</span>
                     </div>
                   </div>
 
-                  {/* Sync Status Badge */}
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2.5">
                     {currentClassSession?.isSubmitted ? (
-                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-medium">
-                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                        <span>Tersimpan & Terkirim ke Meja Piket ({currentClassSession.submittedAt})</span>
-                      </div>
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-medium">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                        Tersimpan ({currentClassSession.submittedAt})
+                      </span>
                     ) : (
-                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-medium">
-                        <span className="w-2 h-2 rounded-full bg-amber-400" />
-                        <span>Belum Diabsen Hari Ini</span>
-                      </div>
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-medium">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                        Belum Diabsen
+                      </span>
                     )}
 
-                    {/* Quick Button: Semua Hadir */}
                     <button
+                      type="button"
                       onClick={handleSetAllHadir}
-                      className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-stone-200 transition flex items-center gap-1.5"
-                      title="Tandai seluruh siswa di kelas ini menjadi HADIR"
+                      className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-medium text-stone-200 transition cursor-pointer"
+                      title="Tandai seluruh siswa menjadi HADIR"
                     >
-                      <span>⚡</span>
-                      <span>Tandai Semua Hadir</span>
+                      ⚡ Semua Hadir
                     </button>
                   </div>
                 </div>
 
-                {/* LEGEND STATUS (Penjelasan Warna yang Jelas untuk Guru) */}
-                <div className="flex flex-wrap items-center gap-2 text-xs bg-black/20 p-3 rounded-xl border border-white/5">
-                  <span className="text-stone-400 font-semibold mr-1">Petunjuk Status:</span>
-                  <span className="px-2 py-0.5 rounded bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-bold">H = Hadir</span>
-                  <span className="px-2 py-0.5 rounded bg-blue-500/20 border border-blue-500/40 text-blue-300 font-bold">S = Sakit</span>
-                  <span className="px-2 py-0.5 rounded bg-amber-500/20 border border-amber-500/40 text-amber-300 font-bold">I = Izin</span>
-                  <span className="px-2 py-0.5 rounded bg-rose-500/20 border border-rose-500/40 text-rose-300 font-bold">A = Alpa</span>
-                  <span className="px-2 py-0.5 rounded bg-orange-500/20 border border-orange-500/40 text-orange-300 font-bold">T = Terlambat</span>
-                  <span className="text-stone-400 ml-auto hidden sm:inline text-[11px]">
-                    *Klik tombol huruf pada siswa untuk mengganti status
-                  </span>
-                </div>
-
-                {/* DAFTAR SISWA (Besar, Ramah Sentuhan Layar HP / Laptop Guru) */}
+                {/* Table Container */}
                 <div className="bg-[#0b0f17] border border-white/10 rounded-2xl overflow-hidden shadow-xl">
-                  <div className="p-4 bg-white/[0.02] border-b border-white/5 flex items-center justify-between">
-                    <div className="text-sm font-bold text-white flex items-center gap-2">
-                      <span>Daftar Siswa {selectedClassId}</span>
-                      <span className="text-xs font-normal text-stone-400">
-                        ({currentClassStudents.length} Siswa Terdaftar)
-                      </span>
-                    </div>
-
-                    <div className="text-xs text-stone-400">
-                      Wali Kelas: <span className="text-stone-200 font-medium">
-                        {SCHOOL_CLASSES.find(c => c.id === selectedClassId)?.waliKelas}
-                      </span>
-                    </div>
+                  <div className="px-4 py-3 bg-white/[0.02] border-b border-white/5 flex items-center justify-between text-xs text-stone-400">
+                    <span className="font-semibold text-white">
+                      Daftar Siswa {selectedClassId} ({currentClassStudents.length})
+                    </span>
+                    <span className="hidden sm:inline font-mono text-[11px] text-stone-500">
+                      <span className="text-emerald-400">H: Hadir</span> · <span className="text-blue-400">S: Sakit</span> · <span className="text-amber-400">I: Izin</span> · <span className="text-rose-400">A: Alpa</span> · <span className="text-orange-400">T: Telat</span>
+                    </span>
                   </div>
 
                   <div className="divide-y divide-white/5">
@@ -611,122 +1122,110 @@ export default function ELearningPage() {
                       return (
                         <div 
                           key={student.id} 
-                          className={`p-3.5 sm:p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 transition ${
-                            currentStatus !== 'H' ? 'bg-white/[0.02]' : 'hover:bg-white/[0.01]'
+                          className={`px-4 py-2.5 sm:py-3 flex flex-col md:flex-row md:items-center justify-between gap-2.5 transition ${
+                            currentStatus !== 'H' ? 'bg-white/[0.03]' : 'hover:bg-white/[0.01]'
                           }`}
                         >
                           {/* Student Identity */}
-                          <div className="flex items-center gap-3 min-w-[240px]">
-                            <div className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center font-mono text-xs font-bold text-cyan-300">
-                              {idx + 1}
-                            </div>
+                          <div className="flex items-center gap-3 min-w-[220px]">
+                            <span className="w-6 font-mono text-xs text-stone-500 text-center">{idx + 1}</span>
                             <div>
-                              <div className="text-sm font-semibold text-white flex items-center gap-2">
-                                {student.name}
-                                <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono ${
-                                  student.gender === 'L' ? 'bg-blue-500/10 text-blue-300' : 'bg-pink-500/10 text-pink-300'
-                                }`}>
-                                  {student.gender === 'L' ? 'L' : 'P'}
-                                </span>
+                              <div className="text-xs sm:text-sm font-medium text-white flex items-center gap-1.5">
+                                <span>{student.name}</span>
+                                {student.gender && student.gender !== '-' && (
+                                  <span className="text-[10px] text-stone-500 font-mono">({student.gender})</span>
+                                )}
                               </div>
-                              <div className="text-[11px] text-stone-400 font-mono">
+                              <div className="text-[10px] text-stone-500 font-mono">
                                 NISN: {student.nisn}
                               </div>
                             </div>
                           </div>
 
-                          {/* Action Buttons for Status (H, S, I, A, T) */}
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            {/* HADIR */}
+                          {/* 5 Compact Buttons [ H ] [ S ] [ I ] [ A ] [ T ] */}
+                          <div className="flex items-center gap-1 shrink-0">
                             <button
                               type="button"
                               onClick={() => handleSetStudentStatus(student.id, 'H')}
-                              className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1 ${
+                              className={`w-8 h-8 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer ${
                                 currentStatus === 'H'
-                                  ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/30 ring-2 ring-emerald-400'
-                                  : 'bg-white/5 text-stone-300 hover:bg-emerald-500/20 hover:text-emerald-300 border border-white/5'
+                                  ? 'bg-emerald-500 text-black shadow-sm ring-2 ring-emerald-400'
+                                  : 'bg-white/5 text-stone-400 hover:bg-emerald-500/20 hover:text-emerald-300'
                               }`}
+                              title="Hadir"
                             >
-                              <span>Hadir</span>
-                              {currentStatus === 'H' && <span>✓</span>}
+                              H
                             </button>
-
-                            {/* SAKIT */}
                             <button
                               type="button"
                               onClick={() => handleSetStudentStatus(student.id, 'S')}
-                              className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1 ${
+                              className={`w-8 h-8 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer ${
                                 currentStatus === 'S'
-                                  ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30 ring-2 ring-blue-400'
-                                  : 'bg-white/5 text-stone-300 hover:bg-blue-500/20 hover:text-blue-300 border border-white/5'
+                                  ? 'bg-blue-500 text-white shadow-sm ring-2 ring-blue-400'
+                                  : 'bg-white/5 text-stone-400 hover:bg-blue-500/20 hover:text-blue-300'
                               }`}
+                              title="Sakit"
                             >
-                              <span>Sakit</span>
-                              {currentStatus === 'S' && <span>✓</span>}
+                              S
                             </button>
-
-                            {/* IZIN */}
                             <button
                               type="button"
                               onClick={() => handleSetStudentStatus(student.id, 'I')}
-                              className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1 ${
+                              className={`w-8 h-8 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer ${
                                 currentStatus === 'I'
-                                  ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/30 ring-2 ring-amber-400'
-                                  : 'bg-white/5 text-stone-300 hover:bg-amber-500/20 hover:text-amber-300 border border-white/5'
+                                  ? 'bg-amber-500 text-black shadow-sm ring-2 ring-amber-400'
+                                  : 'bg-white/5 text-stone-400 hover:bg-amber-500/20 hover:text-amber-300'
                               }`}
+                              title="Izin"
                             >
-                              <span>Izin</span>
-                              {currentStatus === 'I' && <span>✓</span>}
+                              I
                             </button>
-
-                            {/* ALPA */}
                             <button
                               type="button"
                               onClick={() => handleSetStudentStatus(student.id, 'A')}
-                              className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1 ${
+                              className={`w-8 h-8 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer ${
                                 currentStatus === 'A'
-                                  ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/30 ring-2 ring-rose-400'
-                                  : 'bg-white/5 text-stone-300 hover:bg-rose-500/20 hover:text-rose-300 border border-white/5'
+                                  ? 'bg-rose-500 text-white shadow-sm ring-2 ring-rose-400'
+                                  : 'bg-white/5 text-stone-400 hover:bg-rose-500/20 hover:text-rose-300'
                               }`}
+                              title="Alpa"
                             >
-                              <span>Alpa</span>
-                              {currentStatus === 'A' && <span>✓</span>}
+                              A
                             </button>
-
-                            {/* TERLAMBAT */}
                             <button
                               type="button"
                               onClick={() => handleSetStudentStatus(student.id, 'T')}
-                              className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1 ${
+                              className={`w-8 h-8 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer ${
                                 currentStatus === 'T'
-                                  ? 'bg-orange-500 text-black shadow-lg shadow-orange-500/30 ring-2 ring-orange-400'
-                                  : 'bg-white/5 text-stone-300 hover:bg-orange-500/20 hover:text-orange-300 border border-white/5'
+                                  ? 'bg-orange-500 text-black shadow-sm ring-2 ring-orange-400'
+                                  : 'bg-white/5 text-stone-400 hover:bg-orange-500/20 hover:text-orange-300'
                               }`}
+                              title="Terlambat"
                             >
-                              <span>Telat</span>
-                              {currentStatus === 'T' && <span>✓</span>}
+                              T
                             </button>
                           </div>
 
-                          {/* Keterangan / Note (Otomatis muncul jika tidak hadir) */}
-                          <div className="w-full md:w-64">
-                            <input
-                              type="text"
-                              value={currentNote}
-                              onChange={(e) => handleSetStudentNote(student.id, e.target.value)}
-                              placeholder={
-                                currentStatus === 'S' ? 'Contoh: Surat dokter ada' :
-                                currentStatus === 'I' ? 'Contoh: Izin acara keluarga' :
-                                currentStatus === 'T' ? 'Contoh: Ban motor bocor' :
-                                currentStatus === 'A' ? 'Tanpa kabar' :
-                                'Catatan (opsional)...'
-                              }
-                              className={`w-full px-3 py-1.5 text-xs rounded-xl bg-black/40 border text-stone-200 focus:outline-none transition ${
-                                currentStatus !== 'H' 
-                                  ? 'border-white/20 focus:border-cyan-400 bg-white/[0.03]' 
-                                  : 'border-white/5 opacity-60 focus:opacity-100'
-                              }`}
-                            />
+                          {/* Note input ONLY when status is NOT Hadir */}
+                          <div className="w-full md:w-56">
+                            {currentStatus !== 'H' ? (
+                              <input
+                                type="text"
+                                value={currentNote}
+                                onChange={(e) => handleSetStudentNote(student.id, e.target.value)}
+                                placeholder={
+                                  currentStatus === 'S' ? 'Alasan sakit...' :
+                                  currentStatus === 'I' ? 'Alasan izin...' :
+                                  currentStatus === 'T' ? 'Alasan terlambat...' :
+                                  'Keterangan...'
+                                }
+                                className="w-full px-2.5 py-1 text-xs rounded-lg bg-white/[0.06] border border-white/20 text-white focus:outline-none focus:border-cyan-400 placeholder:text-stone-500 animate-[fadeIn_0.15s_ease-out]"
+                              />
+                            ) : (
+                              <div className="hidden md:block text-right">
+                                <span className="text-[11px] text-emerald-400/60 font-medium">Hadir</span>
+                              </div>
+                            )}
                           </div>
 
                         </div>
@@ -734,23 +1233,40 @@ export default function ELearningPage() {
                     })}
                   </div>
 
-                  {/* BOTTOM STICKY ACTION BAR */}
-                  <div className="p-4 sm:p-5 bg-[#090d15] border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <div className="text-xs text-stone-400 text-center sm:text-left">
-                      💡 Setelah selesai memeriksa kehadiran, klik tombol <span className="text-cyan-300 font-semibold">Simpan</span> agar data otomatis masuk ke Meja Piket.
-                    </div>
-
-                    <div className="flex items-center gap-3 w-full sm:w-auto">
+                  {/* BOTTOM ACTION BAR */}
+                  <div className="p-3.5 sm:p-4 bg-[#090d15] border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
                       <button
-                        onClick={handleSaveAttendance}
-                        className="w-full sm:w-auto px-6 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-black font-bold text-sm hover:opacity-95 transition shadow-xl shadow-cyan-500/30 flex items-center justify-center gap-2 cursor-pointer"
+                        type="button"
+                        onClick={handleExportSemesterExcel}
+                        className="px-3.5 py-2 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-400/30 text-cyan-300 font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer"
+                        title="Unduh Rekap 1 Semester (P1 s/d P16) untuk Nilai Rapor"
                       >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                        </svg>
-                        <span>Simpan & Sinkronkan ke Meja Piket</span>
+                        <span>📥</span>
+                        <span>Rekap Semester</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleExportMapelExcel}
+                        className="px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/15 text-stone-300 font-medium text-xs transition flex items-center justify-center gap-1.5 cursor-pointer"
+                        title="Unduh presensi harian hari ini"
+                      >
+                        <span>📄</span>
+                        <span>Jurnal Hari Ini</span>
                       </button>
                     </div>
+
+                    <button
+                      type="button"
+                      onClick={handleSaveAttendance}
+                      className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-black font-extrabold text-xs sm:text-sm hover:opacity-95 transition shadow-lg shadow-cyan-500/25 flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
+                      </svg>
+                      <span>Simpan Presensi</span>
+                    </button>
                   </div>
 
                 </div>
@@ -845,78 +1361,95 @@ export default function ELearningPage() {
         )}
 
         {/* ----------------- 3. VIEW: GURU PIKET (RUANG KONTROL MEJA PIKET) ----------------- */}
-        {currentRole === 'guru_piket' && (
+        {currentUser?.role === 'guru_piket' && (
           <div className="space-y-6">
 
-            {/* Piket Header Banner */}
-            <div className="bg-gradient-to-r from-emerald-950/40 via-[#0d1d17] to-[#0a1310] border border-emerald-500/30 rounded-2xl p-5 sm:p-6 shadow-xl relative overflow-hidden">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="px-2 py-0.5 text-[11px] font-bold rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-                      PUSAT KONTROL PIKET SEKOLAH
-                    </span>
-                    <span className="text-xs text-stone-400">Petugas: Dra. Siti Aminah, M.Pd</span>
-                  </div>
-                  <h1 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
-                    Monitoring Kehadiran Seluruh Kelas
-                  </h1>
-                  <p className="text-xs sm:text-sm text-emerald-300/80 mt-1 font-medium">
-                    ✨ Guru piket <span className="text-white font-bold underline">tidak perlu berkeliling kelas</span>. Data kehadiran otomatis terisi begitu guru mapel mengabsen di ruang kelas.
-                  </p>
+            {/* Piket Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/10">
+              <div>
+                <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+                  <span>Pusat Meja Piket</span>
+                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 font-medium">
+                    Live Monitoring 17 Rombel
+                  </span>
+                </h1>
+                <p className="text-xs text-stone-400 mt-0.5">
+                  Stasiun Meja Piket & Gerbang Utama • SMP Negeri 3 Cihampelas
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2.5">
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-black/50 border border-emerald-500/30 text-xs">
+                  <span className="text-stone-400 font-medium">Petugas Jaga:</span>
+                  <select
+                    value={piketDutyTeacher}
+                    onChange={(e) => setPiketDutyTeacher(e.target.value)}
+                    className="bg-transparent text-emerald-300 font-semibold focus:outline-none cursor-pointer max-w-[220px] truncate"
+                  >
+                    {DEMO_TEACHERS.map((teacher) => (
+                      <option key={teacher.nip} value={teacher.name} className="bg-stone-900 text-white">
+                        {teacher.name} ({teacher.subject})
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => {
-                      const stored = getStoredAttendance();
-                      setAttendanceData(stored);
-                      showToast('Data kehadiran seluruh kelas berhasil diperbarui!', 'success');
-                    }}
-                    className="px-4 py-2.5 rounded-xl bg-emerald-500 text-black font-bold text-xs hover:bg-emerald-400 transition shadow-lg shadow-emerald-500/20 flex items-center gap-2"
-                  >
-                    <span>🔄 Refresh Data Live</span>
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={handleExportPiketExcel}
+                  className="px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/15 text-white font-medium text-xs transition flex items-center gap-1.5 cursor-pointer"
+                  title="Unduh seluruh rekap presensi hari ini (.xlsx)"
+                >
+                  <span>📥</span>
+                  <span>Export Excel</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const stored = getStoredAttendance();
+                    setAttendanceData(stored);
+                    const storedSess = getStoredSessions();
+                    setSessions(storedSess);
+                    showToast('Data kehadiran diperbarui!', 'success');
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-emerald-500 text-black font-bold text-xs hover:bg-emerald-400 transition shadow-md shadow-emerald-500/20 flex items-center gap-1.5 cursor-pointer"
+                >
+                  <span>🔄 Refresh</span>
+                </button>
               </div>
             </div>
 
-            {/* TOP STATS CARDS: REKAP SATU SEKOLAH DALAM DETIK ITU JUGA */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-              <div className="p-4 rounded-xl bg-[#0c1017] border border-white/10">
-                <div className="text-[11px] font-semibold text-stone-400 uppercase tracking-wider">Total Siswa</div>
-                <div className="text-2xl font-black text-white mt-1">288</div>
-                <div className="text-[10px] text-stone-400 mt-0.5">9 Rombel Terdata</div>
+            {/* TOP STATS CARDS: CLEAN & MINIMALIST */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+              <div className="p-3.5 rounded-xl bg-[#0c1017] border border-white/10">
+                <div className="text-[10px] font-semibold text-stone-400 uppercase tracking-wider">Total Siswa</div>
+                <div className="text-xl font-bold text-white mt-0.5">{INITIAL_STUDENTS.length}</div>
               </div>
 
-              <div className="p-4 rounded-xl bg-emerald-950/20 border border-emerald-500/30">
-                <div className="text-[11px] font-semibold text-emerald-400 uppercase tracking-wider">Hadir (H)</div>
-                <div className="text-2xl font-black text-emerald-300 mt-1">{schoolStats.hadir}</div>
-                <div className="text-[10px] text-emerald-400/80 mt-0.5">Siswa di Kelas</div>
+              <div className="p-3.5 rounded-xl bg-emerald-950/20 border border-emerald-500/30">
+                <div className="text-[10px] font-semibold text-emerald-400 uppercase tracking-wider">Hadir (H)</div>
+                <div className="text-xl font-bold text-emerald-300 mt-0.5">{schoolStats.hadir}</div>
               </div>
 
-              <div className="p-4 rounded-xl bg-blue-950/20 border border-blue-500/30">
-                <div className="text-[11px] font-semibold text-blue-400 uppercase tracking-wider">Sakit (S)</div>
-                <div className="text-2xl font-black text-blue-300 mt-1">{schoolStats.sakit}</div>
-                <div className="text-[10px] text-blue-400/80 mt-0.5">Ada Keterangan</div>
+              <div className="p-3.5 rounded-xl bg-blue-950/20 border border-blue-500/30">
+                <div className="text-[10px] font-semibold text-blue-400 uppercase tracking-wider">Sakit (S)</div>
+                <div className="text-xl font-bold text-blue-300 mt-0.5">{schoolStats.sakit}</div>
               </div>
 
-              <div className="p-4 rounded-xl bg-amber-950/20 border border-amber-500/30">
-                <div className="text-[11px] font-semibold text-amber-400 uppercase tracking-wider">Izin (I)</div>
-                <div className="text-2xl font-black text-amber-300 mt-1">{schoolStats.izin}</div>
-                <div className="text-[10px] text-amber-400/80 mt-0.5">Ada Surat/Izin</div>
+              <div className="p-3.5 rounded-xl bg-amber-950/20 border border-amber-500/30">
+                <div className="text-[10px] font-semibold text-amber-400 uppercase tracking-wider">Izin (I)</div>
+                <div className="text-xl font-bold text-amber-300 mt-0.5">{schoolStats.izin}</div>
               </div>
 
-              <div className="p-4 rounded-xl bg-rose-950/20 border border-rose-500/30">
-                <div className="text-[11px] font-semibold text-rose-400 uppercase tracking-wider">Alpa (A)</div>
-                <div className="text-2xl font-black text-rose-300 mt-1">{schoolStats.alpa}</div>
-                <div className="text-[10px] text-rose-400/80 mt-0.5">Tanpa Keterangan</div>
+              <div className="p-3.5 rounded-xl bg-rose-950/20 border border-rose-500/30">
+                <div className="text-[10px] font-semibold text-rose-400 uppercase tracking-wider">Alpa (A)</div>
+                <div className="text-xl font-bold text-rose-300 mt-0.5">{schoolStats.alpa}</div>
               </div>
 
-              <div className="p-4 rounded-xl bg-orange-950/20 border border-orange-500/30">
-                <div className="text-[11px] font-semibold text-orange-400 uppercase tracking-wider">Terlambat (T)</div>
-                <div className="text-2xl font-black text-orange-300 mt-1">{schoolStats.terlambat}</div>
-                <div className="text-[10px] text-orange-400/80 mt-0.5">Dicatat di Gerbang</div>
+              <div className="p-3.5 rounded-xl bg-orange-950/20 border border-orange-500/30">
+                <div className="text-[10px] font-semibold text-orange-400 uppercase tracking-wider">Telat (T)</div>
+                <div className="text-xl font-bold text-orange-300 mt-0.5">{schoolStats.terlambat}</div>
               </div>
             </div>
 
@@ -944,8 +1477,8 @@ export default function ELearningPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5">
                   {SCHOOL_CLASSES.map(cls => {
                     const session = attendanceData[cls.id];
-                    const isDone = session?.isSubmitted;
-                    const students = INITIAL_STUDENTS.filter(s => s.classId === cls.id);
+                    const isDone = Boolean(session?.isSubmitted && session?.date === todayStr);
+                    const students = activeStudents.filter(s => s.classId === cls.id);
                     
                     // Count anomalies (S, I, A, T)
                     let sick = 0, leave = 0, absent = 0, late = 0;
@@ -960,7 +1493,7 @@ export default function ELearningPage() {
                     return (
                       <div
                         key={cls.id}
-                        onClick={() => setDetailModalClassId(cls.id)}
+                        onClick={() => handleOpenPiketClassModal(cls.id)}
                         className={`p-4 rounded-2xl border transition cursor-pointer relative overflow-hidden group ${
                           isDone 
                             ? 'bg-[#0a1310] border-emerald-500/30 hover:border-emerald-400/60 shadow-lg shadow-emerald-950/20' 
@@ -982,16 +1515,17 @@ export default function ELearningPage() {
                           )}
                         </div>
 
-                        <div className="text-[11px] text-stone-400 mb-3">
-                          Wali: <span className="text-stone-300">{cls.waliKelas}</span>
+                        <div className="text-[11px] text-stone-400 mb-3 flex items-center justify-between">
+                          <span>Total: <span className="text-stone-300 font-semibold">{cls.totalStudents} Siswa</span></span>
+                          <span className="text-[10px] text-stone-500 font-mono">2026/2027</span>
                         </div>
 
                         {/* Summary Numbers inside Class Card */}
                         {isDone ? (
                           <div className="space-y-2">
                             <div className="flex items-center justify-between text-xs py-1.5 px-2 rounded-lg bg-black/40">
-                              <span className="text-stone-400">Guru Mapel:</span>
-                              <span className="font-semibold text-stone-200 truncate max-w-[120px]">
+                              <span className="text-stone-400">Guru:</span>
+                              <span className="font-semibold text-stone-200 truncate max-w-[130px]">
                                 {session.teacherName.split(',')[0]}
                               </span>
                             </div>
@@ -1013,20 +1547,33 @@ export default function ELearningPage() {
                             <div className="text-[10px] text-stone-400 text-right">
                               Diabsen jam: <span className="font-mono text-stone-300">{session.submittedAt}</span>
                             </div>
+                            <div className="pt-1 flex items-center justify-between text-[11px]">
+                              <span className="text-cyan-400 font-semibold group-hover:underline">
+                                ✏️ Periksa / Koreksi →
+                              </span>
+                            </div>
                           </div>
                         ) : (
-                          <div className="py-4 text-center">
-                            <span className="text-xs text-amber-400/80 font-medium block">
-                              Menunggu Guru Jam Ke-1...
+                          <div className="py-2 text-center space-y-2.5">
+                            <span className="text-xs text-amber-400/90 font-medium block">
+                              Guru Belum Hadir / Jam Kosong
                             </span>
-                            <span className="text-[10px] text-stone-400 mt-1 block">
-                              Piket bisa cek jika ada jam kosong
-                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenPiketClassModal(cls.id);
+                              }}
+                              className="w-full py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-bold text-xs transition shadow-md shadow-amber-500/20 flex items-center justify-center gap-1.5 cursor-pointer"
+                            >
+                              <span>📝</span>
+                              <span>Absenkan sbg Piket</span>
+                            </button>
                           </div>
                         )}
 
                         <div className="mt-2 pt-2 border-t border-white/5 text-[11px] text-center text-stone-400 group-hover:text-cyan-300 transition">
-                          Klik untuk lihat rincian siswa →
+                          Klik kartu untuk buka presensi kelas ini
                         </div>
                       </div>
                     );
@@ -1037,21 +1584,17 @@ export default function ELearningPage() {
               {/* KOLOM KANAN (1/3): POS MEJA PIKET (AKSI SISWA TELAT & SURAT IZIN) */}
               <div className="space-y-4">
                 <div className="bg-[#0e131d] border border-white/10 rounded-2xl p-5 shadow-xl">
-                  <div className="flex items-center gap-2 mb-3">
+                  <div className="flex items-center gap-2 mb-3 pb-2 border-b border-white/10">
                     <span className="w-7 h-7 rounded-lg bg-orange-500/20 text-orange-300 flex items-center justify-center font-bold text-xs">
                       ⏱️
                     </span>
                     <div>
-                      <h3 className="text-sm font-bold text-white">Pos Cepat Meja Piket</h3>
-                      <p className="text-[11px] text-stone-400">Catat Siswa Terlambat & Titipan Surat Sakit</p>
+                      <h3 className="text-sm font-bold text-white">Pos Gerbang / Piket</h3>
+                      <p className="text-[11px] text-stone-400">Catat Siswa Telat atau Izin</p>
                     </div>
                   </div>
 
-                  <p className="text-xs text-stone-300 mb-4 leading-relaxed">
-                    Jika ada siswa baru datang di gerbang atau orang tua menitipkan surat dokter, petugas piket langsung input di sini. <span className="text-emerald-300 font-medium">Status di kelas otomatis berubah detik itu juga!</span>
-                  </p>
-
-                  <form onSubmit={handlePiketActionSubmit} className="space-y-3.5 text-xs">
+                  <form onSubmit={handlePiketActionSubmit} className="space-y-3 text-xs">
                     <div>
                       <label className="block text-stone-300 font-semibold mb-1">
                         1. Pilih Kelas Siswa:
@@ -1066,7 +1609,7 @@ export default function ELearningPage() {
                         className="w-full px-3 py-2 rounded-xl bg-black/50 border border-white/10 text-white focus:outline-none focus:border-emerald-400 transition"
                       >
                         {SCHOOL_CLASSES.map(c => (
-                          <option key={c.id} value={c.id}>{c.name} ({c.waliKelas})</option>
+                          <option key={c.id} value={c.id}>{c.name} ({c.totalStudents} Siswa)</option>
                         ))}
                       </select>
                     </div>
@@ -1163,82 +1706,234 @@ export default function ELearningPage() {
 
             </div>
 
-            {/* MODAL DETAIL KELAS UNTUK GURU PIKET */}
+            {/* MODAL DETAIL & INPUT PRESENSI KELAS OLEH GURU PIKET */}
             {detailModalClassId && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-                <div className="bg-[#0f141f] border border-white/20 rounded-2xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+              <div 
+                data-lenis-prevent="true"
+                data-lenis-prevent-wheel="true"
+                data-lenis-prevent-touch="true"
+                className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-sm animate-fade-in select-text"
+                onClick={() => setDetailModalClassId(null)}
+              >
+                <div 
+                  data-lenis-prevent="true"
+                  data-lenis-prevent-wheel="true"
+                  data-lenis-prevent-touch="true"
+                  className="bg-[#0f141f] border border-white/20 rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   
                   {/* Modal Header */}
-                  <div className="p-5 border-b border-white/10 flex items-center justify-between bg-white/[0.02]">
-                    <div>
-                      <h3 className="text-base font-bold text-white flex items-center gap-2">
-                        Rincian Kehadiran {detailModalClassId}
-                        <span className="text-xs px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
-                          {attendanceData[detailModalClassId]?.isSubmitted ? 'Sudah Diabsen' : 'Belum Diabsen'}
+                  <div className="p-5 border-b border-white/10 bg-white/[0.02] flex-shrink-0">
+                    <div className="flex items-center justify-between gap-3 mb-2">
+                      <div className="flex items-center gap-2.5">
+                        <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                          🏢 MODE PIKET
                         </span>
-                      </h3>
-                      <p className="text-xs text-stone-400 mt-0.5">
-                        Wali Kelas: {SCHOOL_CLASSES.find(c => c.id === detailModalClassId)?.waliKelas}
-                      </p>
+                        <h3 className="text-lg font-bold text-white">
+                          Presensi & Rincian {detailModalClassId}
+                        </h3>
+                        <span className={`text-xs px-2 py-0.5 rounded font-semibold ${
+                          attendanceData[detailModalClassId]?.isSubmitted 
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' 
+                            : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                        }`}>
+                          {attendanceData[detailModalClassId]?.isSubmitted ? 'Sudah Diabsen' : 'Belum Diabsen (Bisa Diabsenkan Piket)'}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => setDetailModalClassId(null)}
+                        className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 text-stone-400 hover:text-white flex items-center justify-center transition cursor-pointer"
+                      >
+                        ✕
+                      </button>
                     </div>
-                    <button
-                      onClick={() => setDetailModalClassId(null)}
-                      className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 text-stone-400 hover:text-white flex items-center justify-center transition"
-                    >
-                      ✕
-                    </button>
+
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-stone-300 pt-1">
+                      <p>
+                        Total: <span className="font-semibold text-white">{activeStudents.filter(s => s.classId === detailModalClassId).length} Siswa</span>
+                        {attendanceData[detailModalClassId]?.teacherName && (
+                          <span> • Pengabsen sebelumnya: <span className="text-cyan-300">{attendanceData[detailModalClassId]?.teacherName}</span></span>
+                        )}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleSetPiketAllHadir}
+                        className="self-start sm:self-auto px-3 py-1 rounded-lg bg-white/10 hover:bg-white/15 border border-white/10 text-xs font-semibold text-stone-200 transition flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <span>⚡</span>
+                        <span>Tandai Semua Hadir</span>
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Modal Content */}
-                  <div className="p-5 overflow-y-auto flex-1 space-y-3 divide-y divide-white/5 text-xs">
-                    {INITIAL_STUDENTS.filter(s => s.classId === detailModalClassId).map((student, idx) => {
-                      const session = attendanceData[detailModalClassId];
-                      const stStatus = session?.records?.[student.id] || (session?.isSubmitted ? 'H' : '-');
-                      const stNote = session?.notes?.[student.id] || '';
+                  {/* Petunjuk Guru Piket */}
+                  <div className="px-5 py-2.5 bg-black/40 border-b border-white/5 flex flex-wrap items-center justify-between gap-2 text-xs text-stone-400">
+                    <span className="text-emerald-300 font-medium">
+                      💡 Klik tombol status pada siswa jika ada yang Sakit/Izin/Alpa/Telat, lalu klik "Simpan Presensi".
+                    </span>
+                    <div className="flex items-center gap-1.5 font-bold text-[11px]">
+                      <span className="text-emerald-400">H: Hadir</span> •
+                      <span className="text-blue-400">S: Sakit</span> •
+                      <span className="text-amber-400">I: Izin</span> •
+                      <span className="text-rose-400">A: Alpa</span> •
+                      <span className="text-orange-400">T: Telat</span>
+                    </div>
+                  </div>
+
+                  {/* Modal Content (Daftar Siswa Interaktif untuk Piket) */}
+                  <div 
+                    data-lenis-prevent="true"
+                    data-lenis-prevent-wheel="true"
+                    data-lenis-prevent-touch="true"
+                    onWheel={(e) => e.stopPropagation()}
+                    onTouchMove={(e) => e.stopPropagation()}
+                    className="p-5 overflow-y-auto overscroll-contain flex-1 min-h-0 space-y-3 divide-y divide-white/5 text-xs select-text [scrollbar-width:thin] [scrollbar-color:rgba(56,189,248,0.5)_rgba(255,255,255,0.04)] [&::-webkit-scrollbar]:w-2.5 [&::-webkit-scrollbar-track]:bg-white/[0.02] [&::-webkit-scrollbar-thumb]:bg-cyan-500/50 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-cyan-400"
+                  >
+                    {activeStudents.filter(s => s.classId === detailModalClassId).map((student, idx) => {
+                      const currentStatus = piketModalRecords[student.id] || 'H';
+                      const currentNote = piketModalNotes[student.id] || '';
 
                       return (
-                        <div key={student.id} className="pt-2.5 first:pt-0 flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-2.5">
+                        <div key={student.id} className="pt-3 first:pt-0 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                          {/* Nama Siswa */}
+                          <div className="flex items-center gap-2.5 min-w-[200px]">
                             <span className="w-5 text-stone-400 font-mono">{idx + 1}.</span>
                             <div>
-                              <span className="font-semibold text-stone-200">{student.name}</span>
-                              <span className="text-stone-400 text-[10px] ml-2 font-mono">({student.nisn})</span>
-                              {stNote && (
-                                <p className="text-[10px] text-amber-300/80 italic mt-0.5">
-                                  Catatan: {stNote}
-                                </p>
-                              )}
+                              <div className="font-semibold text-stone-200 flex items-center gap-1.5">
+                                <span>{student.name}</span>
+                                {student.gender && student.gender !== '-' && (
+                                  <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono ${
+                                    student.gender === 'L' ? 'bg-blue-500/10 text-blue-300' : 'bg-pink-500/10 text-pink-300'
+                                  }`}>
+                                    {student.gender}
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-stone-400 text-[10px] font-mono">
+                                NISN: {student.nisn} {student.nis ? `• NIS: ${student.nis}` : ''}
+                              </span>
                             </div>
                           </div>
 
-                          <span className={`px-2.5 py-1 rounded-lg font-bold text-xs ${
-                            stStatus === 'H' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' :
-                            stStatus === 'S' ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' :
-                            stStatus === 'I' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
-                            stStatus === 'A' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' :
-                            stStatus === 'T' ? 'bg-orange-500/20 text-orange-300 border border-orange-500/30' :
-                            'bg-white/5 text-stone-400'
-                          }`}>
-                            {stStatus === 'H' ? 'Hadir' :
-                             stStatus === 'S' ? 'Sakit' :
-                             stStatus === 'I' ? 'Izin' :
-                             stStatus === 'A' ? 'Alpa' :
-                             stStatus === 'T' ? 'Terlambat' :
-                             'Belum Diabsen'}
-                          </span>
+                          {/* Tombol Status Interaktif untuk Piket [ H ] [ S ] [ I ] [ A ] [ T ] */}
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => handleSetPiketStudentStatus(student.id, 'H')}
+                              className={`w-8 h-8 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer ${
+                                currentStatus === 'H'
+                                  ? 'bg-emerald-500 text-black shadow-sm ring-2 ring-emerald-400'
+                                  : 'bg-white/5 text-stone-400 hover:bg-emerald-500/20 hover:text-emerald-300'
+                              }`}
+                              title="Hadir"
+                            >
+                              H
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleSetPiketStudentStatus(student.id, 'S')}
+                              className={`w-8 h-8 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer ${
+                                currentStatus === 'S'
+                                  ? 'bg-blue-500 text-white shadow-sm ring-2 ring-blue-400'
+                                  : 'bg-white/5 text-stone-400 hover:bg-blue-500/20 hover:text-blue-300'
+                              }`}
+                              title="Sakit"
+                            >
+                              S
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleSetPiketStudentStatus(student.id, 'I')}
+                              className={`w-8 h-8 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer ${
+                                currentStatus === 'I'
+                                  ? 'bg-amber-500 text-black shadow-sm ring-2 ring-amber-400'
+                                  : 'bg-white/5 text-stone-400 hover:bg-amber-500/20 hover:text-amber-300'
+                              }`}
+                              title="Izin"
+                            >
+                              I
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleSetPiketStudentStatus(student.id, 'A')}
+                              className={`w-8 h-8 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer ${
+                                currentStatus === 'A'
+                                  ? 'bg-rose-500 text-white shadow-sm ring-2 ring-rose-400'
+                                  : 'bg-white/5 text-stone-400 hover:bg-rose-500/20 hover:text-rose-300'
+                              }`}
+                              title="Alpa"
+                            >
+                              A
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleSetPiketStudentStatus(student.id, 'T')}
+                              className={`w-8 h-8 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer ${
+                                currentStatus === 'T'
+                                  ? 'bg-orange-500 text-black shadow-sm ring-2 ring-orange-400'
+                                  : 'bg-white/5 text-stone-400 hover:bg-orange-500/20 hover:text-orange-300'
+                              }`}
+                              title="Terlambat"
+                            >
+                              T
+                            </button>
+                          </div>
+
+                          {/* Kolom Catatan Piket (Hanya saat siswa tidak Hadir) */}
+                          <div className="w-full md:w-48 lg:w-52">
+                            {currentStatus !== 'H' ? (
+                              <input
+                                type="text"
+                                value={currentNote}
+                                onChange={(e) => handleSetPiketStudentNote(student.id, e.target.value)}
+                                placeholder={
+                                  currentStatus === 'S' ? 'Catatan sakit...' :
+                                  currentStatus === 'I' ? 'Catatan izin...' :
+                                  currentStatus === 'T' ? 'Alasan telat...' :
+                                  'Keterangan...'
+                                }
+                                className="w-full px-2.5 py-1 text-xs rounded-lg bg-white/[0.06] border border-white/20 text-white focus:outline-none focus:border-emerald-400 placeholder:text-stone-500 animate-[fadeIn_0.15s_ease-out]"
+                              />
+                            ) : (
+                              <div className="hidden md:block text-right">
+                                <span className="text-[11px] text-emerald-400/60 font-medium">Hadir</span>
+                              </div>
+                            )}
+                          </div>
+
                         </div>
                       );
                     })}
                   </div>
 
-                  {/* Modal Footer */}
-                  <div className="p-4 border-t border-white/10 bg-black/40 flex justify-end">
-                    <button
-                      onClick={() => setDetailModalClassId(null)}
-                      className="px-4 py-2 rounded-xl bg-white/10 text-white font-semibold text-xs hover:bg-white/20 transition"
-                    >
-                      Tutup Rincian
-                    </button>
+                  {/* Modal Footer (Simpan oleh Guru Piket) */}
+                  <div className="p-4 border-t border-white/10 bg-black/50 flex flex-col sm:flex-row items-center justify-between gap-3 flex-shrink-0">
+                    <div className="text-xs text-stone-400 text-center sm:text-left">
+                      Petugas pengesah: <span className="text-emerald-300 font-semibold">{piketDutyTeacher} (Piket)</span>
+                    </div>
+
+                    <div className="flex items-center gap-2.5 w-full sm:w-auto">
+                      <button
+                        type="button"
+                        onClick={() => setDetailModalClassId(null)}
+                        className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-white/10 text-white font-semibold text-xs hover:bg-white/15 transition cursor-pointer"
+                      >
+                        Tutup
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleSavePiketAttendance}
+                        className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-black font-bold text-xs transition shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <span>💾 Simpan Presensi (sbg Guru Piket)</span>
+                      </button>
+                    </div>
                   </div>
 
                 </div>
@@ -1249,7 +1944,7 @@ export default function ELearningPage() {
         )}
 
         {/* ----------------- 4. VIEW: SISWA (PORTAL BELAJAR & NILAI) ----------------- */}
-        {currentRole === 'siswa' && (
+        {currentUser?.role === 'siswa' && (
           <div className="space-y-6 max-w-4xl mx-auto">
             
             {/* Student Profile Card */}
@@ -1262,12 +1957,12 @@ export default function ELearningPage() {
                   <div>
                     <div className="flex items-center gap-2 mb-0.5">
                       <span className="px-2 py-0.5 text-[10px] font-bold rounded-md bg-purple-500/20 text-purple-300 border border-purple-500/30">
-                        SISWA AKTIF
+                        PESERTA DIDIK AKTIF
                       </span>
-                      <span className="text-xs text-stone-400">Kelas 8-A • Rombel Pagi</span>
+                      <span className="text-xs text-stone-400">Kelas {currentUser.classId || '7-A'} • Semester Ganjil 2026/2027</span>
                     </div>
-                    <h1 className="text-xl font-bold text-white">Aditia Pratama</h1>
-                    <p className="text-xs text-stone-300 font-mono">NISN: 0084920192 • SMPN 3 Cihampelas</p>
+                    <h1 className="text-xl font-bold text-white">{currentUser.name}</h1>
+                    <p className="text-xs text-stone-300 font-mono">NISN: {currentUser.nipOrNisn} • SMP Negeri 3 Cihampelas</p>
                   </div>
                 </div>
 
@@ -1291,7 +1986,7 @@ export default function ELearningPage() {
                     <span>✓</span> Terdaftar HADIR di Jam Pelajaran
                   </div>
                   <p className="text-stone-300 text-[11px]">
-                    Diabsen oleh Bpk. Hendra Gunawan, S.Pd (Mapel IPA) dan tersinkron ke buku piket sekolah.
+                    Diabsen oleh Bpk. Rohidin, S.Pd. (Mapel Bahasa Inggris) dan tersinkron ke buku piket sekolah.
                   </p>
                 </div>
                 <div className="text-[11px] text-stone-400">
@@ -1322,22 +2017,22 @@ export default function ELearningPage() {
 
             {/* Jadwal Pelajaran Hari Ini */}
             <div className="bg-[#0b0f17] border border-white/10 rounded-2xl p-5 space-y-3">
-              <h3 className="text-sm font-bold text-white">Jadwal Kelas 8-A Hari Ini</h3>
+              <h3 className="text-sm font-bold text-white">Jadwal Pelajaran Kelas {currentUser.classId || '7-A'} Hari Ini</h3>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
                 <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5">
                   <span className="text-[10px] text-stone-400 font-mono">07.15 - 08.35 WIB</span>
-                  <div className="font-bold text-white mt-1">Ilmu Pengetahuan Alam</div>
-                  <div className="text-[11px] text-stone-400">Hendra Gunawan, S.Pd</div>
+                  <div className="font-bold text-white mt-1">Bahasa Inggris</div>
+                  <div className="text-[11px] text-stone-400">Rohidin, S.Pd.</div>
                 </div>
                 <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5">
                   <span className="text-[10px] text-stone-400 font-mono">08.35 - 09.55 WIB</span>
-                  <div className="font-bold text-white mt-1">Matematika</div>
-                  <div className="text-[11px] text-stone-400">Dra. Siti Aminah, M.Pd</div>
+                  <div className="font-bold text-white mt-1">Ilmu Pengetahuan Alam</div>
+                  <div className="text-[11px] text-stone-400">Dedeh Komalasari, S.Pd.</div>
                 </div>
                 <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5">
                   <span className="text-[10px] text-stone-400 font-mono">10.15 - 11.35 WIB</span>
-                  <div className="font-bold text-white mt-1">Bahasa Indonesia</div>
-                  <div className="text-[11px] text-stone-400">Dra. Eni Rohaeni</div>
+                  <div className="font-bold text-white mt-1">Matematika</div>
+                  <div className="text-[11px] text-stone-400">Yulia M. Ahmad, S.Pd.</div>
                 </div>
               </div>
             </div>

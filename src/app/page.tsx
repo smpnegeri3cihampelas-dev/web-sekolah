@@ -12,7 +12,7 @@ import Footer from '@/components/Footer';
 
 export default function Home() {
   return (
-    <main className="flex flex-col items-center justify-center w-full min-h-screen bg-black">
+    <main className="flex flex-col items-center justify-center w-full min-h-screen bg-[#f8fafc] overflow-x-hidden">
       <Navbar />
       <Hero />
       <LogoCarousel />
