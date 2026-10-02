@@ -517,17 +517,23 @@ export default function ELearningPage() {
   const currentClassSession = attendanceData[selectedClassId]?.date === todayStr ? attendanceData[selectedClassId] : null;
 
   return (
-    <div className="min-h-screen bg-[#07090e] text-stone-200 flex flex-col font-sans selection:bg-cyan-500/20 selection:text-cyan-200">
+    <div className="theme-marklab-app min-h-screen bg-[#f8fafc] text-slate-900 flex flex-col font-sans selection:bg-indigo-500/20 selection:text-indigo-900 relative">
       
+      {/* Background Ambient Glows */}
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+        <div className="absolute top-0 right-1/4 w-[700px] h-[400px] bg-indigo-100/40 rounded-full blur-[180px]" />
+        <div className="absolute bottom-0 left-1/4 w-[600px] h-[500px] bg-purple-100/35 rounded-full blur-[180px]" />
+      </div>
+
       {/* Toast Notification */}
       {toast && (
         <div className="fixed top-5 right-5 z-50 animate-bounce duration-300">
           <div className={`px-4 py-3 rounded-xl shadow-2xl backdrop-blur-md border text-sm font-medium flex items-center gap-3 ${
             toast.type === 'success' 
-              ? 'bg-emerald-950/90 text-emerald-200 border-emerald-500/40 shadow-emerald-900/30' 
+              ? 'bg-emerald-50 text-emerald-800 border-emerald-300 shadow-emerald-500/10' 
               : toast.type === 'warn'
-              ? 'bg-amber-950/90 text-amber-200 border-amber-500/40 shadow-amber-900/30'
-              : 'bg-cyan-950/90 text-cyan-200 border-cyan-500/40 shadow-cyan-900/30'
+              ? 'bg-amber-50 text-amber-800 border-amber-300 shadow-amber-500/10'
+              : 'bg-indigo-50 text-indigo-800 border-indigo-300 shadow-indigo-500/10'
           }`}>
             <span className="w-2.5 h-2.5 rounded-full animate-ping bg-current" />
             <span>{toast.message}</span>
@@ -536,7 +542,7 @@ export default function ELearningPage() {
       )}
 
       {/* TOP NAVIGATION BAR */}
-      <header className="sticky top-0 z-40 bg-[#0c1017]/95 backdrop-blur-xl border-b border-white/[0.08] px-4 sm:px-6 py-3">
+      <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-xl border-b border-indigo-100 px-4 sm:px-6 py-3 relative z-10">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
           
           {/* Logo & School Identity */}

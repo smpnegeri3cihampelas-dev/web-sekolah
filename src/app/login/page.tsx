@@ -43,25 +43,25 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="relative min-h-screen w-full bg-[#0a0a0d] text-stone-100 flex flex-col justify-between p-4 sm:p-6 overflow-hidden select-none">
+    <div className="relative min-h-screen w-full bg-[#f8fafc] text-slate-900 flex flex-col justify-between p-4 sm:p-6 overflow-hidden select-none font-sans">
       
-      {/* Background Atmosphere: Subtle Cosmic Glow & Concentric Rings (Echoing reference image) */}
+      {/* Background Atmosphere: Subtle Indigo/Lavender Glow & Concentric Rings matching landing page */}
       <div className="absolute inset-0 z-0 pointer-events-none flex items-center justify-center">
-        {/* Soft Ambient Nebulae */}
-        <div className="absolute top-1/4 w-[600px] h-[400px] bg-cyan-900/[0.12] rounded-full blur-[160px]" />
-        <div className="absolute bottom-1/4 w-[600px] h-[400px] bg-purple-900/[0.1] rounded-full blur-[160px]" />
+        {/* Soft Ambient Glows */}
+        <div className="absolute top-1/4 w-[600px] h-[400px] bg-indigo-100/50 rounded-full blur-[160px]" />
+        <div className="absolute bottom-1/4 w-[600px] h-[400px] bg-purple-100/40 rounded-full blur-[160px]" />
         
-        {/* Concentric Subtle Radiant Arcs (From Reference) */}
-        <div className="absolute w-[480px] h-[480px] sm:w-[560px] sm:h-[560px] rounded-full border border-white/[0.04] pointer-events-none" />
-        <div className="absolute w-[680px] h-[680px] sm:w-[780px] sm:h-[780px] rounded-full border border-white/[0.03] pointer-events-none" />
-        <div className="absolute w-[880px] h-[880px] sm:w-[1020px] sm:h-[1020px] rounded-full border border-white/[0.02] pointer-events-none" />
+        {/* Concentric Subtle Radiant Arcs */}
+        <div className="absolute w-[480px] h-[480px] sm:w-[560px] sm:h-[560px] rounded-full border border-indigo-200/30 pointer-events-none" />
+        <div className="absolute w-[680px] h-[680px] sm:w-[780px] sm:h-[780px] rounded-full border border-indigo-200/20 pointer-events-none" />
+        <div className="absolute w-[880px] h-[880px] sm:w-[1020px] sm:h-[1020px] rounded-full border border-indigo-200/10 pointer-events-none" />
       </div>
 
       {/* Top Navbar / Brand Bar */}
       <header className="relative z-10 w-full max-w-7xl mx-auto flex items-center justify-between py-2">
         <Link 
           href="/" 
-          className="flex items-center gap-2.5 group transition-opacity hover:opacity-80"
+          className="flex items-center gap-2.5 group transition-opacity hover:opacity-85"
         >
           <div className="relative w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center transition-transform group-hover:scale-105">
             <Image 
@@ -69,40 +69,40 @@ export default function LoginPage() {
               alt="Logo SMP Negeri 3 Cihampelas" 
               width={36} 
               height={36} 
-              className="w-full h-full object-contain drop-shadow-[0_2px_8px_rgba(0,0,0,0.35)]"
+              className="w-full h-full object-contain drop-shadow-[0_2px_8px_rgba(0,0,0,0.25)]"
               priority
             />
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-sm sm:text-base font-medium tracking-tight text-white">
+            <span className="text-sm sm:text-base font-semibold tracking-tight text-slate-900">
               SMPN 3 Cihampelas
             </span>
-            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_8px_#38bdf8]" />
+            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shadow-[0_0_8px_#6366f1]" />
           </div>
         </Link>
 
         {/* Back to Home Link */}
         <Link 
           href="/"
-          className="inline-flex items-center gap-1.5 text-xs text-stone-400 hover:text-white transition-colors px-3 py-1.5 rounded-full bg-white/[0.04] hover:bg-white/[0.08] border border-white/10"
+          className="inline-flex items-center gap-1.5 text-xs text-slate-600 hover:text-slate-900 transition-colors px-3.5 py-1.5 rounded-full bg-white/90 hover:bg-white border border-indigo-100 shadow-sm backdrop-blur-md"
         >
           <span>←</span>
           <span>Kembali ke Beranda</span>
         </Link>
       </header>
 
-      {/* Main Center Area: Login Card 1:1 Structure from Reference */}
+      {/* Main Center Area: Login Card */}
       <main className="relative z-10 w-full flex items-center justify-center my-auto py-8">
-        <div className="w-full max-w-[420px] rounded-[2.2rem] bg-white text-[#0f172a] shadow-2xl shadow-black/60 border border-white/80 overflow-hidden relative group">
+        <div className="w-full max-w-[420px] rounded-[2.2rem] bg-white text-[#0f172a] shadow-xl shadow-indigo-500/10 border border-indigo-100 overflow-hidden relative group">
           
-          {/* Top Soft Cyan / Sky Glow Gradient (reproducing the soft luminous top gradient from the reference) */}
-          <div className="absolute top-0 inset-x-0 h-32 bg-gradient-to-b from-[#e0f2fe]/90 via-[#f0f9ff]/50 to-transparent pointer-events-none" />
+          {/* Top Soft Lavender / Indigo Glow Gradient */}
+          <div className="absolute top-0 inset-x-0 h-32 bg-gradient-to-b from-indigo-50/90 via-purple-50/40 to-transparent pointer-events-none" />
 
           <div className="relative z-10 p-7 sm:p-9 pt-8 flex flex-col items-center">
             
-            {/* Top Icon Badge (Login Arrow ->] badge exactly matching reference) */}
-            <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-white border border-slate-200/90 shadow-md shadow-slate-900/5 flex items-center justify-center mb-5 group-hover:scale-105 transition-transform duration-300">
-              <svg className="w-6 h-6 text-slate-800" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            {/* Top Icon Badge */}
+            <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-indigo-50/90 border border-indigo-100 shadow-sm flex items-center justify-center mb-5 group-hover:scale-105 transition-transform duration-300 text-indigo-600">
+              <svg className="w-6 h-6 text-indigo-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
                 <polyline points="10 17 15 12 10 7" />
                 <line x1="15" y1="12" x2="3" y2="12" />
@@ -110,14 +110,14 @@ export default function LoginPage() {
             </div>
 
             {/* Title & Description */}
-            <h1 className="text-2xl sm:text-[1.65rem] font-bold tracking-tight text-[#0f172a] text-center mb-1.5">
+            <h1 className="text-2xl sm:text-[1.65rem] font-bold tracking-tight text-slate-900 text-center mb-1.5 font-display">
               Masuk ke Portal
             </h1>
             <p className="text-xs text-slate-500 font-normal text-center leading-relaxed max-w-[280px] mb-6">
               Akses sistem informasi akademik, nilai, dan pembelajaran digital SMPN 3 Cihampelas.
             </p>
 
-            {/* Error Message: Muncul tulisan bahwa password salah warna merah */}
+            {/* Error Message */}
             {errorMessage && (
               <div className="w-full mb-4 p-3 rounded-xl bg-red-50 border border-red-200 flex items-center gap-2.5 text-xs text-red-600 animate-[fadeIn_0.2s_ease-out]">
                 <svg className="w-4 h-4 shrink-0 text-red-500" viewBox="0 0 20 20" fill="currentColor">
@@ -130,7 +130,7 @@ export default function LoginPage() {
             {/* Login Form */}
             <form onSubmit={handleSubmit} className="w-full flex flex-col gap-3.5">
               
-              {/* Field 1: Username (Menggantikan Email) */}
+              {/* Field 1: Username */}
               <div className="relative w-full">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                   <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -146,12 +146,12 @@ export default function LoginPage() {
                     if (errorMessage) setErrorMessage('');
                   }}
                   placeholder="Username / NISN"
-                  className="w-full pl-10 pr-4 py-2.5 sm:py-3 rounded-xl bg-[#f3f4f6]/80 hover:bg-[#f3f4f6] focus:bg-white text-xs sm:text-sm text-slate-800 placeholder-slate-400 border border-transparent focus:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900/10 transition-all"
+                  className="w-full pl-10 pr-4 py-2.5 sm:py-3 rounded-xl bg-slate-50 hover:bg-slate-100/70 focus:bg-white text-xs sm:text-sm text-slate-800 placeholder-slate-400 border border-slate-200/90 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
                   autoComplete="username"
                 />
               </div>
 
-              {/* Field 2: Password (dengan tombol lihat/sembunyikan password) */}
+              {/* Field 2: Password */}
               <div className="relative w-full">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                   <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -167,9 +167,9 @@ export default function LoginPage() {
                     if (errorMessage) setErrorMessage('');
                   }}
                   placeholder="Password"
-                  className={`w-full pl-10 pr-11 py-2.5 sm:py-3 rounded-xl bg-[#f3f4f6]/80 hover:bg-[#f3f4f6] focus:bg-white text-xs sm:text-sm text-slate-800 placeholder-slate-400 border ${
-                    errorMessage ? 'border-red-400 ring-1 ring-red-300' : 'border-transparent focus:border-slate-300'
-                  } focus:outline-none focus:ring-2 focus:ring-slate-900/10 transition-all`}
+                  className={`w-full pl-10 pr-11 py-2.5 sm:py-3 rounded-xl bg-slate-50 hover:bg-slate-100/70 focus:bg-white text-xs sm:text-sm text-slate-800 placeholder-slate-400 border ${
+                    errorMessage ? 'border-red-400 ring-1 ring-red-300' : 'border-slate-200/90 focus:border-indigo-400'
+                  } focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all`}
                   autoComplete="current-password"
                 />
                 
@@ -181,13 +181,11 @@ export default function LoginPage() {
                   aria-label={showPassword ? 'Sembunyikan password' : 'Lihat password'}
                 >
                   {showPassword ? (
-                    // Eye Slashed (Hide)
                     <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
                       <line x1="1" y1="1" x2="23" y2="23" />
                     </svg>
                   ) : (
-                    // Eye (Show)
                     <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
                       <circle cx="12" cy="12" r="3" />
@@ -204,17 +202,17 @@ export default function LoginPage() {
                     e.preventDefault();
                     setErrorMessage('Silakan hubungi administrator sekolah untuk reset kata sandi.');
                   }}
-                  className="text-[11px] text-slate-500 hover:text-slate-800 transition-colors"
+                  className="text-[11px] text-indigo-600 hover:text-indigo-800 transition-colors font-medium"
                 >
-                  Forgot password?
+                  Lupa kata sandi?
                 </a>
               </div>
 
-              {/* Submit Button (Get Started style) */}
+              {/* Submit Button */}
               <button 
                 type="submit"
                 disabled={isLoading}
-                className="w-full mt-2 py-3 rounded-xl bg-[#1e2025] hover:bg-[#0f1115] text-white text-xs sm:text-sm font-medium tracking-wide shadow-md hover:shadow-lg transition-all active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70"
+                className="w-full mt-2 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-semibold tracking-wide shadow-md shadow-indigo-600/25 hover:shadow-lg hover:shadow-indigo-600/30 transition-all active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70"
               >
                 {isLoading ? (
                   <span className="inline-block w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />

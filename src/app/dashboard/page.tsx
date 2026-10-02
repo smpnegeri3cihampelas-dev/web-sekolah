@@ -592,20 +592,20 @@ export default function DashboardPage() {
   }, [teachersList, teacherSearch]);
 
   return (
-    <div className="min-h-screen bg-[#070709] text-stone-100 flex flex-col antialiased selection:bg-cyan-500/25 selection:text-cyan-200">
+    <div className="theme-marklab-app min-h-screen bg-[#f8fafc] text-slate-900 flex flex-col antialiased selection:bg-indigo-500/25 selection:text-indigo-900 font-sans">
       
       {/* Toast Notification Popup */}
       {toastMessage && (
-        <div className="fixed top-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-2xl bg-stone-900/90 border border-cyan-400/40 text-white text-xs sm:text-sm font-medium shadow-2xl backdrop-blur-xl animate-[fadeIn_0.2s_ease-out]">
-          <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+        <div className="fixed top-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-2xl bg-white border border-indigo-200 text-slate-900 text-xs sm:text-sm font-medium shadow-2xl backdrop-blur-xl animate-[fadeIn_0.2s_ease-out]">
+          <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
           <span>{toastMessage}</span>
         </div>
       )}
 
       {/* Background Ambient Glows */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-        <div className="absolute top-0 right-1/4 w-[700px] h-[400px] bg-cyan-950/20 rounded-full blur-[180px]" />
-        <div className="absolute bottom-0 left-1/4 w-[600px] h-[500px] bg-purple-950/15 rounded-full blur-[180px]" />
+        <div className="absolute top-0 right-1/4 w-[700px] h-[400px] bg-indigo-100/40 rounded-full blur-[180px]" />
+        <div className="absolute bottom-0 left-1/4 w-[600px] h-[500px] bg-purple-100/35 rounded-full blur-[180px]" />
       </div>
 
       <div className="relative z-10 flex flex-1 overflow-hidden">
