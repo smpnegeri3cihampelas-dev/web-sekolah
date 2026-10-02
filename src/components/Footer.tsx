@@ -16,27 +16,28 @@ export default function Footer() {
         {/* Left Col: School Identity */}
         <div className="lg:col-span-5 flex flex-col justify-between">
           <div>
-            <div className="flex items-center space-x-3.5 mb-6">
-              <div className="relative w-12 h-12 flex items-center justify-center">
+            <a href="#" className="flex items-center gap-3.5 mb-6 group cursor-pointer inline-flex">
+              <div className="relative w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center transition-transform duration-300 group-hover:scale-105 shrink-0">
                 <Image 
                   src="/logo.png" 
                   alt="Logo SMP Negeri 3 Cihampelas" 
-                  fill
-                  className="object-contain drop-shadow-[0_4px_12px_rgba(0,0,0,0.3)]"
+                  width={44} 
+                  height={44} 
+                  className="w-full h-full object-contain drop-shadow-[0_2px_8px_rgba(0,0,0,0.35)]"
                 />
               </div>
-              <div>
-                <h2 className="text-xl sm:text-2xl font-normal tracking-tight text-white flex items-center gap-2">
+              <div className="flex flex-col">
+                <span className="text-xl sm:text-2xl font-semibold tracking-tight text-white flex items-center gap-2 group-hover:text-indigo-200 transition-colors">
                   SMPN 3 Cihampelas
-                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 shadow-[0_0_8px_#6366f1]" />
-                </h2>
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-indigo-400 shadow-[0_0_8px_#6366f1]" />
+                </span>
                 <div className="flex gap-2.5 items-center mt-0.5">
                   <span className="text-[10px] tracking-widest text-indigo-400 uppercase font-mono">Berkarakter RIGAS</span>
                   <span className="text-slate-600">•</span>
                   <span className="text-[10px] tracking-wider text-slate-400 font-mono">NPSN: 20224133</span>
                 </div>
               </div>
-            </div>
+            </a>
             
             <p className="text-slate-400 max-w-md mb-8 text-xs sm:text-sm leading-relaxed font-light">
               Membangun generasi unggul yang menguasai teknologi masa depan, menjunjung tinggi integritas budi pekerti, dan berdaya saing global.
@@ -48,7 +49,7 @@ export default function Footer() {
               Sekretariat & Kampus Utama
             </div>
             <p className="text-slate-300 text-xs sm:text-sm leading-relaxed font-light mb-3">
-              Jl. Raya Cihampelas, Desa Cipatik, Kec. Cihampelas, Kabupaten Bandung Barat, Jawa Barat 40562
+              Kp. Sukawangi RT 02 / RW 09, Desa Situwangi, Kec. Cihampelas, Kabupaten Bandung Barat, Jawa Barat 40767
             </p>
             <div className="pt-3 border-t border-white/[0.06] text-slate-400 flex flex-col gap-1 text-[11px] font-light">
               <span>Email: info@smpn3cihampelas.sch.id</span>
