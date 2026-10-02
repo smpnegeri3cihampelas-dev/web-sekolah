@@ -219,12 +219,6 @@ export default function Hero() {
             className="absolute inset-0 w-full h-full pointer-events-none block" 
           />
 
-          {/* Clean text readability contrast (focused dark gradient specifically behind left text) */}
-          <div className="absolute inset-y-0 left-0 w-full sm:w-[680px] bg-gradient-to-r from-black/85 via-black/50 to-transparent pointer-events-none" />
-          
-          {/* Subtle top edge fade for navbar contrast */}
-          <div className="absolute top-0 inset-x-0 h-24 bg-gradient-to-b from-black/40 to-transparent pointer-events-none" />
-
           {/* Clean White Cloud-Like Edge Mist (Tipis-tipis seperti awan) */}
           <div className="absolute bottom-0 inset-x-0 h-48 bg-gradient-to-t from-white/30 via-white/10 to-transparent pointer-events-none" />
           <div className="absolute -bottom-16 left-1/4 w-[600px] h-[220px] bg-white/20 rounded-full blur-[90px] pointer-events-none" />
@@ -238,20 +232,20 @@ export default function Hero() {
           <div className="absolute top-1/4 right-0 w-[500px] h-[500px] bg-indigo-600/[0.04] rounded-full blur-[160px] pointer-events-none" />
         </div>
 
-        {/* 2. Hero Editorial Content (100% Sharp & Readable Typography) */}
+        {/* 2. Hero Editorial Content (100% Sharp & Readable Typography with clean contrast) */}
         <div className="relative z-10 w-full max-w-7xl mx-auto px-5 sm:px-8 lg:px-12 pb-12 sm:pb-16 lg:pb-20 pt-32 sm:pt-40 flex flex-col items-start">
           
           {/* Headline + Subtext + 2 Minimalist CTA Buttons */}
           <div ref={contentRef} className="max-w-md sm:max-w-lg lg:max-w-xl flex flex-col items-start">
 
-            {/* Headline with drop shadow for 100% crisp readability */}
+            {/* Headline with drop shadow for 100% crisp readability over canvas */}
             <h1 className="font-sans text-2xl sm:text-3xl md:text-4xl lg:text-[2.65rem] xl:text-[2.85rem] tracking-tight leading-[1.15] mb-3.5 sm:mb-4 drop-shadow-[0_2px_12px_rgba(0,0,0,0.9)]">
               <span className="font-light text-slate-200 block drop-shadow-md">SMPN 3 Cihampelas</span>
               <span className="font-bold text-white block drop-shadow-lg">Mencetak Generasi Unggul</span>
             </h1>
 
             {/* High-Contrast Subheadline */}
-            <p className="text-xs sm:text-sm md:text-[15px] text-white/95 font-medium leading-relaxed max-w-sm sm:max-w-md mb-6 sm:mb-7 tracking-wide drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)]">
+            <p className="text-xs sm:text-sm md:text-[15px] text-white font-medium leading-relaxed max-w-sm sm:max-w-md mb-6 sm:mb-7 tracking-wide drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)]">
               Membina integritas, menguasai teknologi masa depan, dan mencetak pemimpin berwawasan global dalam ekosistem belajar modern.
             </p>
 
@@ -271,10 +265,10 @@ export default function Hero() {
                 </span>
               </a>
 
-              {/* Secondary Frosted Glass Pill Button (Prominent & Clearly Visible) */}
+              {/* Secondary Frosted Glass Pill Button (Clean Frosted Glass, No Black) */}
               <a 
                 href="#profil" 
-                className="inline-flex items-center justify-center px-6 sm:px-7 py-3 sm:py-3.5 rounded-full border border-white/40 bg-black/40 hover:bg-black/60 hover:border-white text-white font-semibold text-xs sm:text-sm tracking-wide uppercase transition-all duration-300 active:scale-95 backdrop-blur-md shadow-xl shadow-black/30"
+                className="inline-flex items-center justify-center px-6 sm:px-7 py-3 sm:py-3.5 rounded-full border border-white/40 bg-white/20 hover:bg-white/35 hover:border-white text-white font-semibold text-xs sm:text-sm tracking-wide uppercase transition-all duration-300 active:scale-95 backdrop-blur-xl shadow-lg shadow-black/20"
               >
                 <span>Jelajahi Profil</span>
               </a>
