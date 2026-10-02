@@ -59,7 +59,7 @@ export default function Navbar() {
       desc: 'Portal penilaian siswa khusus Dewan Guru',
       href: 'https://erapor.smpn3cihampelas.sch.id',
       isExternal: true,
-      badgeColor: 'bg-cyan-500/10 border-cyan-400/25 text-cyan-400 group-hover:bg-cyan-500/20 group-hover:border-cyan-400/40',
+      badgeColor: 'bg-indigo-500/10 border-indigo-400/25 text-indigo-400 group-hover:bg-indigo-500/20 group-hover:border-indigo-400/40',
       icon: (
         <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
@@ -71,7 +71,7 @@ export default function Navbar() {
       desc: 'Presensi digital, bahan ajar, & CBT lab',
       href: '/elearning',
       isExternal: false,
-      badgeColor: 'bg-purple-500/10 border-purple-400/25 text-purple-400 group-hover:bg-purple-500/20 group-hover:border-purple-400/40',
+      badgeColor: 'bg-violet-500/10 border-violet-400/25 text-violet-400 group-hover:bg-violet-500/20 group-hover:border-violet-400/40',
       icon: (
         <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M12 14l9-5-9-5-9 5 9 5z" strokeLinecap="round" strokeLinejoin="round" />
@@ -85,7 +85,7 @@ export default function Navbar() {
       desc: 'Kelola berita, pengumuman, & struktur organisasi',
       href: '/login',
       isExternal: false,
-      badgeColor: 'bg-amber-500/10 border-amber-400/25 text-amber-400 group-hover:bg-amber-500/20 group-hover:border-amber-400/40',
+      badgeColor: 'bg-sky-500/10 border-sky-400/25 text-sky-400 group-hover:bg-sky-500/20 group-hover:border-sky-400/40',
       icon: (
         <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <rect x="3" y="11" width="18" height="11" rx="2" ry="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -108,7 +108,7 @@ export default function Navbar() {
         {/* Brand (Left Column - 1fr) */}
         <div className="flex items-center justify-start">
           <a href="#" className="flex items-center gap-3 group">
-            <div className="relative w-8 h-8 rounded-full overflow-hidden border border-white/10 p-0.5 bg-black/60 shadow-lg group-hover:border-cyan-400/40 transition-colors">
+            <div className="relative w-8 h-8 rounded-full overflow-hidden border border-white/10 p-0.5 bg-black/60 shadow-lg group-hover:border-indigo-400/40 transition-colors">
               <Image 
                 src="/logo.png" 
                 alt="Logo SMP Negeri 3 Cihampelas" 
@@ -120,7 +120,7 @@ export default function Navbar() {
             <div className="flex flex-col">
               <span className="text-sm sm:text-base font-normal tracking-tight text-stone-200 flex items-center gap-2 whitespace-nowrap">
                 SMPN 3 Cihampelas
-                <span className="inline-block w-1.5 h-1.5 rounded-full bg-cyan-400/90 shadow-[0_0_8px_#38bdf8]" />
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-indigo-400 shadow-[0_0_8px_#6366f1]" />
               </span>
             </div>
           </a>
@@ -176,7 +176,7 @@ export default function Navbar() {
               <span>Portal</span>
               <svg 
                 className={`w-3.5 h-3.5 transition-transform duration-300 ${
-                  portalOpen ? 'rotate-180 text-cyan-400' : 'text-stone-400'
+                  portalOpen ? 'rotate-180 text-indigo-400' : 'text-stone-400'
                 }`}
                 viewBox="0 0 24 24" 
                 fill="none" 
@@ -197,13 +197,13 @@ export default function Navbar() {
             >
               <div className="rounded-2xl bg-zinc-950/95 backdrop-blur-2xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.85)] p-2 overflow-hidden relative">
                 {/* Subtle top ambient glow */}
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-40 h-8 bg-cyan-500/10 rounded-full blur-xl pointer-events-none" />
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-40 h-8 bg-indigo-500/15 rounded-full blur-xl pointer-events-none" />
 
                 <div className="px-3 py-2 border-b border-white/[0.06] mb-1 flex items-center justify-between">
                   <span className="text-[10px] font-normal tracking-[0.2em] uppercase text-stone-400">
                     Portal Sistem Terpadu
                   </span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_8px_#38bdf8]" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 shadow-[0_0_8px_#6366f1]" />
                 </div>
 
                 <div className="flex flex-col gap-1">
@@ -219,7 +219,7 @@ export default function Navbar() {
                               {item.title}
                             </span>
                             {item.isExternal && (
-                              <span className="text-[10px] text-stone-500 group-hover:text-cyan-400 transition-colors ml-1">
+                              <span className="text-[10px] text-stone-500 group-hover:text-indigo-400 transition-colors ml-1">
                                 ↗
                               </span>
                             )}
