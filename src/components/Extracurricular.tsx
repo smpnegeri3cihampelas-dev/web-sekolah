@@ -29,18 +29,6 @@ export default function Extracurricular() {
 
   const items = [
     { 
-      name: 'Robotika & AI Club', 
-      category: 'Inovasi Digital', 
-      desc: 'Perakitan robot otonom, pemrograman sensor cerdas, dan pengenalan logika kecerdasan buatan.',
-      badgeColor: 'text-indigo-700 border-indigo-200/80 bg-indigo-50'
-    },
-    { 
-      name: 'Web & UI/UX Design', 
-      category: 'Teknologi', 
-      desc: 'Pembuatan aplikasi antarmuka web modern, interaksi digital, dan desain tata letak kreatif.',
-      badgeColor: 'text-purple-700 border-purple-200/80 bg-purple-50'
-    },
-    { 
       name: 'Paskibra & Kepemimpinan', 
       category: 'Karakter', 
       desc: 'Pelatihan baris-berbaris formal, kedisiplinan tingkat tinggi, ketahanan fisik, dan solidaritas tim.',
@@ -83,7 +71,7 @@ export default function Extracurricular() {
               Eksplorasi Potensi <span className="font-semibold text-indigo-950">& Karakter Siswa</span>
             </h2>
             <p className="text-slate-600 mt-3 text-xs sm:text-sm max-w-lg leading-relaxed font-light">
-              Wadah penyaluran bakat, sains terapan, seni budaya, serta kepemimpinan yang berintegritas tinggi.
+              Wadah penyaluran bakat, olahraga, seni budaya, serta kepemimpinan yang berintegritas tinggi.
             </p>
           </div>
           <p className="text-[11px] font-medium text-slate-500 uppercase tracking-widest hidden md:flex items-center gap-2">
