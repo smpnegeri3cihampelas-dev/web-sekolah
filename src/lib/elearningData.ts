@@ -52,6 +52,51 @@ export interface SchoolClass {
   waliKelas?: string;
 }
 
+export interface QuizQuestion {
+  id: string;
+  question: string;
+  options: string[]; // ['A. ...', 'B. ...', 'C. ...', 'D. ...']
+  correctOptionIndex: number; // 0, 1, 2, 3
+  explanation?: string;
+}
+
+export interface Assignment {
+  id: string;
+  title: string;
+  subject: string;
+  teacherName: string;
+  teacherNip: string;
+  targetClass: string;
+  dueDate: string;
+  description: string;
+  allowUpload: boolean;
+  createdAt: string;
+  materialUrl?: string;
+  materialName?: string;
+  videoUrl?: string;
+  videoTitle?: string;
+  quizQuestions?: QuizQuestion[];
+}
+
+export interface AssignmentSubmission {
+  id: string;
+  assignmentId: string;
+  studentId: string;
+  studentName: string;
+  studentClass: string;
+  submittedAt: string;
+  fileName?: string;
+  fileSize?: string;
+  fileData?: string;
+  videoUrl?: string;
+  answerText?: string;
+  grade?: number;
+  feedback?: string;
+  status: 'submitted' | 'graded';
+  quizAnswers?: number[];
+  quizScore?: number;
+}
+
 // All Official Classes at SMP Negeri 3 Cihampelas (Tahun Pelajaran 2026/2027)
 export const SCHOOL_CLASSES: SchoolClass[] = [
   {
@@ -4721,32 +4766,51 @@ export interface SubjectSession {
 }
 
 export const GET_INITIAL_SESSIONS = (): SubjectSession[] => {
-  const today = new Date().toISOString().split('T')[0];
-  return [
-    {
-      id: `${today}_7-A_IPA`,
-      classId: '7-A',
-      date: today,
-      subject: 'Ilmu Pengetahuan Alam (IPA)',
-      teacherName: 'Dedeh Komalasari, S.Pd.',
-      teacherNip: '19680315 199412 2 001',
-      submittedAt: '07:22 WIB',
-      records: {
-        '7A-01': 'H',
-        '7A-02': 'H',
-        '7A-03': 'S',
-        '7A-04': 'H',
-        '7A-05': 'H',
-        '7A-06': 'H',
-        '7A-07': 'I',
-        '7A-08': 'H',
-      },
-      notes: {
-        '7A-03': 'Surat dokter dititip ke satpam',
-        '7A-07': 'Ada acara keluarga'
-      }
-    }
-  ];
+  const todayDate = new Date();
+  const todayStr = todayDate.toISOString().split('T')[0];
+  const dayIndex = todayDate.getDay(); // 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
+
+  let sessions: SubjectSession[] = [];
+  
+  // Real schedule logic for Class 7-A (Siang) based on the provided PDF
+  if (dayIndex === 1) { // SENIN
+    sessions.push(
+      { id: `${todayStr}_7-A_MTK`, classId: '7-A', date: todayStr, subject: 'Matematika', teacherName: 'Sonia Winjuni I, S.Pd.', teacherNip: '-', submittedAt: '07:20 WIB', records: { '7A-01': 'H' } },
+      { id: `${todayStr}_7-A_INF`, classId: '7-A', date: todayStr, subject: 'Prakarya / Informatika', teacherName: 'Ichsanul Arifin, S.Kom', teacherNip: '-', submittedAt: '10:00 WIB', records: { '7A-01': 'H' } },
+      { id: `${todayStr}_7-A_PABP`, classId: '7-A', date: todayStr, subject: 'Pendidikan Agama Islam', teacherName: 'Tina A. Rosdiana, S.Pd.I', teacherNip: '-', submittedAt: '13:00 WIB', records: { '7A-01': 'H' } }
+    );
+  } else if (dayIndex === 2) { // SELASA
+    sessions.push(
+      { id: `${todayStr}_7-A_BINDO`, classId: '7-A', date: todayStr, subject: 'Bahasa Indonesia', teacherName: 'Riski Ismawarni M, S.Pd.', teacherNip: '-', submittedAt: '07:30 WIB', records: { '7A-01': 'H' } },
+      { id: `${todayStr}_7-A_IPA`, classId: '7-A', date: todayStr, subject: 'Ilmu Pengetahuan Alam (IPA)', teacherName: 'Cincin Cintawati, S.Pd.', teacherNip: '-', submittedAt: '09:00 WIB', records: { '7A-01': 'H' } },
+      { id: `${todayStr}_7-A_BING`, classId: '7-A', date: todayStr, subject: 'Bahasa Inggris', teacherName: 'Siti Nurjanah, S.Pd.', teacherNip: '-', submittedAt: '11:00 WIB', records: { '7A-01': 'H' } }
+    );
+  } else if (dayIndex === 3) { // RABU
+    sessions.push(
+      { id: `${todayStr}_7-A_IPA`, classId: '7-A', date: todayStr, subject: 'Ilmu Pengetahuan Alam (IPA)', teacherName: 'Cincin Cintawati, S.Pd.', teacherNip: '-', submittedAt: '07:30 WIB', records: { '7A-01': 'H' } },
+      { id: `${todayStr}_7-A_BINDO`, classId: '7-A', date: todayStr, subject: 'Bahasa Indonesia', teacherName: 'Riski Ismawarni M, S.Pd.', teacherNip: '-', submittedAt: '09:00 WIB', records: { '7A-01': 'H' } },
+      { id: `${todayStr}_7-A_IPS`, classId: '7-A', date: todayStr, subject: 'Ilmu Pengetahuan Sosial (IPS)', teacherName: 'Muhammad Ahiq T, S.Pd.', teacherNip: '-', submittedAt: '11:00 WIB', records: { '7A-01': 'H' } }
+    );
+  } else if (dayIndex === 4) { // KAMIS
+    sessions.push(
+      { id: `${todayStr}_7-A_SUNDA`, classId: '7-A', date: todayStr, subject: 'Bahasa Sunda', teacherName: "Elis Siti Sa'adah, S.Pd.", teacherNip: '-', submittedAt: '07:30 WIB', records: { '7A-01': 'H' } },
+      { id: `${todayStr}_7-A_BING`, classId: '7-A', date: todayStr, subject: 'Bahasa Inggris', teacherName: 'Siti Nurjanah, S.Pd.', teacherNip: '-', submittedAt: '09:00 WIB', records: { '7A-01': 'H' } },
+      { id: `${todayStr}_7-A_SBK`, classId: '7-A', date: todayStr, subject: 'Seni Budaya (SBK)', teacherName: 'Dudi Yusup, S.Pd.', teacherNip: '-', submittedAt: '11:00 WIB', records: { '7A-01': 'H' } }
+    );
+  } else if (dayIndex === 5) { // JUM'AT
+    sessions.push(
+      { id: `${todayStr}_7-A_BTQ`, classId: '7-A', date: todayStr, subject: 'Pembiasaan BTQ / Literasi', teacherName: 'Wali Kelas', teacherNip: '-', submittedAt: '06:30 WIB', records: { '7A-01': 'H' } },
+      { id: `${todayStr}_7-A_IPS`, classId: '7-A', date: todayStr, subject: 'Ilmu Pengetahuan Sosial (IPS)', teacherName: 'Muhammad Ahiq T, S.Pd.', teacherNip: '-', submittedAt: '08:00 WIB', records: { '7A-01': 'H' } },
+      { id: `${todayStr}_7-A_PKN`, classId: '7-A', date: todayStr, subject: 'Pend. Jasmani (PJOK)', teacherName: 'E. Hamdani, S.Pd, M.M.Pd', teacherNip: '-', submittedAt: '10:00 WIB', records: { '7A-01': 'H' } }
+    );
+  } else {
+    // Weekend fallback
+    sessions.push(
+      { id: `${todayStr}_7-A_EKSKUL`, classId: '7-A', date: todayStr, subject: 'Ekstrakurikuler Pramuka', teacherName: 'Pembina Pramuka', teacherNip: '-', submittedAt: '08:00 WIB', records: { '7A-01': 'H' } }
+    );
+  }
+  
+  return sessions;
 };
 
 const SESSIONS_STORAGE_KEY = 'spentic_elearning_subject_sessions_v1';
@@ -4813,5 +4877,463 @@ export function saveStoredStudents(students: Student[]) {
     console.error('Failed saving students to localStorage', e);
   }
 }
+
+import { safeSaveSubmissions } from './elearningStorage';
+
+// -------------------------------------------------------------
+// ASSIGNMENTS & HOMEWORK (TUGAS & PR ELEANING)
+// -------------------------------------------------------------
+export const INITIAL_ASSIGNMENTS: Assignment[] = [
+  {
+    id: 'asg-ipa-7a-1',
+    title: 'Tugas Pengamatan Struktur Sel Bawang & Sel Pipi',
+    subject: 'Ilmu Pengetahuan Alam (IPA)',
+    teacherName: 'Dedeh Komalasari, S.Pd.',
+    teacherNip: '19680315 199412 2 001',
+    targetClass: '7-A',
+    dueDate: '2026-10-10',
+    description: 'Lakukan pengamatan perbedaan bentuk sel bawang merah dan sel epitel pipi manusia sesuai panduan Buku Paket IPA Bab 1. Simak video praktikum, kerjakan kuis pemahaman, dan kumpulkan laporan pengamatan Anda.',
+    allowUpload: true,
+    createdAt: '2026-10-01',
+    materialUrl: 'https://example.com/Panduan_Praktikum_Mikroskop_Sel.pdf',
+    materialName: 'Panduan_Praktikum_Mikroskop_Sel.pdf',
+    videoUrl: 'https://www.youtube.com/watch?v=URUJD5NEXC8',
+    videoTitle: 'Video Panduan Mikroskop & Struktur Sel Tumbuhan',
+    quizQuestions: [
+      {
+        id: 'q-ipa-1',
+        question: 'Bagian sel tumbuhan yang berfungsi memberi bentuk kaku dan perlindungan luar adalah...',
+        options: ['A. Membran sel', 'B. Dinding sel', 'C. Sitoplasma', 'D. Vakuola'],
+        correctOptionIndex: 1,
+        explanation: 'Dinding sel yang tersusun dari selulosa memberikan struktur kokoh dan kaku pada tumbuhan.'
+      },
+      {
+        id: 'q-ipa-2',
+        question: 'Organel sel yang berperan sebagai pusat pengendali seluruh aktivitas sel adalah...',
+        options: ['A. Mitokondria', 'B. Nukleus (Inti Sel)', 'C. Ribosom', 'D. Kloroplas'],
+        correctOptionIndex: 1,
+        explanation: 'Nukleus atau inti sel mengontrol seluruh proses metabolisme dan membawa materi genetik.'
+      },
+      {
+        id: 'q-ipa-3',
+        question: 'Zat warna hijau daun yang berfungsi menyerap cahaya matahari pada fotosintesis adalah...',
+        options: ['A. Karotenoid', 'B. Klorofil', 'C. Antosianin', 'D. Melanin'],
+        correctOptionIndex: 1,
+        explanation: 'Klorofil terdapat di dalam kloroplas untuk menangkap energi foton matahari.'
+      }
+    ]
+  },
+  {
+    id: 'asg-mtk-7a-1',
+    title: 'Latihan Soal Operasi Hitung Bentuk Aljabar',
+    subject: 'Matematika',
+    teacherName: 'Yulia M. Ahmad, S.Pd.',
+    teacherNip: '19850210 200902 2 008',
+    targetClass: '7-A',
+    dueDate: '2026-10-12',
+    description: 'Pelajari video tutorial pemfaktoran aljabar di bawah, kerjakan kuis online 3 soal, lalu foto lembar catatan latihan nomor 1 sampai 5 di buku tulis Anda.',
+    allowUpload: true,
+    createdAt: '2026-10-02',
+    materialUrl: 'https://example.com/Rangkuman_Rumus_Aljabar_Bab3.pdf',
+    materialName: 'Rangkuman_Rumus_Aljabar_Bab3.pdf',
+    videoUrl: 'https://www.youtube.com/watch?v=NybHckSEQBI',
+    videoTitle: 'Tutorial Pemfaktoran Aljabar Mudah & Cepat',
+    quizQuestions: [
+      {
+        id: 'q-mtk-1',
+        question: 'Bentuk sederhana dari operasi aljabar 3x + 5y - x + 2y adalah...',
+        options: ['A. 2x + 7y', 'B. 4x + 7y', 'C. 2x + 3y', 'D. 3x + 7y'],
+        correctOptionIndex: 0,
+        explanation: '(3x - x) + (5y + 2y) = 2x + 7y.'
+      },
+      {
+        id: 'q-mtk-2',
+        question: 'Koefisien dari variabel x pada bentuk aljabar 5x² - 7x + 9 adalah...',
+        options: ['A. 5', 'B. -7', 'C. 7', 'D. 9'],
+        correctOptionIndex: 1,
+        explanation: 'Angka di depan variabel x berpangkat satu adalah -7.'
+      },
+      {
+        id: 'q-mtk-3',
+        question: 'Jika x = 3 dan y = 2, maka nilai dari 2x + 3y adalah...',
+        options: ['A. 10', 'B. 12', 'C. 15', 'D. 18'],
+        correctOptionIndex: 1,
+        explanation: '2(3) + 3(2) = 6 + 6 = 12.'
+      }
+    ]
+  },
+  {
+    id: 'asg-ing-7a-1',
+    title: 'Project: Self-Introduction & Daily Routine Video',
+    subject: 'Bahasa Inggris',
+    teacherName: 'Rohidin, S.Pd.',
+    teacherNip: '19720412 199703 1 002',
+    targetClass: '7-A',
+    dueDate: '2026-10-14',
+    description: 'Watch the English lesson video below, take the 3-question grammar quiz, and record a short speaking video about your daily routine (1-2 minutes).',
+    allowUpload: true,
+    createdAt: '2026-10-03',
+    materialUrl: 'https://example.com/Vocabulary_List_Daily_Routines.pdf',
+    materialName: 'Vocabulary_List_Daily_Routines.pdf',
+    videoUrl: 'https://www.youtube.com/watch?v=tiXtwF1d4i4',
+    videoTitle: 'Daily Routines Speaking & Grammar Explanation',
+    quizQuestions: [
+      {
+        id: 'q-ing-1',
+        question: 'Complete the sentence: "She always ___ up at 05.00 AM every morning."',
+        options: ['A. wake', 'B. wakes', 'C. waking', 'D. waked'],
+        correctOptionIndex: 1,
+        explanation: 'Third-person singular (she/he/it) takes verb + -s/-es in Simple Present Tense.'
+      },
+      {
+        id: 'q-ing-2',
+        question: 'Choose the correct form: "They ___ soccer in the school field every Friday."',
+        options: ['A. plays', 'B. play', 'C. playing', 'D. played'],
+        correctOptionIndex: 1,
+        explanation: 'Subject "They" uses bare infinitive "play".'
+      },
+      {
+        id: 'q-ing-3',
+        question: 'Which of the following is an adverb of frequency?',
+        options: ['A. Quickly', 'B. Usually', 'C. Tomorrow', 'D. Loudly'],
+        correctOptionIndex: 1,
+        explanation: '"Usually", "always", "sometimes", and "never" are adverbs of frequency.'
+      }
+    ]
+  },
+  {
+    id: 'asg-pabp-7a-1',
+    title: 'Refleksi Nilai Akhlak Terpuji & Kuis Doa Harian',
+    subject: 'Pendidikan Agama Islam (PABP)',
+    teacherName: 'Dra. Hj. Wiwin Winarni',
+    teacherNip: '19671107 199802 2 001',
+    targetClass: '7-A',
+    dueDate: '2026-10-15',
+    description: 'Simak tayangan video adab dan akhlak mulia berikut, selesaikan kuis pemahaman doa harian, lalu unggah foto lembar rangkuman catatan adab kepada orang tua dan guru.',
+    allowUpload: true,
+    createdAt: '2026-10-03',
+    materialUrl: 'https://example.com/Bahan_Ajar_PABP_Adab_Siswa.pdf',
+    materialName: 'Bahan_Ajar_PABP_Adab_Siswa.pdf',
+    videoUrl: 'https://www.youtube.com/watch?v=d_k8c9pX_wI',
+    videoTitle: 'Kajian Adab: Akhlak Mulia Kepada Orang Tua & Guru',
+    quizQuestions: [
+      {
+        id: 'q-pabp-1',
+        question: 'Sifat terpuji yang mencerminkan keselarasan antara perkataan dan perbuatan yang benar disebut...',
+        options: ['A. Amanah', 'B. Shiddiq (Jujur)', 'C. Fathanah', 'D. Tabligh'],
+        correctOptionIndex: 1,
+        explanation: 'Shiddiq berarti benar atau jujur baik dalam niat, lisan, maupun perbuatan.'
+      },
+      {
+        id: 'q-pabp-2',
+        question: 'Doa sebelum belajar dibaca oleh seorang penuntut ilmu dengan tujuan agar...',
+        options: ['A. Cepat selesai membaca', 'B. Diberi kemudahan dan keberkahan pemahaman ilmu', 'C. Mendapatkan pujian teman', 'D. Terbebas dari tugas guru'],
+        correctOptionIndex: 1,
+        explanation: 'Doa belajar memohon pertolongan Allah agar ilmu yang dipelajari bermanfaat dan mudah dipahami.'
+      },
+      {
+        id: 'q-pabp-3',
+        question: 'Salah satu pengamalan sikap birrul walidain (berbakti kepada orang tua) di rumah adalah...',
+        options: ['A. Menolak saat dimintai tolong', 'B. Berbicara santun dan menaati nasihat kebaikan', 'C. Bersuara lebih keras dari orang tua', 'D. Menunda-nunda perintah shalat'],
+        correctOptionIndex: 1,
+        explanation: 'Berbicara sopan, lembut, dan tawadhu adalah wujud bakti kepada kedua orang tua.'
+      }
+    ]
+  },
+  {
+    id: 'asg-sunda-7a-1',
+    title: 'Pangajaran Paguneman & Tatakrama Basa Sunda',
+    subject: 'Bahasa Sunda',
+    teacherName: 'Dra. Hj. Wiwin Winarni',
+    teacherNip: '19671107 199802 2 001',
+    targetClass: '7-A',
+    dueDate: '2026-10-16',
+    description: 'Regepkeun video conto paguneman dina basa Sunda lemes di handap, jawab kuis tatakrama basa, sarta seratkeun hiji paguneman pondok di buku catetan.',
+    allowUpload: true,
+    createdAt: '2026-10-03',
+    materialUrl: 'https://example.com/Modul_Tatakrama_Basa_Sunda_SMP.pdf',
+    materialName: 'Modul_Tatakrama_Basa_Sunda_SMP.pdf',
+    videoUrl: 'https://www.youtube.com/watch?v=sundaPaguneman',
+    videoTitle: 'Conto Paguneman & Ragam Basa Lemes di Sakola',
+    quizQuestions: [
+      {
+        id: 'q-sunda-1',
+        question: 'Ragam basa Sunda anu luyu digunakeun nalika nyarios ka saluhureun (sapertos ka guru/sepuh) nyaeta...',
+        options: ['A. Basa loma', 'B. Basa lemes / hormat', 'C. Basa garihal', 'D. Basa kasar'],
+        correctOptionIndex: 1,
+        explanation: 'Basa lemes hormat ka batur dianggo pikeun ngajenan jalma anu saluhureun.'
+      },
+      {
+        id: 'q-sunda-2',
+        question: 'Kecap lemes keur diri sorangan tina kecap "dahar" nyaeta...',
+        options: ['A. Neda', 'B. Tuang', 'C. Nyatu', 'D. Lebok'],
+        correctOptionIndex: 0,
+        explanation: 'Keur diri sorangan nganggo "neda", sedengkeun pikeun batur saluhureun nganggo "tuang".'
+      },
+      {
+        id: 'q-sunda-3',
+        question: 'Dina istilah pancakaki Sunda, sebutan pikeun anakna anak urang nyaeta...',
+        options: ['A. Buyut', 'B. Incu', 'C. Bao', 'D. Jangga wareng'],
+        correctOptionIndex: 1,
+        explanation: 'Rundayan kulawarga: Indung/Bapa ➔ Anak ➔ Incu ➔ Buyut ➔ Bao.'
+      }
+    ]
+  },
+  {
+    id: 'asg-inf-7a-1',
+    title: 'Pengenalan Perangkat Keras Komputer & Logika Komputasi',
+    subject: 'Informatika',
+    teacherName: 'Ichsanul Arifin, S.Kom.',
+    teacherNip: '19930115 201903 1 008',
+    targetClass: '7-A',
+    dueDate: '2026-10-17',
+    description: 'Saksikan video penjelasan arsitektur komputer (CPU, RAM, Storage), selesaikan kuis interaktif Informatika, dan buat tabel fungsi komponen komputer.',
+    allowUpload: true,
+    createdAt: '2026-10-03',
+    materialUrl: 'https://example.com/Bahan_Ajar_Informatika_Kelas7.pdf',
+    materialName: 'Bahan_Ajar_Informatika_Kelas7.pdf',
+    videoUrl: 'https://www.youtube.com/watch?v=AkFi90lZmXA',
+    videoTitle: 'How Computers Work: CPU, Memory, and Storage Overview',
+    quizQuestions: [
+      {
+        id: 'q-inf-1',
+        question: 'Perangkat keras yang sering disebut sebagai "otak" komputer untuk memproses instruksi adalah...',
+        options: ['A. RAM', 'B. CPU (Central Processing Unit)', 'C. Hard Disk', 'D. Power Supply'],
+        correctOptionIndex: 1,
+        explanation: 'CPU bertugas mengeksekusi instruksi aritmatika dan logika dalam sistem komputer.'
+      },
+      {
+        id: 'q-inf-2',
+        question: 'Jenis memori komputer yang bersifat volatile (data hilang saat listrik mati) adalah...',
+        options: ['A. ROM', 'B. RAM (Random Access Memory)', 'C. SSD', 'D. Flashdisk'],
+        correctOptionIndex: 1,
+        explanation: 'RAM menyimpan data sementara untuk program yang sedang berjalan.'
+      },
+      {
+        id: 'q-inf-3',
+        question: 'Manakah dari perangkat berikut yang termasuk perangkat masukan (input device)?',
+        options: ['A. Monitor', 'B. Keyboard & Mouse', 'C. Printer', 'D. Speaker'],
+        correctOptionIndex: 1,
+        explanation: 'Keyboard dan mouse memasukkan sinyal input ke dalam komputer.'
+      }
+    ]
+  }
+];
+
+export const INITIAL_SUBMISSIONS: AssignmentSubmission[] = [
+  {
+    id: 'sub-ipa-abdulhanan',
+    assignmentId: 'asg-ipa-7a-1',
+    studentId: '7A-01',
+    studentName: 'Abdul Hanan',
+    studentClass: '7-A',
+    submittedAt: '02 Okt 2026, 14:30 WIB',
+    fileName: 'Laporan_Pengamatan_Sel_AbdulHanan_7A.pdf',
+    fileSize: '1.8 MB',
+    answerText: 'Tugas pengamatan sel bawang merah dan sel epitel pipi sudah saya kerjakan lengkap dengan gambar sketsa mikroskop dan tabel perbedaannya.',
+    grade: 95,
+    quizScore: 100,
+    feedback: 'Bagus sekali Abdul! Kuis dapat 100 dan sketsa mikroskopis digambar dengan teliti.',
+    status: 'graded'
+  },
+  {
+    id: 'sub-mtk-cantikadewi',
+    assignmentId: 'asg-mtk-7a-1',
+    studentId: '7A-04',
+    studentName: 'Cantika Dewi',
+    studentClass: '7-A',
+    submittedAt: '02 Okt 2026, 15:10 WIB',
+    fileName: 'Latihan_Faktorisasi_Aljabar_Cantika.pdf',
+    fileSize: '1.4 MB',
+    answerText: 'Langkah pemfaktoran aljabar nomor 1 sampai 5 sudah dikerjakan lengkap dengan langkah pembuktian.',
+    grade: 92,
+    quizScore: 100,
+    feedback: 'Penyelesaian faktorisasi aljabar sangat runut dan kuis aljabar sempurna!',
+    status: 'graded'
+  },
+  {
+    id: 'sub-ing-muhammadfarhan',
+    assignmentId: 'asg-ing-7a-1',
+    studentId: '7A-02',
+    studentName: 'Muhammad Farhan',
+    studentClass: '7-A',
+    submittedAt: '03 Okt 2026, 09:15 WIB',
+    fileName: 'Self_Introduction_Daily_Routine_Farhan.mp4',
+    fileSize: '14.2 MB',
+    fileData: 'https://www.w3schools.com/html/mov_bbb.mp4',
+    videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4',
+    answerText: 'Good morning Mr. Rohidin, this is my English speaking project about my self-introduction and daily routines at SMP Negeri 3 Cihampelas.',
+    quizScore: 100,
+    status: 'submitted'
+  },
+  {
+    id: 'sub-ing-alyanurfadilah',
+    assignmentId: 'asg-ing-7a-1',
+    studentId: '7A-03',
+    studentName: 'Alya Nurfadilah',
+    studentClass: '7-A',
+    submittedAt: '03 Okt 2026, 10:20 WIB',
+    fileName: 'English_Worksheet_Daily_Routines_Alya.pdf',
+    fileSize: '1.2 MB',
+    answerText: 'Here is my written transcript and worksheet for Chapter 2 Daily Activities and Simple Present Tense exercises.',
+    grade: 96,
+    quizScore: 100,
+    feedback: 'Excellent vocabulary and clear sentence structure, Alya! Great job!',
+    status: 'graded'
+  },
+  {
+    id: 'sub-pabp-abdulhanan',
+    assignmentId: 'asg-pabp-7a-1',
+    studentId: '7A-01',
+    studentName: 'Abdul Hanan',
+    studentClass: '7-A',
+    submittedAt: '03 Okt 2026, 11:00 WIB',
+    fileName: 'Catatan_Adab_PABP_AbdulHanan.pdf',
+    fileSize: '1.1 MB',
+    answerText: 'Ibu Wiwin, rangkuman adab kepada orang tua dan guru telah saya tulis di buku catatan PABP beserta doa harian.',
+    grade: 98,
+    quizScore: 100,
+    feedback: 'MashaAllah, tulisan rapi dan pemahaman adab sangat terpuji!',
+    status: 'graded'
+  }
+];
+
+const ASSIGNMENTS_STORAGE_KEY = 'spentic_elearning_assignments_v1';
+const SUBMISSIONS_STORAGE_KEY = 'spentic_elearning_submissions_v1';
+
+export function getStoredAssignments(): Assignment[] {
+  if (typeof window === 'undefined') return INITIAL_ASSIGNMENTS;
+  try {
+    const raw = localStorage.getItem(ASSIGNMENTS_STORAGE_KEY);
+    if (!raw) {
+      localStorage.setItem(ASSIGNMENTS_STORAGE_KEY, JSON.stringify(INITIAL_ASSIGNMENTS));
+      return INITIAL_ASSIGNMENTS;
+    }
+    const list: Assignment[] = JSON.parse(raw);
+    if (!Array.isArray(list) || list.length === 0) {
+      localStorage.setItem(ASSIGNMENTS_STORAGE_KEY, JSON.stringify(INITIAL_ASSIGNMENTS));
+      return INITIAL_ASSIGNMENTS;
+    }
+
+    // Auto-merge newly added assignments or upgrade missing quizzes/materials
+    let hasChanges = false;
+    INITIAL_ASSIGNMENTS.forEach(initAsg => {
+      const idx = list.findIndex(a => a.id === initAsg.id);
+      if (idx < 0) {
+        list.push(initAsg);
+        hasChanges = true;
+      } else if (!list[idx].quizQuestions && initAsg.quizQuestions) {
+        list[idx] = {
+          ...initAsg,
+          ...list[idx],
+          materialUrl: list[idx].materialUrl || initAsg.materialUrl,
+          materialName: list[idx].materialName || initAsg.materialName,
+          videoUrl: list[idx].videoUrl || initAsg.videoUrl,
+          videoTitle: list[idx].videoTitle || initAsg.videoTitle,
+          quizQuestions: initAsg.quizQuestions
+        };
+        hasChanges = true;
+      }
+    });
+
+    if (hasChanges) {
+      localStorage.setItem(ASSIGNMENTS_STORAGE_KEY, JSON.stringify(list));
+    }
+    return list;
+  } catch (e) {
+    console.error('Failed reading assignments from localStorage', e);
+    return INITIAL_ASSIGNMENTS;
+  }
+}
+
+export function saveStoredAssignment(assignment: Assignment) {
+  if (typeof window === 'undefined') return;
+  try {
+    const list = getStoredAssignments();
+    const idx = list.findIndex(a => a.id === assignment.id);
+    if (idx >= 0) {
+      list[idx] = assignment;
+    } else {
+      list.unshift(assignment);
+    }
+    localStorage.setItem(ASSIGNMENTS_STORAGE_KEY, JSON.stringify(list));
+    window.dispatchEvent(new Event('elearningAssignmentsUpdated'));
+  } catch (e) {
+    console.error('Failed saving assignment to localStorage', e);
+  }
+}
+
+export function deleteStoredAssignment(id: string) {
+  if (typeof window === 'undefined') return;
+  try {
+    const list = getStoredAssignments().filter(a => a.id !== id);
+    localStorage.setItem(ASSIGNMENTS_STORAGE_KEY, JSON.stringify(list));
+    window.dispatchEvent(new Event('elearningAssignmentsUpdated'));
+  } catch (e) {
+    console.error('Failed deleting assignment from localStorage', e);
+  }
+}
+
+export function getStoredSubmissions(): AssignmentSubmission[] {
+  if (typeof window === 'undefined') return INITIAL_SUBMISSIONS;
+  try {
+    const raw = localStorage.getItem(SUBMISSIONS_STORAGE_KEY);
+    if (!raw) {
+      safeSaveSubmissions(INITIAL_SUBMISSIONS);
+      return INITIAL_SUBMISSIONS;
+    }
+    const list: AssignmentSubmission[] = JSON.parse(raw);
+    if (!Array.isArray(list) || list.length === 0) {
+      safeSaveSubmissions(INITIAL_SUBMISSIONS);
+      return INITIAL_SUBMISSIONS;
+    }
+
+    // Auto-merge initial sample submissions if not yet present
+    let hasMissingInitial = false;
+    INITIAL_SUBMISSIONS.forEach(initSub => {
+      if (!list.some(s => s.id === initSub.id)) {
+        list.push(initSub);
+        hasMissingInitial = true;
+      }
+    });
+
+    // Auto-sanitize: if any item from older test has bloated base64, clean it up silently
+    let hasBloat = false;
+    list.forEach((sub: AssignmentSubmission) => {
+      if (sub.fileData && sub.fileData.length > 50000) {
+        hasBloat = true;
+        sub.fileData = undefined;
+      }
+    });
+    if (hasBloat || hasMissingInitial) {
+      safeSaveSubmissions(list);
+    }
+    return list;
+  } catch (e) {
+    console.error('Failed reading submissions from localStorage', e);
+    return INITIAL_SUBMISSIONS;
+  }
+}
+
+export function saveStoredSubmission(submission: AssignmentSubmission) {
+  if (typeof window === 'undefined') return;
+  try {
+    const list = getStoredSubmissions();
+    const idx = list.findIndex(
+      s => s.id === submission.id || (s.assignmentId === submission.assignmentId && s.studentId === submission.studentId)
+    );
+    if (idx >= 0) {
+      list[idx] = { ...list[idx], ...submission };
+    } else {
+      list.push(submission);
+    }
+    // Use safe storage that will never crash with QuotaExceededError
+    safeSaveSubmissions(list);
+  } catch (e) {
+    console.error('Failed saving submission safely', e);
+  }
+}
+
+
 
 

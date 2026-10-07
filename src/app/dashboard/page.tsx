@@ -592,7 +592,7 @@ export default function DashboardPage() {
   }, [teachersList, teacherSearch]);
 
   return (
-    <div className="theme-marklab-app min-h-screen bg-[#f8fafc] text-slate-900 flex flex-col antialiased selection:bg-indigo-500/25 selection:text-indigo-900 font-sans">
+    <div className="theme-marklab-app min-h-screen bg-[#f8fafc] text-slate-900 flex flex-col antialiased selection:bg-indigo-500/25 selection:text-indigo-900 font-dashboard">
       
       {/* Toast Notification Popup */}
       {toastMessage && (
@@ -712,7 +712,7 @@ export default function DashboardPage() {
                   ),
                   badge: `${leadersList.length + teachersList.length}`
                 },
-                {
+                  {
                   id: 'agenda',
                   label: 'Kalender Akademik',
                   icon: (
@@ -854,7 +854,7 @@ export default function DashboardPage() {
                   {activeTab === 'warta' && 'Manajemen Warta & Berita'}
                   {activeTab === 'siswa' && 'Manajemen Data Siswa & Rombel'}
                   {activeTab === 'pimpinan' && 'Manajemen Pimpinan & Guru (GTK)'}
-                  {activeTab === 'agenda' && 'Kalender & Agenda Akademik'}
+                    {activeTab === 'agenda' && 'Kalender & Agenda Akademik'}
                   {activeTab === 'galeri' && 'Manajemen Galeri & Fasilitas'}
                   {activeTab === 'pesan' && 'Kotak Pesan Masuk Wali Murid'}
                   {activeTab === 'pengaturan' && 'Pengaturan Profil & Website'}
@@ -1731,6 +1731,7 @@ export default function DashboardPage() {
             )}
 
             {/* ========================================================================= */}
+            
             {/* TAB 4: KALENDER AKADEMIK */}
             {/* ========================================================================= */}
             {activeTab === 'agenda' && (
