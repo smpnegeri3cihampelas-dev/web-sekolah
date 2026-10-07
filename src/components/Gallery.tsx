@@ -31,7 +31,7 @@ export default function Gallery() {
     },
     { 
       id: 4, 
-      src: '/school_building.jpg', 
+      src: '/slide2.jpeg', 
       category: 'FASILITAS', 
       title: 'Kawasan Smart Eco-Campus',
       desc: 'Lingkungan sekolah asri dengan sarana olahraga terpadu dan ruang hijau.'

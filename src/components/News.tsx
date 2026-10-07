@@ -22,7 +22,7 @@ export default function News() {
       date: '10 Mei 2026',
       category: 'AKADEMIK',
       desc: 'Jadwal dan tata tertib pelaksanaan UAS Genap Tahun Ajaran 2025/2026.',
-      image: '/school_building.jpg'
+      image: '/slide1.jpeg'
     }
   ];
 

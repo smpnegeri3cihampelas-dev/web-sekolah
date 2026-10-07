@@ -1947,7 +1947,7 @@ export default function DashboardPage() {
                       <label className="text-slate-800 font-black block mb-1.5 text-xs">Status Akreditasi</label>
                       <input 
                         type="text" 
-                        defaultValue="A (Unggul) - BAN S/M" 
+                        defaultValue="B (Baik) - BAN S/M" 
                         className="w-full px-3.5 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-slate-950 font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 shadow-xs"
                       />
                     </div>

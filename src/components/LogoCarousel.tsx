@@ -37,7 +37,7 @@ export default function LogoCarousel() {
     },
     {
       name: 'BAN-S/M',
-      desc: 'Terakreditasi "A" (Unggul)',
+      desc: 'Terakreditasi "B" (Baik)',
       tag: 'Akreditasi',
       icon: (
         <svg className="w-6 h-6 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">

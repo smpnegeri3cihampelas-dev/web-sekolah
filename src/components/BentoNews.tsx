@@ -274,7 +274,7 @@ export default function BentoNews() {
                     </span>
                     <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 text-[#0f172a] text-[10px] font-medium border border-slate-200">
                       <span className="w-1.5 h-1.5 rounded-full bg-purple-600" />
-                      Akreditasi A
+                      Akreditasi B
                     </span>
                   </div>
 

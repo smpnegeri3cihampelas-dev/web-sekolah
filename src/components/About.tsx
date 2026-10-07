@@ -249,13 +249,13 @@ export default function About() {
                 <div className="animate-[fadeIn_0.3s_ease-out] flex flex-col items-center justify-center text-center py-4">
                   <div className="w-24 h-24 border border-indigo-300 bg-indigo-50 rounded-full flex items-center justify-center shadow-lg shadow-indigo-500/10 mb-6 relative">
                     <div className="absolute inset-1.5 border border-indigo-200 rounded-full" />
-                    <span className="text-5xl font-light text-indigo-600 drop-shadow-sm">A</span>
+                    <span className="text-5xl font-light text-indigo-600 drop-shadow-sm">B</span>
                   </div>
                   <h3 className="text-base sm:text-lg font-semibold text-slate-900 mb-2 tracking-wide uppercase">
-                    Terakreditasi "A" (Unggul)
+                    Terakreditasi "B" (Baik)
                   </h3>
                   <p className="text-slate-600 text-xs sm:text-sm leading-relaxed max-w-md mx-auto mb-6 font-light">
-                    Diakui secara resmi oleh Badan Akreditasi Nasional Sekolah/Madrasah (BAN-S/M) dengan predikat Unggul, membuktikan konsistensi standar mutu pendidikan dan tata kelola berdaya saing.
+                    Diakui secara resmi oleh Badan Akreditasi Nasional Sekolah/Madrasah (BAN-S/M) dengan peringkat Akreditasi B (Baik), membuktikan konsistensi standar mutu pendidikan dan tata kelola berdaya saing.
                   </p>
                   <div className="flex flex-wrap justify-center gap-2.5">
                     <span className="px-3.5 py-1.5 border border-indigo-200 bg-indigo-50 rounded-full text-indigo-700 text-[11px] font-medium uppercase tracking-wider">

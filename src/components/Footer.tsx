@@ -61,7 +61,7 @@ export default function Footer() {
         {/* Right Col: Campus Landmark Photo Card */}
         <div className="lg:col-span-7 rounded-[2.2rem] overflow-hidden border border-white/10 h-72 sm:h-80 lg:h-full min-h-[300px] relative bg-white/[0.02] group shadow-2xl shadow-black/50">
           <Image 
-            src="/school_building.jpg"
+            src="/slide4.jpeg"
             alt="Kampus SMPN 3 Cihampelas"
             fill
             className="object-cover opacity-60 group-hover:opacity-80 group-hover:scale-105 transition-all duration-700 ease-out"
@@ -69,7 +69,7 @@ export default function Footer() {
           <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-[#080b20] via-[#080b20]/40 to-transparent z-10" />
           
           <div className="absolute top-5 right-5 px-3.5 py-1 rounded-full bg-[#080b20]/80 backdrop-blur-md border border-white/20 text-[10px] text-indigo-300 font-mono shadow-xl z-20 tracking-widest uppercase">
-            Terakreditasi A Unggul
+            Terakreditasi B (Baik)
           </div>
 
           <div className="absolute bottom-6 left-6 right-6 z-20">
