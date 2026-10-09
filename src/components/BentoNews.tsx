@@ -375,31 +375,6 @@ export default function BentoNews() {
 
         </div>
 
-        {/* Clean Call to Action to Dedicated Warta Page */}
-        <div className="mt-12 p-6 sm:p-8 rounded-3xl bg-white border border-indigo-100 shadow-md flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-4 text-center sm:text-left">
-            <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-xl shrink-0">
-              📰
-            </div>
-            <div>
-              <h4 className="text-base font-bold text-slate-900">
-                Pusat Arsip Warta &amp; Publikasi Digital
-              </h4>
-              <p className="text-xs text-slate-600">
-                Akses katalog lengkap berita, pengumuman resmi, dan galeri prestasi sekolah dengan tampilan ringan berhalaman.
-              </p>
-            </div>
-          </div>
-
-          <Link
-            href="/warta"
-            className="px-6 py-3 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-md shadow-indigo-600/20 transition-all flex items-center gap-2 shrink-0 cursor-pointer"
-          >
-            <span>Buka Kumpulan Warta ({publishedList.length})</span>
-            <span>→</span>
-          </Link>
-        </div>
-
       </div>
 
       {/* ============================================================== */}
