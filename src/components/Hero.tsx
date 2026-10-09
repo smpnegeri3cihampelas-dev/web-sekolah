@@ -35,7 +35,7 @@ export default function Hero() {
     const handleResize = () => {
       if (!canvas || !stickyRef.current) return;
       const isMobile = window.innerWidth < 768;
-      const dpr = isMobile ? 1.0 : Math.min(window.devicePixelRatio || 1, 2);
+      const dpr = isMobile ? 1.5 : Math.min(window.devicePixelRatio || 1, 2);
       const width = stickyRef.current.clientWidth || window.innerWidth;
       const height = stickyRef.current.clientHeight || window.innerHeight;
 
@@ -44,6 +44,8 @@ export default function Hero() {
 
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.scale(dpr, dpr);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
       needsRedrawRef.current = true;
     };
 
@@ -86,6 +88,8 @@ export default function Hero() {
 
       ctx.fillStyle = '#f8fafc';
       ctx.fillRect(0, 0, width, height);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
       ctx.drawImage(img, drawX, drawY, drawW, drawH);
     };
 
