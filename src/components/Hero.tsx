@@ -33,16 +33,14 @@ export default function Hero() {
 
     // 1. Retina / DPR responsive canvas sizing
     const handleResize = () => {
-      if (!canvas) return;
+      if (!canvas || !stickyRef.current) return;
       const isMobile = window.innerWidth < 768;
       const dpr = isMobile ? 1.0 : Math.min(window.devicePixelRatio || 1, 2);
-      const width = window.innerWidth;
-      const height = window.innerHeight;
+      const width = stickyRef.current.clientWidth || window.innerWidth;
+      const height = stickyRef.current.clientHeight || window.innerHeight;
 
       canvas.width = Math.floor(width * dpr);
       canvas.height = Math.floor(height * dpr);
-      canvas.style.width = `${width}px`;
-      canvas.style.height = `${height}px`;
 
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.scale(dpr, dpr);
@@ -54,10 +52,10 @@ export default function Hero() {
 
     // 2. Draw Frame onto canvas (Aspect-ratio Cover)
     const drawFrame = (frameIndex: number) => {
-      if (isDestroyed || !ctx) return;
+      if (isDestroyed || !ctx || !stickyRef.current) return;
 
-      const width = window.innerWidth;
-      const height = window.innerHeight;
+      const width = stickyRef.current.clientWidth || window.innerWidth;
+      const height = stickyRef.current.clientHeight || window.innerHeight;
 
       // Find target frame or nearest available loaded frame
       let img = imagesRef.current[frameIndex];
@@ -86,7 +84,7 @@ export default function Hero() {
       const drawX = (width - drawW) / 2;
       const drawY = (height - drawH) / 2;
 
-      ctx.fillStyle = '#000000';
+      ctx.fillStyle = '#f8fafc';
       ctx.fillRect(0, 0, width, height);
       ctx.drawImage(img, drawX, drawY, drawW, drawH);
     };
@@ -213,12 +211,12 @@ export default function Hero() {
   return (
     <section 
       ref={containerRef}
-      className="relative w-full h-[125vh] sm:h-[220vh] md:h-[400vh] bg-black selection:bg-indigo-500/25 selection:text-indigo-200"
+      className="relative w-full h-[125vh] sm:h-[220vh] md:h-[400vh] bg-[#f8fafc] selection:bg-indigo-500/25 selection:text-indigo-200"
     >
       {/* Full-screen Sticky Viewport */}
       <div 
         ref={stickyRef}
-        className="sticky top-0 w-full h-screen overflow-hidden flex flex-col justify-end"
+        className="sticky top-0 w-full h-screen h-[100dvh] overflow-hidden flex flex-col justify-end bg-[#f8fafc]"
       >
         {/* 1. Full-screen Sticky HTML5 Canvas */}
         <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
