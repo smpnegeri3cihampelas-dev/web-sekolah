@@ -35,7 +35,7 @@ export default function Hero() {
     const handleResize = () => {
       if (!canvas) return;
       const isMobile = window.innerWidth < 768;
-      const dpr = isMobile ? 1.2 : Math.min(window.devicePixelRatio || 1, 2);
+      const dpr = isMobile ? 1.0 : Math.min(window.devicePixelRatio || 1, 2);
       const width = window.innerWidth;
       const height = window.innerHeight;
 
@@ -149,7 +149,7 @@ export default function Hero() {
 
       const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       const isMobile = window.innerWidth < 768;
-      const lerpFactor = isMobile ? 0.22 : LERP_FACTOR;
+      const lerpFactor = isMobile ? 0.75 : LERP_FACTOR;
 
       if (prefersReduced) {
         currentFrameRef.current = targetFrameRef.current;
@@ -157,7 +157,7 @@ export default function Hero() {
         currentFrameRef.current += (targetFrameRef.current - currentFrameRef.current) * lerpFactor;
       }
 
-      if (Math.abs(targetFrameRef.current - currentFrameRef.current) < 0.008) {
+      if (Math.abs(targetFrameRef.current - currentFrameRef.current) < (isMobile ? 0.05 : 0.008)) {
         currentFrameRef.current = targetFrameRef.current;
       }
 
@@ -186,14 +186,15 @@ export default function Hero() {
       );
 
       // Smoothly fade out foreground text toward the end of the scroll
+      const isMobileScreen = window.innerWidth < 768;
       gsap.to(contentRef.current, {
         y: -40,
         opacity: 0,
         ease: 'none',
         scrollTrigger: {
           trigger: containerRef.current,
-          start: '75% top',
-          end: '95% top',
+          start: isMobileScreen ? '45% top' : '75% top',
+          end: isMobileScreen ? '85% top' : '95% top',
           scrub: true,
         }
       });
@@ -212,7 +213,7 @@ export default function Hero() {
   return (
     <section 
       ref={containerRef}
-      className="relative w-full h-[220vh] sm:h-[320vh] md:h-[420vh] bg-black selection:bg-indigo-500/25 selection:text-indigo-200"
+      className="relative w-full h-[125vh] sm:h-[220vh] md:h-[400vh] bg-black selection:bg-indigo-500/25 selection:text-indigo-200"
     >
       {/* Full-screen Sticky Viewport */}
       <div 
