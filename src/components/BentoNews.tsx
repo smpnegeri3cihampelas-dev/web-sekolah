@@ -1,11 +1,11 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
+import Link from 'next/link';
 import { useWartaData, WartaItem } from '@/lib/wartaData';
 
 export default function BentoNews() {
   const { wartaList } = useWartaData();
-  const [selectedCategory, setSelectedCategory] = useState('SEMUA');
   const [selectedArticle, setSelectedArticle] = useState<WartaItem | null>(null);
 
   const publishedList = useMemo(() => {
@@ -13,16 +13,11 @@ export default function BentoNews() {
     return list.length > 0 ? list : wartaList;
   }, [wartaList]);
 
-  const topWarta = publishedList[0];
+  // Warta yang disorot di Bento Grid Informasi Terpadu
+  const topWarta = publishedList[0] || null;
   const secondWarta = publishedList[1] || topWarta;
   const thirdWarta = publishedList[2] || topWarta;
-
-  const filteredArticles = useMemo(() => {
-    if (selectedCategory === 'SEMUA') return publishedList;
-    return publishedList.filter(item => 
-      item.category.toUpperCase() === selectedCategory.toUpperCase()
-    );
-  }, [publishedList, selectedCategory]);
+  const fourthWarta = publishedList[3] || null;
 
   return (
     <section id="berita" className="relative w-full py-20 sm:py-28 bg-[#f8fafc] text-slate-900 overflow-hidden select-none border-b border-indigo-100/70">
@@ -45,15 +40,17 @@ export default function BentoNews() {
               Informasi Terpadu <span className="font-semibold text-indigo-900">&amp; Prestasi Terkini</span>
             </h2>
           </div>
-          <a
-            href="#arsip-berita"
+          
+          {/* Tombol Lihat Semua Warta -> Menuju Halaman Kumpulan Berita Berhalaman (/warta) */}
+          <Link
+            href="/warta"
             className="group inline-flex items-center gap-2.5 px-5 py-2.5 rounded-full bg-white hover:bg-indigo-50 border border-indigo-200/80 text-xs sm:text-sm font-medium text-slate-700 hover:text-indigo-700 transition-all duration-300 shadow-sm self-start md:self-end cursor-pointer"
           >
             <span>Lihat Semua Warta ({publishedList.length})</span>
             <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs group-hover:translate-x-0.5 group-hover:bg-indigo-600 group-hover:text-white transition-all duration-300">
-              ↓
+              →
             </span>
-          </a>
+          </Link>
         </div>
 
         {/* ============================================================== */}
@@ -83,34 +80,33 @@ export default function BentoNews() {
               </div>
             </div>
 
-            {/* CARD 4: Bottom Left Editorial Feature Card (Dynamic from thirdWarta) */}
+            {/* CARD 4: Bottom Left Editorial Feature Card (Warta Utama #1 dari Admin Dashboard) */}
             <div 
-              onClick={() => setSelectedArticle(thirdWarta)}
+              onClick={() => topWarta && setSelectedArticle(topWarta)}
               className="rounded-[2.2rem] bg-white text-[#0f172a] shadow-xl shadow-black/25 border border-white/30 overflow-hidden flex flex-col justify-between h-auto lg:h-[520px] cursor-pointer group hover:border-indigo-300 transition-all duration-300"
             >
-              
               {/* Top Editorial Info Area */}
               <div className="p-7 sm:p-8 flex flex-col justify-between flex-1">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
                     <div className="w-6 h-6 rounded-lg bg-black text-white flex items-center justify-center text-xs font-bold">
-                      3
+                      1
                     </div>
                     <span className="text-sm font-semibold tracking-tight text-[#0f172a]">
-                      SMPN 3 Cihampelas
+                      Warta Utama SMPN 3
                     </span>
                   </div>
                   <span className="text-[11px] font-mono text-indigo-600 font-bold bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-200">
-                    {thirdWarta.category}
+                    {topWarta ? topWarta.category : 'PRESTASI'}
                   </span>
                 </div>
 
                 <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mt-auto">
                   <h3 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#0f172a] leading-[1.15] max-w-sm group-hover:text-indigo-900 transition-colors">
-                    {thirdWarta.title}
+                    {topWarta ? topWarta.title : 'SMPN 3 Cihampelas Menyongsong Era Pendidikan Digital Berkarakter'}
                   </h3>
                   <p className="text-xs text-stone-500 font-normal leading-relaxed max-w-[210px] sm:text-right line-clamp-3">
-                    {thirdWarta.excerpt || 'Ekosistem Belajar Digital, Karakter Unggul & Berwawasan Global.'}
+                    {topWarta ? (topWarta.excerpt || 'Klik untuk membaca selengkapnya warta sekolah ini.') : 'Ekosistem Belajar Digital, Karakter Unggul & Berwawasan Global.'}
                   </p>
                 </div>
               </div>
@@ -118,8 +114,8 @@ export default function BentoNews() {
               {/* Bottom Photo Area (Exact 260px on desktop) */}
               <div className="relative w-full h-[240px] lg:h-[260px] overflow-hidden rounded-b-[2.2rem] shrink-0 bg-slate-100">
                 <img 
-                  src={thirdWarta.src || '/slide4.jpeg'} 
-                  alt={thirdWarta.title}
+                  src={topWarta ? (topWarta.src || '/slide4.jpeg') : '/slide4.jpeg'} 
+                  alt={topWarta ? topWarta.title : 'Warta Utama'}
                   className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700"
                   onError={(e) => {
                     (e.target as HTMLImageElement).src = '/slide4.jpeg';
@@ -127,10 +123,9 @@ export default function BentoNews() {
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent pointer-events-none" />
                 <div className="absolute bottom-3 right-4 px-3 py-1 rounded-full bg-black/60 backdrop-blur-md text-white text-[10px] font-bold">
-                  {thirdWarta.date}
+                  {topWarta ? topWarta.date : 'Terbaru'}
                 </div>
               </div>
-
             </div>
 
           </div>
@@ -146,14 +141,14 @@ export default function BentoNews() {
               {/* SUB-COLUMN 1: Card 2 (230px) + Gap (24px) + Card 5 (266px) = 520px */}
               <div className="flex flex-col gap-6">
                 
-                {/* CARD 2: Top Center (Dynamic Highlight from topWarta) */}
+                {/* CARD 2: Top Center (Warta #2 dari Admin Dashboard) */}
                 <div 
-                  onClick={() => setSelectedArticle(topWarta)}
+                  onClick={() => secondWarta && setSelectedArticle(secondWarta)}
                   className="rounded-[2.2rem] h-[230px] relative overflow-hidden group shadow-xl shadow-black/30 border border-white/10 shrink-0 cursor-pointer"
                 >
                   <img 
-                    src={topWarta.src || '/gallery_2.jpg'} 
-                    alt={topWarta.title} 
+                    src={secondWarta ? (secondWarta.src || '/gallery_2.jpg') : '/gallery_2.jpg'} 
+                    alt={secondWarta ? secondWarta.title : 'Warta Pilihan'} 
                     className="absolute inset-0 w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-700"
                     onError={(e) => {
                       (e.target as HTMLImageElement).src = '/gallery_2.jpg';
@@ -164,27 +159,27 @@ export default function BentoNews() {
                   {/* Header Badge */}
                   <div className="absolute top-4 left-5 right-5 flex justify-between items-center z-10">
                     <span className="px-2.5 py-0.5 rounded-full bg-indigo-600/90 backdrop-blur-md text-white text-[10px] font-mono font-bold uppercase tracking-wider">
-                      {topWarta.category}
+                      {secondWarta ? secondWarta.category : 'PENGUMUMAN'}
                     </span>
                     <span className="text-[10px] text-stone-300 font-mono">
-                      {topWarta.date}
+                      {secondWarta ? secondWarta.date : 'Terkini'}
                     </span>
                   </div>
 
                   {/* Text Overlay */}
                   <div className="absolute bottom-5 left-5 right-5 z-10">
                     <span className="text-lg sm:text-xl font-bold tracking-tight text-white drop-shadow-md block line-clamp-2 leading-snug group-hover:text-indigo-200 transition-colors">
-                      {topWarta.title}
+                      {secondWarta ? secondWarta.title : 'Warta Terkini Sekolah'}
                     </span>
                     <span className="text-[10px] text-stone-300/90 font-light tracking-wide block mt-1 line-clamp-1">
-                      {topWarta.excerpt || 'Klik untuk membaca warta selengkapnya →'}
+                      {secondWarta ? (secondWarta.excerpt || 'Klik untuk membaca warta selengkapnya →') : 'Klik untuk membaca warta selengkapnya →'}
                     </span>
                   </div>
                 </div>
 
-                {/* CARD 5: Center Middle (Smartphone Screen Closeup Mockup - Dynamic secondWarta) */}
+                {/* CARD 5: Center Middle (Smartphone Closeup Mockup - Warta #3 dari Admin Dashboard) */}
                 <div 
-                  onClick={() => setSelectedArticle(secondWarta)}
+                  onClick={() => thirdWarta && setSelectedArticle(thirdWarta)}
                   className="rounded-[2.2rem] h-[266px] p-2 bg-[#1b1b20] border-2 border-white/10 shadow-xl shadow-black/30 flex flex-col relative overflow-hidden group shrink-0 cursor-pointer"
                 >
                   <div className="w-full h-full rounded-[1.7rem] bg-gradient-to-b from-[#f3e6e3] via-[#f7edf0] to-[#eaf2f8] p-4 flex flex-col justify-between relative overflow-hidden">
@@ -204,10 +199,10 @@ export default function BentoNews() {
                       </div>
                       <div className="flex flex-col min-w-0">
                         <span className="text-[11px] font-bold text-slate-900 truncate">
-                          {secondWarta.category} · {secondWarta.title}
+                          {thirdWarta ? `${thirdWarta.category} · ${thirdWarta.title}` : 'Agenda Kegiatan Siswa'}
                         </span>
                         <span className="text-[9px] text-slate-600 truncate">
-                          {secondWarta.excerpt || secondWarta.date}
+                          {thirdWarta ? (thirdWarta.excerpt || thirdWarta.date) : 'Informasi resmi SMPN 3 Cihampelas'}
                         </span>
                       </div>
                     </div>
@@ -258,28 +253,34 @@ export default function BentoNews() {
                   </div>
                 </div>
 
-                {/* CARD 6: Far Right Middle (Vertical Product Detail Card) */}
-                <div className="rounded-[2.2rem] h-[330px] relative overflow-hidden group shadow-xl shadow-black/30 border border-white/10 shrink-0">
+                {/* CARD 6: Far Right Middle (Warta #4 dari Admin Dashboard atau Budaya Sekolah) */}
+                <div 
+                  onClick={() => fourthWarta ? setSelectedArticle(fourthWarta) : null}
+                  className="rounded-[2.2rem] h-[330px] relative overflow-hidden group shadow-xl shadow-black/30 border border-white/10 shrink-0 cursor-pointer"
+                >
                   <img 
-                    src="/slide2.jpeg" 
-                    alt="Kampus SMPN 3 Cihampelas" 
+                    src={fourthWarta ? (fourthWarta.src || '/slide2.jpeg') : '/slide2.jpeg'} 
+                    alt={fourthWarta ? fourthWarta.title : 'Kampus SMPN 3 Cihampelas'} 
                     className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = '/slide2.jpeg';
+                    }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-black/30" />
 
                   <div className="absolute top-5 left-5 right-5 flex justify-between items-center z-10">
                     <span className="px-3 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-[10px] text-stone-200 uppercase tracking-widest font-mono font-bold">
-                      RIGAS · 2026
+                      {fourthWarta ? fourthWarta.category : 'RIGAS · 2026'}
                     </span>
                     <span className="w-2 h-2 rounded-full bg-indigo-400 shadow-[0_0_8px_#818cf8] animate-pulse" />
                   </div>
 
                   <div className="absolute bottom-5 left-5 right-5 z-10">
-                    <h5 className="text-base font-semibold text-white tracking-tight leading-snug">
-                      Budaya Disiplin & Prestasi
+                    <h5 className="text-base font-semibold text-white tracking-tight leading-snug line-clamp-2">
+                      {fourthWarta ? fourthWarta.title : 'Budaya Disiplin & Prestasi'}
                     </h5>
-                    <p className="text-[11px] text-stone-300 font-light mt-0.5 leading-relaxed">
-                      Membina generasi berakhlak mulia dan berdaya saing global.
+                    <p className="text-[11px] text-stone-300 font-light mt-0.5 leading-relaxed line-clamp-2">
+                      {fourthWarta ? (fourthWarta.excerpt || fourthWarta.date) : 'Membina generasi berakhlak mulia dan berdaya saing global.'}
                     </p>
                   </div>
                 </div>
@@ -374,93 +375,29 @@ export default function BentoNews() {
 
         </div>
 
-        {/* ============================================================== */}
-        {/* ARSIP & DAFTAR WARTA SEKOLAH LENGKAP (REAL-TIME SYNC)          */}
-        {/* ============================================================== */}
-        <div id="arsip-berita" className="mt-16 sm:mt-20 pt-10 border-t-2 border-slate-200">
-          
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+        {/* Clean Call to Action to Dedicated Warta Page */}
+        <div className="mt-12 p-6 sm:p-8 rounded-3xl bg-white border border-indigo-100 shadow-md flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-4 text-center sm:text-left">
+            <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-xl shrink-0">
+              📰
+            </div>
             <div>
-              <h3 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
-                Koleksi Warta & Publikasi Sekolah
-              </h3>
-              <p className="text-xs sm:text-sm text-slate-600 font-medium mt-1">
-                Seluruh berita terbaru yang dirilis resmi oleh admin SMP Negeri 3 Cihampelas
+              <h4 className="text-base font-bold text-slate-900">
+                Pusat Arsip Warta &amp; Publikasi Digital
+              </h4>
+              <p className="text-xs text-slate-600">
+                Akses katalog lengkap berita, pengumuman resmi, dan galeri prestasi sekolah dengan tampilan ringan berhalaman.
               </p>
             </div>
-
-            {/* Category Filters */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
-              {['SEMUA', 'PRESTASI', 'PENGUMUMAN', 'KEGIATAN', 'AKADEMIK', 'INOVASI'].map((cat) => (
-                <button
-                  key={cat}
-                  onClick={() => setSelectedCategory(cat)}
-                  className={`px-3.5 py-1.5 rounded-full text-xs font-mono font-extrabold transition-all cursor-pointer whitespace-nowrap ${
-                    selectedCategory === cat
-                      ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
-                      : 'bg-white text-slate-700 border-2 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
-                  }`}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
           </div>
 
-          {/* Grid of Warta Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {filteredArticles.map((article) => (
-              <div 
-                key={article.id}
-                onClick={() => setSelectedArticle(article)}
-                className="rounded-3xl bg-white border-2 border-slate-200 hover:border-indigo-300 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between group cursor-pointer"
-              >
-                <div>
-                  {/* Photo Container */}
-                  <div className="relative w-full h-44 overflow-hidden bg-slate-100">
-                    <img 
-                      src={article.src || '/slide4.jpeg'} 
-                      alt={article.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = '/slide4.jpeg';
-                      }}
-                    />
-                    <div className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-white/90 backdrop-blur-md border border-white/60 text-indigo-700 text-[10px] font-mono font-black uppercase tracking-wider shadow-sm">
-                      {article.category}
-                    </div>
-                  </div>
-
-                  {/* Body Text */}
-                  <div className="p-5">
-                    <div className="text-[11px] font-mono text-slate-500 font-bold mb-2">
-                      📅 {article.date}
-                    </div>
-                    <h4 className="text-base font-extrabold text-slate-900 group-hover:text-indigo-600 transition-colors line-clamp-2 leading-snug mb-2">
-                      {article.title}
-                    </h4>
-                    <p className="text-xs text-slate-600 font-medium line-clamp-3 leading-relaxed">
-                      {article.excerpt || 'Klik untuk membaca selengkapnya warta sekolah ini.'}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="p-5 pt-0">
-                  <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-extrabold text-indigo-600 group-hover:text-indigo-700">
-                    <span>Baca Warta</span>
-                    <span className="group-hover:translate-x-1 transition-transform">→</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {filteredArticles.length === 0 && (
-            <div className="p-12 text-center bg-white rounded-3xl border-2 border-slate-200 text-slate-600 font-bold text-sm">
-              Belum ada warta untuk kategori "{selectedCategory}".
-            </div>
-          )}
-
+          <Link
+            href="/warta"
+            className="px-6 py-3 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-md shadow-indigo-600/20 transition-all flex items-center gap-2 shrink-0 cursor-pointer"
+          >
+            <span>Buka Kumpulan Warta ({publishedList.length})</span>
+            <span>→</span>
+          </Link>
         </div>
 
       </div>
@@ -520,7 +457,7 @@ export default function BentoNews() {
                 {selectedArticle.excerpt || selectedArticle.title}
               </div>
 
-              <p className="text-slate-700 leading-relaxed">
+              <p className="text-slate-700 leading-relaxed whitespace-pre-line">
                 {selectedArticle.content || (
                   <>
                     Warta ini diterbitkan secara resmi oleh Humas SMP Negeri 3 Cihampelas sebagai bagian dari keterbukaan informasi publik dan dokumentasi kegiatan pembelajaran, prestasi, serta program inovasi sekolah.
@@ -530,13 +467,21 @@ export default function BentoNews() {
 
               <div className="pt-6 border-t-2 border-slate-100 flex items-center justify-between text-xs text-slate-500 font-bold">
                 <span>Dipublikasikan oleh: <strong>Humas SMPN 3 Cihampelas</strong></span>
-                <button
-                  type="button"
-                  onClick={() => setSelectedArticle(null)}
-                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black cursor-pointer shadow-md transition-colors"
-                >
-                  Tutup Warta
-                </button>
+                <div className="flex items-center gap-2">
+                  <Link
+                    href="/warta"
+                    className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold transition-colors"
+                  >
+                    Katalog Warta
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedArticle(null)}
+                    className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black cursor-pointer shadow-md transition-colors"
+                  >
+                    Tutup
+                  </button>
+                </div>
               </div>
             </div>
           </div>

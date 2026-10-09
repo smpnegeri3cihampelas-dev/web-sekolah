@@ -144,6 +144,9 @@ export default function Navbar() {
             <a href="#fasilitas" className="hover:text-indigo-200 transition-colors">
               Fasilitas
             </a>
+            <a href="/warta" className="hover:text-indigo-200 transition-colors">
+              Warta
+            </a>
             <a href="#kontak" className="hover:text-indigo-200 transition-colors">
               Kontak
             </a>
@@ -324,6 +327,13 @@ export default function Navbar() {
             className="px-4 py-2.5 rounded-xl hover:bg-indigo-50/80 hover:text-indigo-700 transition-colors"
           >
             Fasilitas Smart Campus
+          </a>
+          <a 
+            href="/warta" 
+            onClick={() => setMobileMenuOpen(false)} 
+            className="px-4 py-2.5 rounded-xl hover:bg-indigo-50/80 hover:text-indigo-700 transition-colors"
+          >
+            Warta & Berita
           </a>
           <a 
             href="#kontak" 
