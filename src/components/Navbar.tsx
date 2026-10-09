@@ -42,7 +42,7 @@ export default function Navbar() {
 
   // Click outside listener to close portal dropdown automatically
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
       if (portalRef.current && !portalRef.current.contains(event.target as Node)) {
         if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
         setPortalOpen(false);
@@ -50,7 +50,11 @@ export default function Navbar() {
     };
 
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
   }, []);
 
   const portalMenuItems = [
@@ -270,13 +274,6 @@ export default function Navbar() {
 
           </div>
 
-          {/* Mobile backdrop for Portal */}
-          {portalOpen && (
-            <div 
-              onClick={() => setPortalOpen(false)}
-              className="fixed inset-0 z-40 bg-slate-950/40 backdrop-blur-xs sm:hidden animate-[fadeIn_0.2s_ease-out]"
-            />
-          )}
 
           {/* Mobile menu trigger (garis 3) - pas dan tidak terpotong */}
           <button 
