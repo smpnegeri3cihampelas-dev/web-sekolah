@@ -55,6 +55,36 @@ export const DEFAULT_WARTA: WartaItem[] = [
     status: 'Published',
     src: '/gallery_1.jpg',
     excerpt: 'Pemanfaatan sistem asesmen digital terintegrasi untuk mengukur capaian kompetensi belajar siswa secara akurat dan objektif.'
+  },
+  {
+    id: 5,
+    title: 'Sosialisasi & Simulasi Mitigasi Bencana Sekolah Tangguh Bencana BPBD',
+    category: 'Kegiatan',
+    date: '06 Sep 2026',
+    views: '1.8k',
+    status: 'Published',
+    src: '/slide5.jpeg',
+    excerpt: 'Peningkatan kesiapsiagaan seluruh warga sekolah menghadapi potensi bencana alam bersama tim BPBD Kabupaten Bandung Barat.'
+  },
+  {
+    id: 6,
+    title: 'Peluncuran Ekosistem E-Learning & Laboratorium Komputer Terpadu',
+    category: 'Inovasi',
+    date: '02 Sep 2026',
+    views: '2.5k',
+    status: 'Published',
+    src: '/slide6.jpeg',
+    excerpt: 'Modernisasi sarana penunjang pembelajaran digital demi terwujudnya sekolah rujukan berbasis smart campus di wilayah Cihampelas.'
+  },
+  {
+    id: 7,
+    title: 'Gelar Karya P5: Pameran Inovasi dan Kearifan Lokal Budaya Sunda',
+    category: 'Prestasi',
+    date: '28 Agu 2026',
+    views: '1.6k',
+    status: 'Published',
+    src: '/slide2.jpeg',
+    excerpt: 'Unjuk bakat dan kreasi peserta didik dalam mengimplementasikan nilai luhur Pancasila melalui karya seni dan wirausaha muda.'
   }
 ];
 

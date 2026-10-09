@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { useWartaData, WartaItem } from '@/lib/wartaData';
+import { useWartaData, WartaItem, DEFAULT_WARTA } from '@/lib/wartaData';
 
 export default function BentoNews() {
   const { wartaList } = useWartaData();
@@ -13,15 +13,26 @@ export default function BentoNews() {
     return list.length > 0 ? list : wartaList;
   }, [wartaList]);
 
-  // Warta yang disorot di Bento Grid Informasi Terpadu
-  const topWarta = publishedList[0] || null;
-  const secondWarta = publishedList[1] || topWarta;
-  const thirdWarta = publishedList[2] || topWarta;
-  const fourthWarta = publishedList[3] || null;
+  // Mengambil artikel untuk ke-7 slot kartu Bento Grid
+  // Jika artikel di dashboard kurang dari 7, gunakan fallback dari DEFAULT_WARTA
+  const getArticle = (index: number): WartaItem => {
+    if (publishedList && publishedList[index]) return publishedList[index];
+    if (DEFAULT_WARTA && DEFAULT_WARTA[index]) return DEFAULT_WARTA[index];
+    return publishedList[index % Math.max(1, publishedList.length)] || DEFAULT_WARTA[0];
+  };
+
+  // 7 Kartu Warta
+  const articleSlot2 = getArticle(0); // Warta Utama #1 (Kiri Bawah - 520px)
+  const articleSlot1 = getArticle(1); // Warta #2 (Kiri Atas - 260px - Pengganti Official School Portal)
+  const articleSlot3 = getArticle(2); // Warta #3 (Tengah Atas - 230px)
+  const articleSlot4 = getArticle(3); // Warta #4 (Tengah Bawah - 266px - Pengganti Layar HP)
+  const articleSlot5 = getArticle(4); // Warta #5 (Kanan Atas - 166px - Pengganti Tingkat Kelulusan)
+  const articleSlot6 = getArticle(5); // Warta #6 (Kanan Tengah - 330px)
+  const articleSlot7 = getArticle(6); // Warta #7 (Kanan Bawah - 260px - Pengganti Gambar Motor/Smart Campus)
 
   return (
     <section id="berita" className="relative w-full py-20 sm:py-28 bg-[#f8fafc] text-slate-900 overflow-hidden select-none border-b border-indigo-100/70">
-      {/* Subtle Studio Backdrop Ambient Glow */}
+      {/* Ambient Backdrop Studio Light */}
       <div className="absolute inset-0 z-0 pointer-events-none">
         <div className="absolute top-1/3 left-1/4 -translate-y-1/2 w-[700px] h-[500px] bg-indigo-100/40 rounded-full blur-[160px]" />
         <div className="absolute bottom-1/4 right-1/4 w-[600px] h-[500px] bg-purple-100/30 rounded-full blur-[160px]" />
@@ -41,7 +52,7 @@ export default function BentoNews() {
             </h2>
           </div>
           
-          {/* Tombol Lihat Semua Warta -> Menuju Halaman Kumpulan Berita Berhalaman (/warta) */}
+          {/* Tombol Lihat Semua Warta (1 Tombol Saja) */}
           <Link
             href="/warta"
             className="group inline-flex items-center gap-2.5 px-5 py-2.5 rounded-full bg-white hover:bg-indigo-50 border border-indigo-200/80 text-xs sm:text-sm font-medium text-slate-700 hover:text-indigo-700 transition-all duration-300 shadow-sm self-start md:self-end cursor-pointer"
@@ -54,35 +65,63 @@ export default function BentoNews() {
         </div>
 
         {/* ============================================================== */}
-        {/* BENTO GRID (1:1 Exact Mathematical Alignment & Asymmetry)     */}
+        {/* BENTO GRID (SELURUH 7 KARTU DIISI WARTA SEKOLAH LENGKAP)      */}
         {/* ============================================================== */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           
           {/* ============================================================== */}
-          {/* LEFT COLUMN: 50% Width (Card 1: 260px + Gap 24px + Card 4: 520px = 804px) */}
+          {/* LEFT COLUMN: 50% Width (Card 1: 260px + Gap 24px + Card 2: 520px = 804px) */}
           {/* ============================================================== */}
           <div className="lg:col-span-6 flex flex-col gap-6">
             
-            {/* CARD 1: Top Left Brand Hero (Soft Lavender Card matching Marklab) */}
-            <div className="rounded-[2.2rem] p-8 sm:p-10 flex flex-col items-center justify-center text-center h-[260px] bg-gradient-to-br from-[#e0e7ff] via-[#eef2ff] to-[#f5f3ff] text-[#0f172a] shadow-md shadow-indigo-950/5 border border-indigo-200/80 relative overflow-hidden group hover:shadow-xl transition-all duration-500">
-              <div className="absolute top-0 right-0 w-64 h-64 bg-white/60 rounded-full blur-3xl pointer-events-none" />
-              
-              <div className="relative z-10 flex flex-col items-center">
-                <span className="inline-block px-3 py-1 rounded-full bg-white/80 border border-indigo-200/70 text-[10px] tracking-[0.2em] font-semibold text-indigo-700 uppercase mb-3 shadow-sm">
-                  Official School Portal
-                </span>
-                <h3 className="text-5xl sm:text-6xl md:text-7xl font-semibold tracking-[-0.04em] text-[#0f172a] leading-none mb-1 group-hover:scale-[1.02] transition-transform duration-300">
-                  SMPN 3
-                </h3>
-                <span className="text-xs sm:text-sm font-medium tracking-[0.3em] uppercase text-indigo-600/80 mt-2">
-                  Cihampelas · Rigas
-                </span>
+            {/* CARD 1: Top Left Warta Card (Pengganti Official School Portal) */}
+            <div 
+              onClick={() => setSelectedArticle(articleSlot1)}
+              className="rounded-[2.2rem] h-[260px] bg-white border border-indigo-100 shadow-xl shadow-indigo-950/5 overflow-hidden flex flex-col sm:flex-row group hover:border-indigo-300 transition-all duration-300 cursor-pointer shrink-0"
+            >
+              {/* Foto Kiri */}
+              <div className="w-full sm:w-5/12 h-28 sm:h-full relative overflow-hidden bg-slate-100 shrink-0">
+                <img 
+                  src={articleSlot1.src || '/gallery_2.jpg'} 
+                  alt={articleSlot1.title}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = '/gallery_2.jpg';
+                  }}
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent sm:hidden" />
+                <div className="absolute top-3.5 left-3.5 px-2.5 py-0.5 rounded-full bg-indigo-600/90 backdrop-blur-md text-white text-[10px] font-mono font-bold uppercase tracking-wider shadow-sm">
+                  {articleSlot1.category}
+                </div>
+              </div>
+
+              {/* Konten Kanan */}
+              <div className="w-full sm:w-7/12 p-5 sm:p-6 flex flex-col justify-between">
+                <div>
+                  <div className="hidden sm:flex items-center justify-between text-[11px] font-mono text-slate-500 mb-2">
+                    <span className="text-indigo-600 font-bold bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-200">
+                      {articleSlot1.category}
+                    </span>
+                    <span>{articleSlot1.date}</span>
+                  </div>
+                  <h3 className="text-base sm:text-lg font-bold tracking-tight text-slate-900 group-hover:text-indigo-900 transition-colors line-clamp-2 leading-snug">
+                    {articleSlot1.title}
+                  </h3>
+                  <p className="text-xs text-slate-600 font-normal line-clamp-2 mt-1.5 leading-relaxed">
+                    {articleSlot1.excerpt || 'Klik untuk membaca laporan warta sekolah selengkapnya.'}
+                  </p>
+                </div>
+
+                <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-indigo-600 group-hover:text-indigo-700">
+                  <span>Baca Warta</span>
+                  <span className="group-hover:translate-x-1 transition-transform">→</span>
+                </div>
               </div>
             </div>
 
-            {/* CARD 4: Bottom Left Editorial Feature Card (Warta Utama #1 dari Admin Dashboard) */}
+            {/* CARD 2: Bottom Left Editorial Feature Card (Warta Utama #1) */}
             <div 
-              onClick={() => topWarta && setSelectedArticle(topWarta)}
+              onClick={() => setSelectedArticle(articleSlot2)}
               className="rounded-[2.2rem] bg-white text-[#0f172a] shadow-xl shadow-black/25 border border-white/30 overflow-hidden flex flex-col justify-between h-auto lg:h-[520px] cursor-pointer group hover:border-indigo-300 transition-all duration-300"
             >
               {/* Top Editorial Info Area */}
@@ -97,16 +136,16 @@ export default function BentoNews() {
                     </span>
                   </div>
                   <span className="text-[11px] font-mono text-indigo-600 font-bold bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-200">
-                    {topWarta ? topWarta.category : 'PRESTASI'}
+                    {articleSlot2.category}
                   </span>
                 </div>
 
                 <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mt-auto">
                   <h3 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#0f172a] leading-[1.15] max-w-sm group-hover:text-indigo-900 transition-colors">
-                    {topWarta ? topWarta.title : 'SMPN 3 Cihampelas Menyongsong Era Pendidikan Digital Berkarakter'}
+                    {articleSlot2.title}
                   </h3>
                   <p className="text-xs text-stone-500 font-normal leading-relaxed max-w-[210px] sm:text-right line-clamp-3">
-                    {topWarta ? (topWarta.excerpt || 'Klik untuk membaca selengkapnya warta sekolah ini.') : 'Ekosistem Belajar Digital, Karakter Unggul & Berwawasan Global.'}
+                    {articleSlot2.excerpt || 'Klik untuk membaca selengkapnya warta sekolah ini.'}
                   </p>
                 </div>
               </div>
@@ -114,8 +153,8 @@ export default function BentoNews() {
               {/* Bottom Photo Area (Exact 260px on desktop) */}
               <div className="relative w-full h-[240px] lg:h-[260px] overflow-hidden rounded-b-[2.2rem] shrink-0 bg-slate-100">
                 <img 
-                  src={topWarta ? (topWarta.src || '/slide4.jpeg') : '/slide4.jpeg'} 
-                  alt={topWarta ? topWarta.title : 'Warta Utama'}
+                  src={articleSlot2.src || '/slide4.jpeg'} 
+                  alt={articleSlot2.title}
                   className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700"
                   onError={(e) => {
                     (e.target as HTMLImageElement).src = '/slide4.jpeg';
@@ -123,7 +162,7 @@ export default function BentoNews() {
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent pointer-events-none" />
                 <div className="absolute bottom-3 right-4 px-3 py-1 rounded-full bg-black/60 backdrop-blur-md text-white text-[10px] font-bold">
-                  {topWarta ? topWarta.date : 'Terbaru'}
+                  {articleSlot2.date}
                 </div>
               </div>
             </div>
@@ -138,17 +177,17 @@ export default function BentoNews() {
             {/* Top Sub-Grid: 2 Columns with EXACT 520px total height */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-stretch">
               
-              {/* SUB-COLUMN 1: Card 2 (230px) + Gap (24px) + Card 5 (266px) = 520px */}
+              {/* SUB-COLUMN 1: Card 3 (230px) + Gap (24px) + Card 4 (266px) = 520px */}
               <div className="flex flex-col gap-6">
                 
-                {/* CARD 2: Top Center (Warta #2 dari Admin Dashboard) */}
+                {/* CARD 3: Top Center Warta Card */}
                 <div 
-                  onClick={() => secondWarta && setSelectedArticle(secondWarta)}
+                  onClick={() => setSelectedArticle(articleSlot3)}
                   className="rounded-[2.2rem] h-[230px] relative overflow-hidden group shadow-xl shadow-black/30 border border-white/10 shrink-0 cursor-pointer"
                 >
                   <img 
-                    src={secondWarta ? (secondWarta.src || '/gallery_2.jpg') : '/gallery_2.jpg'} 
-                    alt={secondWarta ? secondWarta.title : 'Warta Pilihan'} 
+                    src={articleSlot3.src || '/gallery_2.jpg'} 
+                    alt={articleSlot3.title} 
                     className="absolute inset-0 w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-700"
                     onError={(e) => {
                       (e.target as HTMLImageElement).src = '/gallery_2.jpg';
@@ -159,128 +198,127 @@ export default function BentoNews() {
                   {/* Header Badge */}
                   <div className="absolute top-4 left-5 right-5 flex justify-between items-center z-10">
                     <span className="px-2.5 py-0.5 rounded-full bg-indigo-600/90 backdrop-blur-md text-white text-[10px] font-mono font-bold uppercase tracking-wider">
-                      {secondWarta ? secondWarta.category : 'PENGUMUMAN'}
+                      {articleSlot3.category}
                     </span>
                     <span className="text-[10px] text-stone-300 font-mono">
-                      {secondWarta ? secondWarta.date : 'Terkini'}
+                      {articleSlot3.date}
                     </span>
                   </div>
 
                   {/* Text Overlay */}
                   <div className="absolute bottom-5 left-5 right-5 z-10">
                     <span className="text-lg sm:text-xl font-bold tracking-tight text-white drop-shadow-md block line-clamp-2 leading-snug group-hover:text-indigo-200 transition-colors">
-                      {secondWarta ? secondWarta.title : 'Warta Terkini Sekolah'}
+                      {articleSlot3.title}
                     </span>
                     <span className="text-[10px] text-stone-300/90 font-light tracking-wide block mt-1 line-clamp-1">
-                      {secondWarta ? (secondWarta.excerpt || 'Klik untuk membaca warta selengkapnya →') : 'Klik untuk membaca warta selengkapnya →'}
+                      {articleSlot3.excerpt || 'Klik untuk membaca warta selengkapnya →'}
                     </span>
                   </div>
                 </div>
 
-                {/* CARD 5: Center Middle (Smartphone Closeup Mockup - Warta #3 dari Admin Dashboard) */}
+                {/* CARD 4: Middle Center Warta Card (Pengganti Layar HP) */}
                 <div 
-                  onClick={() => thirdWarta && setSelectedArticle(thirdWarta)}
-                  className="rounded-[2.2rem] h-[266px] p-2 bg-[#1b1b20] border-2 border-white/10 shadow-xl shadow-black/30 flex flex-col relative overflow-hidden group shrink-0 cursor-pointer"
+                  onClick={() => setSelectedArticle(articleSlot4)}
+                  className="rounded-[2.2rem] h-[266px] bg-white border border-slate-200 shadow-xl overflow-hidden flex flex-col justify-between group hover:border-indigo-300 transition-all duration-300 cursor-pointer shrink-0"
                 >
-                  <div className="w-full h-full rounded-[1.7rem] bg-gradient-to-b from-[#f3e6e3] via-[#f7edf0] to-[#eaf2f8] p-4 flex flex-col justify-between relative overflow-hidden">
-                    {/* Status bar */}
-                    <div className="flex items-center justify-between text-[10px] text-stone-600 font-semibold px-1">
-                      <span>09:41</span>
-                      <div className="flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-stone-700" />
-                        <span className="text-[9px]">5G</span>
-                      </div>
+                  {/* Foto Atas */}
+                  <div className="relative w-full h-[125px] overflow-hidden bg-slate-100 shrink-0">
+                    <img 
+                      src={articleSlot4.src || '/slide1.jpeg'} 
+                      alt={articleSlot4.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = '/slide1.jpeg';
+                      }}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
+                    <div className="absolute top-3 left-3 px-2.5 py-0.5 rounded-full bg-indigo-600/90 backdrop-blur-md text-white text-[10px] font-mono font-bold uppercase tracking-wider">
+                      {articleSlot4.category}
+                    </div>
+                    <div className="absolute bottom-2.5 right-3 px-2 py-0.5 rounded-md bg-black/60 backdrop-blur-md text-white text-[9px] font-mono">
+                      {articleSlot4.date}
+                    </div>
+                  </div>
+
+                  {/* Info Bawah */}
+                  <div className="p-4 sm:p-5 flex flex-col justify-between flex-1">
+                    <div>
+                      <h4 className="text-sm sm:text-base font-bold text-slate-900 group-hover:text-indigo-600 transition-colors line-clamp-2 leading-snug">
+                        {articleSlot4.title}
+                      </h4>
+                      <p className="text-[11px] text-slate-500 font-normal line-clamp-2 mt-1 leading-relaxed">
+                        {articleSlot4.excerpt || 'Informasi agenda dan kegiatan resmi siswa SMP Negeri 3 Cihampelas.'}
+                      </p>
                     </div>
 
-                    {/* Dynamic School Notification Pill */}
-                    <div className="bg-white/90 backdrop-blur-md p-2.5 rounded-xl border border-white/70 shadow-sm flex items-center gap-2.5 group-hover:bg-white transition-colors">
-                      <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-xs font-bold shrink-0">
-                        ✦
-                      </div>
-                      <div className="flex flex-col min-w-0">
-                        <span className="text-[11px] font-bold text-slate-900 truncate">
-                          {thirdWarta ? `${thirdWarta.category} · ${thirdWarta.title}` : 'Agenda Kegiatan Siswa'}
-                        </span>
-                        <span className="text-[9px] text-slate-600 truncate">
-                          {thirdWarta ? (thirdWarta.excerpt || thirdWarta.date) : 'Informasi resmi SMPN 3 Cihampelas'}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Phone App Dock */}
-                    <div className="flex items-center justify-around p-2 rounded-2xl bg-white/50 backdrop-blur-lg border border-white/40 shadow-sm">
-                      <div className="w-9 h-9 rounded-xl bg-black text-white flex items-center justify-center text-xs font-bold shadow-md">
-                        R3
-                      </div>
-                      <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-500 to-green-400 text-white flex items-center justify-center text-sm shadow-md">
-                        💬
-                      </div>
-                      <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-500 to-sky-400 text-white flex items-center justify-center text-sm shadow-md">
-                        🌐
-                      </div>
+                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] font-bold text-indigo-600 group-hover:text-indigo-700">
+                      <span>Baca Warta</span>
+                      <span className="group-hover:translate-x-1 transition-transform">→</span>
                     </div>
                   </div>
                 </div>
 
               </div>
 
-              {/* SUB-COLUMN 2: Card 3 (166px) + Gap (24px) + Card 6 (330px) = 520px */}
+              {/* SUB-COLUMN 2: Card 5 (166px) + Gap (24px) + Card 6 (330px) = 520px */}
               <div className="flex flex-col gap-6">
                 
-                {/* CARD 3: Top Right (Dark Obsidian Stat Card with Bar Chart) */}
-                <div className="rounded-[2.2rem] h-[166px] bg-[#080b20] border border-indigo-500/20 text-white p-5 sm:p-6 shadow-xl shadow-indigo-950/30 flex flex-col justify-between group hover:border-indigo-400/40 transition-all shrink-0">
-                  <div>
-                    <h4 className="text-sm sm:text-base font-medium text-white tracking-tight">
-                      Tingkat Kelulusan
-                    </h4>
-                    <span className="inline-block px-2 py-0.5 rounded-full bg-white/[0.1] text-[9px] text-indigo-200 font-light mt-0.5">
-                      5 Tahun Terakhir
+                {/* CARD 5: Top Right Warta Card (Pengganti Tingkat Kelulusan) */}
+                <div 
+                  onClick={() => setSelectedArticle(articleSlot5)}
+                  className="rounded-[2.2rem] h-[166px] bg-[#080b20] border border-indigo-500/20 text-white p-5 sm:p-6 shadow-xl shadow-indigo-950/30 flex flex-col justify-between group hover:border-indigo-400/50 transition-all cursor-pointer shrink-0"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="px-2.5 py-0.5 rounded-full bg-indigo-500/30 border border-indigo-400/40 text-[10px] font-mono font-bold text-indigo-300 uppercase tracking-wider">
+                      {articleSlot5.category}
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      {articleSlot5.date}
                     </span>
                   </div>
 
-                  <div className="flex items-end justify-between pt-1">
-                    <div className="flex items-end gap-1.5 h-9">
-                      <div className="w-1.5 h-4 rounded-full bg-indigo-900/60" />
-                      <div className="w-1.5 h-5 rounded-full bg-indigo-800" />
-                      <div className="w-1.5 h-6 rounded-full bg-indigo-600" />
-                      <div className="w-1.5 h-8 rounded-full bg-indigo-400" />
-                      <div className="w-1.5 h-9 rounded-full bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)]" />
-                    </div>
-                    <div className="flex flex-col items-end">
-                      <span className="text-xl sm:text-2xl font-semibold text-white tracking-tight leading-none">100%</span>
-                      <span className="text-[10px] text-indigo-300 font-medium mt-1">Lulus Paripurna</span>
-                    </div>
+                  <div>
+                    <h4 className="text-sm sm:text-base font-bold text-white tracking-tight line-clamp-2 leading-snug group-hover:text-indigo-200 transition-colors">
+                      {articleSlot5.title}
+                    </h4>
+                  </div>
+
+                  <div className="flex items-center justify-between text-[11px] text-indigo-300 font-semibold pt-1 border-t border-white/[0.08]">
+                    <span>Warta Terkini</span>
+                    <span className="group-hover:translate-x-1 transition-transform">Baca Selengkapnya →</span>
                   </div>
                 </div>
 
-                {/* CARD 6: Far Right Middle (Warta #4 dari Admin Dashboard atau Budaya Sekolah) */}
+                {/* CARD 6: Middle Right Warta Card */}
                 <div 
-                  onClick={() => fourthWarta ? setSelectedArticle(fourthWarta) : null}
+                  onClick={() => setSelectedArticle(articleSlot6)}
                   className="rounded-[2.2rem] h-[330px] relative overflow-hidden group shadow-xl shadow-black/30 border border-white/10 shrink-0 cursor-pointer"
                 >
                   <img 
-                    src={fourthWarta ? (fourthWarta.src || '/slide2.jpeg') : '/slide2.jpeg'} 
-                    alt={fourthWarta ? fourthWarta.title : 'Kampus SMPN 3 Cihampelas'} 
+                    src={articleSlot6.src || '/slide4.jpeg'} 
+                    alt={articleSlot6.title} 
                     className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                     onError={(e) => {
-                      (e.target as HTMLImageElement).src = '/slide2.jpeg';
+                      (e.target as HTMLImageElement).src = '/slide4.jpeg';
                     }}
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-black/30" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
 
                   <div className="absolute top-5 left-5 right-5 flex justify-between items-center z-10">
                     <span className="px-3 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-[10px] text-stone-200 uppercase tracking-widest font-mono font-bold">
-                      {fourthWarta ? fourthWarta.category : 'RIGAS · 2026'}
+                      {articleSlot6.category}
                     </span>
-                    <span className="w-2 h-2 rounded-full bg-indigo-400 shadow-[0_0_8px_#818cf8] animate-pulse" />
+                    <span className="text-[10px] text-stone-300 font-mono">
+                      {articleSlot6.date}
+                    </span>
                   </div>
 
                   <div className="absolute bottom-5 left-5 right-5 z-10">
-                    <h5 className="text-base font-semibold text-white tracking-tight leading-snug line-clamp-2">
-                      {fourthWarta ? fourthWarta.title : 'Budaya Disiplin & Prestasi'}
+                    <h5 className="text-base font-semibold text-white tracking-tight leading-snug line-clamp-2 group-hover:text-indigo-200 transition-colors">
+                      {articleSlot6.title}
                     </h5>
-                    <p className="text-[11px] text-stone-300 font-light mt-0.5 leading-relaxed line-clamp-2">
-                      {fourthWarta ? (fourthWarta.excerpt || fourthWarta.date) : 'Membina generasi berakhlak mulia dan berdaya saing global.'}
+                    <p className="text-[11px] text-stone-300 font-light mt-1 leading-relaxed line-clamp-2">
+                      {articleSlot6.excerpt || 'Klik untuk membaca dokumentasi kegiatan sekolah selengkapnya.'}
                     </p>
                   </div>
                 </div>
@@ -289,86 +327,54 @@ export default function BentoNews() {
 
             </div>
 
-            {/* CARD 7: Bottom Right Wide Analytics Card */}
-            <div className="rounded-[2.2rem] bg-white text-[#0f172a] shadow-xl shadow-black/25 border border-white/30 p-6 sm:p-7 flex flex-col justify-between h-[260px] relative overflow-hidden group shrink-0">
-              
-              <div className="flex items-center justify-between gap-4">
-                
-                <div className="w-1/2 flex items-center justify-center">
-                  <img 
-                    src="/smart_campus_device.jpg" 
-                    alt="Smart Campus Robotics Explorer" 
-                    className="h-24 sm:h-28 w-auto object-contain mix-blend-multiply group-hover:scale-105 transition-transform duration-500"
-                  />
+            {/* CARD 7: Bottom Right Wide Warta Card (Pengganti Gambar Motor/Smart Campus Device) */}
+            <div 
+              onClick={() => setSelectedArticle(articleSlot7)}
+              className="rounded-[2.2rem] bg-white text-[#0f172a] shadow-xl shadow-black/25 border border-white/30 overflow-hidden flex flex-col sm:flex-row h-[260px] relative group hover:border-indigo-300 transition-all duration-300 cursor-pointer shrink-0"
+            >
+              {/* Foto Kiri */}
+              <div className="w-full sm:w-5/12 h-28 sm:h-full relative overflow-hidden bg-slate-100 shrink-0">
+                <img 
+                  src={articleSlot7.src || '/slide6.jpeg'} 
+                  alt={articleSlot7.title} 
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = '/slide6.jpeg';
+                  }}
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent sm:hidden" />
+                <div className="absolute top-3.5 left-3.5 px-2.5 py-0.5 rounded-full bg-indigo-600/90 backdrop-blur-md text-white text-[10px] font-mono font-bold uppercase tracking-wider shadow-sm">
+                  {articleSlot7.category}
                 </div>
-
-                <div className="w-1/2 flex flex-col gap-3">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 text-[#0f172a] text-[10px] font-medium border border-slate-200">
-                      <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
-                      1.200+ Siswa
-                    </span>
-                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 text-[#0f172a] text-[10px] font-medium border border-slate-200">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
-                      100% Lulus
-                    </span>
-                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 text-[#0f172a] text-[10px] font-medium border border-slate-200">
-                      <span className="w-1.5 h-1.5 rounded-full bg-purple-600" />
-                      Akreditasi B
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-3 pt-0.5">
-                    <div className="relative w-10 h-10 flex items-center justify-center shrink-0">
-                      <svg className="w-10 h-10 -rotate-90" viewBox="0 0 36 36">
-                        <circle cx="18" cy="18" r="14" fill="none" stroke="#e2e8f0" strokeWidth="3" />
-                        <circle 
-                          cx="18" 
-                          cy="18" 
-                          r="14" 
-                          fill="none" 
-                          stroke="#3b82f6" 
-                          strokeWidth="3" 
-                          strokeDasharray="88" 
-                          strokeDashoffset="22" 
-                          strokeLinecap="round" 
-                        />
-                      </svg>
-                      <span className="absolute text-[9px] font-bold text-slate-800">75%</span>
-                    </div>
-
-                    <div className="w-10 h-10 rounded-full bg-[#18181b] border border-stone-700 flex items-center justify-center relative shadow-sm shrink-0">
-                      <div className="absolute inset-1 rounded-full border border-stone-800" />
-                      <div className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_6px_#38bdf8] animate-ping" />
-                      <div className="absolute w-1.5 h-1.5 rounded-full bg-white" />
-                    </div>
-
-                    <div className="flex flex-col min-w-0">
-                      <span className="text-xs font-semibold text-slate-800 truncate">Smart Campus</span>
-                      <span className="text-[10px] text-slate-500 truncate">Sistem Terintegrasi</span>
-                    </div>
-                  </div>
+                <div className="absolute bottom-3 right-3 px-2 py-0.5 rounded-md bg-black/60 backdrop-blur-md text-white text-[9px] font-mono hidden sm:block">
+                  👁️ {articleSlot7.views || '1.2k'}
                 </div>
-
               </div>
 
-              <div className="flex items-center gap-3 pt-3 border-t border-slate-100 mt-1">
-                <span className="text-xs font-semibold text-slate-700 min-w-[28px]">75%</span>
-                <div className="flex-1 flex gap-1 sm:gap-1.5">
-                  {[...Array(15)].map((_, i) => (
-                    <div 
-                      key={i} 
-                      className={`h-3.5 sm:h-4 flex-1 rounded-[3px] transition-all duration-300 ${
-                        i < 11 ? 'bg-sky-200' : 'bg-slate-100'
-                      }`}
-                    />
-                  ))}
-                </div>
-                <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap hidden sm:inline">
-                  Semester Ganjil 2026/2027
-                </span>
-              </div>
+              {/* Konten Kanan */}
+              <div className="w-full sm:w-7/12 p-5 sm:p-6 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between text-[11px] font-mono text-slate-500 mb-2">
+                    <span className="text-indigo-600 font-bold bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-200 hidden sm:inline-block">
+                      {articleSlot7.category}
+                    </span>
+                    <span>📅 {articleSlot7.date}</span>
+                  </div>
 
+                  <h4 className="text-base sm:text-lg font-bold tracking-tight text-slate-900 group-hover:text-indigo-900 transition-colors line-clamp-2 leading-snug">
+                    {articleSlot7.title}
+                  </h4>
+
+                  <p className="text-xs text-slate-600 font-normal line-clamp-2 mt-1.5 leading-relaxed">
+                    {articleSlot7.excerpt || 'Klik untuk membaca laporan warta inovasi dan program sekolah.'}
+                  </p>
+                </div>
+
+                <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-indigo-600 group-hover:text-indigo-700">
+                  <span>Baca Selengkapnya</span>
+                  <span className="group-hover:translate-x-1 transition-transform">→</span>
+                </div>
+              </div>
             </div>
 
           </div>
