@@ -263,29 +263,40 @@ export default function BentoNews() {
               {/* SUB-COLUMN 2: Card 5 (166px) + Gap (24px) + Card 6 (330px) = 520px */}
               <div className="flex flex-col gap-6">
                 
-                {/* CARD 5: Top Right Warta Card (Pengganti Tingkat Kelulusan) */}
+                {/* CARD 5: Top Right Warta Card (Foto Background) */}
                 <div 
                   onClick={() => setSelectedArticle(articleSlot5)}
-                  className="rounded-[2.2rem] h-[166px] bg-[#080b20] border border-indigo-500/20 text-white p-5 sm:p-6 shadow-xl shadow-indigo-950/30 flex flex-col justify-between group hover:border-indigo-400/50 transition-all cursor-pointer shrink-0"
+                  className="rounded-[2.2rem] h-[166px] relative overflow-hidden group shadow-xl shadow-indigo-950/30 border border-white/10 shrink-0 cursor-pointer"
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="px-2.5 py-0.5 rounded-full bg-indigo-500/30 border border-indigo-400/40 text-[10px] font-mono font-bold text-indigo-300 uppercase tracking-wider">
-                      {articleSlot5.category}
-                    </span>
-                    <span className="text-[10px] text-slate-400 font-mono">
-                      {articleSlot5.date}
-                    </span>
-                  </div>
+                  <img 
+                    src={articleSlot5.src || '/gallery_1.jpg'} 
+                    alt={articleSlot5.title} 
+                    className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = '/gallery_1.jpg';
+                    }}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/60 to-black/30" />
 
-                  <div>
-                    <h4 className="text-sm sm:text-base font-bold text-white tracking-tight line-clamp-2 leading-snug group-hover:text-indigo-200 transition-colors">
-                      {articleSlot5.title}
-                    </h4>
-                  </div>
+                  <div className="relative z-10 p-5 flex flex-col justify-between h-full">
+                    <div className="flex items-center justify-between">
+                      <span className="px-2.5 py-0.5 rounded-full bg-indigo-600/90 backdrop-blur-md text-[10px] font-mono font-bold text-white uppercase tracking-wider shadow-sm">
+                        {articleSlot5.category}
+                      </span>
+                      <span className="text-[10px] text-stone-300 font-mono">
+                        {articleSlot5.date}
+                      </span>
+                    </div>
 
-                  <div className="flex items-center justify-between text-[11px] text-indigo-300 font-semibold pt-1 border-t border-white/[0.08]">
-                    <span>Warta Terkini</span>
-                    <span className="group-hover:translate-x-1 transition-transform">Baca Selengkapnya →</span>
+                    <div>
+                      <h4 className="text-sm font-bold text-white tracking-tight line-clamp-2 leading-snug group-hover:text-indigo-200 transition-colors drop-shadow-sm">
+                        {articleSlot5.title}
+                      </h4>
+                      <div className="flex items-center justify-between text-[10px] text-indigo-300 font-semibold pt-1.5 mt-1 border-t border-white/10">
+                        <span>Warta Terkini</span>
+                        <span className="group-hover:translate-x-0.5 transition-transform">Baca →</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
