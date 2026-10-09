@@ -194,13 +194,13 @@ export default function Navbar() {
 
             {/* Glassmorphism Luxury Dropdown Menu Container */}
             <div 
-              className={`absolute right-0 top-full pt-2 w-[calc(100vw-32px)] max-w-[320px] sm:w-[340px] z-50 transition-all duration-300 transform origin-top-right ${
+              className={`fixed inset-x-4 top-[76px] max-w-sm mx-auto sm:max-w-none sm:inset-auto sm:absolute sm:right-0 sm:top-full sm:pt-2 sm:w-[340px] z-50 transition-all duration-300 transform sm:origin-top-right ${
                 portalOpen 
                   ? 'opacity-100 scale-100 translate-y-0 pointer-events-auto' 
                   : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'
               }`}
             >
-              <div className="rounded-2xl bg-white/95 backdrop-blur-2xl border border-white/80 shadow-[0_20px_50px_rgba(0,0,0,0.18)] p-2.5 overflow-hidden relative">
+              <div className="rounded-3xl sm:rounded-2xl bg-white/95 backdrop-blur-2xl border border-white/80 shadow-[0_20px_50px_rgba(0,0,0,0.25)] p-3 sm:p-2.5 overflow-hidden relative">
                 {/* Subtle top ambient glow */}
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-10 bg-indigo-100/60 rounded-full blur-xl pointer-events-none" />
 
@@ -269,6 +269,14 @@ export default function Navbar() {
             </div>
 
           </div>
+
+          {/* Mobile backdrop for Portal */}
+          {portalOpen && (
+            <div 
+              onClick={() => setPortalOpen(false)}
+              className="fixed inset-0 z-40 bg-slate-950/40 backdrop-blur-xs sm:hidden animate-[fadeIn_0.2s_ease-out]"
+            />
+          )}
 
           {/* Mobile menu trigger (garis 3) - pas dan tidak terpotong */}
           <button 
