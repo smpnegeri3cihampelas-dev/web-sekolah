@@ -85,7 +85,7 @@ export default function WartaPage() {
   const handlePageChange = (page: number) => {
     if (page < 1 || page > totalPages) return;
     setCurrentPage(page);
-    window.scrollTo({ top: 350, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleCopyLink = (article: WartaItem) => {
@@ -147,51 +147,10 @@ export default function WartaPage() {
       {/* ============================================================== */}
       {/* HERO BANNER SECTION (Tema Terang Studio Backdrop Landing Page) */}
       {/* ============================================================== */}
-      <section className="relative w-full py-16 sm:py-24 px-4 sm:px-8 overflow-hidden bg-gradient-to-b from-indigo-50/50 via-[#f8fafc] to-[#f8fafc] border-b border-indigo-100/70">
-        {/* Glow ambient effects serasi dengan Bento Grid */}
-        <div className="absolute inset-0 z-0 pointer-events-none">
-          <div className="absolute top-1/3 left-1/4 -translate-y-1/2 w-[650px] h-[450px] bg-indigo-100/50 rounded-full blur-[140px]" />
-          <div className="absolute bottom-1/4 right-1/4 w-[550px] h-[400px] bg-purple-100/40 rounded-full blur-[140px]" />
-        </div>
-
-        <div className="relative z-10 max-w-7xl mx-auto text-center flex flex-col items-center">
-          
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-indigo-50/90 border border-indigo-200/80 text-indigo-700 text-xs font-semibold tracking-wider uppercase mb-4 shadow-sm">
-            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shadow-[0_0_8px_#6366f1]" />
-            <span>Kumpulan Warta &amp; Publikasi Resmi</span>
-          </div>
-
-          <h1 className="text-3xl sm:text-5xl md:text-6xl font-light text-slate-900 tracking-tight leading-[1.12] max-w-4xl mb-4">
-            Informasi Terpadu <span className="font-semibold text-indigo-900">&amp; Warta Sekolah</span>
-          </h1>
-
-          <p className="text-sm sm:text-base text-slate-600 max-w-2xl font-normal leading-relaxed mb-8">
-            Dapatkan berita terkini seputar agenda akademik, prestasi siswa, kegiatan kesiswaan, dan perkembangan SMP Negeri 3 Cihampelas secara lengkap dan transparan.
-          </p>
-
-          {/* Quick Metrics (Kartu Putih Elegan) */}
-          <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-6 text-xs text-slate-700 font-mono">
-            <div className="px-4 py-2 rounded-2xl bg-white border border-indigo-100 shadow-sm flex items-center gap-2">
-              <span className="text-indigo-600 font-bold text-sm">{publishedList.length}</span>
-              <span className="font-medium">Warta Terpublikasi</span>
-            </div>
-            <div className="px-4 py-2 rounded-2xl bg-white border border-indigo-100 shadow-sm flex items-center gap-2">
-              <span className="text-emerald-600 font-bold text-sm">6 Kategori</span>
-              <span className="font-medium">Informasi Terpadu</span>
-            </div>
-            <div className="px-4 py-2 rounded-2xl bg-white border border-indigo-100 shadow-sm flex items-center gap-2">
-              <span className="text-sky-600 font-bold text-sm">Real-time</span>
-              <span className="font-medium">Sinkronisasi Dashboard</span>
-            </div>
-          </div>
-
-        </div>
-      </section>
-
       {/* ============================================================== */}
       {/* FILTER, SEARCH, & PAGINATION CONTROLS                          */}
       {/* ============================================================== */}
-      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-8 py-10">
+      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-8 py-8 sm:py-10">
         
         {/* Search & Filter Bar (Tema Putih Bersih) */}
         <div className="bg-white border-2 border-slate-200/90 rounded-3xl p-4 sm:p-6 mb-8 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
