@@ -97,18 +97,18 @@ export default function Navbar() {
 
   return (
     <header 
-      className={`fixed top-0 left-0 right-0 z-50 px-4 sm:px-8 lg:px-12 pt-6 sm:pt-8 pb-4 bg-transparent transition-all duration-1000 ease-out ${
+      className={`fixed top-0 left-0 right-0 z-50 px-4 sm:px-8 lg:px-12 pt-4 sm:pt-8 pb-3 sm:pb-4 bg-transparent transition-all duration-1000 ease-out ${
         isLoaded 
           ? 'opacity-100 translate-y-0' 
           : 'opacity-0 -translate-y-4 pointer-events-none'
       }`}
     >
-      <div className="max-w-7xl mx-auto grid grid-cols-[1fr_auto_1fr] items-center gap-2 sm:gap-4">
+      <div className="max-w-7xl mx-auto flex items-center justify-between gap-3 sm:gap-4">
         
-        {/* Brand (Left Column - 1fr) */}
-        <div className="flex items-center justify-start">
-          <a href="#" className="flex items-center gap-3 group">
-            <div className="relative w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center transition-transform duration-300 group-hover:scale-105">
+        {/* Brand (Left) */}
+        <div className="flex items-center justify-start shrink-0">
+          <a href="#" className="flex items-center gap-2.5 sm:gap-3 group">
+            <div className="relative w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center transition-transform duration-300 group-hover:scale-105 shrink-0">
               <Image 
                 src="/logo.png" 
                 alt="Logo SMP Negeri 3 Cihampelas" 
@@ -119,7 +119,7 @@ export default function Navbar() {
               />
             </div>
             <div className="flex flex-col">
-              <span className="text-sm sm:text-base font-semibold tracking-tight text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)] flex items-center gap-2 whitespace-nowrap">
+              <span className="text-xs sm:text-base font-semibold tracking-tight text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)] flex items-center gap-1.5 sm:gap-2 whitespace-nowrap">
                 SMPN 3 Cihampelas
                 <span className="inline-block w-1.5 h-1.5 rounded-full bg-indigo-400 shadow-[0_0_8px_#6366f1]" />
               </span>
@@ -127,10 +127,10 @@ export default function Navbar() {
           </a>
         </div>
 
-        {/* Center Floating Pill Menu (Clean Frosted Glass Pill) */}
-        <div className="flex items-center justify-center">
+        {/* Center Floating Pill Menu (Clean Frosted Glass Pill - Desktop Only) */}
+        <div className="hidden md:flex items-center justify-center">
           <nav 
-            className="hidden md:flex items-center gap-4 lg:gap-6 px-5 lg:px-6 py-2 rounded-full glass-pill-nav text-xs sm:text-sm font-medium text-white drop-shadow-[0_1px_4px_rgba(0,0,0,0.7)] transition-all duration-300 whitespace-nowrap"
+            className="flex items-center gap-4 lg:gap-6 px-5 lg:px-6 py-2 rounded-full glass-pill-nav text-xs sm:text-sm font-medium text-white drop-shadow-[0_1px_4px_rgba(0,0,0,0.7)] transition-all duration-300 whitespace-nowrap"
           >
             <a href="#" className="hover:text-indigo-200 transition-colors">
               Beranda
@@ -153,13 +153,13 @@ export default function Navbar() {
           </nav>
         </div>
 
-        {/* Right Actions (Right Column - 1fr) */}
-        <div className="flex items-center justify-end gap-2 sm:gap-3">
+        {/* Right Actions: Portal Dropdown + Mobile Menu Trigger */}
+        <div className="flex items-center justify-end gap-2 sm:gap-3 shrink-0">
           
-          {/* Dropdown Portal Button (Clearly Visible Frosted Pill) */}
+          {/* Dropdown Portal Button (Accessible on both Mobile & Desktop) */}
           <div 
             ref={portalRef}
-            className="relative hidden sm:block"
+            className="relative"
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
           >
@@ -168,8 +168,9 @@ export default function Navbar() {
               onClick={() => {
                 if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
                 setPortalOpen(!portalOpen);
+                if (!portalOpen) setMobileMenuOpen(false);
               }}
-              className={`px-4 lg:px-5 py-2 rounded-full glass-pill-btn text-xs sm:text-sm font-semibold whitespace-nowrap transition-all duration-300 flex items-center gap-1.5 cursor-pointer text-white drop-shadow-[0_1px_4px_rgba(0,0,0,0.7)] ${
+              className={`px-3.5 sm:px-4 lg:px-5 py-1.5 sm:py-2 rounded-full glass-pill-btn text-xs sm:text-sm font-semibold whitespace-nowrap transition-all duration-300 flex items-center gap-1.5 cursor-pointer text-white drop-shadow-[0_1px_4px_rgba(0,0,0,0.7)] ${
                 portalOpen 
                   ? 'bg-white/40 border-white/60 shadow-[0_0_20px_rgba(255,255,255,0.25)]' 
                   : 'hover:bg-white/35'
@@ -191,9 +192,9 @@ export default function Navbar() {
               </svg>
             </button>
 
-            {/* Glassmorphism Luxury Dropdown Menu Container (Clean Frosted Glass) */}
+            {/* Glassmorphism Luxury Dropdown Menu Container */}
             <div 
-              className={`absolute right-0 top-full pt-2 w-[340px] z-50 transition-all duration-300 transform origin-top-right ${
+              className={`absolute right-0 top-full pt-2 w-[calc(100vw-32px)] max-w-[320px] sm:w-[340px] z-50 transition-all duration-300 transform origin-top-right ${
                 portalOpen 
                   ? 'opacity-100 scale-100 translate-y-0 pointer-events-auto' 
                   : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'
@@ -269,23 +270,17 @@ export default function Navbar() {
 
           </div>
 
-          {/* PPDB Online Button */}
-          <a 
-            href="https://ppdb.jabarprov.go.id" 
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-4 lg:px-5 py-2 rounded-full bg-white text-black text-xs sm:text-sm font-medium whitespace-nowrap hover:bg-stone-200 hover:scale-[1.01] active:scale-95 transition-all duration-300 shadow-md"
-          >
-            PPDB Online
-          </a>
-
-          {/* Mobile menu trigger */}
+          {/* Mobile menu trigger (garis 3) - pas dan tidak terpotong */}
           <button 
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden p-2 rounded-full glass-pill-btn text-stone-300 hover:text-white transition-colors ml-1"
-            aria-label="Buka Menu"
+            type="button"
+            onClick={() => {
+              setMobileMenuOpen(!mobileMenuOpen);
+              if (!mobileMenuOpen) setPortalOpen(false);
+            }}
+            className="md:hidden p-2 rounded-full glass-pill-btn text-white hover:text-white transition-colors shrink-0 cursor-pointer"
+            aria-label="Buka Menu Navigasi"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="w-5 h-5">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
               {mobileMenuOpen ? (
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
               ) : (
@@ -297,9 +292,9 @@ export default function Navbar() {
 
       </div>
 
-      {/* Mobile Glass Drawer */}
+      {/* Mobile Glass Drawer (Hanya isi: Beranda, Profil, Program, Fasilitas, Warta, Kontak) */}
       {mobileMenuOpen && (
-        <div className="md:hidden mt-3 max-w-sm mx-auto p-5 rounded-3xl bg-white/95 backdrop-blur-2xl border border-white/80 shadow-2xl flex flex-col gap-2.5 text-sm font-semibold text-slate-800 animate-[fadeIn_0.2s_ease-out]">
+        <div className="md:hidden mt-3 max-w-sm mx-auto p-4 rounded-3xl bg-white/95 backdrop-blur-2xl border border-white/80 shadow-2xl flex flex-col gap-1 text-sm font-semibold text-slate-800 animate-[fadeIn_0.2s_ease-out]">
           <a 
             href="#" 
             onClick={() => setMobileMenuOpen(false)} 
@@ -312,69 +307,36 @@ export default function Navbar() {
             onClick={() => setMobileMenuOpen(false)} 
             className="px-4 py-2.5 rounded-xl hover:bg-indigo-50/80 hover:text-indigo-700 transition-colors"
           >
-            Profil Sekolah
+            Profil
           </a>
           <a 
             href="#kurikulum" 
             onClick={() => setMobileMenuOpen(false)} 
             className="px-4 py-2.5 rounded-xl hover:bg-indigo-50/80 hover:text-indigo-700 transition-colors"
           >
-            Program Unggulan
+            Program
           </a>
           <a 
             href="#fasilitas" 
             onClick={() => setMobileMenuOpen(false)} 
             className="px-4 py-2.5 rounded-xl hover:bg-indigo-50/80 hover:text-indigo-700 transition-colors"
           >
-            Fasilitas Smart Campus
+            Fasilitas
           </a>
           <a 
             href="/warta" 
             onClick={() => setMobileMenuOpen(false)} 
             className="px-4 py-2.5 rounded-xl hover:bg-indigo-50/80 hover:text-indigo-700 transition-colors"
           >
-            Warta & Berita
+            Warta
           </a>
           <a 
             href="#kontak" 
             onClick={() => setMobileMenuOpen(false)} 
             className="px-4 py-2.5 rounded-xl hover:bg-indigo-50/80 hover:text-indigo-700 transition-colors"
           >
-            Kontak & Lokasi
+            Kontak
           </a>
-
-          {/* Mobile Portal Links Section */}
-          <div className="pt-3 border-t border-indigo-100/80 flex flex-col gap-2">
-            <span className="text-[10px] uppercase tracking-wider text-indigo-700 font-bold px-2">
-              Akses Portal Sekolah
-            </span>
-            {portalMenuItems.map((item, idx) => (
-              item.isExternal ? (
-                <a
-                  key={`m-${idx}`}
-                  href={item.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center gap-3 px-3 py-2 rounded-xl bg-slate-50 hover:bg-indigo-50/80 text-xs font-medium text-slate-800 transition-colors"
-                >
-                  <span className="text-base">{item.icon}</span>
-                  <span className="truncate">{item.title}</span>
-                  <span className="text-slate-400 text-[10px] ml-auto font-bold">↗</span>
-                </a>
-              ) : (
-                <Link
-                  key={`m-${idx}`}
-                  href={item.href}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center gap-3 px-3 py-2 rounded-xl bg-slate-50 hover:bg-indigo-50/80 text-xs font-medium text-slate-800 transition-colors"
-                >
-                  <span className="text-base">{item.icon}</span>
-                  <span className="truncate">{item.title}</span>
-                </Link>
-              )
-            ))}
-          </div>
         </div>
       )}
     </header>

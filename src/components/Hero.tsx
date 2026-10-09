@@ -34,7 +34,8 @@ export default function Hero() {
     // 1. Retina / DPR responsive canvas sizing
     const handleResize = () => {
       if (!canvas) return;
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const isMobile = window.innerWidth < 768;
+      const dpr = isMobile ? 1.2 : Math.min(window.devicePixelRatio || 1, 2);
       const width = window.innerWidth;
       const height = window.innerHeight;
 
@@ -147,11 +148,17 @@ export default function Hero() {
       if (isDestroyed) return;
 
       const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const isMobile = window.innerWidth < 768;
+      const lerpFactor = isMobile ? 0.22 : LERP_FACTOR;
 
       if (prefersReduced) {
         currentFrameRef.current = targetFrameRef.current;
       } else {
-        currentFrameRef.current += (targetFrameRef.current - currentFrameRef.current) * LERP_FACTOR;
+        currentFrameRef.current += (targetFrameRef.current - currentFrameRef.current) * lerpFactor;
+      }
+
+      if (Math.abs(targetFrameRef.current - currentFrameRef.current) < 0.008) {
+        currentFrameRef.current = targetFrameRef.current;
       }
 
       const frameIndex = Math.round(currentFrameRef.current);
@@ -205,7 +212,7 @@ export default function Hero() {
   return (
     <section 
       ref={containerRef}
-      className="relative w-full h-[420vh] bg-black selection:bg-indigo-500/25 selection:text-indigo-200"
+      className="relative w-full h-[220vh] sm:h-[320vh] md:h-[420vh] bg-black selection:bg-indigo-500/25 selection:text-indigo-200"
     >
       {/* Full-screen Sticky Viewport */}
       <div 
@@ -219,17 +226,17 @@ export default function Hero() {
             className="absolute inset-0 w-full h-full pointer-events-none block" 
           />
 
-          {/* Clean White Cloud-Like Edge Mist (Tipis-tipis seperti awan) */}
+          {/* Clean White Cloud-Like Edge Mist */}
           <div className="absolute bottom-0 inset-x-0 h-48 bg-gradient-to-t from-white/30 via-white/10 to-transparent pointer-events-none" />
-          <div className="absolute -bottom-16 left-1/4 w-[600px] h-[220px] bg-white/20 rounded-full blur-[90px] pointer-events-none" />
-          <div className="absolute -bottom-16 right-1/4 w-[500px] h-[200px] bg-white/15 rounded-full blur-[80px] pointer-events-none" />
+          <div className="hidden sm:block absolute -bottom-16 left-1/4 w-[600px] h-[220px] bg-white/20 rounded-full blur-[90px] pointer-events-none" />
+          <div className="hidden sm:block absolute -bottom-16 right-1/4 w-[500px] h-[200px] bg-white/15 rounded-full blur-[80px] pointer-events-none" />
 
           {/* Subtle perimeter white cloud tint around edges */}
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_65%,rgba(255,255,255,0.08)_100%)] pointer-events-none" />
 
           {/* Subtle indigo atmospheric ambient tint matching new palette */}
           <div className="absolute inset-0 bg-indigo-950/[0.04] mix-blend-color pointer-events-none" />
-          <div className="absolute top-1/4 right-0 w-[500px] h-[500px] bg-indigo-600/[0.04] rounded-full blur-[160px] pointer-events-none" />
+          <div className="hidden sm:block absolute top-1/4 right-0 w-[500px] h-[500px] bg-indigo-600/[0.04] rounded-full blur-[160px] pointer-events-none" />
         </div>
 
         {/* 2. Hero Editorial Content (100% Sharp & Readable Typography with clean contrast) */}
