@@ -30,12 +30,19 @@ export function TabPimpinan({
   showToast
 }: TabPimpinanProps) {
   const [teacherSearch, setTeacherSearch] = useState('');
+  const [teacherPage, setTeacherPage] = useState(1);
+  const TEACHERS_PER_PAGE = 8;
   
   // Local Data Pokok form state to avoid root lag while editing numbers
   const [localDataPokok, setLocalDataPokok] = useState<DataPokok>(dataPokok);
   useEffect(() => {
     setLocalDataPokok(dataPokok);
   }, [dataPokok]);
+
+  // Reset page when search changes
+  useEffect(() => {
+    setTeacherPage(1);
+  }, [teacherSearch]);
 
   // Modal open states
   const [selectedLeader, setSelectedLeader] = useState<Leader | null>(null);
@@ -52,6 +59,12 @@ export function TabPimpinan({
       (t.nip && t.nip.includes(q))
     );
   }, [teachersList, teacherSearch]);
+
+  const totalTeacherPages = Math.max(1, Math.ceil(filteredTeachers.length / TEACHERS_PER_PAGE));
+  const paginatedTeachers = useMemo(() => {
+    const start = (teacherPage - 1) * TEACHERS_PER_PAGE;
+    return filteredTeachers.slice(start, start + TEACHERS_PER_PAGE);
+  }, [filteredTeachers, teacherPage]);
 
   const handleSaveDataPokokSubmit = () => {
     onSaveDataPokok(localDataPokok);
@@ -244,7 +257,7 @@ export function TabPimpinan({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 text-slate-800">
-                {filteredTeachers.map((teacher) => (
+                {paginatedTeachers.map((teacher) => (
                   <tr key={teacher.id} className="hover:bg-slate-50 transition-colors">
                     <td className="py-4 px-4 sm:px-5">
                       <div className="flex items-center gap-3">
@@ -345,6 +358,49 @@ export function TabPimpinan({
               </tbody>
             </table>
           </div>
+
+          {filteredTeachers.length > 0 && (
+            <div className="p-3.5 bg-slate-100 border-t-2 border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-800 font-bold">
+              <div>
+                Menampilkan <span className="text-slate-950 font-black">{(teacherPage - 1) * TEACHERS_PER_PAGE + 1}</span> - <span className="text-slate-950 font-black">{Math.min(teacherPage * TEACHERS_PER_PAGE, filteredTeachers.length)}</span> dari <span className="text-slate-950 font-black">{filteredTeachers.length}</span> guru
+              </div>
+
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <button
+                  type="button"
+                  disabled={teacherPage <= 1}
+                  onClick={() => setTeacherPage(p => Math.max(1, p - 1))}
+                  className="px-3.5 py-1.5 rounded-lg bg-white hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed border-2 border-slate-300 text-slate-900 text-xs font-extrabold transition cursor-pointer shadow-xs active:scale-98"
+                >
+                  ◀ Sebelumnya
+                </button>
+
+                {Array.from({ length: totalTeacherPages }, (_, i) => i + 1).map((pageNum) => (
+                  <button
+                    key={pageNum}
+                    type="button"
+                    onClick={() => setTeacherPage(pageNum)}
+                    className={`w-8 h-8 rounded-lg text-xs font-mono font-black transition-all cursor-pointer border-2 ${
+                      teacherPage === pageNum
+                        ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm'
+                        : 'bg-white hover:bg-slate-200 border-slate-300 text-slate-900 shadow-xs'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                ))}
+
+                <button
+                  type="button"
+                  disabled={teacherPage >= totalTeacherPages}
+                  onClick={() => setTeacherPage(p => Math.min(totalTeacherPages, p + 1))}
+                  className="px-3.5 py-1.5 rounded-lg bg-white hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed border-2 border-slate-300 text-slate-900 text-xs font-extrabold transition cursor-pointer shadow-xs active:scale-98"
+                >
+                  Selanjutnya ▶
+                </button>
+              </div>
+            </div>
+          )}
 
           {filteredTeachers.length === 0 && (
             <div className="py-12 text-center text-slate-700 text-xs font-bold">
