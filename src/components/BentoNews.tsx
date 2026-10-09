@@ -1,8 +1,29 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useMemo } from 'react';
+import { useWartaData, WartaItem } from '@/lib/wartaData';
 
 export default function BentoNews() {
+  const { wartaList } = useWartaData();
+  const [selectedCategory, setSelectedCategory] = useState('SEMUA');
+  const [selectedArticle, setSelectedArticle] = useState<WartaItem | null>(null);
+
+  const publishedList = useMemo(() => {
+    const list = wartaList.filter(item => item.status === 'Published');
+    return list.length > 0 ? list : wartaList;
+  }, [wartaList]);
+
+  const topWarta = publishedList[0];
+  const secondWarta = publishedList[1] || topWarta;
+  const thirdWarta = publishedList[2] || topWarta;
+
+  const filteredArticles = useMemo(() => {
+    if (selectedCategory === 'SEMUA') return publishedList;
+    return publishedList.filter(item => 
+      item.category.toUpperCase() === selectedCategory.toUpperCase()
+    );
+  }, [publishedList, selectedCategory]);
+
   return (
     <section id="berita" className="relative w-full py-20 sm:py-28 bg-[#f8fafc] text-slate-900 overflow-hidden select-none border-b border-indigo-100/70">
       {/* Subtle Studio Backdrop Ambient Glow */}
@@ -26,11 +47,11 @@ export default function BentoNews() {
           </div>
           <a
             href="#arsip-berita"
-            className="group inline-flex items-center gap-2.5 px-5 py-2.5 rounded-full bg-white hover:bg-indigo-50 border border-indigo-200/80 text-xs sm:text-sm font-medium text-slate-700 hover:text-indigo-700 transition-all duration-300 shadow-sm self-start md:self-end"
+            className="group inline-flex items-center gap-2.5 px-5 py-2.5 rounded-full bg-white hover:bg-indigo-50 border border-indigo-200/80 text-xs sm:text-sm font-medium text-slate-700 hover:text-indigo-700 transition-all duration-300 shadow-sm self-start md:self-end cursor-pointer"
           >
-            <span>Lihat Selengkapnya</span>
+            <span>Lihat Semua Warta ({publishedList.length})</span>
             <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs group-hover:translate-x-0.5 group-hover:bg-indigo-600 group-hover:text-white transition-all duration-300">
-              →
+              ↓
             </span>
           </a>
         </div>
@@ -47,7 +68,6 @@ export default function BentoNews() {
             
             {/* CARD 1: Top Left Brand Hero (Soft Lavender Card matching Marklab) */}
             <div className="rounded-[2.2rem] p-8 sm:p-10 flex flex-col items-center justify-center text-center h-[260px] bg-gradient-to-br from-[#e0e7ff] via-[#eef2ff] to-[#f5f3ff] text-[#0f172a] shadow-md shadow-indigo-950/5 border border-indigo-200/80 relative overflow-hidden group hover:shadow-xl transition-all duration-500">
-              {/* Subtle light reflex */}
               <div className="absolute top-0 right-0 w-64 h-64 bg-white/60 rounded-full blur-3xl pointer-events-none" />
               
               <div className="relative z-10 flex flex-col items-center">
@@ -63,8 +83,11 @@ export default function BentoNews() {
               </div>
             </div>
 
-            {/* CARD 4: Bottom Left Editorial Feature Card (Exact 520px on desktop) */}
-            <div className="rounded-[2.2rem] bg-white text-[#0f172a] shadow-xl shadow-black/25 border border-white/30 overflow-hidden flex flex-col justify-between h-auto lg:h-[520px]">
+            {/* CARD 4: Bottom Left Editorial Feature Card (Dynamic from thirdWarta) */}
+            <div 
+              onClick={() => setSelectedArticle(thirdWarta)}
+              className="rounded-[2.2rem] bg-white text-[#0f172a] shadow-xl shadow-black/25 border border-white/30 overflow-hidden flex flex-col justify-between h-auto lg:h-[520px] cursor-pointer group hover:border-indigo-300 transition-all duration-300"
+            >
               
               {/* Top Editorial Info Area */}
               <div className="p-7 sm:p-8 flex flex-col justify-between flex-1">
@@ -77,30 +100,35 @@ export default function BentoNews() {
                       SMPN 3 Cihampelas
                     </span>
                   </div>
-                  <span className="text-[11px] font-mono text-stone-500 tracking-tight">
-                    smpn3cihampelas.sch.id
+                  <span className="text-[11px] font-mono text-indigo-600 font-bold bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-200">
+                    {thirdWarta.category}
                   </span>
                 </div>
 
                 <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mt-auto">
-                  <h3 className="text-3xl sm:text-4xl font-semibold tracking-tight text-[#0f172a] leading-[1.08] max-w-xs">
-                    Langkah Pasti <br />
-                    Menuju Prestasi
+                  <h3 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#0f172a] leading-[1.15] max-w-sm group-hover:text-indigo-900 transition-colors">
+                    {thirdWarta.title}
                   </h3>
-                  <p className="text-xs sm:text-sm text-stone-500 font-normal leading-relaxed max-w-[210px] sm:text-right">
-                    Ekosistem Belajar Digital, Karakter Unggul & Berwawasan Global.
+                  <p className="text-xs text-stone-500 font-normal leading-relaxed max-w-[210px] sm:text-right line-clamp-3">
+                    {thirdWarta.excerpt || 'Ekosistem Belajar Digital, Karakter Unggul & Berwawasan Global.'}
                   </p>
                 </div>
               </div>
 
               {/* Bottom Photo Area (Exact 260px on desktop) */}
-              <div className="relative w-full h-[240px] lg:h-[260px] overflow-hidden rounded-b-[2.2rem] shrink-0">
+              <div className="relative w-full h-[240px] lg:h-[260px] overflow-hidden rounded-b-[2.2rem] shrink-0 bg-slate-100">
                 <img 
-                  src="/gallery_1.jpg" 
-                  alt="Kegiatan Belajar Siswa SMPN 3 Cihampelas di Laboratorium Sains" 
-                  className="w-full h-full object-cover object-center hover:scale-105 transition-transform duration-700"
+                  src={thirdWarta.src || '/slide4.jpeg'} 
+                  alt={thirdWarta.title}
+                  className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = '/slide4.jpeg';
+                  }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent pointer-events-none" />
+                <div className="absolute bottom-3 right-4 px-3 py-1 rounded-full bg-black/60 backdrop-blur-md text-white text-[10px] font-bold">
+                  {thirdWarta.date}
+                </div>
               </div>
 
             </div>
@@ -118,31 +146,49 @@ export default function BentoNews() {
               {/* SUB-COLUMN 1: Card 2 (230px) + Gap (24px) + Card 5 (266px) = 520px */}
               <div className="flex flex-col gap-6">
                 
-                {/* CARD 2: Top Center (Action Photo with Bold Overlay Text) */}
-                <div className="rounded-[2.2rem] h-[230px] relative overflow-hidden group shadow-xl shadow-black/30 border border-white/10 shrink-0">
+                {/* CARD 2: Top Center (Dynamic Highlight from topWarta) */}
+                <div 
+                  onClick={() => setSelectedArticle(topWarta)}
+                  className="rounded-[2.2rem] h-[230px] relative overflow-hidden group shadow-xl shadow-black/30 border border-white/10 shrink-0 cursor-pointer"
+                >
                   <img 
-                    src="/gallery_2.jpg" 
-                    alt="Pertandingan Basket Siswa SMPN 3" 
+                    src={topWarta.src || '/gallery_2.jpg'} 
+                    alt={topWarta.title} 
                     className="absolute inset-0 w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-700"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = '/gallery_2.jpg';
+                    }}
                   />
-                  {/* Subtle dark gradient overlay */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-black/10" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/10" />
 
-                  {/* Text Overlay (Replicating "Pedrix" on Cyclist photo) */}
-                  <div className="absolute bottom-5 left-6 right-6 z-10">
-                    <span className="text-3xl sm:text-4xl font-bold tracking-tight text-white drop-shadow-md block">
-                      JUARA
+                  {/* Header Badge */}
+                  <div className="absolute top-4 left-5 right-5 flex justify-between items-center z-10">
+                    <span className="px-2.5 py-0.5 rounded-full bg-indigo-600/90 backdrop-blur-md text-white text-[10px] font-mono font-bold uppercase tracking-wider">
+                      {topWarta.category}
                     </span>
-                    <span className="text-[11px] text-stone-200/90 font-light tracking-wide block mt-0.5">
-                      Porseni Basket KBB 2026
+                    <span className="text-[10px] text-stone-300 font-mono">
+                      {topWarta.date}
+                    </span>
+                  </div>
+
+                  {/* Text Overlay */}
+                  <div className="absolute bottom-5 left-5 right-5 z-10">
+                    <span className="text-lg sm:text-xl font-bold tracking-tight text-white drop-shadow-md block line-clamp-2 leading-snug group-hover:text-indigo-200 transition-colors">
+                      {topWarta.title}
+                    </span>
+                    <span className="text-[10px] text-stone-300/90 font-light tracking-wide block mt-1 line-clamp-1">
+                      {topWarta.excerpt || 'Klik untuk membaca warta selengkapnya →'}
                     </span>
                   </div>
                 </div>
 
-                {/* CARD 5: Center Middle (Smartphone Screen Closeup Mockup - Exact 266px) */}
-                <div className="rounded-[2.2rem] h-[266px] p-2 bg-[#1b1b20] border-2 border-white/10 shadow-xl shadow-black/30 flex flex-col relative overflow-hidden group shrink-0">
+                {/* CARD 5: Center Middle (Smartphone Screen Closeup Mockup - Dynamic secondWarta) */}
+                <div 
+                  onClick={() => setSelectedArticle(secondWarta)}
+                  className="rounded-[2.2rem] h-[266px] p-2 bg-[#1b1b20] border-2 border-white/10 shadow-xl shadow-black/30 flex flex-col relative overflow-hidden group shrink-0 cursor-pointer"
+                >
                   <div className="w-full h-full rounded-[1.7rem] bg-gradient-to-b from-[#f3e6e3] via-[#f7edf0] to-[#eaf2f8] p-4 flex flex-col justify-between relative overflow-hidden">
-                    {/* Status bar indication */}
+                    {/* Status bar */}
                     <div className="flex items-center justify-between text-[10px] text-stone-600 font-semibold px-1">
                       <span>09:41</span>
                       <div className="flex items-center gap-1.5">
@@ -151,29 +197,30 @@ export default function BentoNews() {
                       </div>
                     </div>
 
-                    {/* School Notification Pill */}
-                    <div className="bg-white/80 backdrop-blur-md p-2 rounded-xl border border-white/70 shadow-sm flex items-center gap-2.5">
-                      <div className="w-6 h-6 rounded-lg bg-black text-white flex items-center justify-center text-[10px] shrink-0">
+                    {/* Dynamic School Notification Pill */}
+                    <div className="bg-white/90 backdrop-blur-md p-2.5 rounded-xl border border-white/70 shadow-sm flex items-center gap-2.5 group-hover:bg-white transition-colors">
+                      <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-xs font-bold shrink-0">
                         ✦
                       </div>
                       <div className="flex flex-col min-w-0">
-                        <span className="text-[10px] font-semibold text-stone-800 truncate">Portal PPDB 2026</span>
-                        <span className="text-[9px] text-stone-500 truncate">Pendaftaran jalur zonasi dibuka</span>
+                        <span className="text-[11px] font-bold text-slate-900 truncate">
+                          {secondWarta.category} · {secondWarta.title}
+                        </span>
+                        <span className="text-[9px] text-slate-600 truncate">
+                          {secondWarta.excerpt || secondWarta.date}
+                        </span>
                       </div>
                     </div>
 
-                    {/* Phone App Dock (iOS style dock replicating reference) */}
+                    {/* Phone App Dock */}
                     <div className="flex items-center justify-around p-2 rounded-2xl bg-white/50 backdrop-blur-lg border border-white/40 shadow-sm">
-                      {/* App 1: RIGAS App */}
-                      <div className="w-9 h-9 rounded-xl bg-black text-white flex items-center justify-center text-xs font-bold shadow-md cursor-pointer hover:scale-105 transition-transform">
+                      <div className="w-9 h-9 rounded-xl bg-black text-white flex items-center justify-center text-xs font-bold shadow-md">
                         R3
                       </div>
-                      {/* App 2: Green Messages */}
-                      <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-500 to-green-400 text-white flex items-center justify-center text-sm shadow-md cursor-pointer hover:scale-105 transition-transform">
+                      <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-500 to-green-400 text-white flex items-center justify-center text-sm shadow-md">
                         💬
                       </div>
-                      {/* App 3: Browser */}
-                      <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-500 to-sky-400 text-white flex items-center justify-center text-sm shadow-md cursor-pointer hover:scale-105 transition-transform">
+                      <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-500 to-sky-400 text-white flex items-center justify-center text-sm shadow-md">
                         🌐
                       </div>
                     </div>
@@ -185,7 +232,7 @@ export default function BentoNews() {
               {/* SUB-COLUMN 2: Card 3 (166px) + Gap (24px) + Card 6 (330px) = 520px */}
               <div className="flex flex-col gap-6">
                 
-                {/* CARD 3: Top Right (Dark Obsidian Stat Card with Bar Chart - Exact 166px) */}
+                {/* CARD 3: Top Right (Dark Obsidian Stat Card with Bar Chart) */}
                 <div className="rounded-[2.2rem] h-[166px] bg-[#080b20] border border-indigo-500/20 text-white p-5 sm:p-6 shadow-xl shadow-indigo-950/30 flex flex-col justify-between group hover:border-indigo-400/40 transition-all shrink-0">
                   <div>
                     <h4 className="text-sm sm:text-base font-medium text-white tracking-tight">
@@ -196,7 +243,6 @@ export default function BentoNews() {
                     </span>
                   </div>
 
-                  {/* Frequency Histogram Bars (matching reference graphic) */}
                   <div className="flex items-end justify-between pt-1">
                     <div className="flex items-end gap-1.5 h-9">
                       <div className="w-1.5 h-4 rounded-full bg-indigo-900/60" />
@@ -212,31 +258,28 @@ export default function BentoNews() {
                   </div>
                 </div>
 
-                {/* CARD 6: Far Right Middle (Vertical Product Detail Card - Exact 330px) */}
+                {/* CARD 6: Far Right Middle (Vertical Product Detail Card) */}
                 <div className="rounded-[2.2rem] h-[330px] relative overflow-hidden group shadow-xl shadow-black/30 border border-white/10 shrink-0">
                   <img 
-                    src="/stem_robotics_hardware.jpg" 
-                    alt="Detail Hardware Robotika & Ekskul STEM" 
+                    src="/slide2.jpeg" 
+                    alt="Kampus SMPN 3 Cihampelas" 
                     className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                   />
-                  {/* Subtle vignette gradient */}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-black/30" />
 
-                  {/* Header Badge */}
                   <div className="absolute top-5 left-5 right-5 flex justify-between items-center z-10">
-                    <span className="px-3 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-[10px] text-stone-200 uppercase tracking-widest font-mono">
-                      STEM · 4.0
+                    <span className="px-3 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-[10px] text-stone-200 uppercase tracking-widest font-mono font-bold">
+                      RIGAS · 2026
                     </span>
-                    <span className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_#38bdf8] animate-pulse" />
+                    <span className="w-2 h-2 rounded-full bg-indigo-400 shadow-[0_0_8px_#818cf8] animate-pulse" />
                   </div>
 
-                  {/* Bottom Description */}
                   <div className="absolute bottom-5 left-5 right-5 z-10">
                     <h5 className="text-base font-semibold text-white tracking-tight leading-snug">
-                      Robotika & IoT
+                      Budaya Disiplin & Prestasi
                     </h5>
                     <p className="text-[11px] text-stone-300 font-light mt-0.5 leading-relaxed">
-                      Praktik rekayasa digital & kecerdasan buatan terapan.
+                      Membina generasi berakhlak mulia dan berdaya saing global.
                     </p>
                   </div>
                 </div>
@@ -245,13 +288,11 @@ export default function BentoNews() {
 
             </div>
 
-            {/* CARD 7: Bottom Right Wide Analytics Card (Exact 260px - Aligning with Card 4 bottom!) */}
+            {/* CARD 7: Bottom Right Wide Analytics Card */}
             <div className="rounded-[2.2rem] bg-white text-[#0f172a] shadow-xl shadow-black/25 border border-white/30 p-6 sm:p-7 flex flex-col justify-between h-[260px] relative overflow-hidden group shrink-0">
               
-              {/* Top Row: Device Illustration + Stat Pills + Dial/Radar */}
               <div className="flex items-center justify-between gap-4">
                 
-                {/* Left Device Shot (AURA-7 Explorer) */}
                 <div className="w-1/2 flex items-center justify-center">
                   <img 
                     src="/smart_campus_device.jpg" 
@@ -260,9 +301,7 @@ export default function BentoNews() {
                   />
                 </div>
 
-                {/* Right Analytics: Pills & Circular Dial */}
                 <div className="w-1/2 flex flex-col gap-3">
-                  {/* 3 Metric Pills (matching 45km, 55min, 130w from reference) */}
                   <div className="flex flex-wrap items-center gap-1.5">
                     <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 text-[#0f172a] text-[10px] font-medium border border-slate-200">
                       <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
@@ -278,9 +317,7 @@ export default function BentoNews() {
                     </span>
                   </div>
 
-                  {/* Circular Dial & Dark Radar Indicator */}
                   <div className="flex items-center gap-3 pt-0.5">
-                    {/* Circular Dial Gauge */}
                     <div className="relative w-10 h-10 flex items-center justify-center shrink-0">
                       <svg className="w-10 h-10 -rotate-90" viewBox="0 0 36 36">
                         <circle cx="18" cy="18" r="14" fill="none" stroke="#e2e8f0" strokeWidth="3" />
@@ -299,7 +336,6 @@ export default function BentoNews() {
                       <span className="absolute text-[9px] font-bold text-slate-800">75%</span>
                     </div>
 
-                    {/* Dark Radar Circle (matching circular radar map in reference) */}
                     <div className="w-10 h-10 rounded-full bg-[#18181b] border border-stone-700 flex items-center justify-center relative shadow-sm shrink-0">
                       <div className="absolute inset-1 rounded-full border border-stone-800" />
                       <div className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_6px_#38bdf8] animate-ping" />
@@ -308,14 +344,13 @@ export default function BentoNews() {
 
                     <div className="flex flex-col min-w-0">
                       <span className="text-xs font-semibold text-slate-800 truncate">Smart Campus</span>
-                      <span className="text-[10px] text-slate-500 truncate">Sensor IoT Aktif</span>
+                      <span className="text-[10px] text-slate-500 truncate">Sistem Terintegrasi</span>
                     </div>
                   </div>
                 </div>
 
               </div>
 
-              {/* Bottom Segmented Progress Bar (reproducing reference bar exactly) */}
               <div className="flex items-center gap-3 pt-3 border-t border-slate-100 mt-1">
                 <span className="text-xs font-semibold text-slate-700 min-w-[28px]">75%</span>
                 <div className="flex-1 flex gap-1 sm:gap-1.5">
@@ -329,7 +364,7 @@ export default function BentoNews() {
                   ))}
                 </div>
                 <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap hidden sm:inline">
-                  Semester Genap 2026
+                  Semester Ganjil 2026/2027
                 </span>
               </div>
 
@@ -339,7 +374,175 @@ export default function BentoNews() {
 
         </div>
 
+        {/* ============================================================== */}
+        {/* ARSIP & DAFTAR WARTA SEKOLAH LENGKAP (REAL-TIME SYNC)          */}
+        {/* ============================================================== */}
+        <div id="arsip-berita" className="mt-16 sm:mt-20 pt-10 border-t-2 border-slate-200">
+          
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+            <div>
+              <h3 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+                Koleksi Warta & Publikasi Sekolah
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-600 font-medium mt-1">
+                Seluruh berita terbaru yang dirilis resmi oleh admin SMP Negeri 3 Cihampelas
+              </p>
+            </div>
+
+            {/* Category Filters */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+              {['SEMUA', 'PRESTASI', 'PENGUMUMAN', 'KEGIATAN', 'AKADEMIK', 'INOVASI'].map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setSelectedCategory(cat)}
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-mono font-extrabold transition-all cursor-pointer whitespace-nowrap ${
+                    selectedCategory === cat
+                      ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
+                      : 'bg-white text-slate-700 border-2 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Grid of Warta Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {filteredArticles.map((article) => (
+              <div 
+                key={article.id}
+                onClick={() => setSelectedArticle(article)}
+                className="rounded-3xl bg-white border-2 border-slate-200 hover:border-indigo-300 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between group cursor-pointer"
+              >
+                <div>
+                  {/* Photo Container */}
+                  <div className="relative w-full h-44 overflow-hidden bg-slate-100">
+                    <img 
+                      src={article.src || '/slide4.jpeg'} 
+                      alt={article.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = '/slide4.jpeg';
+                      }}
+                    />
+                    <div className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-white/90 backdrop-blur-md border border-white/60 text-indigo-700 text-[10px] font-mono font-black uppercase tracking-wider shadow-sm">
+                      {article.category}
+                    </div>
+                  </div>
+
+                  {/* Body Text */}
+                  <div className="p-5">
+                    <div className="text-[11px] font-mono text-slate-500 font-bold mb-2">
+                      📅 {article.date}
+                    </div>
+                    <h4 className="text-base font-extrabold text-slate-900 group-hover:text-indigo-600 transition-colors line-clamp-2 leading-snug mb-2">
+                      {article.title}
+                    </h4>
+                    <p className="text-xs text-slate-600 font-medium line-clamp-3 leading-relaxed">
+                      {article.excerpt || 'Klik untuk membaca selengkapnya warta sekolah ini.'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-5 pt-0">
+                  <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-extrabold text-indigo-600 group-hover:text-indigo-700">
+                    <span>Baca Warta</span>
+                    <span className="group-hover:translate-x-1 transition-transform">→</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {filteredArticles.length === 0 && (
+            <div className="p-12 text-center bg-white rounded-3xl border-2 border-slate-200 text-slate-600 font-bold text-sm">
+              Belum ada warta untuk kategori "{selectedCategory}".
+            </div>
+          )}
+
+        </div>
+
       </div>
+
+      {/* ============================================================== */}
+      {/* MODAL PRATINJAU / DETAIL ARTIKEL WARTA                         */}
+      {/* ============================================================== */}
+      {selectedArticle && (
+        <div 
+          data-lenis-prevent="true"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]"
+          onClick={() => setSelectedArticle(null)}
+        >
+          <div 
+            data-lenis-prevent="true"
+            className="w-full max-w-2xl rounded-3xl bg-white border-2 border-slate-300 overflow-hidden shadow-2xl relative max-h-[90vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header / Cover */}
+            <div className="relative w-full h-64 sm:h-80 bg-slate-100 shrink-0">
+              <img 
+                src={selectedArticle.src || '/slide4.jpeg'} 
+                alt={selectedArticle.title} 
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = '/slide4.jpeg';
+                }}
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/30 to-transparent" />
+              
+              <button 
+                onClick={() => setSelectedArticle(null)}
+                className="absolute top-4 right-4 w-9 h-9 rounded-full bg-black/60 hover:bg-black/90 text-white font-bold flex items-center justify-center cursor-pointer border border-white/20 transition-all z-20"
+                title="Tutup"
+              >
+                ✕
+              </button>
+
+              <div className="absolute bottom-5 left-5 right-5 z-10 text-white">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="px-3 py-1 rounded-full bg-indigo-600 text-white text-[10px] font-mono font-black uppercase tracking-wider">
+                    {selectedArticle.category}
+                  </span>
+                  <span className="text-xs text-slate-300 font-mono">
+                    {selectedArticle.date}
+                  </span>
+                </div>
+                <h3 className="text-xl sm:text-2xl font-black text-white leading-snug drop-shadow-md">
+                  {selectedArticle.title}
+                </h3>
+              </div>
+            </div>
+
+            {/* Content Scroll Area */}
+            <div className="p-6 sm:p-8 overflow-y-auto space-y-4 text-sm text-slate-800 leading-relaxed font-normal">
+              <div className="p-4 rounded-2xl bg-indigo-50/70 border-2 border-indigo-100 text-indigo-950 font-bold text-sm">
+                {selectedArticle.excerpt || selectedArticle.title}
+              </div>
+
+              <p className="text-slate-700 leading-relaxed">
+                {selectedArticle.content || (
+                  <>
+                    Warta ini diterbitkan secara resmi oleh Humas SMP Negeri 3 Cihampelas sebagai bagian dari keterbukaan informasi publik dan dokumentasi kegiatan pembelajaran, prestasi, serta program inovasi sekolah.
+                  </>
+                )}
+              </p>
+
+              <div className="pt-6 border-t-2 border-slate-100 flex items-center justify-between text-xs text-slate-500 font-bold">
+                <span>Dipublikasikan oleh: <strong>Humas SMPN 3 Cihampelas</strong></span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedArticle(null)}
+                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black cursor-pointer shadow-md transition-colors"
+                >
+                  Tutup Warta
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </section>
   );
 }
