@@ -227,13 +227,13 @@ export default function Hero() {
             className="absolute inset-0 w-full h-full pointer-events-none block" 
           />
 
-          {/* Clean White Cloud-Like Edge Mist */}
-          <div className="absolute bottom-0 inset-x-0 h-48 bg-gradient-to-t from-white/30 via-white/10 to-transparent pointer-events-none" />
+          {/* Clean White Cloud-Like Edge Mist (desktop only) */}
+          <div className="hidden sm:block absolute bottom-0 inset-x-0 h-48 bg-gradient-to-t from-white/30 via-white/10 to-transparent pointer-events-none" />
           <div className="hidden sm:block absolute -bottom-16 left-1/4 w-[600px] h-[220px] bg-white/20 rounded-full blur-[90px] pointer-events-none" />
           <div className="hidden sm:block absolute -bottom-16 right-1/4 w-[500px] h-[200px] bg-white/15 rounded-full blur-[80px] pointer-events-none" />
 
-          {/* Subtle perimeter white cloud tint around edges */}
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_65%,rgba(255,255,255,0.08)_100%)] pointer-events-none" />
+          {/* Subtle perimeter white cloud tint around edges (desktop only) */}
+          <div className="hidden sm:block absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_65%,rgba(255,255,255,0.08)_100%)] pointer-events-none" />
 
           {/* Subtle indigo atmospheric ambient tint matching new palette */}
           <div className="absolute inset-0 bg-indigo-950/[0.04] mix-blend-color pointer-events-none" />
@@ -287,12 +287,9 @@ export default function Hero() {
 
         </div>
 
-        {/* Ultra-subtle hairline bottom divider */}
-        <div className="w-full h-px bg-white/[0.06]" />
+        {/* Ultra-subtle hairline bottom divider (desktop only) */}
+        <div className="hidden sm:block w-full h-px bg-white/[0.06]" />
       </div>
-
-      {/* Smooth bottom transition into the light lower sections */}
-      <div className="absolute bottom-0 inset-x-0 h-40 bg-gradient-to-b from-transparent to-[#f8fafc] pointer-events-none z-20" />
     </section>
   );
 }
