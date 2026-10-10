@@ -8,43 +8,46 @@ export default function Curriculum() {
 
   const programs = [
     {
-      id: 'ai-steam',
-      title: 'Digital & AI Literacy',
+      id: 'pembelajaran-mendalam',
+      title: 'Pembelajaran Mendalam',
       badge: 'Fokus 01',
-      tagline: 'Membekali pemikiran komputasional dan adopsi AI sejak dini.',
-      desc: 'Siswa diajarkan dasar-dasar logika algoritma, pemanfaatan teknologi kecerdasan buatan secara produktif dan etis, serta penguasaan perangkat digital untuk menyongsong era revolusi industri 4.0.',
+      categoryTag: 'Eksplorasi Akademik',
+      tagline: 'Pembelajaran bermakna yang melatih nalar kritis, diskusi aktif, dan pemahaman konsep secara kontekstual.',
+      desc: 'Menerapkan paradigma baru Kurikulum Merdeka yang berpusat pada peserta didik. Siswa tidak sekadar menghafal materi, tetapi diajak bereksplorasi secara aktif, berkolaborasi dalam kelompok, dan memecahkan persoalan dunia nyata melalui pembelajaran berdiferensiasi.',
       metrics: [
-        { label: 'Kurikulum', value: '12 Modul' },
-        { label: 'Fasilitas', value: 'Smart Lab' },
-        { label: 'Hasil Karya', value: 'Portofolio' },
+        { label: 'Pendekatan', value: 'Nalar Kritis' },
+        { label: 'Metode', value: 'Berdiferensiasi' },
+        { label: 'Orientasi', value: 'Kontekstual' },
       ],
       image: '/slide6.jpeg',
     },
     {
-      id: 'steam-lab',
-      title: 'STEAM & Creative Robotics',
+      id: 'pembiasaan-karakter',
+      title: 'Pembiasaan Karakter & Budaya Sekolah',
       badge: 'Fokus 02',
-      tagline: 'Eksperimen langsung dengan rekayasa teknologi dan sains terapan.',
-      desc: 'Menggabungkan sains, teknologi, rekayasa, seni, dan matematika dalam proyek kolaboratif terintegrasi yang dirancang untuk memecahkan persoalan dunia nyata dan inovasi hijau.',
+      categoryTag: 'Pendidikan Karakter',
+      tagline: 'Pembiasaan rutin pagi: religius, literasi harian, kedisiplinan 5S, dan Jumat bersih/sehat.',
+      desc: 'Membangun karakter mulia melalui rutinitas harian yang konsisten: apel pagi, pembiasaan tadarus & sholat dhuha berjamaah, gerakan literasi 15 menit, penanaman budaya 5S (Senyum, Salam, Sapa, Sopan, Santun), serta kepedulian lingkungan melalui Jumat Bersih.',
       metrics: [
-        { label: 'Laboratorium', value: 'Sains Modern' },
-        { label: 'Teknologi', value: 'IoT & Robotika' },
-        { label: 'Kompetisi', value: 'Olimpiade' },
+        { label: 'Rutinitas', value: 'Setiap Pagi' },
+        { label: 'Nilai Utama', value: 'Religius & 5S' },
+        { label: 'Lingkungan', value: 'Jumat Bersih' },
       ],
-      image: '/slide7.jpeg',
+      image: '/slide4.jpeg',
     },
     {
-      id: 'karakter',
-      title: 'Character & Leadership',
+      id: 'projek-p5',
+      title: 'Projek Penguatan P5',
       badge: 'Fokus 03',
-      tagline: 'Intelektual unggul dengan akhlak mulia dan kepedulian sosial.',
-      desc: 'Pendidikan holistik yang menanamkan keimanan, kemandirian, dan kepedulian lingkungan sebagai fondasi pembentukan profil pelajar Pancasila yang tangguh dan berwawasan global.',
+      categoryTag: 'Aksi Nyata Siswa',
+      tagline: 'Projek Profil Pelajar Pancasila: kearifan lokal Sunda, kewirausahaan siswa, dan kepedulian lingkungan.',
+      desc: 'Wadah eksplorasi lintas disiplin ilmu untuk menumbuhkan kemandirian, gotong royong, dan kreativitas. Siswa menghasilkan karya nyata melalui pelestarian seni budaya lokal Sunda, inovasi wirausaha muda, serta aksi nyata peduli kelestarian alam Cihampelas.',
       metrics: [
-        { label: 'Pembiasaan', value: 'Harian' },
-        { label: 'Kepemimpinan', value: 'OSIS & Pramuka' },
-        { label: 'Bimbingan', value: 'Konseling 1-on-1' },
+        { label: 'Tema Utama', value: 'Kearifan Lokal' },
+        { label: 'Karakter', value: 'Kreatif & Mandiri' },
+        { label: 'Hasil Karya', value: 'Gelar Pameran' },
       ],
-      image: '/slide1.jpeg',
+      image: '/slide2.jpeg',
     },
   ];
 
@@ -68,7 +71,7 @@ export default function Curriculum() {
             </h2>
           </div>
           <p className="text-slate-600 text-xs sm:text-sm font-light max-w-md leading-relaxed">
-            Mempersiapkan generasi masa depan melalui pendekatan pembelajaran terdiferensiasi, kecerdasan digital, dan penanaman budi pekerti luhur.
+            Mempersiapkan generasi unggul melalui pendekatan pembelajaran mendalam, pembiasaan karakter luhur, dan aksi nyata Projek Pelajar Pancasila.
           </p>
         </div>
 
@@ -110,7 +113,7 @@ export default function Curriculum() {
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/90 border border-indigo-200/80 text-indigo-700 text-[10px] font-semibold tracking-widest uppercase mb-4 shadow-sm">
                 <span>{programs[activeTab].badge}</span>
                 <span>•</span>
-                <span>Prioritas Akademik</span>
+                <span>{programs[activeTab].categoryTag}</span>
               </div>
 
               <h3 className="text-2xl sm:text-3xl font-semibold text-slate-900 tracking-tight mb-3">
