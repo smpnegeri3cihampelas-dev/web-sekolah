@@ -78,9 +78,12 @@ const CATEGORIES = [
   { key: 'EKSTRAKURIKULER', label: 'Ekstrakurikuler' },
 ];
 
+const INITIAL_LIMIT = 6;
+
 export default function Gallery() {
   const [photos, setPhotos] = useState<PhotoItem[]>(DEFAULT_PHOTOS);
   const [filter, setFilter] = useState('SEMUA');
+  const [visibleCount, setVisibleCount] = useState(INITIAL_LIMIT);
   const [selectedPhoto, setSelectedPhoto] = useState<PhotoItem | null>(null);
 
   // Sync with Dashboard LocalStorage if available
@@ -109,6 +112,10 @@ export default function Gallery() {
   const filteredPhotos = filter === 'SEMUA' 
     ? photos 
     : photos.filter((p) => p.category === filter);
+
+  const displayedPhotos = filteredPhotos.slice(0, visibleCount);
+  const remainingCount = filteredPhotos.length - visibleCount;
+  const hasMore = remainingCount > 0;
 
   const currentIndex = selectedPhoto 
     ? filteredPhotos.findIndex((p) => p.id === selectedPhoto.id) 
@@ -189,7 +196,10 @@ export default function Gallery() {
             return (
               <button
                 key={cat.key}
-                onClick={() => setFilter(cat.key)}
+                onClick={() => {
+                  setFilter(cat.key);
+                  setVisibleCount(INITIAL_LIMIT);
+                }}
                 className={`inline-flex items-center gap-1.5 px-4 sm:px-5 py-2 text-xs font-semibold tracking-wide transition-all rounded-full cursor-pointer ${
                   isActive 
                     ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' 
@@ -209,7 +219,7 @@ export default function Gallery() {
 
         {/* Photo Grid - Clean Card Layout */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-7">
-          {filteredPhotos.map((photo) => (
+          {displayedPhotos.map((photo) => (
             <div 
               key={photo.id}
               onClick={() => setSelectedPhoto(photo)}
@@ -263,6 +273,42 @@ export default function Gallery() {
             </div>
           ))}
         </div>
+
+        {/* Load More Button */}
+        {hasMore && (
+          <div className="mt-10 sm:mt-12 text-center">
+            <button
+              type="button"
+              onClick={() => setVisibleCount((prev) => prev + 6)}
+              className="inline-flex items-center gap-2.5 px-6 sm:px-8 py-3.5 rounded-full bg-white hover:bg-indigo-50 text-indigo-700 hover:text-indigo-800 text-xs sm:text-sm font-bold border border-indigo-200/90 shadow-sm hover:shadow-md transition-all active:scale-98 cursor-pointer"
+            >
+              <span>+ Tampilkan Lebih Banyak Foto</span>
+              <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-mono text-[11px] font-semibold">
+                {remainingCount} lagi
+              </span>
+            </button>
+          </div>
+        )}
+
+        {/* Show Less Option */}
+        {!hasMore && filteredPhotos.length > INITIAL_LIMIT && (
+          <div className="mt-10 text-center flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4">
+            <span className="text-xs text-slate-400 font-medium">
+              Menampilkan seluruh {filteredPhotos.length} foto
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setVisibleCount(INITIAL_LIMIT);
+                const el = document.getElementById('galeri');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="text-xs text-indigo-600 hover:text-indigo-800 font-bold underline underline-offset-4 cursor-pointer"
+            >
+              Tampilkan Lebih Sedikit ↑
+            </button>
+          </div>
+        )}
 
         {filteredPhotos.length === 0 && (
           <div className="text-center py-16 bg-white rounded-3xl border border-dashed border-slate-200">
