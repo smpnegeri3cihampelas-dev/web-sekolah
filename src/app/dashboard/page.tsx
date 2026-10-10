@@ -217,10 +217,13 @@ export default function DashboardPage() {
   // 4. Agenda Akademik (Terintegrasi Penuh dengan Kalender Landing Page)
   const { 
     agendaList, 
+    pdfInfo,
     addAgenda, 
     updateAgenda, 
     deleteAgenda, 
-    resetAgenda 
+    resetAgenda,
+    updatePdfInfo,
+    resetPdfInfo
   } = useAgendaData();
 
   const handleAddAgenda = (data: { name: string; date: string; category: string; semester?: string }) => {
@@ -654,10 +657,13 @@ export default function DashboardPage() {
             {activeTab === 'agenda' && (
               <TabAgenda
                 agendaList={agendaList}
+                pdfInfo={pdfInfo}
                 onAddAgenda={handleAddAgenda}
                 onUpdateAgenda={handleUpdateAgenda}
                 onDeleteAgenda={handleDeleteAgenda}
                 onResetAgenda={resetAgenda}
+                onUpdatePdfInfo={updatePdfInfo}
+                onResetPdfInfo={resetPdfInfo}
                 showToast={showToast}
               />
             )}

@@ -180,7 +180,7 @@ export function computeAutomaticStatus(dateStr: string, manualStatus?: string): 
 }
 
 export default function Calendar() {
-  const { agendaList } = useAgendaData();
+  const { agendaList, pdfInfo } = useAgendaData();
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [modalFilter, setModalFilter] = useState<string>('SEMUA');
 
@@ -395,10 +395,10 @@ export default function Calendar() {
               </div>
               <div className="flex items-center gap-2">
                 <a
-                  href="/kalender-akademik-smpn3.pdf"
+                  href={pdfInfo.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  download="Kalender-Akademik-SMPN3-Cihampelas-2026-2027.pdf"
+                  download={pdfInfo.fileName || "Kalender-Akademik-SMPN3-Cihampelas-2026-2027.pdf"}
                   className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
                   title="Unduh File PDF Asli"
                 >

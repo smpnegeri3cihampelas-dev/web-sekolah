@@ -1,30 +1,37 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { AgendaItem } from '@/lib/agendaData';
+import { AgendaItem, KaldikPdfInfo } from '@/lib/agendaData';
 import { AddAgendaModal, EditAgendaModal } from './AgendaModal';
 
 interface TabAgendaProps {
   agendaList: AgendaItem[];
+  pdfInfo?: KaldikPdfInfo;
   onAddAgenda: (data: { name: string; date: string; category: string; semester?: string }) => void;
   onUpdateAgenda?: (id: number, data: Partial<AgendaItem>) => void;
   onDeleteAgenda: (id: number) => void;
   onResetAgenda?: () => void;
+  onUpdatePdfInfo?: (info: Partial<KaldikPdfInfo>) => void;
+  onResetPdfInfo?: () => void;
   showToast: (msg: string) => void;
 }
 
 export function TabAgenda({
   agendaList,
+  pdfInfo,
   onAddAgenda,
   onUpdateAgenda,
   onDeleteAgenda,
   onResetAgenda,
+  onUpdatePdfInfo,
+  onResetPdfInfo,
   showToast
 }: TabAgendaProps) {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<AgendaItem | null>(null);
   const [activeFilter, setActiveFilter] = useState<'SEMUA' | 'SEM1' | 'SEM2'>('SEMUA');
   const [searchQuery, setSearchQuery] = useState('');
+  const [pdfLinkInput, setPdfLinkInput] = useState('');
 
   const sem1Count = useMemo(() => {
     return agendaList.filter((a) => (a.semester || '').includes('1') || a.id <= 16).length;
@@ -64,6 +71,55 @@ export function TabAgenda({
     }
   };
 
+  const handlePdfFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+      showToast('⚠️ Harap pilih berkas dengan format PDF (.pdf)!');
+      return;
+    }
+
+    // Limit check for browser memory (recommend max 15MB)
+    if (file.size > 15 * 1024 * 1024) {
+      showToast('⚠️ Ukuran file PDF terlalu besar (maksimal 15MB)!');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      if (onUpdatePdfInfo) {
+        onUpdatePdfInfo({
+          url: dataUrl,
+          fileName: file.name
+        });
+      }
+      showToast(`✅ Berkas PDF "${file.name}" berhasil diunggah & tersinkron ke Landing Page!`);
+    };
+    reader.onerror = () => {
+      showToast('❌ Gagal memproses berkas PDF.');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSavePdfLink = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pdfLinkInput.trim()) {
+      showToast('⚠️ Harap masukkan tautan link PDF atau Google Drive!');
+      return;
+    }
+
+    if (onUpdatePdfInfo) {
+      onUpdatePdfInfo({
+        url: pdfLinkInput.trim(),
+        fileName: 'Kalender-Akademik-Dokumen.pdf'
+      });
+    }
+    setPdfLinkInput('');
+    showToast('✅ Tautan dokumen PDF berhasil disimpan & aktif di Beranda!');
+  };
+
   return (
     <div className="space-y-6 animate-[fadeIn_0.3s_ease-out]">
       {/* Header */}
@@ -99,6 +155,121 @@ export function TabAgenda({
           >
             <span>+ Tambah Agenda Baru</span>
           </button>
+        </div>
+      </div>
+
+      {/* CARD KELOLA DOKUMEN PDF KALDIK */}
+      <div className="p-5 sm:p-6 rounded-2xl bg-white border-2 border-slate-200 shadow-sm space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+          <div className="flex items-start gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-rose-50 border-2 border-rose-200 text-rose-600 flex items-center justify-center text-2xl shrink-0">
+              📑
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-black text-slate-950">File Dokumen PDF Kalender Resmi</h3>
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-black bg-rose-50 text-rose-700 border border-rose-200">
+                  Unduhan Pengunjung
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 font-semibold mt-0.5">
+                Dokumen ini otomatis diunduh saat pengunjung klik tombol <strong>&ldquo;Unduh PDF Asli&rdquo;</strong> di Kalender Beranda.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0 flex-wrap">
+            <a
+              href={pdfInfo?.url || '/kalender-akademik-smpn3.pdf'}
+              target="_blank"
+              rel="noopener noreferrer"
+              download={pdfInfo?.fileName || 'Kalender-Pendidikan-SMPN-3-Cihampelas-2026-2027.pdf'}
+              className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition-all flex items-center gap-1.5 border border-slate-300 cursor-pointer shadow-2xs"
+            >
+              <span>👁️ Pratinjau / Unduh File Aktif</span>
+            </a>
+
+            {onResetPdfInfo && (
+              <button
+                type="button"
+                onClick={() => {
+                  onResetPdfInfo();
+                  showToast('🔄 Dokumen PDF dikembalikan ke file server bawaan.');
+                }}
+                className="px-3 py-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-600 text-xs font-semibold transition-all border border-slate-200 cursor-pointer"
+                title="Kembalikan tautan ke file PDF bawaan server"
+              >
+                Reset Bawaan
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* 2 Opsi Penggantian Dokumen PDF */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-1">
+          {/* Opsi 1: Upload File PDF */}
+          <div className="p-4 rounded-xl bg-slate-50/80 border border-slate-200 space-y-2.5">
+            <div className="flex items-center gap-2">
+              <span className="text-base">📤</span>
+              <h4 className="text-xs font-black text-slate-900">Opsi 1: Upload File PDF Langsung</h4>
+            </div>
+            <p className="text-[11px] text-slate-600 font-medium leading-relaxed">
+              Pilih file PDF kalender bertanda tangan dari komputer/laptop/HP Anda. File langsung tersimpan & aktif di Beranda.
+            </p>
+            <div className="pt-1 flex items-center gap-3">
+              <label className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold cursor-pointer transition-all shadow-xs active:scale-98">
+                <span>📁 Pilih Berkas PDF Baru</span>
+                <input
+                  type="file"
+                  accept="application/pdf"
+                  className="hidden"
+                  onChange={handlePdfFileUpload}
+                />
+              </label>
+              <span className="text-[11px] text-slate-600 font-mono truncate max-w-[200px]" title={pdfInfo?.fileName}>
+                {pdfInfo?.fileName || 'kalender-akademik-smpn3.pdf'}
+              </span>
+            </div>
+          </div>
+
+          {/* Opsi 2: Link Google Drive / Cloud */}
+          <div className="p-4 rounded-xl bg-slate-50/80 border border-slate-200 space-y-2.5">
+            <div className="flex items-center gap-2">
+              <span className="text-base">🔗</span>
+              <h4 className="text-xs font-black text-slate-900">Opsi 2: Tautkan Link Google Drive / Cloud</h4>
+            </div>
+            <p className="text-[11px] text-slate-600 font-medium leading-relaxed">
+              Jika file disimpan di Google Drive sekolah atau link cloud, masukkan link berbagi publik dokumen tersebut.
+            </p>
+            <form onSubmit={handleSavePdfLink} className="pt-1 flex items-center gap-2">
+              <input
+                type="url"
+                value={pdfLinkInput}
+                onChange={(e) => setPdfLinkInput(e.target.value)}
+                placeholder="https://drive.google.com/file/d/... atau https://..."
+                className="flex-1 px-3 py-1.5 rounded-xl bg-white border border-slate-300 text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-indigo-600"
+              />
+              <button
+                type="submit"
+                className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-98 shrink-0"
+              >
+                Simpan
+              </button>
+            </form>
+          </div>
+        </div>
+
+        {/* Petunjuk Server / cPanel Hostinger */}
+        <div className="p-3.5 rounded-xl bg-indigo-50/70 border border-indigo-200 text-xs text-indigo-950 flex items-start gap-2.5">
+          <span className="text-base shrink-0">💡</span>
+          <div className="space-y-0.5 text-[11px]">
+            <p className="font-bold">
+              Lokasi File Permanen di Server (Hostinger / cPanel):
+            </p>
+            <p className="text-indigo-900 leading-relaxed">
+              Anda juga bisa menaruh atau menimpa file fisik secara langsung di folder: <code className="bg-white/80 px-1.5 py-0.5 rounded text-indigo-950 font-mono font-bold">public/kalender-akademik-smpn3.pdf</code> melalui File Manager Hostinger atau Git. File tersebut adalah sumber utama berkas unduhan website.
+            </p>
+          </div>
         </div>
       </div>
 

@@ -237,6 +237,61 @@ export const OFFICIAL_KALDIK_SMPN3: AgendaItem[] = [
 
 const STORAGE_KEY = 'smpn3_agenda_data_v2';
 const EVENT_NAME = 'smpn3_agenda_updated';
+const PDF_INFO_STORAGE_KEY = 'smpn3_kaldik_pdf_info_v2';
+export const DEFAULT_PDF_URL = '/kalender-akademik-smpn3.pdf';
+export const DEFAULT_PDF_NAME = 'Kalender-Pendidikan-SMPN-3-Cihampelas-2026-2027.pdf';
+
+export interface KaldikPdfInfo {
+  url: string;
+  fileName: string;
+  updatedAt?: string;
+}
+
+export function getStoredPdfInfo(): KaldikPdfInfo {
+  if (typeof window === 'undefined') {
+    return { url: DEFAULT_PDF_URL, fileName: DEFAULT_PDF_NAME };
+  }
+  try {
+    const saved = localStorage.getItem(PDF_INFO_STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed && parsed.url) return parsed;
+    }
+  } catch {}
+  return { url: DEFAULT_PDF_URL, fileName: DEFAULT_PDF_NAME };
+}
+
+export function saveStoredPdfInfo(info: Partial<KaldikPdfInfo>): KaldikPdfInfo {
+  const current = getStoredPdfInfo();
+  const updated: KaldikPdfInfo = {
+    url: info.url || current.url || DEFAULT_PDF_URL,
+    fileName: info.fileName || current.fileName || DEFAULT_PDF_NAME,
+    updatedAt: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
+  };
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(PDF_INFO_STORAGE_KEY, JSON.stringify(updated));
+      window.dispatchEvent(new Event(EVENT_NAME));
+    } catch (err) {
+      console.error('Error saving PDF info to storage', err);
+    }
+  }
+  return updated;
+}
+
+export function resetStoredPdfInfo(): KaldikPdfInfo {
+  const defaultInfo: KaldikPdfInfo = {
+    url: DEFAULT_PDF_URL,
+    fileName: DEFAULT_PDF_NAME
+  };
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(PDF_INFO_STORAGE_KEY, JSON.stringify(defaultInfo));
+      window.dispatchEvent(new Event(EVENT_NAME));
+    } catch {}
+  }
+  return defaultInfo;
+}
 
 export function getStoredAgenda(): AgendaItem[] {
   if (typeof window === 'undefined') return OFFICIAL_KALDIK_SMPN3;
@@ -311,13 +366,19 @@ export function resetStoredAgenda(): AgendaItem[] {
 
 export function useAgendaData() {
   const [agendaList, setAgendaList] = useState<AgendaItem[]>(OFFICIAL_KALDIK_SMPN3);
+  const [pdfInfo, setPdfInfo] = useState<KaldikPdfInfo>({
+    url: DEFAULT_PDF_URL,
+    fileName: DEFAULT_PDF_NAME
+  });
 
   useEffect(() => {
     // Initial sync
     setAgendaList(getStoredAgenda());
+    setPdfInfo(getStoredPdfInfo());
 
     const handleUpdate = () => {
       setAgendaList(getStoredAgenda());
+      setPdfInfo(getStoredPdfInfo());
     };
 
     window.addEventListener(EVENT_NAME, handleUpdate);
@@ -331,9 +392,13 @@ export function useAgendaData() {
 
   return {
     agendaList,
+    pdfInfo,
     addAgenda: (item: Omit<AgendaItem, 'id' | 'status'> & { status?: string }) => addStoredAgenda(item),
     updateAgenda: (id: number, patch: Partial<AgendaItem>) => updateStoredAgenda(id, patch),
     deleteAgenda: (id: number) => deleteStoredAgenda(id),
-    resetAgenda: () => resetStoredAgenda()
+    resetAgenda: () => resetStoredAgenda(),
+    updatePdfInfo: (info: Partial<KaldikPdfInfo>) => saveStoredPdfInfo(info),
+    resetPdfInfo: () => resetStoredPdfInfo()
   };
 }
+
