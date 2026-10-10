@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   OFFICIAL_KALDIK_SMPN3, 
   AgendaItem, 
@@ -183,6 +183,27 @@ export default function Calendar() {
   const { agendaList, pdfInfo } = useAgendaData();
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [modalFilter, setModalFilter] = useState<string>('SEMUA');
+
+  // Prevent background scrolling and handle Escape key when modal is open
+  useEffect(() => {
+    if (isModalOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isModalOpen) {
+        setIsModalOpen(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = '';
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isModalOpen]);
 
   // Compute automatic real-time status for all events based on today's calendar
   const resolvedEvents = agendaList.map((item) => ({
@@ -373,20 +394,26 @@ export default function Calendar() {
         </div>
       </div>
 
-      {/* Official Calendar Modal (Printable & Clean) */}
+      {/* Official Calendar Modal (Printable & Clean with Smooth Scrolling) */}
       {isModalOpen && (
         <div 
+          data-lenis-prevent="true"
+          data-lenis-prevent-wheel="true"
+          data-lenis-prevent-touch="true"
           className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200"
           onClick={() => setIsModalOpen(false)}
           role="dialog"
           aria-modal="true"
         >
           <div 
-            className="relative max-w-4xl w-full bg-white rounded-3xl overflow-hidden shadow-2xl border border-slate-300 flex flex-col max-h-[92vh]"
+            data-lenis-prevent="true"
+            data-lenis-prevent-wheel="true"
+            data-lenis-prevent-touch="true"
+            className="relative max-w-4xl w-full bg-white rounded-3xl overflow-hidden shadow-2xl border border-slate-300 flex flex-col max-h-[90vh] overscroll-contain"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Top Controls */}
-            <div className="flex items-center justify-between px-6 py-4 bg-slate-50 border-b border-slate-200">
+            <div className="flex items-center justify-between px-6 py-4 bg-slate-50 border-b border-slate-200 shrink-0">
               <div className="flex items-center gap-2">
                 <span className="w-3 h-3 rounded-full bg-indigo-600" />
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
@@ -423,8 +450,13 @@ export default function Calendar() {
               </div>
             </div>
 
-            {/* Modal Body */}
-            <div className="p-6 sm:p-8 overflow-y-auto space-y-5">
+            {/* Modal Body - Enabled Full Internal Scroll */}
+            <div 
+              data-lenis-prevent="true"
+              data-lenis-prevent-wheel="true"
+              data-lenis-prevent-touch="true"
+              className="p-6 sm:p-8 overflow-y-auto flex-1 min-h-0 space-y-5 overscroll-contain"
+            >
               {/* Kop Surat Header */}
               <div className="text-center pb-4 border-b-2 border-slate-900">
                 <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-0.5">
