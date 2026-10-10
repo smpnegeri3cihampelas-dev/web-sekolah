@@ -2,118 +2,286 @@
 
 import React, { useState, useEffect } from 'react';
 
-interface AgendaItem {
+export interface AgendaItem {
   id: number;
-  name?: string;
-  title?: string;
+  name: string;
   date: string;
-  category?: string;
+  category: string;
+  status: string;
+  semester?: string;
+  title?: string;
   type?: string;
-  status?: string;
 }
 
-const DEFAULT_EVENTS: AgendaItem[] = [
+export const OFFICIAL_KALDIK_SMPN3: AgendaItem[] = [
+  // SEMESTER 1 (2026)
   {
     id: 1,
-    name: 'Masa Pengenalan Lingkungan Sekolah (MPLS)',
-    date: '15 - 20 Juli 2026',
+    name: 'Hari Pertama Masuk Sekolah',
+    date: '13 Juli 2026',
     category: 'Akademik',
+    semester: 'Semester 1',
     status: 'Selesai'
   },
   {
     id: 2,
-    name: 'Upacara Peringatan Hari Kemerdekaan RI Ke-81',
-    date: '17 Agustus 2026',
-    category: 'Kegiatan',
+    name: 'Pengenalan Lingkungan Sekolah (MPLS)',
+    date: '15 - 17 & 20 - 21 Juli 2026',
+    category: 'Akademik',
+    semester: 'Semester 1',
     status: 'Selesai'
   },
   {
     id: 3,
-    name: 'Asesmen Sumatif Tengah Semester (ASTS) Ganjil',
-    date: '21 - 26 September 2026',
-    category: 'Ujian CBT',
+    name: 'Pelaksanaan Sulingjar (Survei Lingkungan Belajar)',
+    date: '03 - 26 Agustus 2026',
+    category: 'Akademik',
+    semester: 'Semester 1',
     status: 'Selesai'
   },
   {
     id: 4,
-    name: 'Asesmen Sumatif Akhir Semester (ASAS) Ganjil',
-    date: '01 - 08 Desember 2026',
-    category: 'Ujian CBT',
-    status: 'Berlangsung'
+    name: 'Kegiatan Hari Pramuka Nasional',
+    date: '14 Agustus 2026',
+    category: 'Kegiatan',
+    semester: 'Semester 1',
+    status: 'Selesai'
   },
   {
     id: 5,
-    name: 'Gelar Karya P5 & Pentas Seni Budaya',
-    date: '15 Desember 2026',
-    category: 'Kreativitas',
-    status: 'Mendatang'
+    name: 'Libur Hari Proklamasi Kemerdekaan RI',
+    date: '17 Agustus 2026',
+    category: 'Libur Resmi',
+    semester: 'Semester 1',
+    status: 'Selesai'
   },
   {
     id: 6,
-    name: 'Pembagian Buku Laporan Hasil Belajar (Rapor)',
-    date: '19 Desember 2026',
-    category: 'Akademik',
-    status: 'Mendatang'
+    name: 'Olimpiade Olahraga Siswa Nasional (O2SN) Tk. Nasional',
+    date: '19 - 23 Agustus 2026',
+    category: 'Kesiswaan',
+    semester: 'Semester 1',
+    status: 'Selesai'
   },
   {
     id: 7,
-    name: 'Libur Akhir Semester Ganjil',
-    date: '21 Des 2026 - 03 Jan 2027',
-    category: 'Libur Semester',
-    status: 'Mendatang'
+    name: 'Libur Maulid Nabi Muhammad SAW',
+    date: '25 Agustus 2026',
+    category: 'Libur Resmi',
+    semester: 'Semester 1',
+    status: 'Selesai'
   },
   {
     id: 8,
-    name: 'Awal Masuk Pembelajaran Semester Genap',
-    date: '04 Januari 2027',
+    name: 'Olimpiade Sains Nasional (OSN) Jenjang Dikdas Tk. Nasional',
+    date: '25 - 31 Agustus 2026',
     category: 'Akademik',
+    semester: 'Semester 1',
+    status: 'Selesai'
+  },
+  {
+    id: 9,
+    name: 'FLS2N Jenjang Pendidikan Dasar Tk. Nasional (Daring)',
+    date: '28 Sep - 03 Okt 2026',
+    category: 'Kreativitas',
+    semester: 'Semester 1',
+    status: 'Selesai'
+  },
+  {
+    id: 10,
+    name: 'Gelar Aksi Karakter Siswa Indonesia Tk. Provinsi',
+    date: '21 November 2026',
+    category: 'Kesiswaan',
+    semester: 'Semester 1',
+    status: 'Mendatang'
+  },
+  {
+    id: 11,
+    name: 'Peringatan Hari Guru Nasional',
+    date: '25 November 2026',
+    category: 'Kegiatan',
+    semester: 'Semester 1',
+    status: 'Mendatang'
+  },
+  {
+    id: 12,
+    name: 'Pelaksanaan Sumatif Akhir Semester 1 (SAS 1)',
+    date: '30 Nov - 11 Des 2026',
+    category: 'Ujian CBT',
+    semester: 'Semester 1',
+    status: 'Mendatang'
+  },
+  {
+    id: 13,
+    name: 'Hari Disabilitas Internasional',
+    date: '03 Desember 2026',
+    category: 'Kegiatan',
+    semester: 'Semester 1',
+    status: 'Mendatang'
+  },
+  {
+    id: 14,
+    name: 'Penetapan dan Pembagian Rapor Semester 1',
+    date: '23 Desember 2026',
+    category: 'Akademik',
+    semester: 'Semester 1',
+    status: 'Mendatang'
+  },
+  {
+    id: 15,
+    name: 'Cuti Bersama & Libur Hari Natal',
+    date: '24 - 25 Desember 2026',
+    category: 'Libur Resmi',
+    semester: 'Semester 1',
+    status: 'Mendatang'
+  },
+  {
+    id: 16,
+    name: 'Libur Semester 1',
+    date: '28 Des 2026 - 08 Jan 2027',
+    category: 'Libur Semester',
+    semester: 'Semester 1',
+    status: 'Mendatang'
+  },
+
+  // SEMESTER 2 (2027)
+  {
+    id: 17,
+    name: 'Hari Pertama Masuk Sekolah Semester 2',
+    date: '11 Januari 2027',
+    category: 'Akademik',
+    semester: 'Semester 2',
+    status: 'Mendatang'
+  },
+  {
+    id: 18,
+    name: 'Kegiatan Penumbuhan Budi Pekerti (SMARTTREN Ramadhan)',
+    date: '15 Feb - 05 Mar 2027',
+    category: 'Kegiatan',
+    semester: 'Semester 2',
+    status: 'Mendatang'
+  },
+  {
+    id: 19,
+    name: 'Perkiraan Libur Hari Raya Idul Fitri 1448 H',
+    date: '08 - 19 Maret 2027',
+    category: 'Libur Resmi',
+    semester: 'Semester 2',
+    status: 'Mendatang'
+  },
+  {
+    id: 20,
+    name: 'Libur Wafat Isa Almasih',
+    date: '26 April 2027',
+    category: 'Libur Resmi',
+    semester: 'Semester 2',
+    status: 'Mendatang'
+  },
+  {
+    id: 21,
+    name: 'Hari Pendidikan Nasional (Hardiknas)',
+    date: '02 Mei 2027',
+    category: 'Kegiatan',
+    semester: 'Semester 2',
+    status: 'Mendatang'
+  },
+  {
+    id: 22,
+    name: 'Perkiraan Sumatif Akhir Jenjang SMP (Ujian Sekolah Kelas 9)',
+    date: '11 - 21 Mei 2027',
+    category: 'Ujian CBT',
+    semester: 'Semester 2',
+    status: 'Mendatang'
+  },
+  {
+    id: 23,
+    name: 'Perkiraan Penetapan Kelulusan Siswa Kelas 9',
+    date: '02 Juni 2027',
+    category: 'Akademik',
+    semester: 'Semester 2',
+    status: 'Mendatang'
+  },
+  {
+    id: 24,
+    name: 'Perkiraan Sumatif Akhir Tahun (SAT) / Akhir Fase',
+    date: '07 - 18 Juni 2027',
+    category: 'Ujian CBT',
+    semester: 'Semester 2',
+    status: 'Mendatang'
+  },
+  {
+    id: 25,
+    name: 'Tanggal Penetapan dan Pembagian Rapor Semester 2',
+    date: '25 Juni 2027',
+    category: 'Akademik',
+    semester: 'Semester 2',
+    status: 'Mendatang'
+  },
+  {
+    id: 26,
+    name: 'Libur Akhir Tahun Pelajaran',
+    date: '28 Juni - 09 Juli 2027',
+    category: 'Libur Semester',
+    semester: 'Semester 2',
+    status: 'Mendatang'
+  },
+  {
+    id: 27,
+    name: 'Masa SPMB / PPDB Tahun Pelajaran 2027/2028',
+    date: 'Juni - Juli 2027',
+    category: 'Akademik',
+    semester: 'Semester 2',
     status: 'Mendatang'
   }
 ];
 
-const INITIAL_LIMIT = 5;
+const INITIAL_LIMIT = 6;
 
-// Helper to extract day range and month safely
 function parseDateParts(dateStr: string) {
-  if (!dateStr) return { day: '•', month: 'Agenda', full: 'Mendatang' };
-  
+  if (!dateStr) return { day: '•', month: 'AGENDA' };
   const trimmed = dateStr.trim();
   
-  // Format range: "15 - 20 Juli 2026"
-  const rangeMatch = trimmed.match(/^(\d{1,2})\s*[-–]\s*(\d{1,2})\s+([A-Za-z]+)/i);
-  if (rangeMatch) {
+  // Cross month range e.g. "30 Nov - 11 Des 2026" or "28 Des 2026 - 08 Jan 2027"
+  const crossMonth = trimmed.match(/^(\d{1,2})\s+([A-Za-z]+).+[-–]\s*(\d{1,2})\s+([A-Za-z]+)/i);
+  if (crossMonth) {
     return {
-      day: `${rangeMatch[1]}-${rangeMatch[2]}`,
-      month: rangeMatch[3].toUpperCase(),
-      full: trimmed
+      day: `${crossMonth[1]}-${crossMonth[3]}`,
+      month: `${crossMonth[2].slice(0, 3)}/${crossMonth[4].slice(0, 3)}`.toUpperCase()
     };
   }
 
-  // Format single date: "17 Agustus 2026"
-  const singleMatch = trimmed.match(/^(\d{1,2})\s+([A-Za-z]+)/i);
-  if (singleMatch) {
+  // Multi range e.g. "15 - 17 & 20 - 21 Juli 2026"
+  const multiRange = trimmed.match(/^(\d{1,2}).+[-–]\s*(\d{1,2})\s+([A-Za-z]+)/i);
+  if (multiRange) {
     return {
-      day: singleMatch[1],
-      month: singleMatch[2].toUpperCase(),
-      full: trimmed
+      day: `${multiRange[1]}-${multiRange[2]}`,
+      month: multiRange[3].slice(0, 3).toUpperCase()
     };
   }
 
-  // Cross month range: "21 Des 2026 - 03 Jan 2027"
-  const crossMatch = trimmed.match(/^(\d{1,2})\s+([A-Za-z]+).+[-–]\s*(\d{1,2})\s+([A-Za-z]+)/i);
-  if (crossMatch) {
+  // Standard range e.g. "03 - 26 Agustus 2026"
+  const stdRange = trimmed.match(/^(\d{1,2})\s*[-–]\s*(\d{1,2})\s+([A-Za-z]+)/i);
+  if (stdRange) {
     return {
-      day: `${crossMatch[1]}-${crossMatch[3]}`,
-      month: `${crossMatch[2].substring(0, 3)}/${crossMatch[4].substring(0, 3)}`.toUpperCase(),
-      full: trimmed
+      day: `${stdRange[1]}-${stdRange[2]}`,
+      month: stdRange[3].slice(0, 3).toUpperCase()
     };
   }
 
-  return { day: '🗓️', month: 'AGENDA', full: trimmed };
+  // Single date e.g. "13 Juli 2026"
+  const singleDate = trimmed.match(/^(\d{1,2})\s+([A-Za-z]+)/i);
+  if (singleDate) {
+    return {
+      day: singleDate[1],
+      month: singleDate[2].slice(0, 3).toUpperCase()
+    };
+  }
+
+  return { day: '🗓️', month: 'AGENDA' };
 }
 
 export default function Calendar() {
-  const [events, setEvents] = useState<AgendaItem[]>(DEFAULT_EVENTS);
+  const [events, setEvents] = useState<AgendaItem[]>(OFFICIAL_KALDIK_SMPN3);
   const [filter, setFilter] = useState<string>('SEMUA');
   const [visibleCount, setVisibleCount] = useState<number>(INITIAL_LIMIT);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
@@ -126,21 +294,29 @@ export default function Calendar() {
         if (saved) {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            setEvents(parsed);
+            setEvents(parsed.map((p) => ({
+              id: p.id || Date.now(),
+              name: p.name || p.title || 'Agenda Sekolah',
+              date: p.date || 'Mendatang',
+              category: p.category || p.type || 'Akademik',
+              status: p.status || 'Mendatang',
+              semester: p.semester || 'Semester 1'
+            })));
           }
         }
       } catch {}
     }
   }, []);
 
-  // Filter categorization
   const filteredEvents = events.filter((item) => {
-    const cat = item.category || item.type || 'Akademik';
+    const cat = (item.category || item.type || 'Akademik').toLowerCase();
+    const sem = (item.semester || '').toLowerCase();
+
     if (filter === 'SEMUA') return true;
-    if (filter === 'UJIAN') return cat === 'Ujian CBT' || cat.toLowerCase().includes('ujian') || cat.toLowerCase().includes('asesmen');
-    if (filter === 'KEGIATAN') return cat === 'Kegiatan' || cat === 'Kreativitas';
-    if (filter === 'LIBUR') return cat === 'Libur Semester' || cat.toLowerCase().includes('libur');
-    if (filter === 'AKADEMIK') return cat === 'Akademik';
+    if (filter === 'SEM1') return sem.includes('1') || (!sem && item.id <= 16);
+    if (filter === 'SEM2') return sem.includes('2') || (!sem && item.id > 16);
+    if (filter === 'UJIAN') return cat.includes('cbt') || cat.includes('ujian') || cat.includes('sumatif');
+    if (filter === 'LIBUR') return cat.includes('libur');
     return true;
   });
 
@@ -150,10 +326,11 @@ export default function Calendar() {
 
   const getBadgeStyle = (cat?: string) => {
     const c = (cat || 'Akademik').toLowerCase();
-    if (c.includes('cbt') || c.includes('ujian')) return 'bg-sky-50 text-sky-700 border-sky-200/80';
+    if (c.includes('cbt') || c.includes('ujian') || c.includes('sumatif')) return 'bg-sky-50 text-sky-700 border-sky-200/80';
     if (c.includes('kegiatan')) return 'bg-purple-50 text-purple-700 border-purple-200/80';
     if (c.includes('kreativitas')) return 'bg-pink-50 text-pink-700 border-pink-200/80';
     if (c.includes('libur')) return 'bg-rose-50 text-rose-700 border-rose-200/80';
+    if (c.includes('kesiswaan')) return 'bg-amber-50 text-amber-800 border-amber-200/80';
     return 'bg-indigo-50 text-indigo-700 border-indigo-200/80';
   };
 
@@ -199,7 +376,7 @@ export default function Calendar() {
           <div className="lg:col-span-5 lg:sticky lg:top-32">
             <div className="inline-flex items-center gap-2.5 px-3.5 py-1 rounded-full bg-indigo-50/80 border border-indigo-200/70 text-indigo-700 text-[11px] font-medium tracking-[0.15em] uppercase mb-4 shadow-sm">
               <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shadow-[0_0_8px_#6366f1]" />
-              <span>Agenda & Kegiatan Resmi</span>
+              <span>Kalender Pendidikan Resmi</span>
             </div>
 
             <h2 className="text-3xl sm:text-4xl md:text-5xl font-light text-slate-900 mb-5 leading-[1.12] tracking-tight">
@@ -208,34 +385,53 @@ export default function Calendar() {
             </h2>
 
             <p className="text-slate-600 text-xs sm:text-sm leading-relaxed mb-6 font-light max-w-md">
-              Panduan resmi jadwal pembelajaran, evaluasi sumatif ASTS & ASAS, kegiatan kesiswaan, dan libur semester di lingkungan SMP Negeri 3 Cihampelas.
+              Jadwal resmi Disdik KBB untuk SMP Negeri 3 Cihampelas. Memuat seluruh agenda belajar, pelaksanaan asesmen sumatif, kegiatan kesiswaan, dan libur semester.
             </p>
 
-            {/* Quick Action Button - Opens Print / Summary Modal */}
-            <button 
-              type="button"
-              onClick={() => setIsModalOpen(true)}
-              className="group inline-flex items-center gap-3 px-5 py-3 rounded-full bg-white hover:bg-indigo-50 border border-indigo-200/90 text-xs sm:text-sm font-semibold text-slate-800 hover:text-indigo-700 transition-all duration-300 shadow-sm hover:shadow-md cursor-pointer active:scale-98"
-            >
-              <span className="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                📄
-              </span>
-              <span>Lihat & Cetak Kalender Lengkap</span>
-              <span className="text-indigo-400 group-hover:translate-x-0.5 transition-transform">↗</span>
-            </button>
+            {/* Official Signature Badge */}
+            <div className="mb-6 p-4 rounded-2xl bg-white border border-indigo-100 shadow-xs flex items-center gap-3.5">
+              <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-700 font-bold text-lg shrink-0">
+                🏛️
+              </div>
+              <div className="text-xs">
+                <p className="font-bold text-slate-900">Ditetapkan oleh Kepala Sekolah</p>
+                <p className="text-slate-500 text-[11px]">H. Rustandi, M.Pd. · NIP. 197006081998021001</p>
+              </div>
+            </div>
 
-            {/* Summary Tag */}
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row lg:flex-col gap-3">
+              {/* Primary: Direct Download Official PDF */}
+              <a 
+                href="/kalender-akademik-smpn3.pdf" 
+                target="_blank"
+                rel="noopener noreferrer"
+                download="Kalender-Akademik-SMPN3-Cihampelas-2026-2027.pdf"
+                className="group inline-flex items-center justify-center sm:justify-start gap-3 px-5 py-3 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-bold transition-all duration-300 shadow-md shadow-indigo-600/20 active:scale-98 cursor-pointer"
+              >
+                <span className="w-7 h-7 rounded-full bg-white/20 text-white flex items-center justify-center text-xs group-hover:scale-110 transition-transform">
+                  ↓
+                </span>
+                <span>Unduh Dokumen PDF Resmi</span>
+              </a>
+
+              {/* Secondary: Open Modal Summary */}
+              <button 
+                type="button"
+                onClick={() => setIsModalOpen(true)}
+                className="inline-flex items-center justify-center sm:justify-start gap-2.5 px-5 py-3 rounded-full bg-white hover:bg-indigo-50 border border-indigo-200 text-xs sm:text-sm font-semibold text-slate-700 hover:text-indigo-700 transition-all shadow-xs cursor-pointer active:scale-98"
+              >
+                <span>📋</span>
+                <span>Lihat Rekap Jadwal & Cetak</span>
+                <span className="text-indigo-400">↗</span>
+              </button>
+            </div>
+
+            {/* Quick Stats */}
             <div className="mt-8 pt-6 border-t border-slate-200/80 flex items-center gap-6 text-xs text-slate-500">
               <div>
                 <span className="font-bold text-slate-800 text-sm block">{events.length}</span>
                 <span>Total Agenda</span>
-              </div>
-              <div className="h-7 w-px bg-slate-200" />
-              <div>
-                <span className="font-bold text-amber-700 text-sm block">
-                  {events.filter(e => (e.status || '').toLowerCase() === 'berlangsung').length}
-                </span>
-                <span>Sedang Berlangsung</span>
               </div>
               <div className="h-7 w-px bg-slate-200" />
               <div>
@@ -244,20 +440,27 @@ export default function Calendar() {
                 </span>
                 <span>Mendatang</span>
               </div>
+              <div className="h-7 w-px bg-slate-200" />
+              <div>
+                <span className="font-bold text-slate-600 text-sm block">
+                  {events.filter(e => (e.status || '').toLowerCase() === 'selesai').length}
+                </span>
+                <span>Terlaksana</span>
+              </div>
             </div>
           </div>
 
           {/* Timeline & Filter List */}
           <div className="lg:col-span-7">
             
-            {/* Filter Buttons */}
+            {/* Filter Tabs */}
             <div className="flex flex-wrap items-center gap-2 mb-6">
               {[
-                { key: 'SEMUA', label: 'Semua' },
-                { key: 'AKADEMIK', label: 'Akademik' },
-                { key: 'UJIAN', label: 'Asesmen & CBT' },
-                { key: 'KEGIATAN', label: 'Kegiatan Siswa' },
-                { key: 'LIBUR', label: 'Libur Semester' }
+                { key: 'SEMUA', label: 'Semua Agenda' },
+                { key: 'SEM1', label: 'Semester 1 (Ganjil)' },
+                { key: 'SEM2', label: 'Semester 2 (Genap)' },
+                { key: 'UJIAN', label: 'Ujian / Asesmen' },
+                { key: 'LIBUR', label: 'Libur Resmi' }
               ].map((f) => (
                 <button
                   key={f.key}
@@ -292,7 +495,7 @@ export default function Calendar() {
                     
                     {/* Date Badge */}
                     <div className="shrink-0 flex sm:flex-col items-center justify-between sm:justify-center w-full sm:w-20 h-14 sm:h-20 px-3 sm:px-1 rounded-xl bg-slate-50 border border-slate-200/90 group-hover:bg-indigo-600 group-hover:border-indigo-600 transition-colors">
-                      <span className="text-lg sm:text-2xl font-bold text-slate-900 group-hover:text-white transition-colors leading-none tracking-tight">
+                      <span className="text-base sm:text-xl font-bold text-slate-900 group-hover:text-white transition-colors leading-none tracking-tight">
                         {dateParts.day}
                       </span>
                       <span className="text-[10px] font-bold tracking-wider text-indigo-700 sm:mt-1 group-hover:text-indigo-100 transition-colors">
@@ -306,6 +509,11 @@ export default function Calendar() {
                         <span className={`px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-md border ${getBadgeStyle(category)}`}>
                           {category}
                         </span>
+                        {item.semester && (
+                          <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
+                            {item.semester}
+                          </span>
+                        )}
                         {getStatusBadge(item.status)}
                       </div>
 
@@ -329,7 +537,7 @@ export default function Calendar() {
               <div className="mt-8 text-center">
                 <button
                   type="button"
-                  onClick={() => setVisibleCount((prev) => prev + 5)}
+                  onClick={() => setVisibleCount((prev) => prev + 6)}
                   className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-white hover:bg-indigo-50 text-indigo-700 hover:text-indigo-800 text-xs font-bold border border-indigo-200 shadow-xs hover:shadow-sm transition-all cursor-pointer"
                 >
                   <span>+ Tampilkan Lebih Banyak Agenda</span>
@@ -379,7 +587,7 @@ export default function Calendar() {
           aria-modal="true"
         >
           <div 
-            className="relative max-w-3xl w-full bg-white rounded-3xl overflow-hidden shadow-2xl border border-slate-300 flex flex-col max-h-[90vh]"
+            className="relative max-w-4xl w-full bg-white rounded-3xl overflow-hidden shadow-2xl border border-slate-300 flex flex-col max-h-[92vh]"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Top Controls */}
@@ -387,17 +595,27 @@ export default function Calendar() {
               <div className="flex items-center gap-2">
                 <span className="w-3 h-3 rounded-full bg-indigo-600" />
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                  Kalender Pendidikan Resmi
+                  Kalender Pendidikan Resmi SMPN 3 Cihampelas
                 </span>
               </div>
               <div className="flex items-center gap-2">
+                <a
+                  href="/kalender-akademik-smpn3.pdf"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  download="Kalender-Akademik-SMPN3-Cihampelas-2026-2027.pdf"
+                  className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+                  title="Unduh File PDF Asli"
+                >
+                  <span>📥 Unduh PDF</span>
+                </a>
                 <button
                   type="button"
                   onClick={() => window.print()}
-                  className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
-                  title="Cetak atau Simpan PDF"
+                  className="px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer border border-slate-300"
+                  title="Cetak Tabel"
                 >
-                  <span>🖨️ Cetak / PDF</span>
+                  <span>🖨️ Cetak</span>
                 </button>
                 <button
                   type="button"
@@ -421,7 +639,7 @@ export default function Calendar() {
                   SMP Negeri 3 Cihampelas
                 </h3>
                 <p className="text-xs text-slate-600">
-                  Kalender Akademik & Jadwal Kegiatan Siswa — Tahun Ajaran 2026/2027
+                  Kalender Pendidikan Tahun Pelajaran 2026 / 2027 — Semester 1 & 2
                 </p>
               </div>
 
@@ -430,21 +648,23 @@ export default function Calendar() {
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-100 text-slate-800 font-bold uppercase text-[10px] tracking-wider border-b border-slate-200">
                     <tr>
-                      <th className="py-3 px-4">No</th>
-                      <th className="py-3 px-4">Tanggal Pelaksanaan</th>
+                      <th className="py-3 px-3">No</th>
+                      <th className="py-3 px-3">Tanggal Pelaksanaan</th>
                       <th className="py-3 px-4">Nama Agenda / Kegiatan</th>
-                      <th className="py-3 px-4">Kategori</th>
-                      <th className="py-3 px-4 text-center">Status</th>
+                      <th className="py-3 px-3">Semester</th>
+                      <th className="py-3 px-3">Kategori</th>
+                      <th className="py-3 px-3 text-center">Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
                     {events.map((evt, idx) => (
                       <tr key={evt.id} className="hover:bg-slate-50/80">
-                        <td className="py-3 px-4 font-bold text-slate-900">{idx + 1}</td>
-                        <td className="py-3 px-4 font-semibold text-indigo-900 whitespace-nowrap">{evt.date}</td>
-                        <td className="py-3 px-4 font-bold text-slate-900">{evt.name || evt.title}</td>
-                        <td className="py-3 px-4 text-slate-600">{evt.category || evt.type || 'Akademik'}</td>
-                        <td className="py-3 px-4 text-center whitespace-nowrap">
+                        <td className="py-2.5 px-3 font-bold text-slate-900">{idx + 1}</td>
+                        <td className="py-2.5 px-3 font-semibold text-indigo-900 whitespace-nowrap">{evt.date}</td>
+                        <td className="py-2.5 px-4 font-bold text-slate-900">{evt.name || evt.title}</td>
+                        <td className="py-2.5 px-3 text-slate-500 whitespace-nowrap">{evt.semester || '-'}</td>
+                        <td className="py-2.5 px-3 text-slate-600">{evt.category || evt.type || 'Akademik'}</td>
+                        <td className="py-2.5 px-3 text-center whitespace-nowrap">
                           {getStatusBadge(evt.status)}
                         </td>
                       </tr>
@@ -453,14 +673,20 @@ export default function Calendar() {
                 </table>
               </div>
 
-              {/* Footer Note */}
-              <div className="text-[11px] text-slate-500 leading-relaxed bg-slate-50 p-4 rounded-xl border border-slate-200">
-                <p className="font-bold text-slate-700 mb-1">Catatan Penting:</p>
-                <ul className="list-disc pl-4 space-y-0.5">
-                  <li>Jadwal sewaktu-waktu dapat disesuaikan mengikuti edaran resmi Dinas Pendidikan KBB.</li>
-                  <li>Pelaksanaan asesmen sumatif CBT membutuhkan kelengkapan akun peserta didik.</li>
-                  <li>Untuk informasi lebih lanjut, silakan hubungi bagian Tata Usaha atau Kurikulum sekolah.</li>
-                </ul>
+              {/* Signoff Block */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between pt-4 border-t border-slate-200 gap-4 text-xs">
+                <div className="text-[11px] text-slate-500 space-y-0.5 max-w-sm">
+                  <p className="font-bold text-slate-700">Catatan Sekolah:</p>
+                  <p>• Jeda tengah semester diisi perlombaan antar kelas, pentas seni, pameran karya P5, dan studi wisata.</p>
+                  <p>• Penetapan kelulusan kelas 9 mengikuti jadwal rapat penentuan kelulusan sekolah.</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-slate-500">Cihampelas, 13 Juli 2026</p>
+                  <p className="font-bold text-slate-900">Kepala SMP Negeri 3 Cihampelas</p>
+                  <div className="h-10" />
+                  <p className="font-black text-slate-950 underline">H. Rustandi, M.Pd.</p>
+                  <p className="text-[11px] text-slate-500 font-mono">NIP. 197006081998021001</p>
+                </div>
               </div>
             </div>
 
