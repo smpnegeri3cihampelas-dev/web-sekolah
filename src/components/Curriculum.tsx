@@ -10,7 +10,6 @@ export default function Curriculum() {
     {
       id: 'pembelajaran-mendalam',
       title: 'Pembelajaran Mendalam',
-      badge: 'Fokus 01',
       categoryTag: 'Eksplorasi Akademik',
       tagline: 'Pembelajaran bermakna yang melatih nalar kritis, diskusi aktif, dan pemahaman konsep secara kontekstual.',
       desc: 'Menerapkan paradigma baru Kurikulum Merdeka yang berpusat pada peserta didik. Siswa tidak sekadar menghafal materi, tetapi diajak bereksplorasi secara aktif, berkolaborasi dalam kelompok, dan memecahkan persoalan dunia nyata melalui pembelajaran berdiferensiasi.',
@@ -24,7 +23,6 @@ export default function Curriculum() {
     {
       id: 'pembiasaan-karakter',
       title: 'Pembiasaan Karakter & Budaya Sekolah',
-      badge: 'Fokus 02',
       categoryTag: 'Pendidikan Karakter',
       tagline: 'Pembiasaan rutin pagi: religius, literasi harian, kedisiplinan 5S, dan Jumat bersih/sehat.',
       desc: 'Membangun karakter mulia melalui rutinitas harian yang konsisten: apel pagi, pembiasaan tadarus & sholat dhuha berjamaah, gerakan literasi 15 menit, penanaman budaya 5S (Senyum, Salam, Sapa, Sopan, Santun), serta kepedulian lingkungan melalui Jumat Bersih.',
@@ -38,7 +36,6 @@ export default function Curriculum() {
     {
       id: 'projek-p5',
       title: 'Projek Penguatan P5',
-      badge: 'Fokus 03',
       categoryTag: 'Aksi Nyata Siswa',
       tagline: 'Projek Profil Pelajar Pancasila: kearifan lokal Sunda, kewirausahaan siswa, dan kepedulian lingkungan.',
       desc: 'Wadah eksplorasi lintas disiplin ilmu untuk menumbuhkan kemandirian, gotong royong, dan kreativitas. Siswa menghasilkan karya nyata melalui pelestarian seni budaya lokal Sunda, inovasi wirausaha muda, serta aksi nyata peduli kelestarian alam Cihampelas.',
@@ -88,10 +85,7 @@ export default function Curriculum() {
               }`}
             >
               <div>
-                <span className={`text-[10px] font-mono tracking-widest uppercase block mb-1 ${activeTab === idx ? 'text-indigo-600 font-bold' : 'text-slate-500'}`}>
-                  {prog.badge}
-                </span>
-                <span className={`text-sm sm:text-base font-normal block ${activeTab === idx ? 'text-slate-900 font-semibold' : 'text-slate-600'}`}>
+                <span className={`text-sm sm:text-base block transition-colors ${activeTab === idx ? 'text-slate-900 font-semibold' : 'text-slate-600 font-medium'}`}>
                   {prog.title}
                 </span>
               </div>
@@ -110,9 +104,8 @@ export default function Curriculum() {
           {/* Content Left */}
           <div className="lg:col-span-6 flex flex-col justify-between relative z-10">
             <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/90 border border-indigo-200/80 text-indigo-700 text-[10px] font-semibold tracking-widest uppercase mb-4 shadow-sm">
-                <span>{programs[activeTab].badge}</span>
-                <span>•</span>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/90 border border-indigo-200/80 text-indigo-700 text-[10px] font-semibold tracking-wider uppercase mb-4 shadow-sm">
+                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
                 <span>{programs[activeTab].categoryTag}</span>
               </div>
 
