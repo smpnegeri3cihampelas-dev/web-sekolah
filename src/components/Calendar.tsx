@@ -518,43 +518,19 @@ export default function Calendar() {
               Menampilkan kegiatan resmi terdekat di SMP Negeri 3 Cihampelas. Untuk melihat jadwal lengkap 1 tahun ajaran atau mengunduh surat ketetapan resmi, silakan buka rekap kalender.
             </p>
 
-            {/* Official Signature Badge */}
-            <div className="mb-6 p-4 rounded-2xl bg-white border border-indigo-100 shadow-xs flex items-center gap-3.5">
-              <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-700 font-bold text-lg shrink-0">
-                🏛️
-              </div>
-              <div className="text-xs">
-                <p className="font-bold text-slate-900">Ditetapkan oleh Kepala Sekolah</p>
-                <p className="text-slate-500 text-[11px]">H. Rustandi, M.Pd. · NIP. 197006081998021001</p>
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row lg:flex-col gap-3">
-              {/* Primary: Open Complete 27-Event Modal */}
+            {/* Single Action Button */}
+            <div>
               <button 
                 type="button"
                 onClick={() => setIsModalOpen(true)}
-                className="group inline-flex items-center justify-center sm:justify-start gap-3 px-6 py-3.5 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-bold transition-all duration-300 shadow-md shadow-indigo-600/20 active:scale-98 cursor-pointer"
+                className="group inline-flex items-center gap-3 px-6 py-3.5 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-bold transition-all duration-300 shadow-md shadow-indigo-600/20 active:scale-98 cursor-pointer"
               >
                 <span className="w-7 h-7 rounded-full bg-white/20 text-white flex items-center justify-center text-xs group-hover:scale-110 transition-transform">
                   📋
                 </span>
-                <span>Buka Rekap Lengkap (27 Agenda)</span>
+                <span>Lihat Rekap Kalender Lengkap</span>
                 <span className="text-indigo-200 group-hover:translate-x-1 transition-transform">➔</span>
               </button>
-
-              {/* Secondary: Download Official Signed PDF */}
-              <a 
-                href="/kalender-akademik-smpn3.pdf" 
-                target="_blank"
-                rel="noopener noreferrer"
-                download="Kalender-Akademik-SMPN3-Cihampelas-2026-2027.pdf"
-                className="inline-flex items-center justify-center sm:justify-start gap-2.5 px-6 py-3 rounded-full bg-white hover:bg-indigo-50 border border-indigo-200 text-xs sm:text-sm font-semibold text-slate-700 hover:text-indigo-700 transition-all shadow-xs cursor-pointer active:scale-98"
-              >
-                <span>📥</span>
-                <span>Unduh Dokumen PDF Resmi</span>
-              </a>
             </div>
 
             {/* Info Hint */}
@@ -637,25 +613,6 @@ export default function Calendar() {
                   </div>
                 );
               })}
-            </div>
-
-            {/* Bottom Invitation Banner (Zero Confusion) */}
-            <div className="mt-6 p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-indigo-50/80 via-white to-purple-50/80 border border-indigo-100/90 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="text-center sm:text-left">
-                <p className="text-xs font-bold text-slate-900">
-                  Butuh melihat seluruh 27 jadwal Semester 1 & 2?
-                </p>
-                <p className="text-[11px] text-slate-500 mt-0.5">
-                  Termasuk kegiatan yang telah lalu, jadwal libur, dan asesmen akhir tahun.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(true)}
-                className="px-4 py-2 rounded-xl bg-white hover:bg-indigo-600 text-indigo-700 hover:text-white text-xs font-bold border border-indigo-200 hover:border-indigo-600 shadow-xs transition-all cursor-pointer whitespace-nowrap active:scale-98"
-              >
-                Lihat Rekap Lengkap ➔
-              </button>
             </div>
 
           </div>
