@@ -10,7 +10,7 @@ export default function Curriculum() {
     {
       id: 'pembelajaran-mendalam',
       title: 'Pembelajaran Mendalam',
-      categoryTag: 'Eksplorasi Akademik',
+      categoryTag: 'Akademik',
       tagline: 'Pembelajaran bermakna yang melatih nalar kritis, diskusi aktif, dan pemahaman konsep secara kontekstual.',
       desc: 'Menerapkan paradigma baru Kurikulum Merdeka yang berpusat pada peserta didik. Siswa tidak sekadar menghafal materi, tetapi diajak bereksplorasi secara aktif, berkolaborasi dalam kelompok, dan memecahkan persoalan dunia nyata melalui pembelajaran berdiferensiasi.',
       metrics: [
@@ -23,7 +23,7 @@ export default function Curriculum() {
     {
       id: 'pembiasaan-karakter',
       title: 'Pembiasaan Karakter & Budaya Sekolah',
-      categoryTag: 'Pendidikan Karakter',
+      categoryTag: 'Budaya Sekolah',
       tagline: 'Pembiasaan rutin pagi: religius, literasi harian, kedisiplinan 5S, dan Jumat bersih/sehat.',
       desc: 'Membangun karakter mulia melalui rutinitas harian yang konsisten: apel pagi, pembiasaan tadarus & sholat dhuha berjamaah, gerakan literasi 15 menit, penanaman budaya 5S (Senyum, Salam, Sapa, Sopan, Santun), serta kepedulian lingkungan melalui Jumat Bersih.',
       metrics: [
@@ -36,7 +36,7 @@ export default function Curriculum() {
     {
       id: 'projek-p5',
       title: 'Projek Penguatan P5',
-      categoryTag: 'Aksi Nyata Siswa',
+      categoryTag: 'Karya Nyata P5',
       tagline: 'Projek Profil Pelajar Pancasila: kearifan lokal Sunda, kewirausahaan siswa, dan kepedulian lingkungan.',
       desc: 'Wadah eksplorasi lintas disiplin ilmu untuk menumbuhkan kemandirian, gotong royong, dan kreativitas. Siswa menghasilkan karya nyata melalui pelestarian seni budaya lokal Sunda, inovasi wirausaha muda, serta aksi nyata peduli kelestarian alam Cihampelas.',
       metrics: [
@@ -85,6 +85,11 @@ export default function Curriculum() {
               }`}
             >
               <div>
+                <span className={`text-[10px] font-mono tracking-widest uppercase block mb-1 font-semibold ${
+                  activeTab === idx ? 'text-indigo-600' : 'text-slate-400'
+                }`}>
+                  {prog.categoryTag}
+                </span>
                 <span className={`text-sm sm:text-base block transition-colors ${activeTab === idx ? 'text-slate-900 font-semibold' : 'text-slate-600 font-medium'}`}>
                   {prog.title}
                 </span>
