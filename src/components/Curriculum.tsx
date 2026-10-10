@@ -64,10 +64,10 @@ export default function Curriculum() {
           <div>
             <div className="inline-flex items-center gap-2.5 px-3.5 py-1 rounded-full bg-indigo-50/80 border border-indigo-200/70 text-indigo-700 text-[11px] font-medium tracking-[0.15em] uppercase mb-3 shadow-sm">
               <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shadow-[0_0_8px_#6366f1]" />
-              <span>Program Unggulan & Kurikulum</span>
+              <span>Kurikulum & Budaya Sekolah</span>
             </div>
             <h2 className="text-3xl sm:text-4xl md:text-5xl font-light text-slate-900 tracking-tight leading-[1.12]">
-              Pembelajaran Modern <span className="font-semibold text-indigo-950">Kurikulum Merdeka</span>
+              Fokus Pembelajaran <span className="font-semibold text-indigo-950">& Pembiasaan Karakter</span>
             </h2>
           </div>
           <p className="text-slate-600 text-xs sm:text-sm font-light max-w-md leading-relaxed">
