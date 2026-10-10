@@ -64,7 +64,7 @@ export default function Curriculum() {
               <span>Kurikulum & Budaya Sekolah</span>
             </div>
             <h2 className="text-3xl sm:text-4xl md:text-5xl font-light text-slate-900 tracking-tight leading-[1.12]">
-              Fokus Pembelajaran <span className="font-semibold text-indigo-950">& Pembiasaan Karakter</span>
+              Pembelajaran <span className="font-semibold text-indigo-950">& Pembiasaan Karakter</span>
             </h2>
           </div>
           <p className="text-slate-600 text-xs sm:text-sm font-light max-w-md leading-relaxed">
