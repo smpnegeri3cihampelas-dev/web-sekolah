@@ -23,7 +23,7 @@ import { TabAgenda } from '@/components/dashboard/TabAgenda';
 import { TabGaleri } from '@/components/dashboard/TabGaleri';
 import { TabPesan } from '@/components/dashboard/TabPesan';
 import { TabPengaturan } from '@/components/dashboard/TabPengaturan';
-import { OFFICIAL_KALDIK_SMPN3 } from '@/components/Calendar';
+import { useAgendaData, AgendaItem } from '@/lib/agendaData';
 
 // Isolated Clock Component to prevent whole dashboard re-renders every 1000ms
 const DashboardClock = React.memo(function DashboardClock() {
@@ -41,7 +41,6 @@ const DashboardClock = React.memo(function DashboardClock() {
   return <span>{time || 'Memuat...'}</span>;
 });
 
-const DEFAULT_AGENDA = OFFICIAL_KALDIK_SMPN3;
 
 const DEFAULT_GALLERY = [
   { id: 1, title: 'Laboratorium Komputer & Praktikum TIK', category: 'FASILITAS', src: '/gallery_2.jpg', desc: 'Sarana pembelajaran komputasi, literasi digital, dan pelaksanaan asesmen nasional ANBK.' },
@@ -215,36 +214,33 @@ export default function DashboardPage() {
     showToast('🗑️ Data guru telah dihapus dari direktori & Landing Page.');
   };
 
-  // 4. Agenda Akademik
-  const [agendaList, setAgendaList] = useState<typeof DEFAULT_AGENDA>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('smpn3_agenda_data_v1');
-        if (saved) return JSON.parse(saved);
-      } catch {}
-    }
-    return DEFAULT_AGENDA;
-  });
+  // 4. Agenda Akademik (Terintegrasi Penuh dengan Kalender Landing Page)
+  const { 
+    agendaList, 
+    addAgenda, 
+    updateAgenda, 
+    deleteAgenda, 
+    resetAgenda 
+  } = useAgendaData();
 
   const handleAddAgenda = (data: { name: string; date: string; category: string; semester?: string }) => {
-    const newItem = {
-      id: Date.now(),
+    addAgenda({
       name: data.name,
       date: data.date,
       category: data.category,
-      semester: data.semester || 'Semester 1',
-      status: 'Mendatang'
-    };
-    const updated = [...agendaList, newItem];
-    setAgendaList(updated);
-    try { localStorage.setItem('smpn3_agenda_data_v1', JSON.stringify(updated)); } catch {}
+      semester: data.semester || 'Semester 1'
+    });
+    showToast('📅 Agenda berhasil ditambahkan & tersinkron ke Landing Page.');
+  };
+
+  const handleUpdateAgenda = (id: number, data: Partial<AgendaItem>) => {
+    updateAgenda(id, data);
+    showToast('✏️ Agenda berhasil diperbarui & tersinkron ke Landing Page.');
   };
 
   const handleDeleteAgenda = (id: number) => {
-    const updated = agendaList.filter(a => a.id !== id);
-    setAgendaList(updated);
-    try { localStorage.setItem('smpn3_agenda_data_v1', JSON.stringify(updated)); } catch {}
-    showToast('🗑️ Agenda berhasil dihapus.');
+    deleteAgenda(id);
+    showToast('🗑️ Agenda berhasil dihapus dari sistem.');
   };
 
   // 5. Galeri & Fasilitas
@@ -659,7 +655,9 @@ export default function DashboardPage() {
               <TabAgenda
                 agendaList={agendaList}
                 onAddAgenda={handleAddAgenda}
+                onUpdateAgenda={handleUpdateAgenda}
                 onDeleteAgenda={handleDeleteAgenda}
+                onResetAgenda={resetAgenda}
                 showToast={showToast}
               />
             )}
