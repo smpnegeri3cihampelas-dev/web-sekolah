@@ -43,9 +43,12 @@ const DashboardClock = React.memo(function DashboardClock() {
 const DEFAULT_AGENDA = [
   { id: 1, name: 'Masa Pengenalan Lingkungan Sekolah (MPLS)', date: '15 - 20 Juli 2026', category: 'Akademik', status: 'Selesai' },
   { id: 2, name: 'Upacara Peringatan Hari Kemerdekaan RI Ke-81', date: '17 Agustus 2026', category: 'Kegiatan', status: 'Selesai' },
-  { id: 3, name: 'Asesmen Tengah Semester (Sumatif) Ganjil', date: '21 - 26 September 2026', category: 'Ujian CBT', status: 'Berlangsung' },
-  { id: 4, name: 'Asesmen Akhir Semester (PAS) Berbasis Digital', date: '04 - 12 Desember 2026', category: 'Ujian CBT', status: 'Mendatang' },
-  { id: 5, name: 'Gelar Karya P5 Kewirausahaan & Pentas Seni', date: '18 Desember 2026', category: 'Kreativitas', status: 'Mendatang' },
+  { id: 3, name: 'Asesmen Sumatif Tengah Semester (ASTS) Ganjil', date: '21 - 26 September 2026', category: 'Ujian CBT', status: 'Selesai' },
+  { id: 4, name: 'Asesmen Sumatif Akhir Semester (ASAS) Ganjil', date: '01 - 08 Desember 2026', category: 'Ujian CBT', status: 'Berlangsung' },
+  { id: 5, name: 'Gelar Karya P5 & Pentas Seni Budaya', date: '15 Desember 2026', category: 'Kreativitas', status: 'Mendatang' },
+  { id: 6, name: 'Pembagian Buku Laporan Hasil Belajar (Rapor)', date: '19 Desember 2026', category: 'Akademik', status: 'Mendatang' },
+  { id: 7, name: 'Libur Akhir Semester Ganjil', date: '21 Des 2026 - 03 Jan 2027', category: 'Libur Semester', status: 'Mendatang' },
+  { id: 8, name: 'Awal Masuk Pembelajaran Semester Genap', date: '04 Januari 2027', category: 'Akademik', status: 'Mendatang' },
 ];
 
 const DEFAULT_GALLERY = [
