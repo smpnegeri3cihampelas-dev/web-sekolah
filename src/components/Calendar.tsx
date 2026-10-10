@@ -278,6 +278,132 @@ function parseDateParts(dateStr: string) {
   return { day: '🗓️', month: 'AGENDA' };
 }
 
+const MONTH_INDEX_MAP: Record<string, number> = {
+  jan: 0, januari: 0,
+  feb: 1, februari: 1,
+  mar: 2, maret: 2,
+  apr: 3, april: 3,
+  mei: 4,
+  jun: 5, juni: 5,
+  jul: 6, juli: 6,
+  agu: 7, agustus: 7,
+  sep: 8, september: 8,
+  okt: 9, oktober: 9,
+  nov: 10, november: 10,
+  des: 11, desember: 11
+};
+
+export function computeAutomaticStatus(dateStr: string, manualStatus?: string): string {
+  if (!dateStr) return manualStatus || 'Mendatang';
+
+  try {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const trimmed = dateStr.trim();
+
+    // 1. Cross year range: e.g. "28 Des 2026 - 08 Jan 2027"
+    const crossYearMatch = trimmed.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})\s*[-–]\s*(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})/i);
+    if (crossYearMatch) {
+      const sDay = parseInt(crossYearMatch[1], 10);
+      const sMonth = MONTH_INDEX_MAP[crossYearMatch[2].toLowerCase().slice(0, 3)] ?? 0;
+      const sYear = parseInt(crossYearMatch[3], 10);
+
+      const eDay = parseInt(crossYearMatch[4], 10);
+      const eMonth = MONTH_INDEX_MAP[crossYearMatch[5].toLowerCase().slice(0, 3)] ?? 0;
+      const eYear = parseInt(crossYearMatch[6], 10);
+
+      const start = new Date(sYear, sMonth, sDay).getTime();
+      const end = new Date(eYear, eMonth, eDay, 23, 59, 59).getTime();
+
+      if (today < start) return 'Mendatang';
+      if (today > end) return 'Selesai';
+      return 'Berlangsung';
+    }
+
+    // 2. Cross month range same year: e.g. "30 Nov - 11 Des 2026" or "28 Sep - 03 Okt 2026"
+    const crossMonthMatch = trimmed.match(/^(\d{1,2})\s+([A-Za-z]+)\s*[-–]\s*(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})/i);
+    if (crossMonthMatch) {
+      const year = parseInt(crossMonthMatch[5], 10);
+      const sDay = parseInt(crossMonthMatch[1], 10);
+      const sMonth = MONTH_INDEX_MAP[crossMonthMatch[2].toLowerCase().slice(0, 3)] ?? 0;
+
+      const eDay = parseInt(crossMonthMatch[3], 10);
+      const eMonth = MONTH_INDEX_MAP[crossMonthMatch[4].toLowerCase().slice(0, 3)] ?? 0;
+
+      const start = new Date(year, sMonth, sDay).getTime();
+      const end = new Date(year, eMonth, eDay, 23, 59, 59).getTime();
+
+      if (today < start) return 'Mendatang';
+      if (today > end) return 'Selesai';
+      return 'Berlangsung';
+    }
+
+    // 3. Multi range in month: e.g. "15 - 17 & 20 - 21 Juli 2026"
+    const multiRangeMatch = trimmed.match(/^(\d{1,2}).+[-–]\s*(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})/i);
+    if (multiRangeMatch) {
+      const year = parseInt(multiRangeMatch[4], 10);
+      const month = MONTH_INDEX_MAP[multiRangeMatch[3].toLowerCase().slice(0, 3)] ?? 0;
+      const sDay = parseInt(multiRangeMatch[1], 10);
+      const eDay = parseInt(multiRangeMatch[2], 10);
+
+      const start = new Date(year, month, sDay).getTime();
+      const end = new Date(year, month, eDay, 23, 59, 59).getTime();
+
+      if (today < start) return 'Mendatang';
+      if (today > end) return 'Selesai';
+      return 'Berlangsung';
+    }
+
+    // 4. Standard range in month: e.g. "03 - 26 Agustus 2026"
+    const stdRangeMatch = trimmed.match(/^(\d{1,2})\s*[-–]\s*(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})/i);
+    if (stdRangeMatch) {
+      const year = parseInt(stdRangeMatch[4], 10);
+      const month = MONTH_INDEX_MAP[stdRangeMatch[3].toLowerCase().slice(0, 3)] ?? 0;
+      const sDay = parseInt(stdRangeMatch[1], 10);
+      const eDay = parseInt(stdRangeMatch[2], 10);
+
+      const start = new Date(year, month, sDay).getTime();
+      const end = new Date(year, month, eDay, 23, 59, 59).getTime();
+
+      if (today < start) return 'Mendatang';
+      if (today > end) return 'Selesai';
+      return 'Berlangsung';
+    }
+
+    // 5. Single date: e.g. "13 Juli 2026"
+    const singleMatch = trimmed.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})/i);
+    if (singleMatch) {
+      const year = parseInt(singleMatch[3], 10);
+      const month = MONTH_INDEX_MAP[singleMatch[2].toLowerCase().slice(0, 3)] ?? 0;
+      const day = parseInt(singleMatch[1], 10);
+
+      const start = new Date(year, month, day).getTime();
+      const end = new Date(year, month, day, 23, 59, 59).getTime();
+
+      if (today < start) return 'Mendatang';
+      if (today > end) return 'Selesai';
+      return 'Berlangsung';
+    }
+
+    // 6. Month range e.g. "Juni - Juli 2027"
+    const monthRangeMatch = trimmed.match(/^([A-Za-z]+)\s*[-–]\s*([A-Za-z]+)\s+(\d{4})/i);
+    if (monthRangeMatch) {
+      const year = parseInt(monthRangeMatch[3], 10);
+      const sMonth = MONTH_INDEX_MAP[monthRangeMatch[1].toLowerCase().slice(0, 3)] ?? 0;
+      const eMonth = MONTH_INDEX_MAP[monthRangeMatch[2].toLowerCase().slice(0, 3)] ?? 0;
+
+      const start = new Date(year, sMonth, 1).getTime();
+      const end = new Date(year, eMonth + 1, 0, 23, 59, 59).getTime();
+
+      if (today < start) return 'Mendatang';
+      if (today > end) return 'Selesai';
+      return 'Berlangsung';
+    }
+  } catch {}
+
+  return manualStatus || 'Mendatang';
+}
+
 export default function Calendar() {
   const [events, setEvents] = useState<AgendaItem[]>(OFFICIAL_KALDIK_SMPN3);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
@@ -305,12 +431,18 @@ export default function Calendar() {
     }
   }, []);
 
+  // Compute automatic real-time status for all events based on today's calendar
+  const resolvedEvents = events.map((item) => ({
+    ...item,
+    status: computeAutomaticStatus(item.date, item.status)
+  }));
+
   // Filter ONLY Upcoming / Active Events for the main landing page
-  const upcomingEvents = events.filter((e) => (e.status || '').toLowerCase() !== 'selesai');
-  const displayedLandingEvents = (upcomingEvents.length > 0 ? upcomingEvents : events.slice(-4)).slice(0, 4);
+  const upcomingEvents = resolvedEvents.filter((e) => e.status !== 'Selesai');
+  const displayedLandingEvents = (upcomingEvents.length > 0 ? upcomingEvents : resolvedEvents.slice(-4)).slice(0, 4);
 
   // Filter for the complete modal
-  const filteredModalEvents = events.filter((item) => {
+  const filteredModalEvents = resolvedEvents.filter((item) => {
     const cat = (item.category || item.type || 'Akademik').toLowerCase();
     const sem = (item.semester || '').toLowerCase();
 
