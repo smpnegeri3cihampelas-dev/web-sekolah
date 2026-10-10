@@ -49,12 +49,14 @@ const DEFAULT_AGENDA = [
 ];
 
 const DEFAULT_GALLERY = [
-  { id: 1, title: 'Laboratorium Komputer & Digital 4.0', category: 'FASILITAS', src: '/gallery_2.jpg' },
-  { id: 2, title: 'Perpustakaan Digital Terpadu', category: 'FASILITAS', src: '/gallery_1.jpg' },
-  { id: 3, title: 'Upacara Bendera & Pembinaan Karakter', category: 'KEGIATAN', src: '/slide1.jpeg' },
-  { id: 4, title: 'Turnamen & Kejuaraan Olahraga KBB', category: 'EKSTRAKURIKULER', src: '/slide3.jpeg' },
-  { id: 5, title: 'Creative STEM & Robotika Room', category: 'FASILITAS', src: '/slide4.jpeg' },
-  { id: 6, title: 'Praktikum Sains & Kolaborasi Kelas', category: 'AKADEMIK', src: '/slide7.jpeg' },
+  { id: 1, title: 'Laboratorium Komputer & Praktikum TIK', category: 'FASILITAS', src: '/gallery_2.jpg', desc: 'Sarana pembelajaran komputasi, literasi digital, dan pelaksanaan asesmen nasional ANBK.' },
+  { id: 2, title: 'Perpustakaan & Pojok Baca Siswa', category: 'FASILITAS', src: '/gallery_1.jpg', desc: 'Pusat sumber belajar, koleksi buku literasi harian, dan ruang baca yang nyaman bagi siswa.' },
+  { id: 3, title: 'Upacara Bendera & Apel Kedisiplinan', category: 'KEGIATAN', src: '/slide1.jpeg', desc: 'Pembiasaan rutin hari Senin untuk menanamkan jiwa patriotisme, budi pekerti, dan kepemimpinan.' },
+  { id: 4, title: 'Kegiatan Olahraga & Pengembangan Bakat', category: 'EKSTRAKURIKULER', src: '/slide3.jpeg', desc: 'Wadah pembinaan bakat olahraga, sportivitas, dan kebugaran jasmani seluruh siswa.' },
+  { id: 5, title: 'Pentas Seni & Gelar Budaya Sunda', category: 'KEGIATAN', src: '/slide4.jpeg', desc: 'Apresiasi bakat seni budaya daerah, pelestarian kearifan lokal, dan unjuk kreativitas siswa.' },
+  { id: 6, title: 'Praktikum Sains & Diskusi Berdiferensiasi', category: 'AKADEMIK', src: '/slide7.jpeg', desc: 'Pembelajaran kontekstual melalui observasi langsung, eksperimen ilmiah, dan kerja sama tim.' },
+  { id: 7, title: 'Gelar Karya Projek Penguatan P5', category: 'AKADEMIK', src: '/slide2.jpeg', desc: 'Pameran hasil karya inovatif, daur ulang ramah lingkungan, dan kewirausahaan siswa.' },
+  { id: 8, title: 'Senam Sehat & Jumat Bersih Lingkungan', category: 'KEGIATAN', src: '/slide6.jpeg', desc: 'Pembiasaan rutin hidup sehat dan gotong royong memelihara keasrian lingkungan sekolah.' },
 ];
 
 const DEFAULT_MESSAGES = [
@@ -260,9 +262,10 @@ export default function DashboardPage() {
     return DEFAULT_GALLERY;
   });
 
-  const handleAddGallery = (data: { title: string; category: string; src: string }) => {
+  const handleAddGallery = (data: { title: string; category: string; src: string; desc?: string }) => {
     const newItem = {
       id: Date.now(),
+      desc: data.desc || '',
       ...data
     };
     const updated = [newItem, ...galleryList];

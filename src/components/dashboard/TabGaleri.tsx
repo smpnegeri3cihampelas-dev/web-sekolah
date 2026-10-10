@@ -27,7 +27,7 @@ export function TabGaleri({ galleryList, onAddGallery, onDeleteGallery, showToas
       <div className="p-5 sm:p-6 rounded-2xl bg-white border-2 border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-black text-slate-950 tracking-tight">Manajemen Galeri & Fasilitas</h2>
-          <p className="text-xs text-slate-700 font-semibold mt-0.5">Foto dokumentasi kegiatan belajar dan sarana kampus terpadu</p>
+          <p className="text-xs text-slate-700 font-semibold mt-0.5">Foto dokumentasi kegiatan belajar, kesiswaan, dan sarana sekolah</p>
         </div>
 
         <button

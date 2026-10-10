@@ -15,7 +15,7 @@ const GALLERY_PRESETS = [
   { label: 'Perpustakaan', src: '/gallery_1.jpg' },
   { label: 'Upacara', src: '/slide1.jpeg' },
   { label: 'Olahraga', src: '/slide3.jpeg' },
-  { label: 'STEM & Robotika', src: '/slide4.jpeg' },
+  { label: 'Pentas Seni / Budaya', src: '/slide4.jpeg' },
   { label: 'Praktikum Sains', src: '/slide7.jpeg' }
 ];
 
