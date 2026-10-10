@@ -235,8 +235,6 @@ export const OFFICIAL_KALDIK_SMPN3: AgendaItem[] = [
   }
 ];
 
-const INITIAL_LIMIT = 6;
-
 function parseDateParts(dateStr: string) {
   if (!dateStr) return { day: '•', month: 'AGENDA' };
   const trimmed = dateStr.trim();
@@ -282,9 +280,8 @@ function parseDateParts(dateStr: string) {
 
 export default function Calendar() {
   const [events, setEvents] = useState<AgendaItem[]>(OFFICIAL_KALDIK_SMPN3);
-  const [filter, setFilter] = useState<string>('SEMUA');
-  const [visibleCount, setVisibleCount] = useState<number>(INITIAL_LIMIT);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const [modalFilter, setModalFilter] = useState<string>('SEMUA');
 
   // Sync with Dashboard LocalStorage
   useEffect(() => {
@@ -308,21 +305,22 @@ export default function Calendar() {
     }
   }, []);
 
-  const filteredEvents = events.filter((item) => {
+  // Filter ONLY Upcoming / Active Events for the main landing page
+  const upcomingEvents = events.filter((e) => (e.status || '').toLowerCase() !== 'selesai');
+  const displayedLandingEvents = (upcomingEvents.length > 0 ? upcomingEvents : events.slice(-4)).slice(0, 4);
+
+  // Filter for the complete modal
+  const filteredModalEvents = events.filter((item) => {
     const cat = (item.category || item.type || 'Akademik').toLowerCase();
     const sem = (item.semester || '').toLowerCase();
 
-    if (filter === 'SEMUA') return true;
-    if (filter === 'SEM1') return sem.includes('1') || (!sem && item.id <= 16);
-    if (filter === 'SEM2') return sem.includes('2') || (!sem && item.id > 16);
-    if (filter === 'UJIAN') return cat.includes('cbt') || cat.includes('ujian') || cat.includes('sumatif');
-    if (filter === 'LIBUR') return cat.includes('libur');
+    if (modalFilter === 'SEMUA') return true;
+    if (modalFilter === 'SEM1') return sem.includes('1') || (!sem && item.id <= 16);
+    if (modalFilter === 'SEM2') return sem.includes('2') || (!sem && item.id > 16);
+    if (modalFilter === 'UJIAN') return cat.includes('cbt') || cat.includes('ujian') || cat.includes('sumatif');
+    if (modalFilter === 'LIBUR') return cat.includes('libur');
     return true;
   });
-
-  const displayedEvents = filteredEvents.slice(0, visibleCount);
-  const remainingCount = filteredEvents.length - visibleCount;
-  const hasMore = remainingCount > 0;
 
   const getBadgeStyle = (cat?: string) => {
     const c = (cat || 'Akademik').toLowerCase();
@@ -370,22 +368,22 @@ export default function Calendar() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-8 relative z-10">
         
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-start">
           
           {/* Header & Sticky Description */}
           <div className="lg:col-span-5 lg:sticky lg:top-32">
             <div className="inline-flex items-center gap-2.5 px-3.5 py-1 rounded-full bg-indigo-50/80 border border-indigo-200/70 text-indigo-700 text-[11px] font-medium tracking-[0.15em] uppercase mb-4 shadow-sm">
-              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shadow-[0_0_8px_#6366f1]" />
-              <span>Kalender Pendidikan Resmi</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981]" />
+              <span>Agenda Terdekat Sekolah</span>
             </div>
 
             <h2 className="text-3xl sm:text-4xl md:text-5xl font-light text-slate-900 mb-5 leading-[1.12] tracking-tight">
-              Kalender Akademik <br/> 
-              <span className="font-semibold text-indigo-950">Tahun Ajaran 2026/2027</span>
+              Jadwal & Agenda <br/> 
+              <span className="font-semibold text-indigo-950">Mendatang</span>
             </h2>
 
             <p className="text-slate-600 text-xs sm:text-sm leading-relaxed mb-6 font-light max-w-md">
-              Jadwal resmi Disdik KBB untuk SMP Negeri 3 Cihampelas. Memuat seluruh agenda belajar, pelaksanaan asesmen sumatif, kegiatan kesiswaan, dan libur semester.
+              Menampilkan kegiatan resmi terdekat di SMP Negeri 3 Cihampelas. Untuk melihat jadwal lengkap 1 tahun ajaran atau mengunduh surat ketetapan resmi, silakan buka rekap kalender.
             </p>
 
             {/* Official Signature Badge */}
@@ -401,88 +399,65 @@ export default function Calendar() {
 
             {/* Action Buttons */}
             <div className="flex flex-col sm:flex-row lg:flex-col gap-3">
-              {/* Primary: Direct Download Official PDF */}
+              {/* Primary: Open Complete 27-Event Modal */}
+              <button 
+                type="button"
+                onClick={() => setIsModalOpen(true)}
+                className="group inline-flex items-center justify-center sm:justify-start gap-3 px-6 py-3.5 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-bold transition-all duration-300 shadow-md shadow-indigo-600/20 active:scale-98 cursor-pointer"
+              >
+                <span className="w-7 h-7 rounded-full bg-white/20 text-white flex items-center justify-center text-xs group-hover:scale-110 transition-transform">
+                  📋
+                </span>
+                <span>Buka Rekap Lengkap (27 Agenda)</span>
+                <span className="text-indigo-200 group-hover:translate-x-1 transition-transform">➔</span>
+              </button>
+
+              {/* Secondary: Download Official Signed PDF */}
               <a 
                 href="/kalender-akademik-smpn3.pdf" 
                 target="_blank"
                 rel="noopener noreferrer"
                 download="Kalender-Akademik-SMPN3-Cihampelas-2026-2027.pdf"
-                className="group inline-flex items-center justify-center sm:justify-start gap-3 px-5 py-3 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-bold transition-all duration-300 shadow-md shadow-indigo-600/20 active:scale-98 cursor-pointer"
+                className="inline-flex items-center justify-center sm:justify-start gap-2.5 px-6 py-3 rounded-full bg-white hover:bg-indigo-50 border border-indigo-200 text-xs sm:text-sm font-semibold text-slate-700 hover:text-indigo-700 transition-all shadow-xs cursor-pointer active:scale-98"
               >
-                <span className="w-7 h-7 rounded-full bg-white/20 text-white flex items-center justify-center text-xs group-hover:scale-110 transition-transform">
-                  ↓
-                </span>
+                <span>📥</span>
                 <span>Unduh Dokumen PDF Resmi</span>
               </a>
-
-              {/* Secondary: Open Modal Summary */}
-              <button 
-                type="button"
-                onClick={() => setIsModalOpen(true)}
-                className="inline-flex items-center justify-center sm:justify-start gap-2.5 px-5 py-3 rounded-full bg-white hover:bg-indigo-50 border border-indigo-200 text-xs sm:text-sm font-semibold text-slate-700 hover:text-indigo-700 transition-all shadow-xs cursor-pointer active:scale-98"
-              >
-                <span>📋</span>
-                <span>Lihat Rekap Jadwal & Cetak</span>
-                <span className="text-indigo-400">↗</span>
-              </button>
             </div>
 
-            {/* Quick Stats */}
+            {/* Info Hint */}
             <div className="mt-8 pt-6 border-t border-slate-200/80 flex items-center gap-6 text-xs text-slate-500">
               <div>
-                <span className="font-bold text-slate-800 text-sm block">{events.length}</span>
-                <span>Total Agenda</span>
+                <span className="font-bold text-indigo-900 text-sm block">{displayedLandingEvents.length} Agenda</span>
+                <span>Tampil di Beranda</span>
               </div>
               <div className="h-7 w-px bg-slate-200" />
               <div>
-                <span className="font-bold text-emerald-700 text-sm block">
-                  {events.filter(e => (e.status || 'mendatang').toLowerCase() === 'mendatang').length}
-                </span>
-                <span>Mendatang</span>
-              </div>
-              <div className="h-7 w-px bg-slate-200" />
-              <div>
-                <span className="font-bold text-slate-600 text-sm block">
-                  {events.filter(e => (e.status || '').toLowerCase() === 'selesai').length}
-                </span>
-                <span>Terlaksana</span>
+                <span className="font-bold text-slate-800 text-sm block">{events.length} Agenda</span>
+                <span>Total 1 Tahun Ajaran</span>
               </div>
             </div>
           </div>
 
-          {/* Timeline & Filter List */}
+          {/* Right Side: ONLY 3-4 UPCOMING EVENTS */}
           <div className="lg:col-span-7">
             
-            {/* Filter Tabs */}
-            <div className="flex flex-wrap items-center gap-2 mb-6">
-              {[
-                { key: 'SEMUA', label: 'Semua Agenda' },
-                { key: 'SEM1', label: 'Semester 1 (Ganjil)' },
-                { key: 'SEM2', label: 'Semester 2 (Genap)' },
-                { key: 'UJIAN', label: 'Ujian / Asesmen' },
-                { key: 'LIBUR', label: 'Libur Resmi' }
-              ].map((f) => (
-                <button
-                  key={f.key}
-                  type="button"
-                  onClick={() => {
-                    setFilter(f.key);
-                    setVisibleCount(INITIAL_LIMIT);
-                  }}
-                  className={`px-3.5 py-1.5 text-xs font-semibold rounded-full transition-all cursor-pointer ${
-                    filter === f.key
-                      ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/20'
-                      : 'bg-white text-slate-600 hover:text-indigo-700 hover:bg-indigo-50 border border-slate-200'
-                  }`}
-                >
-                  {f.label}
-                </button>
-              ))}
+            {/* Header Tag for List */}
+            <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-200/80">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                  Agenda Mendatang Terdekat
+                </span>
+              </div>
+              <span className="text-xs text-slate-400 font-medium">
+                Periode Berjalan 2026/2027
+              </span>
             </div>
 
-            {/* Timeline Cards */}
+            {/* Event Cards */}
             <div className="flex flex-col gap-3.5">
-              {displayedEvents.map((item) => {
+              {displayedLandingEvents.map((item) => {
                 const dateParts = parseDateParts(item.date);
                 const title = item.name || item.title || 'Agenda Sekolah';
                 const category = item.category || item.type || 'Akademik';
@@ -490,11 +465,11 @@ export default function Calendar() {
                 return (
                   <div 
                     key={item.id} 
-                    className="group flex flex-col sm:flex-row items-start sm:items-center p-4 sm:p-5 rounded-2xl bg-white hover:bg-indigo-50/30 border border-slate-200/90 hover:border-indigo-300 transition-all duration-300 gap-4 sm:gap-5 shadow-xs hover:shadow-md"
+                    className="group flex flex-col sm:flex-row items-start sm:items-center p-4 sm:p-5 rounded-2xl bg-white hover:bg-indigo-50/40 border border-slate-200 hover:border-indigo-300 transition-all duration-300 gap-4 sm:gap-5 shadow-xs hover:shadow-md"
                   >
                     
                     {/* Date Badge */}
-                    <div className="shrink-0 flex sm:flex-col items-center justify-between sm:justify-center w-full sm:w-20 h-14 sm:h-20 px-3 sm:px-1 rounded-xl bg-slate-50 border border-slate-200/90 group-hover:bg-indigo-600 group-hover:border-indigo-600 transition-colors">
+                    <div className="shrink-0 flex sm:flex-col items-center justify-between sm:justify-center w-full sm:w-20 h-14 sm:h-20 px-3 sm:px-1 rounded-xl bg-slate-50 border border-slate-200 group-hover:bg-indigo-600 group-hover:border-indigo-600 transition-colors">
                       <span className="text-base sm:text-xl font-bold text-slate-900 group-hover:text-white transition-colors leading-none tracking-tight">
                         {dateParts.day}
                       </span>
@@ -532,46 +507,24 @@ export default function Calendar() {
               })}
             </div>
 
-            {/* Load More Button */}
-            {hasMore && (
-              <div className="mt-8 text-center">
-                <button
-                  type="button"
-                  onClick={() => setVisibleCount((prev) => prev + 6)}
-                  className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-white hover:bg-indigo-50 text-indigo-700 hover:text-indigo-800 text-xs font-bold border border-indigo-200 shadow-xs hover:shadow-sm transition-all cursor-pointer"
-                >
-                  <span>+ Tampilkan Lebih Banyak Agenda</span>
-                  <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-mono text-[10px]">
-                    {remainingCount} lagi
-                  </span>
-                </button>
-              </div>
-            )}
-
-            {/* Show Less Option */}
-            {!hasMore && filteredEvents.length > INITIAL_LIMIT && (
-              <div className="mt-6 text-center">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setVisibleCount(INITIAL_LIMIT);
-                    const el = document.getElementById('kalender');
-                    if (el) el.scrollIntoView({ behavior: 'smooth' });
-                  }}
-                  className="text-xs text-indigo-600 hover:text-indigo-800 font-bold underline underline-offset-4 cursor-pointer"
-                >
-                  Tampilkan Lebih Sedikit ↑
-                </button>
-              </div>
-            )}
-
-            {filteredEvents.length === 0 && (
-              <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-slate-200">
-                <p className="text-slate-500 text-xs font-semibold">
-                  Belum ada agenda pada kategori ini.
+            {/* Bottom Invitation Banner (Zero Confusion) */}
+            <div className="mt-6 p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-indigo-50/80 via-white to-purple-50/80 border border-indigo-100/90 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="text-center sm:text-left">
+                <p className="text-xs font-bold text-slate-900">
+                  Butuh melihat seluruh 27 jadwal Semester 1 & 2?
+                </p>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Termasuk kegiatan yang telah lalu, jadwal libur, dan asesmen akhir tahun.
                 </p>
               </div>
-            )}
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(true)}
+                className="px-4 py-2 rounded-xl bg-white hover:bg-indigo-600 text-indigo-700 hover:text-white text-xs font-bold border border-indigo-200 hover:border-indigo-600 shadow-xs transition-all cursor-pointer whitespace-nowrap active:scale-98"
+              >
+                Lihat Rekap Lengkap ➔
+              </button>
+            </div>
 
           </div>
 
@@ -595,7 +548,7 @@ export default function Calendar() {
               <div className="flex items-center gap-2">
                 <span className="w-3 h-3 rounded-full bg-indigo-600" />
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                  Kalender Pendidikan Resmi SMPN 3 Cihampelas
+                  Rekap Kalender Pendidikan Resmi SMPN 3 Cihampelas
                 </span>
               </div>
               <div className="flex items-center gap-2">
@@ -607,7 +560,7 @@ export default function Calendar() {
                   className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
                   title="Unduh File PDF Asli"
                 >
-                  <span>📥 Unduh PDF</span>
+                  <span>📥 Unduh PDF Asli</span>
                 </a>
                 <button
                   type="button"
@@ -628,8 +581,8 @@ export default function Calendar() {
               </div>
             </div>
 
-            {/* Document Content */}
-            <div className="p-6 sm:p-8 overflow-y-auto space-y-6">
+            {/* Modal Body */}
+            <div className="p-6 sm:p-8 overflow-y-auto space-y-5">
               {/* Kop Surat Header */}
               <div className="text-center pb-4 border-b-2 border-slate-900">
                 <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-0.5">
@@ -643,21 +596,45 @@ export default function Calendar() {
                 </p>
               </div>
 
+              {/* Modal Filter Tabs */}
+              <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                {[
+                  { key: 'SEMUA', label: `Semua (${events.length})` },
+                  { key: 'SEM1', label: 'Semester 1' },
+                  { key: 'SEM2', label: 'Semester 2' },
+                  { key: 'UJIAN', label: 'Ujian / Asesmen' },
+                  { key: 'LIBUR', label: 'Libur Resmi' }
+                ].map((f) => (
+                  <button
+                    key={f.key}
+                    type="button"
+                    onClick={() => setModalFilter(f.key)}
+                    className={`px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                      modalFilter === f.key
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+
               {/* Table of Events */}
               <div className="overflow-x-auto rounded-xl border border-slate-200">
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-100 text-slate-800 font-bold uppercase text-[10px] tracking-wider border-b border-slate-200">
                     <tr>
-                      <th className="py-3 px-3">No</th>
-                      <th className="py-3 px-3">Tanggal Pelaksanaan</th>
-                      <th className="py-3 px-4">Nama Agenda / Kegiatan</th>
-                      <th className="py-3 px-3">Semester</th>
-                      <th className="py-3 px-3">Kategori</th>
-                      <th className="py-3 px-3 text-center">Status</th>
+                      <th className="py-2.5 px-3">No</th>
+                      <th className="py-2.5 px-3">Tanggal Pelaksanaan</th>
+                      <th className="py-2.5 px-4">Nama Agenda / Kegiatan</th>
+                      <th className="py-2.5 px-3">Semester</th>
+                      <th className="py-2.5 px-3">Kategori</th>
+                      <th className="py-2.5 px-3 text-center">Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                    {events.map((evt, idx) => (
+                    {filteredModalEvents.map((evt, idx) => (
                       <tr key={evt.id} className="hover:bg-slate-50/80">
                         <td className="py-2.5 px-3 font-bold text-slate-900">{idx + 1}</td>
                         <td className="py-2.5 px-3 font-semibold text-indigo-900 whitespace-nowrap">{evt.date}</td>
@@ -676,7 +653,7 @@ export default function Calendar() {
               {/* Signoff Block */}
               <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between pt-4 border-t border-slate-200 gap-4 text-xs">
                 <div className="text-[11px] text-slate-500 space-y-0.5 max-w-sm">
-                  <p className="font-bold text-slate-700">Catatan Sekolah:</p>
+                  <p className="font-bold text-slate-700">Catatan Resmi Sekolah:</p>
                   <p>• Jeda tengah semester diisi perlombaan antar kelas, pentas seni, pameran karya P5, dan studi wisata.</p>
                   <p>• Penetapan kelulusan kelas 9 mengikuti jadwal rapat penentuan kelulusan sekolah.</p>
                 </div>
