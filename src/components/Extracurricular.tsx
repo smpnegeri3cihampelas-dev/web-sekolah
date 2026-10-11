@@ -29,27 +29,33 @@ export default function Extracurricular() {
 
   const items = [
     { 
+      name: 'Gerakan Pramuka (Gudep)', 
+      category: 'Kepanduan & Karakter', 
+      desc: 'Pendidikan kepanduan wajib, kemandirian alam terbuka, penanaman Dasa Darma, pioneering, dan pembentukan jiwa pemimpin tangguh.',
+      badgeColor: 'text-amber-800 border-amber-300 bg-amber-100/80'
+    },
+    { 
       name: 'Paskibra & Kepemimpinan', 
-      category: 'Karakter', 
-      desc: 'Pelatihan baris-berbaris formal, kedisiplinan tingkat tinggi, ketahanan fisik, dan solidaritas tim.',
+      category: 'Kedisiplinan', 
+      desc: 'Pelatihan baris-berbaris formal, kedisiplinan tingkat tinggi, ketahanan fisik, dan solidaritas tim pengibar bendera.',
       badgeColor: 'text-blue-700 border-blue-200/80 bg-blue-50'
     },
     { 
       name: 'PMR Madya (Kemanusiaan)', 
-      category: 'Sosial', 
-      desc: 'Pertolongan pertama, edukasi kesehatan remaja, dan bakti sosial kepedulian lingkungan.',
+      category: 'Sosial & Kesehatan', 
+      desc: 'Pertolongan pertama pada kecelakaan (P3K), edukasi kesehatan remaja, dan bakti sosial kepedulian lingkungan.',
       badgeColor: 'text-rose-700 border-rose-200/80 bg-rose-50'
     },
     { 
       name: 'Basketball & Futsal', 
       category: 'Olahraga', 
-      desc: 'Pembinaan atlet muda berprestasi dengan pelatih berlisensi dan rekam jejak juara tingkat KBB.',
+      desc: 'Pembinaan atlet muda berprestasi dengan pelatih berlisensi dan rekam jejak kejuaraan tingkat Kabupaten Bandung Barat.',
       badgeColor: 'text-amber-700 border-amber-200/80 bg-amber-50'
     },
     { 
       name: 'Seni Musik & Vokal', 
-      category: 'Kesenian', 
-      desc: 'Eksplorasi musikalitas, ansambel instrumen tradisional angklung & modern, serta paduan suara sekolah.',
+      category: 'Kesenian & Budaya', 
+      desc: 'Eksplorasi musikalitas, ansambel instrumen tradisional Sunda (angklung) & modern, serta paduan suara sekolah.',
       badgeColor: 'text-emerald-700 border-emerald-200/80 bg-emerald-50'
     },
   ];
@@ -114,10 +120,9 @@ export default function Extracurricular() {
             </div>
 
             <div className="pt-4 border-t border-slate-200/80 flex items-center justify-between text-xs">
-              <span className="font-light text-[11px] text-slate-500">Pembinaan Intensif</span>
-              <span className="text-indigo-600 font-semibold text-xs group-hover:text-indigo-800 transition-colors flex items-center gap-1.5">
-                <span>Daftar Ekskul</span>
-                <span className="group-hover:translate-x-1 transition-transform">→</span>
+              <span className="font-light text-[11px] text-slate-500">Pembinaan Rutin</span>
+              <span className="text-slate-700 font-bold text-[11px] bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200/90">
+                Terbuka Kelas 7, 8, &amp; 9
               </span>
             </div>
           </div>
