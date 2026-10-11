@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { AuthUserSession } from '@/app/elearning/page';
+import { getTeacherUsername } from '@/lib/elearningData';
 
 interface TeacherSettingsModalProps {
   isOpen: boolean;
@@ -59,6 +60,8 @@ export default function TeacherSettingsModal({
       return;
     }
 
+    const teacherUsername = getTeacherUsername(currentUser);
+
     // Verify current active password
     let currentStoredPass = '';
     let map: Record<string, string> = {};
@@ -67,7 +70,7 @@ export default function TeacherSettingsModal({
         const raw = localStorage.getItem('smpn3_teacher_passwords');
         if (raw) {
           map = JSON.parse(raw);
-          currentStoredPass = map[cleanNip] || map[currentUser.name] || '';
+          currentStoredPass = map[teacherUsername] || (cleanNip ? map[cleanNip] : '') || map[currentUser.name] || '';
         }
       } catch {}
     }
@@ -84,7 +87,8 @@ export default function TeacherSettingsModal({
 
     // Save newly changed password
     const newTrimmed = newPassword.trim();
-    map[cleanNip] = newTrimmed;
+    if (cleanNip && cleanNip !== '-') map[cleanNip] = newTrimmed;
+    map[teacherUsername] = newTrimmed;
     if (currentUser.name) {
       map[currentUser.name] = newTrimmed;
     }

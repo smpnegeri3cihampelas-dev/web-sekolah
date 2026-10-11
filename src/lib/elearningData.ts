@@ -34,9 +34,26 @@ export interface ClassSessionAttendance {
 export interface TeacherUser {
   nip: string;
   name: string;
+  username?: string;
   role: 'mapel' | 'piket' | 'both';
   subject: string;
   classes: string[];
+}
+
+export function getTeacherUsername(teacher: { name: string; username?: string }): string {
+  if (teacher.username) return teacher.username.toLowerCase().trim();
+  const clean = teacher.name
+    .replace(/\b(M\.M\.Pd|M\.Pd\.I|S\.Pd\.I|S\.IP|S\.Pd|M\.Pd|S\.Kom|Dra|Drs|Dr|Hj|SP|MM|H)\b\.?/gi, '')
+    .replace(/[.,'"`]/g, '')
+    .trim()
+    .toLowerCase();
+  const parts = clean.split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return 'guru';
+  if (parts.length === 1) return parts[0];
+  const nonSingleParts = parts.filter(p => p.length > 1);
+  if (nonSingleParts.length === 1) return nonSingleParts[0];
+  if (nonSingleParts.length >= 2) return `${nonSingleParts[0]}.${nonSingleParts[1]}`;
+  return `${parts[0]}.${parts[1]}`;
 }
 
 export interface StudentUser {

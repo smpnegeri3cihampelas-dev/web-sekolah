@@ -17,6 +17,7 @@ export interface Leader {
 export interface Teacher {
   id: number;
   name: string;
+  username?: string;
   role?: string;
   subject: string;
   category?: string;

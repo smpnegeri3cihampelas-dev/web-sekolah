@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Leader, Teacher } from '@/lib/schoolData';
 import { compressImage } from '@/lib/imageCompression';
+import { getTeacherUsername } from '@/lib/elearningData';
 
 export const GTK_PHOTO_PRESETS = [
   { label: 'Avatar Default', src: '/teachers/default_avatar.svg' },
@@ -725,6 +726,7 @@ export function ResetTeacherPasswordModal({
   const [hasCopied, setHasCopied] = useState(false);
 
   const cleanNip = (teacher?.nip || '').replace(/\s+/g, '');
+  const teacherUsername = teacher ? getTeacherUsername(teacher) : 'guru';
 
   useEffect(() => {
     if (teacher && isOpen) {
@@ -734,7 +736,7 @@ export function ResetTeacherPasswordModal({
           const raw = localStorage.getItem('smpn3_teacher_passwords');
           if (raw) {
             const map = JSON.parse(raw);
-            currentPass = map[cleanNip] || map[teacher.id] || '';
+            currentPass = map[teacherUsername] || map[cleanNip] || map[teacher.id] || '';
           }
         } catch {}
       }
@@ -742,7 +744,7 @@ export function ResetTeacherPasswordModal({
       setShowPassword(false);
       setHasCopied(false);
     }
-  }, [teacher, isOpen, cleanNip]);
+  }, [teacher, isOpen, cleanNip, teacherUsername]);
 
   if (!isOpen || !teacher) return null;
 
@@ -763,6 +765,7 @@ export function ResetTeacherPasswordModal({
         const raw = localStorage.getItem('smpn3_teacher_passwords');
         if (raw) map = JSON.parse(raw);
         if (cleanNip && cleanNip !== '-') map[cleanNip] = password.trim();
+        map[teacherUsername] = password.trim();
         map[teacher.name] = password.trim();
         map[teacher.id] = password.trim();
         localStorage.setItem('smpn3_teacher_passwords', JSON.stringify(map));
@@ -774,15 +777,11 @@ export function ResetTeacherPasswordModal({
 
   const shareMessage = `Yth. Bapak/Ibu ${teacher.name},
 Berikut informasi akun masuk portal SIAP SPENTIC Anda:
-• Akun Guru      : ${teacher.name}
-• Kata Sandi Baru: ${password}
+• Username Masuk : ${teacherUsername}
+• Kata Sandi     : ${password}
 • Tautan Masuk   : https://smpn3cihampelas.sch.id/elearning
 
-Petunjuk Masuk:
-1. Buka tautan di atas dan pilih nama Anda pada daftar akun guru.
-2. Masukkan kata sandi baru Anda.
-
-Silakan simpan kata sandi ini dengan baik.
+Silakan gunakan username dan kata sandi di atas untuk masuk.
 — Admin SMP Negeri 3 Cihampelas`;
 
   const handleCopyMessage = () => {
@@ -844,10 +843,15 @@ Silakan simpan kata sandi ini dengan baik.
           />
           <div className="min-w-0 flex-1">
             <h4 className="text-sm font-black text-slate-950 truncate">{teacher.name}</h4>
-            <p className="text-xs font-mono text-indigo-900 font-bold mt-0.5">
-              NIP: {teacher.nip || '-'}
-            </p>
-            <p className="text-[11px] text-slate-600 font-medium truncate">
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
+              <span className="text-xs font-mono text-indigo-900 font-bold">
+                NIP: {teacher.nip || '-'}
+              </span>
+              <span className="text-[11px] font-mono font-bold bg-white text-indigo-800 px-2 py-0.5 rounded-md border border-indigo-200 shadow-xs">
+                Username: @{teacherUsername}
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-600 font-medium truncate mt-1">
               Mapel: {teacher.subject}
             </p>
           </div>

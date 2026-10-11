@@ -24,7 +24,8 @@ import {
   saveStoredAssignment,
   deleteStoredAssignment,
   getStoredSubmissions,
-  saveStoredSubmission
+  saveStoredSubmission,
+  getTeacherUsername
 } from '@/lib/elearningData';
 import {
   saveSubmissionFile,
@@ -94,8 +95,8 @@ export default function ELearningPage() {
 
   // Login Form Local State
   const [loginRole, setLoginRole] = useState<'guru' | 'piket' | 'siswa'>('guru');
-  const [loginIdentifier, setLoginIdentifier] = useState<string>('19720412 199703 1 002');
-  const [loginPassword, setLoginPassword] = useState<string>('spentic2026');
+  const [loginIdentifier, setLoginIdentifier] = useState<string>('rohidin');
+  const [loginPassword, setLoginPassword] = useState<string>('guru123');
 
   // Realtime Attendance State (synced via localStorage)
   const [attendanceData, setAttendanceData] = useState<Record<string, ClassSessionAttendance>>({});
@@ -265,11 +266,14 @@ export default function ELearningPage() {
   const switchLoginTab = (tab: 'guru' | 'piket' | 'siswa') => {
     setLoginRole(tab);
     if (tab === 'guru') {
-      setLoginIdentifier('19720412 199703 1 002'); // Rohidin, S.Pd.
+      setLoginIdentifier('rohidin');
+      setLoginPassword('guru123');
     } else if (tab === 'piket') {
       setLoginIdentifier('piketspentic');
+      setLoginPassword('');
     } else {
       setLoginIdentifier('0133138158');
+      setLoginPassword('');
     }
   };
 
@@ -277,51 +281,61 @@ export default function ELearningPage() {
     e.preventDefault();
 
     if (loginRole === 'guru') {
-      const cleanId = loginIdentifier.replace(/\s+/g, '');
-      const queryLower = loginIdentifier.trim().toLowerCase();
-      const queryClean = queryLower.replace(/[^a-z0-9]/g, '');
+      const inputRaw = loginIdentifier.trim();
+      const inputClean = inputRaw.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const inputNipClean = inputRaw.replace(/\s+/g, '');
 
       const teacher = DEMO_TEACHERS.find(t => {
+        const tUsername = getTeacherUsername(t);
+        const tUsernameClean = tUsername.replace(/[^a-z0-9]/g, '');
         const tNipClean = (t.nip || '').replace(/\s+/g, '');
         const tNameLower = t.name.toLowerCase();
         const tNameClean = tNameLower.replace(/[^a-z0-9]/g, '');
 
         return (
-          (tNipClean && tNipClean !== '-' && tNipClean === cleanId) ||
-          tNameLower === queryLower ||
-          (queryClean.length >= 3 && tNameClean.includes(queryClean)) ||
-          (queryClean.length >= 3 && queryClean.includes(tNameClean))
+          tUsername === inputRaw.toLowerCase() ||
+          tUsernameClean === inputClean ||
+          (tNipClean && tNipClean !== '-' && tNipClean === inputNipClean) ||
+          tNameLower === inputRaw.toLowerCase() ||
+          (inputClean.length >= 3 && tNameClean.includes(inputClean))
         );
-      }) || DEMO_TEACHERS[0];
+      });
 
-      // Custom password verification set by administrator
+      if (!teacher) {
+        showToast('⚠️ Username akun guru tidak terdaftar! Periksa kembali username Anda.', 'warn');
+        return;
+      }
+
+      const teacherUsername = getTeacherUsername(teacher);
+      const tNipClean = (teacher.nip || '').replace(/\s+/g, '');
+
+      // Custom password verification set by administrator or teacher
       let customPassword = '';
       if (typeof window !== 'undefined') {
         try {
           const raw = localStorage.getItem('smpn3_teacher_passwords');
           if (raw) {
             const map = JSON.parse(raw);
-            const tNipClean = teacher ? (teacher.nip || '').replace(/\s+/g, '') : '';
-            customPassword = map[cleanId] || (tNipClean ? map[tNipClean] : '') || (teacher ? map[teacher.name] : '') || '';
+            customPassword = map[teacherUsername] || (tNipClean ? map[tNipClean] : '') || map[teacher.name] || map[inputNipClean] || '';
           }
         } catch {}
       }
 
       const trimmedPass = loginPassword.trim();
       const isValidPass = customPassword
-        ? (trimmedPass === customPassword || trimmedPass === 'guru123' || trimmedPass === cleanId)
-        : (trimmedPass === 'spentic2026' || trimmedPass === 'guru123' || trimmedPass === cleanId || trimmedPass.length >= 4);
+        ? (trimmedPass === customPassword || trimmedPass === 'guru123')
+        : (trimmedPass === 'guru123' || trimmedPass === 'spentic2026' || trimmedPass === teacherUsername || (tNipClean && trimmedPass === tNipClean));
 
       if (!isValidPass) {
-        showToast('⚠️ Kata sandi salah! Hubungi operator admin sekolah via WhatsApp jika Anda lupa kata sandi.', 'warn');
+        showToast('⚠️ Kata sandi akun guru salah! Default: guru123 (hubungi Admin jika Anda lupa).', 'warn');
         return;
       }
 
       handleLogin({
         role: 'guru_mapel',
-        name: teacher ? teacher.name : 'Dewan Guru SPENTIC',
-        nipOrNisn: teacher ? teacher.nip : loginIdentifier,
-        subject: teacher ? teacher.subject : 'Bahasa Inggris',
+        name: teacher.name,
+        nipOrNisn: teacher.nip,
+        subject: teacher.subject,
         classId: '7-A'
       });
     } else if (loginRole === 'piket') {
@@ -1155,37 +1169,30 @@ export default function ELearningPage() {
                     <div>
                       <div className="flex items-center justify-between mb-1.5">
                         <label className="block text-xs font-semibold text-slate-700">
-                          Pilih Akun Guru Anda (28 Guru Roster):
+                          Username Akun Guru *
                         </label>
                         <span className="text-[11px] text-indigo-600 font-semibold font-mono">
-                          {loginIdentifier ? '✓ Terpilih' : 'Wajib Dipilih'}
+                          Format: nama guru
                         </span>
                       </div>
-                      <select
+                      <input
+                        type="text"
                         value={loginIdentifier}
                         onChange={(e) => setLoginIdentifier(e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-300 text-slate-900 text-sm font-semibold focus:outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition cursor-pointer shadow-xs"
+                        className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-300 text-slate-900 text-sm font-semibold focus:outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition shadow-xs font-mono"
+                        placeholder="Ketik username (contoh: rohidin, dedeh.komalasari)"
+                        autoComplete="username"
                         required
-                      >
-                        <option value="">-- Klik untuk Memilih Nama Anda --</option>
-                        {DEMO_TEACHERS.map((t, idx) => {
-                          const optionVal = t.nip && t.nip !== '-' ? t.nip : t.name;
-                          return (
-                            <option key={`${t.name}-${idx}`} value={optionVal}>
-                              {idx + 1}. {t.name} — {t.subject}
-                            </option>
-                          );
-                        })}
-                      </select>
+                      />
                       <span className="text-[11px] text-slate-500 mt-1.5 block font-medium">
-                        *Cukup pilih nama Anda dari daftar di atas, tidak perlu menghafal atau mengetik NIP
+                        *Gunakan username akun Anda (contoh: <span className="font-mono font-bold text-slate-700">rohidin</span>, <span className="font-mono font-bold text-slate-700">dedeh.komalasari</span>, atau NIP)
                       </span>
                     </div>
 
                     <div>
                       <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1">
                         <label className="block text-xs font-semibold text-slate-700">
-                          Kata Sandi Akun Guru
+                          Kata Sandi Akun Guru *
                         </label>
                         <a
                           href={`https://wa.me/?text=${encodeURIComponent('Halo Operator / Admin SMPN 3 Cihampelas, saya guru pengampu ingin meminta bantuan reset kata sandi akun SIAP SPENTIC saya.')}`}
@@ -1200,18 +1207,19 @@ export default function ELearningPage() {
                         type="password"
                         value={loginPassword}
                         onChange={(e) => setLoginPassword(e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition"
+                        className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition shadow-xs"
                         placeholder="Masukkan kata sandi..."
+                        autoComplete="current-password"
                         required
                       />
                       <span className="text-[11px] text-slate-500 mt-1 block font-medium">
-                        *Kata sandi standar: <span className="font-mono font-bold text-slate-700">guru123</span> (bisa diubah di menu Pengaturan setelah masuk)
+                        *Kata sandi standar seluruh guru: <span className="font-mono font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200">guru123</span> (dapat diubah mandiri di menu Pengaturan ⚙️)
                       </span>
                     </div>
 
                     <button
                       type="submit"
-                      className="w-full py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm transition shadow-lg shadow-indigo-600/25 flex items-center justify-center gap-2 cursor-pointer mt-2"
+                      className="w-full py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm transition shadow-lg shadow-indigo-600/25 flex items-center justify-center gap-2 cursor-pointer mt-2 active:scale-95"
                     >
                       <span>Masuk ke Ruang Guru</span>
                       <span>→</span>

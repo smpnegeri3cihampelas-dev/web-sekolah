@@ -3,6 +3,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Leader, Teacher, DataPokok } from '@/lib/schoolData';
 import { EditLeaderModal, AddTeacherModal, EditTeacherModal, ResetTeacherPasswordModal } from './GtkModals';
+import { getTeacherUsername } from '@/lib/elearningData';
 
 interface TabPimpinanProps {
   leadersList: Leader[];
@@ -269,9 +270,14 @@ export function TabPimpinan({
                         />
                         <div className="min-w-0">
                           <span className="block font-black text-slate-950 truncate text-sm">{teacher.name}</span>
-                          <span className="block text-xs font-mono text-slate-700 truncate mt-0.5 font-bold">
-                            {teacher.nip && teacher.nip !== '-' ? `NIP/Gol. ${teacher.nip}` : teacher.status}
-                          </span>
+                          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                            <span className="text-xs font-mono text-slate-700 truncate font-bold">
+                              {teacher.nip && teacher.nip !== '-' ? `NIP/Gol. ${teacher.nip}` : teacher.status}
+                            </span>
+                            <span className="text-[10px] font-mono font-bold bg-indigo-50 text-indigo-800 px-1.5 py-0.5 rounded border border-indigo-200">
+                              @{getTeacherUsername(teacher)}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </td>
