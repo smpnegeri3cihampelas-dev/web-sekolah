@@ -1192,144 +1192,115 @@ export default function ELearningPage() {
       {/* MAIN CONTENT AREA */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
 
-        {/* ----------------- 1. VIEW: OFFICIAL LOGIN PORTAL (WHEN NOT LOGGED IN) ----------------- */}
+        {/* ----------------- 1. VIEW: CLEAN LOGIN PORTAL (WHEN NOT LOGGED IN) ----------------- */}
         {!currentUser && (
-          <div className="max-w-2xl mx-auto my-4 sm:my-8 space-y-6">
+          <div className="max-w-[420px] mx-auto my-8 sm:my-16 px-4">
             
-            {/* Main Login Card */}
-            <div className="bg-white border border-indigo-100 rounded-3xl p-6 sm:p-8 shadow-xl shadow-indigo-500/5 relative overflow-hidden">
-              {/* Ambient Glows */}
-              <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-100/50 rounded-full blur-3xl pointer-events-none" />
-              <div className="absolute bottom-0 left-0 w-80 h-80 bg-purple-100/40 rounded-full blur-3xl pointer-events-none" />
+            {/* Clean Login Card */}
+            <div className="bg-white border border-slate-200/80 rounded-3xl p-7 sm:p-8 shadow-xl shadow-slate-900/5 relative">
               
-              {/* Institutional Header */}
-              <div className="text-center mb-6 relative z-10">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-100 text-[11px] text-indigo-700 font-mono font-semibold mb-3">
-                  <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse" />
-                  SISTEM INFORMASI AKADEMIK & PRESENSI (SIAP)
+              {/* Minimal Header */}
+              <div className="text-center mb-6">
+                <div className="w-12 h-12 mx-auto mb-3.5 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-xl shadow-xs">
+                  📚
                 </div>
-                <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-                  Portal Masuk Terpadu
+                <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+                  E-Learning
                 </h1>
-                <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-md mx-auto">
-                  SMP Negeri 3 Cihampelas — Layanan Presensi Digital & KBM Online TP. 2026/2027
+                <p className="text-xs text-slate-500 mt-1">
+                  SMP Negeri 3 Cihampelas
                 </p>
               </div>
 
-              {/* 3-Role Segmented Selector */}
-              <div className="grid grid-cols-3 gap-1.5 p-1.5 bg-slate-100 rounded-2xl border border-slate-200 mb-6 text-xs font-semibold relative z-10">
+              {/* 3-Role Clean Switcher */}
+              <div className="grid grid-cols-3 gap-1 p-1 bg-slate-100 rounded-xl mb-5 text-xs font-medium">
                 <button 
                   type="button"
                   onClick={() => switchLoginTab('guru')}
-                  className={`py-2.5 px-2 rounded-xl transition flex flex-col sm:flex-row items-center justify-center gap-1.5 cursor-pointer ${
+                  className={`py-2 rounded-lg transition cursor-pointer text-center ${
                     loginRole === 'guru'
-                      ? 'bg-indigo-600 text-white font-bold shadow-md shadow-indigo-600/20'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
+                      ? 'bg-white text-indigo-600 font-bold shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  <span className="text-sm">👨‍🏫</span>
-                  <span>Dewan Guru</span>
+                  Guru
                 </button>
 
                 <button 
                   type="button"
                   onClick={() => switchLoginTab('piket')}
-                  className={`py-2.5 px-2 rounded-xl transition flex flex-col sm:flex-row items-center justify-center gap-1.5 cursor-pointer ${
+                  className={`py-2 rounded-lg transition cursor-pointer text-center ${
                     loginRole === 'piket'
-                      ? 'bg-emerald-600 text-white font-bold shadow-md shadow-emerald-600/20'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
+                      ? 'bg-white text-emerald-600 font-bold shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  <span className="text-sm">🏢</span>
-                  <span>Pos Meja Piket</span>
+                  Piket
                 </button>
 
                 <button 
                   type="button"
                   onClick={() => switchLoginTab('siswa')}
-                  className={`py-2.5 px-2 rounded-xl transition flex flex-col sm:flex-row items-center justify-center gap-1.5 cursor-pointer ${
+                  className={`py-2 rounded-lg transition cursor-pointer text-center ${
                     loginRole === 'siswa'
-                      ? 'bg-purple-600 text-white font-bold shadow-md shadow-purple-600/20'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
+                      ? 'bg-white text-purple-600 font-bold shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  <span className="text-sm">🎓</span>
-                  <span>Peserta Didik</span>
+                  Siswa
                 </button>
               </div>
 
-              {/* Login Form */}
-              <form onSubmit={handleFormLoginSubmit} className="space-y-4 relative z-10">
+              {/* Clean Form */}
+              <form onSubmit={handleFormLoginSubmit} className="space-y-4">
                 
                 {loginRole === 'guru' && (
                   <>
                     <div>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <label className="block text-xs font-bold text-slate-700">
-                          Username Akun Guru *
-                        </label>
-                        <span className="text-[11px] text-indigo-600 font-semibold font-mono">
-                          Format: nama guru / NIP
-                        </span>
-                      </div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                        Username
+                      </label>
                       <input
                         type="text"
                         value={loginIdentifier}
                         onChange={(e) => setLoginIdentifier(e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-300 text-slate-900 text-sm font-semibold focus:outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition shadow-xs font-mono"
-                        placeholder="Masukkan username Anda (contoh: rustandi)"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition"
+                        placeholder="Username atau NIP"
                         autoComplete="username"
                         required
                       />
-                      <span className="text-[11px] text-slate-500 mt-1.5 block font-medium">
-                        *Gunakan username resmi atau NIP yang telah didaftarkan operator sekolah
-                      </span>
                     </div>
 
                     <div>
-                      <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1">
-                        <label className="block text-xs font-bold text-slate-700">
-                          Kata Sandi Akun Guru *
-                        </label>
-                        <a
-                          href={`https://wa.me/?text=${encodeURIComponent('Halo Operator / Admin SMPN 3 Cihampelas, saya guru pengampu ingin meminta bantuan reset kata sandi akun SIAP SPENTIC saya.')}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 transition flex items-center gap-1 cursor-pointer"
-                        >
-                          <span>💬 Lupa Sandi? Hubungi Admin</span>
-                        </a>
-                      </div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                        Kata Sandi
+                      </label>
                       <div className="relative">
                         <input
                           type={showPassword ? "text" : "password"}
                           value={loginPassword}
                           onChange={(e) => setLoginPassword(e.target.value)}
-                          className="w-full px-4 py-3 pr-11 rounded-xl bg-slate-50 border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition shadow-xs"
-                          placeholder="Masukkan kata sandi..."
+                          className="w-full px-3.5 py-2.5 pr-10 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition"
+                          placeholder="Masukkan kata sandi"
                           autoComplete="current-password"
                           required
                         />
                         <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition p-1 cursor-pointer text-sm"
-                          title={showPassword ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition p-1 cursor-pointer text-xs"
+                          title={showPassword ? "Sembunyikan sandi" : "Lihat sandi"}
                         >
                           {showPassword ? "👁️" : "🙈"}
                         </button>
                       </div>
-                      <span className="text-[11px] text-slate-500 mt-1 block font-medium">
-                        *Kata sandi dapat diubah secara mandiri di menu Pengaturan (⚙️) setelah berhasil masuk
-                      </span>
                     </div>
 
                     <button
                       type="submit"
-                      className="w-full py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm transition shadow-lg shadow-indigo-600/25 flex items-center justify-center gap-2 cursor-pointer mt-2 active:scale-95"
+                      className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm transition shadow-md shadow-indigo-600/20 flex items-center justify-center gap-1.5 cursor-pointer mt-2 active:scale-[0.99]"
                     >
-                      <span>Masuk ke Ruang Guru</span>
-                      <span>→</span>
+                      Masuk
                     </button>
                   </>
                 )}
@@ -1337,40 +1308,37 @@ export default function ELearningPage() {
                 {loginRole === 'piket' && (
                   <>
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                        ID Stasiun / Akun Pos Piket Sekolah *
+                      <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                        ID Stasiun
                       </label>
                       <input
                         type="text"
                         value={loginIdentifier}
                         onChange={(e) => setLoginIdentifier(e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition font-mono"
-                        placeholder="piketspentic atau ID Petugas"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition font-mono"
+                        placeholder="ID stasiun piket"
                         required
                       />
-                      <span className="text-[11px] text-slate-500 mt-1 block font-medium">
-                        *Akses terintegrasi di meja piket lobi utama untuk monitoring KBM dan presensi gerbang
-                      </span>
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                        Kata Sandi Petugas Piket *
+                      <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                        Kata Sandi
                       </label>
                       <div className="relative">
                         <input
                           type={showPassword ? "text" : "password"}
                           value={loginPassword}
                           onChange={(e) => setLoginPassword(e.target.value)}
-                          className="w-full px-4 py-3 pr-11 rounded-xl bg-slate-50 border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition shadow-xs"
-                          placeholder="Masukkan kata sandi stasiun piket..."
+                          className="w-full px-3.5 py-2.5 pr-10 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition"
+                          placeholder="Masukkan kata sandi"
                           required
                         />
                         <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition p-1 cursor-pointer text-sm"
-                          title={showPassword ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition p-1 cursor-pointer text-xs"
+                          title={showPassword ? "Sembunyikan sandi" : "Lihat sandi"}
                         >
                           {showPassword ? "👁️" : "🙈"}
                         </button>
@@ -1379,10 +1347,9 @@ export default function ELearningPage() {
 
                     <button
                       type="submit"
-                      className="w-full py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm transition shadow-lg shadow-emerald-600/25 flex items-center justify-center gap-2 cursor-pointer mt-2 active:scale-95"
+                      className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm transition shadow-md shadow-emerald-600/20 flex items-center justify-center gap-1.5 cursor-pointer mt-2 active:scale-[0.99]"
                     >
-                      <span>Buka Stasiun Meja Piket</span>
-                      <span>→</span>
+                      Masuk
                     </button>
                   </>
                 )}
@@ -1390,51 +1357,38 @@ export default function ELearningPage() {
                 {loginRole === 'siswa' && (
                   <>
                     <div>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <label className="block text-xs font-bold text-slate-700">
-                          Nomor Induk Siswa Nasional (NISN) *
-                        </label>
-                        <span className="text-[11px] text-purple-600 font-semibold font-mono">
-                          10 Digit Angka
-                        </span>
-                      </div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                        NISN
+                      </label>
                       <input
                         type="text"
                         value={loginIdentifier}
                         onChange={(e) => setLoginIdentifier(e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-purple-500 focus:bg-white focus:ring-2 focus:ring-purple-500/20 transition font-mono"
-                        placeholder="Masukkan 10 digit NISN..."
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-purple-500 focus:bg-white focus:ring-2 focus:ring-purple-500/20 transition font-mono"
+                        placeholder="10 digit NISN"
                         maxLength={12}
                         required
                       />
-                      <span className="text-[11px] text-slate-500 mt-1 block font-medium">
-                        *NISN resmi tertera pada rapor atau kartu pelajar SMP Negeri 3 Cihampelas
-                      </span>
                     </div>
 
                     <div>
-                      <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1">
-                        <label className="block text-xs font-bold text-slate-700">
-                          Kata Sandi Peserta Didik *
-                        </label>
-                        <span className="text-[11px] text-slate-500 font-medium">
-                          Hubungi Wali Kelas jika lupa
-                        </span>
-                      </div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                        Kata Sandi
+                      </label>
                       <div className="relative">
                         <input
                           type={showPassword ? "text" : "password"}
                           value={loginPassword}
                           onChange={(e) => setLoginPassword(e.target.value)}
-                          className="w-full px-4 py-3 pr-11 rounded-xl bg-slate-50 border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-purple-500 focus:bg-white focus:ring-2 focus:ring-purple-500/20 transition shadow-xs"
-                          placeholder="Masukkan kata sandi..."
+                          className="w-full px-3.5 py-2.5 pr-10 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-purple-500 focus:bg-white focus:ring-2 focus:ring-purple-500/20 transition"
+                          placeholder="Masukkan kata sandi"
                           required
                         />
                         <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition p-1 cursor-pointer text-sm"
-                          title={showPassword ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition p-1 cursor-pointer text-xs"
+                          title={showPassword ? "Sembunyikan sandi" : "Lihat sandi"}
                         >
                           {showPassword ? "👁️" : "🙈"}
                         </button>
@@ -1443,54 +1397,27 @@ export default function ELearningPage() {
 
                     <button
                       type="submit"
-                      className="w-full py-3.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-sm transition shadow-lg shadow-purple-600/25 flex items-center justify-center gap-2 cursor-pointer mt-2 active:scale-95"
+                      className="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-sm transition shadow-md shadow-purple-600/20 flex items-center justify-center gap-1.5 cursor-pointer mt-2 active:scale-[0.99]"
                     >
-                      <span>Masuk Portal Peserta Didik</span>
-                      <span>→</span>
+                      Masuk
                     </button>
                   </>
                 )}
 
               </form>
 
-              {/* Institutional Security Notice */}
-              <div className="mt-8 pt-5 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-2.5 text-xs text-slate-500 relative z-10">
-                <div className="flex items-center gap-2 font-medium">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-slate-600">Sistem Resmi Terenkripsi & Terintegrasi SPENTIC</span>
-                </div>
-                <div className="text-[11px] font-mono text-slate-400">
-                  SIAP SPENTIC v3.2 TP. 2026/2027
-                </div>
-              </div>
-
-            </div>
-
-            {/* Official Help Desk & Support Banner */}
-            <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex items-start gap-3.5">
-                  <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center text-lg shrink-0">
-                    ℹ️
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-slate-900 text-xs sm:text-sm">
-                      Pusat Informasi & Layanan Akun Resmi
-                    </h3>
-                    <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
-                      Belum memiliki akun, lupa kata sandi, atau memerlukan bantuan teknis? Hubungi tim Operator Sekolah & Manajemen Kurikulum SMPN 3 Cihampelas.
-                    </p>
-                  </div>
-                </div>
+              {/* Minimal Helper Link */}
+              <div className="mt-6 pt-4 border-t border-slate-100 text-center">
                 <a
-                  href={`https://wa.me/?text=${encodeURIComponent('Halo Operator / Admin SMPN 3 Cihampelas, saya memerlukan bantuan terkait akun portal E-Learning SIAP SPENTIC.')}`}
+                  href={`https://wa.me/?text=${encodeURIComponent('Halo Admin SMPN 3 Cihampelas, saya memerlukan bantuan terkait akun E-Learning.')}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-sm shrink-0 cursor-pointer active:scale-95"
+                  className="text-xs text-slate-400 hover:text-indigo-600 transition"
                 >
-                  <span>💬 Bantuan Operator WA</span>
+                  Lupa sandi atau butuh bantuan? <span className="font-medium text-slate-600 hover:underline">Hubungi Admin</span>
                 </a>
               </div>
+
             </div>
 
           </div>
