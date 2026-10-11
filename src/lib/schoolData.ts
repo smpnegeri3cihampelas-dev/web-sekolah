@@ -438,9 +438,9 @@ export const DEFAULT_TEACHERS: Teacher[] = [
 ];
 
 export const DEFAULT_DATA_POKOK: DataPokok = {
-  siswa: '850+',
-  rombel: '16',
-  guru: '28',
+  siswa: '535',
+  rombel: '17',
+  guru: '33',
   staf: '8'
 };
 

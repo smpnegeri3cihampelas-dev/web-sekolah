@@ -104,7 +104,11 @@ export default function DashboardPage() {
     setStudentsList(getStoredStudents());
     const handleUpdate = () => setStudentsList(getStoredStudents());
     window.addEventListener('elearningStudentsUpdated', handleUpdate);
-    return () => window.removeEventListener('elearningStudentsUpdated', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+    return () => {
+      window.removeEventListener('elearningStudentsUpdated', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+    };
   }, []);
 
   const handleAddStudent = (data: { name: string; nisn: string; nis: string; classId: string }) => {
