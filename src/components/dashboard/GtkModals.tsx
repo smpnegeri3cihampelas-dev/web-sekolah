@@ -291,8 +291,27 @@ export function AddTeacherModal({ isOpen, onClose, onAdd, showToast }: AddTeache
       return;
     }
 
+    const generatedUsername = getTeacherUsername({ name: name.trim() });
+
+    // Auto-seed default password guru123 into smpn3_teacher_passwords map
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('smpn3_teacher_passwords');
+        const map = raw ? JSON.parse(raw) : {};
+        map[generatedUsername] = 'guru123';
+        if (nip.trim() && nip.trim() !== '-') {
+          map[nip.trim().replace(/\s+/g, '')] = 'guru123';
+        }
+        map[name.trim()] = 'guru123';
+        localStorage.setItem('smpn3_teacher_passwords', JSON.stringify(map));
+      } catch (err) {
+        console.error('Failed auto-seeding password', err);
+      }
+    }
+
     onAdd({
       name: name.trim(),
+      username: generatedUsername,
       subject: subject.trim() || 'Guru Mata Pelajaran',
       nip: nip.trim() || '-',
       status,
@@ -302,7 +321,7 @@ export function AddTeacherModal({ isOpen, onClose, onAdd, showToast }: AddTeache
       role: subject.trim() || 'Guru Mata Pelajaran',
       quote: 'Mendidik dengan keteladanan dan budi pekerti luhur.'
     });
-    showToast(`👨‍🏫 Guru baru "${name}" berhasil ditambahkan!`);
+    showToast(`👨‍🏫 Guru baru "${name}" & Akun @${generatedUsername} berhasil dibuat!`);
     onClose();
   };
 
@@ -438,6 +457,33 @@ export function AddTeacherModal({ isOpen, onClose, onAdd, showToast }: AddTeache
                 <option value="Tenaga Kependidikan">Tenaga Kependidikan</option>
               </select>
             </div>
+          </div>
+
+          {/* Automatic E-Learning Account Preview Box */}
+          <div className="p-3.5 rounded-2xl bg-indigo-50 border-2 border-indigo-200 text-xs">
+            <div className="flex items-center justify-between mb-2">
+              <span className="font-extrabold text-indigo-950 flex items-center gap-1.5">
+                <span>⚡</span> Akun E-Learning Otomatis
+              </span>
+              <span className="text-[10px] font-black bg-indigo-200/80 text-indigo-800 px-2 py-0.5 rounded-lg font-mono">
+                SIAP SPENTIC
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-indigo-200/60 text-[11px]">
+              <div>
+                <span className="text-slate-600 block font-semibold text-[10px]">Username Masuk:</span>
+                <span className="font-mono font-black text-indigo-700">
+                  @{name.trim() ? getTeacherUsername({ name: name.trim() }) : 'nama.guru'}
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-600 block font-semibold text-[10px]">Kata Sandi Awal:</span>
+                <span className="font-mono font-black text-slate-900">guru123</span>
+              </div>
+            </div>
+            <p className="text-[10px] text-slate-600 mt-2 font-medium">
+              *Akun langsung aktif setelah disimpan. Guru baru dapat langsung login di <span className="font-mono text-indigo-700 font-bold">/elearning</span>.
+            </p>
           </div>
 
           <div className="pt-3 flex items-center justify-end gap-2.5 border-t-2 border-slate-200">

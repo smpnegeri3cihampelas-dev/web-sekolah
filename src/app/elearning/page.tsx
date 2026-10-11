@@ -42,6 +42,7 @@ import SubmissionSplitPreviewModal from '@/components/SubmissionSplitPreviewModa
 import CreateAssignmentModal from '@/components/CreateAssignmentModal';
 import StudentSubmitModal from '@/components/StudentSubmitModal';
 import TeacherSettingsModal from '@/components/TeacherSettingsModal';
+import { getStoredSchoolData } from '@/lib/schoolData';
 
 // Isolated Clock to keep re-renders local and lightweight
 const ELearningClock = React.memo(function ELearningClock() {
@@ -131,6 +132,45 @@ export default function ELearningPage() {
   // Mapel Teacher & Class State
   const [selectedClassId, setSelectedClassId] = useState<string>('7-A');
   
+  // Dynamic Teachers List (synced with getStoredSchoolData and dashboard additions)
+  const [allTeachers, setAllTeachers] = useState<TeacherUser[]>(DEMO_TEACHERS);
+  useEffect(() => {
+    const loadSchoolTeachers = () => {
+      try {
+        const stored = getStoredSchoolData().teachers;
+        if (stored && stored.length > 0) {
+          const merged: TeacherUser[] = stored.map(st => {
+            const cleanStNip = (st.nip || '').replace(/\s+/g, '');
+            const existingDemo = DEMO_TEACHERS.find(dt => 
+              (cleanStNip && cleanStNip !== '-' && (dt.nip || '').replace(/\s+/g, '') === cleanStNip) ||
+              dt.name.toLowerCase() === st.name.toLowerCase()
+            );
+            return {
+              nip: st.nip || '-',
+              name: st.name,
+              role: 'mapel' as const,
+              subject: st.subject || 'Guru Mata Pelajaran',
+              classes: existingDemo?.classes || ['7-A', '7-B', '8-A'],
+              username: st.username || getTeacherUsername(st)
+            };
+          });
+          setAllTeachers(merged);
+        }
+      } catch (err) {
+        console.error('Failed syncing school teachers', err);
+      }
+    };
+    loadSchoolTeachers();
+    window.addEventListener('smpn3_school_data_changed', loadSchoolTeachers);
+    window.addEventListener('storage', loadSchoolTeachers);
+    return () => {
+      window.removeEventListener('smpn3_school_data_changed', loadSchoolTeachers);
+      window.removeEventListener('storage', loadSchoolTeachers);
+    };
+  }, []);
+
+  const activeTeachers = allTeachers.length > 0 ? allTeachers : DEMO_TEACHERS;
+
   // Current active teacher derived from logged-in session, with graceful fallback
   const currentTeacher = currentUser && currentUser.role === 'guru_mapel'
     ? {
@@ -140,7 +180,7 @@ export default function ELearningPage() {
         subject: currentUser.subject || 'Bahasa Inggris',
         classes: ['7-A', '7-B', '8-A', '9-A']
       }
-    : DEMO_TEACHERS[0];
+    : activeTeachers[0];
 
   // Duty officer at Pos Meja Piket for the day (from official roster)
   const [piketDutyTeacher, setPiketDutyTeacher] = useState<string>('Rohidin, S.Pd.');
@@ -285,7 +325,7 @@ export default function ELearningPage() {
       const inputClean = inputRaw.toLowerCase().replace(/[^a-z0-9]/g, '');
       const inputNipClean = inputRaw.replace(/\s+/g, '');
 
-      const teacher = DEMO_TEACHERS.find(t => {
+      const teacher = activeTeachers.find(t => {
         const tUsername = getTeacherUsername(t);
         const tUsernameClean = tUsername.replace(/[^a-z0-9]/g, '');
         const tNipClean = (t.nip || '').replace(/\s+/g, '');
