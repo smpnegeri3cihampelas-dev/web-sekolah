@@ -18,6 +18,7 @@ export interface Teacher {
   id: number;
   name: string;
   username?: string;
+  phone?: string;
   role?: string;
   subject: string;
   category?: string;

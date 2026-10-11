@@ -25,7 +25,8 @@ import {
   deleteStoredAssignment,
   getStoredSubmissions,
   saveStoredSubmission,
-  getTeacherUsername
+  getTeacherUsername,
+  TeacherUser
 } from '@/lib/elearningData';
 import {
   saveSubmissionFile,

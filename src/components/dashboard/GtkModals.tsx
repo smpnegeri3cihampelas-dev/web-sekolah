@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Leader, Teacher } from '@/lib/schoolData';
 import { compressImage } from '@/lib/imageCompression';
-import { getTeacherUsername } from '@/lib/elearningData';
+import { getTeacherUsername, formatWhatsAppUrl } from '@/lib/elearningData';
 
 export const GTK_PHOTO_PRESETS = [
   { label: 'Avatar Default', src: '/teachers/default_avatar.svg' },
@@ -248,6 +248,7 @@ export function AddTeacherModal({ isOpen, onClose, onAdd, showToast }: AddTeache
   const [name, setName] = useState('');
   const [subject, setSubject] = useState('');
   const [nip, setNip] = useState('');
+  const [phone, setPhone] = useState('');
   const [status, setStatus] = useState('PNS');
   const [photo, setPhoto] = useState('/teachers/default_avatar.svg');
   const [isCompressing, setIsCompressing] = useState(false);
@@ -258,6 +259,7 @@ export function AddTeacherModal({ isOpen, onClose, onAdd, showToast }: AddTeache
       setName('');
       setSubject('');
       setNip('');
+      setPhone('');
       setStatus('PNS');
       setPhoto('/teachers/default_avatar.svg');
       setIsCompressing(false);
@@ -312,6 +314,7 @@ export function AddTeacherModal({ isOpen, onClose, onAdd, showToast }: AddTeache
     onAdd({
       name: name.trim(),
       username: generatedUsername,
+      phone: phone.trim() || undefined,
       subject: subject.trim() || 'Guru Mata Pelajaran',
       nip: nip.trim() || '-',
       status,
@@ -459,6 +462,25 @@ export function AddTeacherModal({ isOpen, onClose, onAdd, showToast }: AddTeache
             </div>
           </div>
 
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-slate-800 font-extrabold">Nomor WhatsApp Guru</label>
+              <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                Opsional
+              </span>
+            </div>
+            <input
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="Contoh: 081234567890 (Boleh kosong)"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-slate-950 font-mono font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 shadow-xs placeholder:text-slate-400"
+            />
+            <p className="text-[10px] text-slate-500 mt-1 font-medium">
+              *Jika diisi, admin bisa langsung membagikan info akun ke WA pribadi guru dengan satu klik.
+            </p>
+          </div>
+
           {/* Automatic E-Learning Account Preview Box */}
           <div className="p-3.5 rounded-2xl bg-indigo-50 border-2 border-indigo-200 text-xs">
             <div className="flex items-center justify-between mb-2">
@@ -523,6 +545,7 @@ export function EditTeacherModal({ isOpen, teacher, onClose, onSave, onDelete, s
   const [name, setName] = useState('');
   const [subject, setSubject] = useState('');
   const [nip, setNip] = useState('');
+  const [phone, setPhone] = useState('');
   const [status, setStatus] = useState('PNS');
   const [photo, setPhoto] = useState('/teachers/default_avatar.svg');
   const [active, setActive] = useState(true);
@@ -534,6 +557,7 @@ export function EditTeacherModal({ isOpen, teacher, onClose, onSave, onDelete, s
       setName(teacher.name || '');
       setSubject(teacher.subject || '');
       setNip(teacher.nip || '');
+      setPhone(teacher.phone || '');
       setStatus(teacher.status || 'PNS');
       setPhoto(teacher.photo || '/teachers/default_avatar.svg');
       setActive(teacher.active !== false);
@@ -572,6 +596,7 @@ export function EditTeacherModal({ isOpen, teacher, onClose, onSave, onDelete, s
       name: name.trim(),
       subject: subject.trim(),
       nip: nip.trim(),
+      phone: phone.trim() || undefined,
       status,
       photo,
       active
@@ -688,6 +713,29 @@ export function EditTeacherModal({ isOpen, teacher, onClose, onSave, onDelete, s
 
           <div className="grid grid-cols-2 gap-3">
             <div>
+              <label className="text-slate-800 block mb-1.5 font-extrabold">NIP / NUPTK</label>
+              <input
+                type="text"
+                value={nip}
+                onChange={(e) => setNip(e.target.value)}
+                placeholder="Boleh kosong jika GTT"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-slate-950 font-mono font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 shadow-xs"
+              />
+            </div>
+            <div>
+              <label className="text-slate-800 block mb-1.5 font-extrabold">Nomor WhatsApp Guru</label>
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="Contoh: 081234567890"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-slate-950 font-mono font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 shadow-xs"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
               <label className="text-slate-800 block mb-1.5 font-extrabold">Status Kepegawaian</label>
               <select
                 value={status}
@@ -759,15 +807,18 @@ interface ResetTeacherPasswordModalProps {
   teacher: Teacher | null;
   onClose: () => void;
   showToast: (msg: string) => void;
+  onSaveTeacher?: (teacherId: number, data: Partial<Teacher>) => void;
 }
 
 export function ResetTeacherPasswordModal({
   isOpen,
   teacher,
   onClose,
-  showToast
+  showToast,
+  onSaveTeacher
 }: ResetTeacherPasswordModalProps) {
   const [password, setPassword] = useState('guru123');
+  const [phone, setPhone] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [hasCopied, setHasCopied] = useState(false);
 
@@ -776,6 +827,7 @@ export function ResetTeacherPasswordModal({
 
   useEffect(() => {
     if (teacher && isOpen) {
+      setPhone(teacher.phone || '');
       let currentPass = '';
       if (typeof window !== 'undefined') {
         try {
@@ -818,6 +870,10 @@ export function ResetTeacherPasswordModal({
       } catch {}
     }
 
+    if (onSaveTeacher && teacher) {
+      onSaveTeacher(teacher.id, { phone: phone.trim() || undefined });
+    }
+
     showToast(`🔑 Kata sandi akun "${teacher.name}" berhasil diperbarui!`);
   };
 
@@ -840,7 +896,7 @@ Silakan gunakan username dan kata sandi di atas untuk masuk.
   };
 
   const handleOpenWhatsApp = () => {
-    const url = `https://wa.me/?text=${encodeURIComponent(shareMessage)}`;
+    const url = formatWhatsAppUrl(phone, shareMessage);
     window.open(url, '_blank');
   };
 
@@ -977,20 +1033,49 @@ Silakan gunakan username dan kata sandi di atas untuk masuk.
               {shareMessage}
             </div>
 
-            <div className="flex items-center gap-2 pt-1">
+            {/* Target WhatsApp Phone Number */}
+            <div className="pt-1 space-y-1">
+              <div className="flex items-center justify-between">
+                <label className="text-slate-800 font-extrabold text-xs block">
+                  Nomor WhatsApp Guru:
+                </label>
+                {phone.trim() ? (
+                  <span className="text-[10px] font-mono font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                    ✓ Chat Personal Langsung
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                    Pilih Kontak di WhatsApp
+                  </span>
+                )}
+              </div>
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="Contoh: 081234567890 (Ketik untuk kirim langsung ke nomor guru)"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-slate-950 font-mono text-xs font-bold focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 shadow-xs placeholder:text-slate-400"
+              />
+              <p className="text-[10px] text-slate-500 font-medium">
+                *Jika diisi, klik Simpan akan menyimpan nomor HP guru ke sistem dan tombol hijau langsung membuka chat personal ke nomor tersebut.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 pt-2">
               <button
                 type="button"
                 onClick={handleCopyMessage}
-                className="flex-1 py-2 px-3 rounded-xl bg-white hover:bg-slate-100 border-2 border-slate-300 text-slate-800 font-extrabold transition-all cursor-pointer shadow-xs active:scale-98 flex items-center justify-center gap-1.5"
+                className="flex-1 py-2.5 px-3 rounded-xl bg-white hover:bg-slate-100 border-2 border-slate-300 text-slate-800 font-extrabold transition-all cursor-pointer shadow-xs active:scale-98 flex items-center justify-center gap-1.5 text-xs"
               >
                 <span>{hasCopied ? '✅ Tersalin' : '📋 Salin Pesan'}</span>
               </button>
               <button
                 type="button"
                 onClick={handleOpenWhatsApp}
-                className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold transition-all cursor-pointer shadow-xs active:scale-98 flex items-center justify-center gap-1.5"
+                className="flex-1 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold transition-all cursor-pointer shadow-xs active:scale-98 flex items-center justify-center gap-1.5 text-xs"
               >
-                <span>💬 Buka WhatsApp</span>
+                <span>💬</span>
+                <span>{phone.trim() ? `Kirim ke WA (${phone.trim()})` : 'Buka WhatsApp'}</span>
               </button>
             </div>
           </div>

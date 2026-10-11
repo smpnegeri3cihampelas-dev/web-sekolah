@@ -277,6 +277,12 @@ export function TabPimpinan({
                             <span className="text-[10px] font-mono font-bold bg-indigo-50 text-indigo-800 px-1.5 py-0.5 rounded border border-indigo-200">
                               @{getTeacherUsername(teacher)}
                             </span>
+                            {teacher.phone && (
+                              <span className="text-[10px] font-mono font-bold bg-emerald-50 text-emerald-800 px-1.5 py-0.5 rounded border border-emerald-200 flex items-center gap-1" title={`WhatsApp: ${teacher.phone}`}>
+                                <span>📱</span>
+                                <span>{teacher.phone}</span>
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -459,6 +465,7 @@ export function TabPimpinan({
         teacher={resetPasswordTeacher}
         onClose={() => setResetPasswordTeacher(null)}
         showToast={showToast}
+        onSaveTeacher={onSaveTeacher}
       />
     </div>
   );

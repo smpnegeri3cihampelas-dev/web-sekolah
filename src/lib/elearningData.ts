@@ -35,6 +35,7 @@ export interface TeacherUser {
   nip: string;
   name: string;
   username?: string;
+  phone?: string;
   role: 'mapel' | 'piket' | 'both';
   subject: string;
   classes: string[];
@@ -54,6 +55,20 @@ export function getTeacherUsername(teacher: { name: string; username?: string })
   if (nonSingleParts.length === 1) return nonSingleParts[0];
   if (nonSingleParts.length >= 2) return `${nonSingleParts[0]}.${nonSingleParts[1]}`;
   return `${parts[0]}.${parts[1]}`;
+}
+
+export function formatWhatsAppUrl(phone?: string, text?: string): string {
+  const encodedText = text ? encodeURIComponent(text) : '';
+  if (!phone || !phone.trim()) {
+    return encodedText ? `https://wa.me/?text=${encodedText}` : 'https://wa.me/';
+  }
+  let clean = phone.replace(/[^0-9]/g, '');
+  if (clean.startsWith('0')) {
+    clean = '62' + clean.slice(1);
+  } else if (clean.startsWith('8')) {
+    clean = '62' + clean;
+  }
+  return encodedText ? `https://wa.me/${clean}?text=${encodedText}` : `https://wa.me/${clean}`;
 }
 
 export interface StudentUser {
