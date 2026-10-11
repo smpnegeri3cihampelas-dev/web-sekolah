@@ -278,6 +278,29 @@ export default function ELearningPage() {
         t.nip.replace(/\s+/g, '') === cleanId || 
         t.name.toLowerCase() === loginIdentifier.trim().toLowerCase()
       ) || DEMO_TEACHERS[0];
+
+      // Custom password verification set by administrator
+      let customPassword = '';
+      if (typeof window !== 'undefined') {
+        try {
+          const raw = localStorage.getItem('smpn3_teacher_passwords');
+          if (raw) {
+            const map = JSON.parse(raw);
+            customPassword = map[cleanId] || (teacher ? map[teacher.nip.replace(/\s+/g, '')] : '') || '';
+          }
+        } catch {}
+      }
+
+      const trimmedPass = loginPassword.trim();
+      const isValidPass = customPassword
+        ? (trimmedPass === customPassword || trimmedPass === 'guru123' || trimmedPass === cleanId)
+        : (trimmedPass === 'spentic2026' || trimmedPass === 'guru123' || trimmedPass === cleanId || trimmedPass.length >= 4);
+
+      if (!isValidPass) {
+        showToast('⚠️ Kata sandi salah! Hubungi operator admin sekolah via WhatsApp jika Anda lupa kata sandi.', 'warn');
+        return;
+      }
+
       handleLogin({
         role: 'guru_mapel',
         name: teacher ? teacher.name : 'Dewan Guru SPENTIC',
@@ -1141,9 +1164,19 @@ export default function ELearningPage() {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                        Kata Sandi Akun Guru
-                      </label>
+                      <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1">
+                        <label className="block text-xs font-semibold text-slate-700">
+                          Kata Sandi Akun Guru
+                        </label>
+                        <a
+                          href={`https://wa.me/?text=${encodeURIComponent('Halo Operator / Admin SMPN 3 Cihampelas, saya guru pengampu ingin meminta bantuan reset kata sandi akun SIAP SPENTIC saya.')}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 transition flex items-center gap-1 cursor-pointer"
+                        >
+                          <span>💬 Lupa Sandi? Hubungi Admin</span>
+                        </a>
+                      </div>
                       <input
                         type="password"
                         value={loginPassword}
@@ -1152,6 +1185,9 @@ export default function ELearningPage() {
                         placeholder="Masukkan kata sandi..."
                         required
                       />
+                      <span className="text-[11px] text-slate-500 mt-1 block font-medium">
+                        *Kata sandi standar: <span className="font-mono font-bold text-slate-700">guru123</span> atau NIP, atau sandi baru hasil reset oleh Admin via Dashboard.
+                      </span>
                     </div>
 
                     <button

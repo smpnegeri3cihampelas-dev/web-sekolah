@@ -703,3 +703,245 @@ export function EditTeacherModal({ isOpen, teacher, onClose, onSave, onDelete, s
     </div>
   );
 }
+
+// =========================================================================
+// MODAL: RESET PASSWORD AKUN GURU (E-LEARNING / SIAP SPENTIC)
+// =========================================================================
+interface ResetTeacherPasswordModalProps {
+  isOpen: boolean;
+  teacher: Teacher | null;
+  onClose: () => void;
+  showToast: (msg: string) => void;
+}
+
+export function ResetTeacherPasswordModal({
+  isOpen,
+  teacher,
+  onClose,
+  showToast
+}: ResetTeacherPasswordModalProps) {
+  const [password, setPassword] = useState('guru123');
+  const [showPassword, setShowPassword] = useState(false);
+  const [hasCopied, setHasCopied] = useState(false);
+
+  const cleanNip = (teacher?.nip || '').replace(/\s+/g, '');
+
+  useEffect(() => {
+    if (teacher && isOpen) {
+      let currentPass = '';
+      if (typeof window !== 'undefined') {
+        try {
+          const raw = localStorage.getItem('smpn3_teacher_passwords');
+          if (raw) {
+            const map = JSON.parse(raw);
+            currentPass = map[cleanNip] || map[teacher.id] || '';
+          }
+        } catch {}
+      }
+      setPassword(currentPass || 'guru123');
+      setShowPassword(false);
+      setHasCopied(false);
+    }
+  }, [teacher, isOpen, cleanNip]);
+
+  if (!isOpen || !teacher) return null;
+
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!password.trim()) {
+      showToast('⚠️ Kata sandi tidak boleh kosong!');
+      return;
+    }
+    if (password.length < 4) {
+      showToast('⚠️ Kata sandi minimal harus 4 karakter!');
+      return;
+    }
+
+    if (typeof window !== 'undefined') {
+      try {
+        let map: Record<string, string> = {};
+        const raw = localStorage.getItem('smpn3_teacher_passwords');
+        if (raw) map = JSON.parse(raw);
+        map[cleanNip] = password.trim();
+        map[teacher.id] = password.trim();
+        localStorage.setItem('smpn3_teacher_passwords', JSON.stringify(map));
+      } catch {}
+    }
+
+    showToast(`🔑 Kata sandi akun "${teacher.name}" berhasil diperbarui!`);
+  };
+
+  const shareMessage = `Yth. Bapak/Ibu ${teacher.name},
+Berikut informasi akun masuk portal SIAP SPENTIC Anda:
+• NIP / Username : ${teacher.nip || '-'}
+• Kata Sandi Baru: ${password}
+• Tautan Masuk   : https://smpn3cihampelas.sch.id/elearning
+
+Silakan simpan kata sandi ini dengan baik.
+— Admin SMP Negeri 3 Cihampelas`;
+
+  const handleCopyMessage = () => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(shareMessage);
+      setHasCopied(true);
+      showToast('📋 Info akun berhasil disalin! Silakan kirimkan ke WhatsApp guru.');
+      setTimeout(() => setHasCopied(false), 3000);
+    }
+  };
+
+  const handleOpenWhatsApp = () => {
+    const url = `https://wa.me/?text=${encodeURIComponent(shareMessage)}`;
+    window.open(url, '_blank');
+  };
+
+  return (
+    <div
+      data-lenis-prevent="true"
+      data-lenis-prevent-wheel="true"
+      data-lenis-prevent-touch="true"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]"
+    >
+      <div
+        data-lenis-prevent="true"
+        data-lenis-prevent-wheel="true"
+        data-lenis-prevent-touch="true"
+        className="w-full max-w-lg rounded-3xl bg-white border-2 border-slate-300 p-6 sm:p-7 shadow-2xl relative max-h-[90vh] overflow-y-auto"
+      >
+        <div className="flex items-center justify-between pb-4 border-b-2 border-slate-100 mb-5">
+          <div className="flex items-center gap-2.5">
+            <div className="w-10 h-10 rounded-2xl bg-indigo-50 border-2 border-indigo-200 flex items-center justify-center text-xl shrink-0">
+              🔑
+            </div>
+            <div>
+              <h3 className="text-base sm:text-lg font-black text-slate-950">
+                Reset Kata Sandi Akun Guru
+              </h3>
+              <p className="text-xs text-slate-600 font-bold mt-0.5">
+                Akses portal e-learning & presensi SIAP SPENTIC
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-950 font-bold flex items-center justify-center cursor-pointer border border-slate-300 transition-colors"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Teacher Identity Badge */}
+        <div className="p-4 rounded-2xl bg-indigo-50/70 border border-indigo-200 mb-5 flex items-center gap-3.5">
+          <img
+            src={teacher.photo || '/teachers/default_avatar.svg'}
+            alt={teacher.name}
+            className="w-12 h-12 rounded-xl object-cover border border-indigo-200 bg-white shrink-0"
+          />
+          <div className="min-w-0 flex-1">
+            <h4 className="text-sm font-black text-slate-950 truncate">{teacher.name}</h4>
+            <p className="text-xs font-mono text-indigo-900 font-bold mt-0.5">
+              NIP: {teacher.nip || '-'}
+            </p>
+            <p className="text-[11px] text-slate-600 font-medium truncate">
+              Mapel: {teacher.subject}
+            </p>
+          </div>
+        </div>
+
+        <form onSubmit={handleSave} className="space-y-4 text-xs">
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-slate-800 font-black text-xs">Kata Sandi Baru</label>
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 cursor-pointer"
+              >
+                {showPassword ? 'Sembunyikan' : 'Tampilkan'}
+              </button>
+            </div>
+            <input
+              type={showPassword ? 'text' : 'password'}
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Masukkan kata sandi baru untuk guru..."
+              className="w-full px-3.5 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-slate-950 font-bold font-mono focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 shadow-xs"
+            />
+          </div>
+
+          {/* Quick Preset Buttons */}
+          <div className="space-y-1.5">
+            <span className="text-[11px] font-bold text-slate-600 block">Pilihan Cepat Standar:</span>
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={() => setPassword('guru123')}
+                className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 font-mono font-bold text-[11px] border border-slate-300 transition-colors cursor-pointer"
+              >
+                guru123
+              </button>
+              {cleanNip && cleanNip !== '-' && (
+                <button
+                  type="button"
+                  onClick={() => setPassword(cleanNip)}
+                  className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 font-mono font-bold text-[11px] border border-slate-300 transition-colors cursor-pointer"
+                >
+                  NIP Lengkap
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  const randomPin = Math.floor(100000 + Math.random() * 900000).toString();
+                  setPassword(randomPin);
+                }}
+                className="px-2.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-800 font-mono font-bold text-[11px] border border-indigo-200 transition-colors cursor-pointer"
+              >
+                🎲 Acak PIN 6 Angka
+              </button>
+            </div>
+          </div>
+
+          {/* Action to Save */}
+          <div className="pt-2">
+            <button
+              type="submit"
+              className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold cursor-pointer shadow-md shadow-indigo-600/20 active:scale-98 transition-all flex items-center justify-center gap-2"
+            >
+              <span>💾 Simpan Kata Sandi Ini</span>
+            </button>
+          </div>
+
+          {/* Share Box for WhatsApp */}
+          <div className="pt-3 border-t-2 border-slate-100 space-y-2">
+            <label className="text-slate-800 font-black text-xs block">
+              Kirimkan Akses ke Guru (WhatsApp):
+            </label>
+            <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 font-mono text-[11px] leading-relaxed select-all">
+              {shareMessage}
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={handleCopyMessage}
+                className="flex-1 py-2 px-3 rounded-xl bg-white hover:bg-slate-100 border-2 border-slate-300 text-slate-800 font-extrabold transition-all cursor-pointer shadow-xs active:scale-98 flex items-center justify-center gap-1.5"
+              >
+                <span>{hasCopied ? '✅ Tersalin' : '📋 Salin Pesan'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleOpenWhatsApp}
+                className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold transition-all cursor-pointer shadow-xs active:scale-98 flex items-center justify-center gap-1.5"
+              >
+                <span>💬 Buka WhatsApp</span>
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+

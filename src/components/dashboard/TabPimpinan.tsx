@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { Leader, Teacher, DataPokok } from '@/lib/schoolData';
-import { EditLeaderModal, AddTeacherModal, EditTeacherModal } from './GtkModals';
+import { EditLeaderModal, AddTeacherModal, EditTeacherModal, ResetTeacherPasswordModal } from './GtkModals';
 
 interface TabPimpinanProps {
   leadersList: Leader[];
@@ -47,6 +47,7 @@ export function TabPimpinan({
   // Modal open states
   const [selectedLeader, setSelectedLeader] = useState<Leader | null>(null);
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
+  const [resetPasswordTeacher, setResetPasswordTeacher] = useState<Teacher | null>(null);
   const [isAddTeacherOpen, setIsAddTeacherOpen] = useState(false);
 
   // Memoized search
@@ -314,6 +315,14 @@ export function TabPimpinan({
                       <div className="flex items-center justify-end gap-2">
                         <button
                           type="button"
+                          onClick={() => setResetPasswordTeacher(teacher)}
+                          className="p-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border-2 border-amber-300 transition-all cursor-pointer shadow-xs active:scale-95 flex items-center justify-center"
+                          title="Reset Kata Sandi Akun & Kirim via WhatsApp"
+                        >
+                          <span className="text-sm leading-none" role="img" aria-label="Kunci">🔑</span>
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => setSelectedTeacher(teacher)}
                           className="p-2 rounded-xl bg-white hover:bg-slate-100 text-indigo-700 border-2 border-slate-300 transition-all cursor-pointer shadow-xs"
                           title="Ubah Data & Foto Guru"
@@ -436,6 +445,13 @@ export function TabPimpinan({
         onClose={() => setSelectedTeacher(null)}
         onSave={onSaveTeacher}
         onDelete={onDeleteTeacher}
+        showToast={showToast}
+      />
+
+      <ResetTeacherPasswordModal
+        isOpen={!!resetPasswordTeacher}
+        teacher={resetPasswordTeacher}
+        onClose={() => setResetPasswordTeacher(null)}
         showToast={showToast}
       />
     </div>
