@@ -772,13 +772,15 @@ export function ResetTeacherPasswordModal({
     showToast(`🔑 Kata sandi akun "${teacher.name}" berhasil diperbarui!`);
   };
 
-  const usernameDisplay = teacher.nip && teacher.nip !== '-' ? teacher.nip : teacher.name;
-
   const shareMessage = `Yth. Bapak/Ibu ${teacher.name},
 Berikut informasi akun masuk portal SIAP SPENTIC Anda:
-• Username Masuk : ${usernameDisplay}
+• Akun Guru      : ${teacher.name}
 • Kata Sandi Baru: ${password}
 • Tautan Masuk   : https://smpn3cihampelas.sch.id/elearning
+
+Petunjuk Masuk:
+1. Buka tautan di atas dan pilih nama Anda pada daftar akun guru.
+2. Masukkan kata sandi baru Anda.
 
 Silakan simpan kata sandi ini dengan baik.
 — Admin SMP Negeri 3 Cihampelas`;
