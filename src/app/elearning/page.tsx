@@ -97,8 +97,8 @@ export default function ELearningPage() {
 
   // Login Form Local State
   const [loginRole, setLoginRole] = useState<'guru' | 'piket' | 'siswa'>('guru');
-  const [loginIdentifier, setLoginIdentifier] = useState<string>('rohidin');
-  const [loginPassword, setLoginPassword] = useState<string>('guru123');
+  const [loginIdentifier, setLoginIdentifier] = useState<string>('');
+  const [loginPassword, setLoginPassword] = useState<string>('');
 
   // Realtime Attendance State (synced via localStorage)
   const [attendanceData, setAttendanceData] = useState<Record<string, ClassSessionAttendance>>({});
@@ -306,16 +306,8 @@ export default function ELearningPage() {
 
   const switchLoginTab = (tab: 'guru' | 'piket' | 'siswa') => {
     setLoginRole(tab);
-    if (tab === 'guru') {
-      setLoginIdentifier('rohidin');
-      setLoginPassword('guru123');
-    } else if (tab === 'piket') {
-      setLoginIdentifier('piketspentic');
-      setLoginPassword('');
-    } else {
-      setLoginIdentifier('0133138158');
-      setLoginPassword('');
-    }
+    setLoginIdentifier('');
+    setLoginPassword('');
   };
 
   const handleFormLoginSubmit = (e: React.FormEvent) => {
