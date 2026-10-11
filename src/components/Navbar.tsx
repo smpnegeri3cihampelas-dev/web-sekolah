@@ -136,17 +136,14 @@ export default function Navbar() {
           <nav 
             className="flex items-center gap-4 lg:gap-6 px-5 lg:px-6 py-2 rounded-full glass-pill-nav text-xs sm:text-sm font-medium text-white drop-shadow-[0_1px_4px_rgba(0,0,0,0.7)] transition-all duration-300 whitespace-nowrap"
           >
-            <a href="#" className="hover:text-indigo-200 transition-colors">
-              Beranda
-            </a>
-            <a href="#profil" className="hover:text-indigo-200 transition-colors">
-              Profil
-            </a>
             <a href="#kurikulum" className="hover:text-indigo-200 transition-colors">
               Program
             </a>
-            <a href="#fasilitas" className="hover:text-indigo-200 transition-colors">
-              Fasilitas
+            <a href="#kalender" className="hover:text-indigo-200 transition-colors">
+              Kalender
+            </a>
+            <a href="#galeri" className="hover:text-indigo-200 transition-colors">
+              Galeri
             </a>
             <a href="/warta" className="hover:text-indigo-200 transition-colors">
               Warta
@@ -301,20 +298,6 @@ export default function Navbar() {
       {mobileMenuOpen && (
         <div className="md:hidden mt-3 max-w-sm mx-auto p-4 rounded-3xl bg-white/95 backdrop-blur-2xl border border-white/80 shadow-2xl flex flex-col gap-1 text-sm font-semibold text-slate-800 animate-[fadeIn_0.2s_ease-out]">
           <a 
-            href="#" 
-            onClick={() => setMobileMenuOpen(false)} 
-            className="px-4 py-2.5 rounded-xl hover:bg-indigo-50/80 hover:text-indigo-700 transition-colors"
-          >
-            Beranda
-          </a>
-          <a 
-            href="#profil" 
-            onClick={() => setMobileMenuOpen(false)} 
-            className="px-4 py-2.5 rounded-xl hover:bg-indigo-50/80 hover:text-indigo-700 transition-colors"
-          >
-            Profil
-          </a>
-          <a 
             href="#kurikulum" 
             onClick={() => setMobileMenuOpen(false)} 
             className="px-4 py-2.5 rounded-xl hover:bg-indigo-50/80 hover:text-indigo-700 transition-colors"
@@ -322,11 +305,18 @@ export default function Navbar() {
             Program
           </a>
           <a 
-            href="#fasilitas" 
+            href="#kalender" 
             onClick={() => setMobileMenuOpen(false)} 
             className="px-4 py-2.5 rounded-xl hover:bg-indigo-50/80 hover:text-indigo-700 transition-colors"
           >
-            Fasilitas
+            Kalender
+          </a>
+          <a 
+            href="#galeri" 
+            onClick={() => setMobileMenuOpen(false)} 
+            className="px-4 py-2.5 rounded-xl hover:bg-indigo-50/80 hover:text-indigo-700 transition-colors"
+          >
+            Galeri
           </a>
           <a 
             href="/warta" 
