@@ -223,57 +223,14 @@ export default function LoginPage() {
 
             </form>
 
-            {/* Divider "Or sign in with" */}
-            <div className="w-full flex items-center justify-between my-5">
-              <div className="h-[1px] flex-1 bg-slate-200/80" />
-              <span className="text-[11px] text-slate-400 font-normal px-3 uppercase tracking-wider">
-                Or sign in with
-              </span>
-              <div className="h-[1px] flex-1 bg-slate-200/80" />
+            {/* Catatan Keamanan / Akses Terbatas */}
+            <div className="w-full mt-6 pt-4 border-t border-slate-100 flex items-center justify-center gap-2 text-[11px] text-slate-400 select-none">
+              <svg className="w-3.5 h-3.5 text-slate-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+              <span>Akses terbatas khusus pengelola resmi SMPN 3 Cihampelas</span>
             </div>
-
-            {/* SSO / Alternative Login Buttons (Google, Belajar.id, Apple from reference) */}
-            <div className="w-full grid grid-cols-3 gap-2.5">
-              {/* Google Button */}
-              <button 
-                type="button"
-                onClick={() => setErrorMessage('Layanan SSO Google sedang dalam sinkronisasi.')}
-                className="py-2.5 px-3 rounded-xl bg-white border border-slate-200/90 hover:bg-slate-50 shadow-sm flex items-center justify-center transition-all hover:scale-[1.02] cursor-pointer"
-                title="Masuk dengan Akun Google / Belajar.id"
-              >
-                <svg className="w-4 h-4" viewBox="0 0 24 24">
-                  <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.65v3.03h3.88c2.27-2.09 3.66-5.17 3.66-9.12z" />
-                  <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.03c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.27v3.13C3.26 21.35 7.33 24 12 24z" />
-                  <path fill="#FBBC05" d="M5.28 14.29c-.25-.72-.38-1.49-.38-2.29s.13-1.57.38-2.29V6.57H1.27C.46 8.19 0 10.04 0 12s.46 3.81 1.27 5.43l4.01-3.14z" />
-                  <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.65 1.27 6.57l4.01 3.14c.95-2.83 3.6-4.96 6.72-4.96z" />
-                </svg>
-              </button>
-
-              {/* Belajar.id / Facebook button position */}
-              <button 
-                type="button"
-                onClick={() => setErrorMessage('Gunakan akun resmi @belajar.id atau username sekolah.')}
-                className="py-2.5 px-3 rounded-xl bg-white border border-slate-200/90 hover:bg-slate-50 shadow-sm flex items-center justify-center transition-all hover:scale-[1.02] cursor-pointer"
-                title="Masuk dengan Portal Belajar.id"
-              >
-                <div className="w-4 h-4 rounded-full bg-[#1877F2] text-white flex items-center justify-center text-[10px] font-bold">
-                  f
-                </div>
-              </button>
-
-              {/* Apple Button */}
-              <button 
-                type="button"
-                onClick={() => setErrorMessage('Layanan SSO Apple ID segera hadir.')}
-                className="py-2.5 px-3 rounded-xl bg-white border border-slate-200/90 hover:bg-slate-50 shadow-sm flex items-center justify-center transition-all hover:scale-[1.02] cursor-pointer"
-                title="Masuk dengan Apple ID"
-              >
-                <svg className="w-4 h-4 text-slate-900" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.84c.66-.8 1.11-1.92.99-3.04-.95.04-2.1.63-2.77 1.43-.59.68-1.11 1.82-.97 2.91 1.06.08 2.14-.53 2.75-1.3z" />
-                </svg>
-              </button>
-            </div>
-
           </div>
 
         </div>
