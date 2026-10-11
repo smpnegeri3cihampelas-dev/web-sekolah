@@ -40,6 +40,7 @@ import {
 import SubmissionSplitPreviewModal from '@/components/SubmissionSplitPreviewModal';
 import CreateAssignmentModal from '@/components/CreateAssignmentModal';
 import StudentSubmitModal from '@/components/StudentSubmitModal';
+import TeacherSettingsModal from '@/components/TeacherSettingsModal';
 
 // Isolated Clock to keep re-renders local and lightweight
 const ELearningClock = React.memo(function ELearningClock() {
@@ -122,6 +123,9 @@ export default function ELearningPage() {
 
   // Submission File Preview Modal State (for Teacher & Student)
   const [previewSubmission, setPreviewSubmission] = useState<{ sub: AssignmentSubmission; asg?: Assignment } | null>(null);
+  
+  // Teacher Account Settings Modal State
+  const [isTeacherSettingsOpen, setIsTeacherSettingsOpen] = useState<boolean>(false);
   
   // Mapel Teacher & Class State
   const [selectedClassId, setSelectedClassId] = useState<string>('7-A');
@@ -1024,6 +1028,19 @@ export default function ELearningPage() {
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                 <ELearningClock />
               </div>
+
+              {/* Teacher Account Settings & Change Password */}
+              {(currentUser.role === 'guru_mapel' || currentUser.role === 'guru_piket') && (
+                <button
+                  type="button"
+                  onClick={() => setIsTeacherSettingsOpen(true)}
+                  className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-indigo-50 border border-slate-300 hover:border-indigo-300 text-slate-800 hover:text-indigo-800 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs active:scale-95"
+                  title="Pengaturan Akun & Ganti Kata Sandi"
+                >
+                  <span>⚙️</span>
+                  <span className="hidden sm:inline">Pengaturan</span>
+                </button>
+              )}
 
               {/* Red Official Logout Button */}
               <button
@@ -3430,6 +3447,14 @@ export default function ELearningPage() {
             }}
           />
         )}
+
+        {/* MODAL: PENGATURAN AKUN GURU & GANTI KATA SANDI MANDIRI */}
+        <TeacherSettingsModal
+          isOpen={isTeacherSettingsOpen}
+          onClose={() => setIsTeacherSettingsOpen(false)}
+          currentUser={currentUser}
+          showToast={showToast}
+        />
 
       </main>
 
