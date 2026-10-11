@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import Image from 'next/image';
 import { Leader, Teacher } from '@/lib/schoolData';
 import { WartaItem } from '@/lib/wartaData';
 import { Student } from '@/lib/elearningData';
@@ -120,7 +119,14 @@ export function TabOverview({
               >
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="w-12 h-12 rounded-xl overflow-hidden relative flex-shrink-0 bg-slate-200 border border-slate-300">
-                    <Image src={item.src} alt={item.title} fill className="object-cover" />
+                    <img 
+                      src={item.src || '/slide4.jpeg'} 
+                      alt={item.title} 
+                      className="w-full h-full object-cover" 
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = '/slide4.jpeg';
+                      }}
+                    />
                   </div>
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 mb-1">

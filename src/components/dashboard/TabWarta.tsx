@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import Image from 'next/image';
 import { WartaItem } from '@/lib/wartaData';
 
 interface TabWartaProps {
@@ -107,7 +106,14 @@ export function TabWarta({ newsList, onOpenAdd, onOpenEdit, onDelete }: TabWarta
                   <td className="py-4 px-4 sm:px-6">
                     <div className="flex items-center gap-3">
                       <div className="w-12 h-12 rounded-xl overflow-hidden relative flex-shrink-0 bg-slate-200 border border-slate-300">
-                        <Image src={item.src} alt={item.title} fill className="object-cover" />
+                        <img 
+                          src={item.src || '/slide4.jpeg'} 
+                          alt={item.title} 
+                          className="w-full h-full object-cover" 
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = '/slide4.jpeg';
+                          }}
+                        />
                       </div>
                       <span className="font-black text-slate-950 text-sm max-w-md truncate">
                         {item.title}
@@ -141,7 +147,11 @@ export function TabWarta({ newsList, onOpenAdd, onOpenEdit, onDelete }: TabWarta
                       </button>
                       <button
                         type="button"
-                        onClick={() => onDelete(item.id)}
+                        onClick={() => {
+                          if (confirm(`Yakin ingin menghapus warta "${item.title}"?`)) {
+                            onDelete(item.id);
+                          }
+                        }}
                         className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-800 border-2 border-rose-300 transition-colors cursor-pointer"
                         title="Hapus Warta"
                       >
