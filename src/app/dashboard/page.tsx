@@ -21,7 +21,6 @@ import { TabSiswa } from '@/components/dashboard/TabSiswa';
 import { TabPimpinan } from '@/components/dashboard/TabPimpinan';
 import { TabAgenda } from '@/components/dashboard/TabAgenda';
 import { TabGaleri } from '@/components/dashboard/TabGaleri';
-import { TabPesan } from '@/components/dashboard/TabPesan';
 import { TabPengaturan } from '@/components/dashboard/TabPengaturan';
 import { useAgendaData, AgendaItem } from '@/lib/agendaData';
 import { useGalleryData, GalleryItem } from '@/lib/galleryData';
@@ -42,41 +41,11 @@ const DashboardClock = React.memo(function DashboardClock() {
   return <span>{time || 'Memuat...'}</span>;
 });
 
-const DEFAULT_MESSAGES = [
-  {
-    id: 1,
-    sender: 'Rina Kusuma (Wali Murid)',
-    contact: '0812-3456-7890 · rina.kusuma@gmail.com',
-    date: 'Hari ini, 14:20',
-    subject: 'Pertanyaan Alur Verifikasi Berkas PPDB',
-    message: 'Selamat siang bapak/ibu panitia, untuk pendaftaran PPDB jalur prestasi apakah sertifikat kejuaraan tingkat kabupaten perlu dilegalisir dinas?',
-    read: false
-  },
-  {
-    id: 2,
-    sender: 'Dedi Suryadi (Komite Sekolah)',
-    contact: '0813-9876-5432 · dedi.suryadi@gmail.com',
-    date: 'Kemarin, 09:45',
-    subject: 'Jadwal Rapat Koordinasi Program Smart Campus',
-    message: 'Menindaklanjuti rencana penambahan perangkat IoT laboratorium, kami usulkan pertemuan koordinasi hari Jumat pekan depan.',
-    read: true
-  },
-  {
-    id: 3,
-    sender: 'Ahmad Fauzi (Alumni 2023)',
-    contact: '0857-1122-3344 · ahmad.alumni@yahoo.com',
-    date: '22 Sep 2026',
-    subject: 'Permohonan Legalisir Ijazah Digital',
-    message: 'Permisi staf TU, apakah layanan legalisir ijazah bisa dikirimkan salinan dokumen yang sudah bertanda tangan elektronik?',
-    read: true
-  }
-];
-
 export default function DashboardPage() {
   const router = useRouter();
 
   // Navigation State
-  const [activeTab, setActiveTab] = useState<'overview' | 'warta' | 'siswa' | 'pimpinan' | 'agenda' | 'galeri' | 'pesan' | 'pengaturan'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'warta' | 'siswa' | 'pimpinan' | 'agenda' | 'galeri' | 'pengaturan'>('overview');
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   // Toast Notification
@@ -263,32 +232,12 @@ export default function DashboardPage() {
     showToast('🗑️ Foto telah dihapus dari galeri.');
   };
 
-  // 6. Pesan Masuk
-  const [messagesList, setMessagesList] = useState<typeof DEFAULT_MESSAGES>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('smpn3_messages_data_v1');
-        if (saved) return JSON.parse(saved);
-      } catch {}
-    }
-    return DEFAULT_MESSAGES;
-  });
-
-  const handleDeleteMessage = (id: number) => {
-    const updated = messagesList.filter(m => m.id !== id);
-    setMessagesList(updated);
-    try { localStorage.setItem('smpn3_messages_data_v1', JSON.stringify(updated)); } catch {}
-    showToast('🗑️ Pesan berhasil dihapus.');
-  };
-
   const handleLogout = () => {
     showToast('Keluar dari sesi admin...');
     setTimeout(() => {
       router.push('/login');
     }, 500);
   };
-
-  const unreadMessagesCount = messagesList.filter(m => !m.read).length;
 
   return (
     <div className="theme-marklab-app min-h-screen bg-[#f8fafc] text-slate-900 flex flex-col antialiased selection:bg-indigo-500/25 selection:text-indigo-900 font-dashboard">
@@ -438,17 +387,6 @@ export default function DashboardPage() {
                   badge: `${galleryList.length}`
                 },
                 {
-                  id: 'pesan',
-                  label: 'Pesan Masuk',
-                  icon: (
-                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                      <rect width="20" height="16" x="2" y="4" rx="2" />
-                      <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
-                    </svg>
-                  ),
-                  badge: `${unreadMessagesCount || messagesList.length}`
-                },
-                {
                   id: 'pengaturan',
                   label: 'Pengaturan Web',
                   icon: (
@@ -558,7 +496,6 @@ export default function DashboardPage() {
                   {activeTab === 'pimpinan' && 'Manajemen Pimpinan & Guru (GTK)'}
                   {activeTab === 'agenda' && 'Kalender & Agenda Akademik'}
                   {activeTab === 'galeri' && 'Manajemen Galeri & Fasilitas'}
-                  {activeTab === 'pesan' && 'Kotak Pesan Masuk Wali Murid'}
                   {activeTab === 'pengaturan' && 'Pengaturan Profil & Website'}
                 </h1>
                 <p className="text-xs text-slate-600 font-semibold hidden sm:block">
@@ -594,7 +531,7 @@ export default function DashboardPage() {
                 leadersList={leaders}
                 teachersList={teachers}
                 agendaList={agendaList}
-                messagesList={messagesList}
+                galleryList={galleryList}
                 studentsList={studentsList}
                 onNavigateTab={setActiveTab}
               />
@@ -663,13 +600,6 @@ export default function DashboardPage() {
                 onDeleteGallery={handleDeleteGallery}
                 onResetGallery={resetGallery}
                 showToast={showToast}
-              />
-            )}
-
-            {activeTab === 'pesan' && (
-              <TabPesan
-                messagesList={messagesList}
-                onDeleteMessage={handleDeleteMessage}
               />
             )}
 

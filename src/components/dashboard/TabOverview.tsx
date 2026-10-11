@@ -4,15 +4,16 @@ import React from 'react';
 import { Leader, Teacher } from '@/lib/schoolData';
 import { WartaItem } from '@/lib/wartaData';
 import { Student } from '@/lib/elearningData';
+import { GalleryItem } from '@/lib/galleryData';
 
 interface TabOverviewProps {
   newsList: WartaItem[];
   leadersList: Leader[];
   teachersList: Teacher[];
   agendaList: Array<{ id: number; name: string; date: string; category: string; status: string }>;
-  messagesList: Array<{ id: number; sender: string; contact: string; date: string; subject: string; message: string; read: boolean }>;
+  galleryList: GalleryItem[];
   studentsList: Student[];
-  onNavigateTab: (tab: 'overview' | 'warta' | 'siswa' | 'pimpinan' | 'agenda' | 'galeri' | 'pesan' | 'pengaturan') => void;
+  onNavigateTab: (tab: 'overview' | 'warta' | 'siswa' | 'pimpinan' | 'agenda' | 'galeri' | 'pengaturan') => void;
 }
 
 export function TabOverview({
@@ -20,11 +21,10 @@ export function TabOverview({
   leadersList,
   teachersList,
   agendaList,
-  messagesList,
+  galleryList,
   studentsList,
   onNavigateTab
 }: TabOverviewProps) {
-  const unreadMessagesCount = messagesList.filter(m => !m.read).length;
   const totalStudents = studentsList.length || 535;
 
   return (
@@ -61,11 +61,11 @@ export function TabOverview({
             onClick: () => onNavigateTab('agenda')
           },
           {
-            label: 'Pesan Masuk',
-            value: `${messagesList.length}`,
-            desc: unreadMessagesCount > 0 ? `${unreadMessagesCount} belum dibaca` : 'Semua telah dibaca',
-            icon: '💬',
-            onClick: () => onNavigateTab('pesan')
+            label: 'Galeri Foto',
+            value: `${galleryList.length}`,
+            desc: 'Dokumentasi Sekolah',
+            icon: '📸',
+            onClick: () => onNavigateTab('galeri')
           }
         ].map((stat, i) => (
           <div 
@@ -84,121 +84,110 @@ export function TabOverview({
             <div className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight mb-1">
               {stat.value}
             </div>
-            <div className="text-[11px] font-extrabold text-indigo-700 flex items-center gap-1.5 truncate">
-              <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 shrink-0" />
-              <span className="truncate">{stat.desc}</span>
+            <div className="text-[11px] font-semibold text-slate-700 truncate">
+              {stat.desc}
             </div>
           </div>
         ))}
       </div>
 
-      {/* Grid 2 Column: Warta Terbaru + Agenda Terdekat & Status Akademik */}
+      {/* Main Grid: Data Pokok Sekolah & Agenda Terdekat */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
-        {/* Left Column: Recent News (7 Cols) */}
-        <div className="lg:col-span-7 rounded-2xl bg-white border-2 border-slate-200 p-5 sm:p-6 shadow-sm space-y-4">
-          <div className="flex items-center justify-between pb-3.5 border-b-2 border-slate-100">
-            <div>
-              <h3 className="text-base font-black text-slate-950">Warta & Berita Tayang</h3>
-              <p className="text-xs text-slate-600 font-semibold">Status artikel di halaman beranda & warta</p>
-            </div>
-            <button 
-              type="button"
-              onClick={() => onNavigateTab('warta')}
-              className="text-xs font-black text-indigo-700 hover:text-indigo-900 transition-colors cursor-pointer"
-            >
-              Lihat Semua →
-            </button>
-          </div>
-
-          <div className="space-y-3">
-            {newsList.slice(0, 4).map((item) => (
-              <div 
-                key={item.id}
-                className="p-3.5 rounded-xl bg-slate-50 border-2 border-slate-200 hover:border-indigo-400 hover:bg-white transition-all flex items-center justify-between gap-3 shadow-xs"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-12 h-12 rounded-xl overflow-hidden relative flex-shrink-0 bg-slate-200 border border-slate-300">
-                    <img 
-                      src={item.src || '/slide4.jpeg'} 
-                      alt={item.title} 
-                      className="w-full h-full object-cover" 
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = '/slide4.jpeg';
-                      }}
-                    />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-extrabold text-indigo-800 border border-indigo-300 bg-indigo-50">
-                        {item.category}
-                      </span>
-                      <span className="text-xs text-slate-600 font-mono font-bold">{item.date}</span>
-                    </div>
-                    <h4 className="text-sm font-bold text-slate-950 truncate max-w-sm">
-                      {item.title}
-                    </h4>
-                  </div>
+        {/* Left Column: Data Pokok Singkat */}
+        <div className="lg:col-span-7 space-y-6">
+          <div className="p-5 sm:p-6 rounded-2xl bg-white border-2 border-slate-200 shadow-sm space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b-2 border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-700 font-bold text-sm">
+                  🏫
                 </div>
-                <span className="flex-shrink-0 px-2.5 py-1 rounded-full text-[10px] font-mono font-extrabold bg-emerald-100 text-emerald-900 border border-emerald-300">
-                  {item.status}
-                </span>
+                <div>
+                  <h3 className="text-sm font-black text-slate-950 tracking-tight">Status Operasional Sekolah</h3>
+                  <p className="text-[11px] text-slate-600 font-bold">SMP Negeri 3 Cihampelas · Akreditasi B</p>
+                </div>
               </div>
-            ))}
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
+                ● Aktif & Berjalan
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <span className="text-[10px] text-slate-600 font-bold uppercase tracking-wider block mb-0.5">NPSN</span>
+                <span className="text-xs font-mono font-black text-slate-900">20279930</span>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <span className="text-[10px] text-slate-600 font-bold uppercase tracking-wider block mb-0.5">Bentuk Pendidikan</span>
+                <span className="text-xs font-black text-slate-900">SMP Negeri</span>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <span className="text-[10px] text-slate-600 font-bold uppercase tracking-wider block mb-0.5">Status Sekolah</span>
+                <span className="text-xs font-black text-emerald-700">Negeri</span>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <span className="text-[10px] text-slate-600 font-bold uppercase tracking-wider block mb-0.5">Kurikulum</span>
+                <span className="text-xs font-black text-slate-900">Kurikulum Merdeka</span>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <span className="text-[10px] text-slate-600 font-bold uppercase tracking-wider block mb-0.5">Tahun Ajaran</span>
+                <span className="text-xs font-mono font-black text-indigo-700">2026/2027</span>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <span className="text-[10px] text-slate-600 font-bold uppercase tracking-wider block mb-0.5">Total Rombel</span>
+                <span className="text-xs font-mono font-black text-slate-900">17 Rombel</span>
+              </div>
+            </div>
+
+            <div className="pt-2 flex items-center justify-between text-xs text-slate-600 font-semibold border-t border-slate-100">
+              <span>Alamat: Kp. Sukawangi RT 02/09, Situwangi, Bandung Barat</span>
+              <button
+                type="button"
+                onClick={() => onNavigateTab('pimpinan')}
+                className="text-indigo-600 hover:text-indigo-800 font-bold cursor-pointer"
+              >
+                Kelola Data Pokok →
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Right Column: Upcoming Agenda & Status Akademik (5 Cols) */}
+        {/* Right Column: Agenda Mendatang */}
         <div className="lg:col-span-5 space-y-6">
-          
-          {/* Agenda Card */}
-          <div className="rounded-2xl bg-white border-2 border-slate-200 p-5 sm:p-6 shadow-sm space-y-4">
-            <div className="flex items-center justify-between pb-3.5 border-b-2 border-slate-100">
-              <div>
-                <h3 className="text-base font-black text-slate-950">Agenda Akademik</h3>
-                <p className="text-xs text-slate-600 font-semibold">Jadwal kegiatan terdekat</p>
+          <div className="p-5 sm:p-6 rounded-2xl bg-white border-2 border-slate-200 shadow-sm space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b-2 border-slate-100">
+              <div className="flex items-center gap-2">
+                <span className="text-base">📅</span>
+                <h3 className="text-sm font-black text-slate-950 tracking-tight">Agenda Terdekat</h3>
               </div>
-              <button 
+              <button
                 type="button"
                 onClick={() => onNavigateTab('agenda')}
-                className="text-xs font-black text-indigo-700 hover:text-indigo-900 cursor-pointer"
+                className="text-xs font-bold text-indigo-600 hover:text-indigo-800 cursor-pointer"
               >
-                Kelola →
+                Lihat Semua ({agendaList.length}) →
               </button>
             </div>
 
-            <div className="space-y-3">
-              {agendaList.slice(0, 3).map((agenda) => (
-                <div key={agenda.id} className="p-3.5 rounded-xl bg-slate-50 border-2 border-slate-200 flex items-center justify-between shadow-xs">
-                  <div>
-                    <h5 className="text-sm text-slate-950 font-bold mb-1">{agenda.name}</h5>
-                    <p className="text-xs font-mono font-extrabold text-indigo-700">{agenda.date}</p>
+            <div className="space-y-2.5">
+              {agendaList.slice(0, 4).map((item) => (
+                <div
+                  key={item.id}
+                  className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between gap-3 text-xs"
+                >
+                  <div className="min-w-0">
+                    <p className="font-bold text-slate-900 truncate">{item.name}</p>
+                    <p className="text-[11px] text-slate-500 font-medium">{item.date}</p>
                   </div>
-                  <span className="text-xs font-mono font-bold text-slate-800 px-2.5 py-1 rounded-full bg-white border border-slate-300">
-                    {agenda.category}
+                  <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-100 text-indigo-800 shrink-0">
+                    {item.category}
                   </span>
                 </div>
               ))}
             </div>
           </div>
-
-          {/* Status Akademik */}
-          <div className="p-5 rounded-2xl bg-gradient-to-br from-indigo-50/80 via-white to-slate-50 border-2 border-indigo-100 shadow-sm flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3.5">
-              <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center text-lg font-black shadow-md shadow-indigo-600/25 shrink-0">
-                🏫
-              </div>
-              <div>
-                <p className="text-sm font-black text-slate-950">Tahun Ajaran 2026/2027</p>
-                <p className="text-xs text-indigo-700 font-bold">Semester Genap · Kurikulum Merdeka</p>
-              </div>
-            </div>
-            <span className="px-3 py-1 rounded-full text-[11px] font-mono font-extrabold text-emerald-800 bg-emerald-100 border border-emerald-300 shrink-0">
-              ● Aktif
-            </span>
-          </div>
-
         </div>
+
       </div>
     </div>
   );
