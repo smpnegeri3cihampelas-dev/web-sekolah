@@ -1160,18 +1160,18 @@ export default function ELearningPage() {
                       </select>
 
                       <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                        Nama Guru atau NIP / NUPTK
+                        Nomor Induk Pegawai (NIP) / NUPTK Guru
                       </label>
                       <input
                         type="text"
                         value={loginIdentifier}
                         onChange={(e) => setLoginIdentifier(e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition font-sans"
-                        placeholder="Ketik Nama Guru (misal: Rohidin) atau NIP..."
+                        className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition font-mono"
+                        placeholder="Contoh: 19720412 199703 1 002"
                         required
                       />
                       <span className="text-[11px] text-slate-500 mt-1 block font-medium">
-                        *Bisa login menggunakan <span className="font-semibold text-indigo-700">Nama Guru</span> atau nomor <span className="font-semibold text-indigo-700">NIP/NUPTK</span>
+                        *Pilih nama guru pada menu dropdown di atas agar NIP terisi otomatis
                       </span>
                     </div>
 
