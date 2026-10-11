@@ -274,10 +274,21 @@ export default function ELearningPage() {
 
     if (loginRole === 'guru') {
       const cleanId = loginIdentifier.replace(/\s+/g, '');
-      const teacher = DEMO_TEACHERS.find(t => 
-        t.nip.replace(/\s+/g, '') === cleanId || 
-        t.name.toLowerCase() === loginIdentifier.trim().toLowerCase()
-      ) || DEMO_TEACHERS[0];
+      const queryLower = loginIdentifier.trim().toLowerCase();
+      const queryClean = queryLower.replace(/[^a-z0-9]/g, '');
+
+      const teacher = DEMO_TEACHERS.find(t => {
+        const tNipClean = (t.nip || '').replace(/\s+/g, '');
+        const tNameLower = t.name.toLowerCase();
+        const tNameClean = tNameLower.replace(/[^a-z0-9]/g, '');
+
+        return (
+          (tNipClean && tNipClean !== '-' && tNipClean === cleanId) ||
+          tNameLower === queryLower ||
+          (queryClean.length >= 3 && tNameClean.includes(queryClean)) ||
+          (queryClean.length >= 3 && queryClean.includes(tNameClean))
+        );
+      }) || DEMO_TEACHERS[0];
 
       // Custom password verification set by administrator
       let customPassword = '';
@@ -286,7 +297,8 @@ export default function ELearningPage() {
           const raw = localStorage.getItem('smpn3_teacher_passwords');
           if (raw) {
             const map = JSON.parse(raw);
-            customPassword = map[cleanId] || (teacher ? map[teacher.nip.replace(/\s+/g, '')] : '') || '';
+            const tNipClean = teacher ? (teacher.nip || '').replace(/\s+/g, '') : '';
+            customPassword = map[cleanId] || (tNipClean ? map[tNipClean] : '') || (teacher ? map[teacher.name] : '') || '';
           }
         } catch {}
       }
@@ -1148,18 +1160,18 @@ export default function ELearningPage() {
                       </select>
 
                       <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                        Nomor Induk Pegawai (NIP) / NUPTK Guru
+                        Nama Guru atau NIP / NUPTK
                       </label>
                       <input
                         type="text"
                         value={loginIdentifier}
                         onChange={(e) => setLoginIdentifier(e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition font-mono"
-                        placeholder="Contoh: 19850615 201001 1 012"
+                        className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition font-sans"
+                        placeholder="Ketik Nama Guru (misal: Rohidin) atau NIP..."
                         required
                       />
                       <span className="text-[11px] text-slate-500 mt-1 block font-medium">
-                        *Akun terintegrasi otomatis dengan Data Pokok Pendidikan (Dapodik)
+                        *Bisa login menggunakan <span className="font-semibold text-indigo-700">Nama Guru</span> atau nomor <span className="font-semibold text-indigo-700">NIP/NUPTK</span>
                       </span>
                     </div>
 
