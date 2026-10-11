@@ -284,6 +284,9 @@ export default function ELearningPage() {
   // Authentication & Session Management
   const handleLogin = (user: AuthUserSession) => {
     setCurrentUser(user);
+    setLoginIdentifier('');
+    setLoginPassword('');
+    setShowPassword(false);
     if (user.classId) {
       setSelectedClassId(user.classId);
     }
@@ -297,6 +300,9 @@ export default function ELearningPage() {
 
   const handleLogout = () => {
     setCurrentUser(null);
+    setLoginIdentifier('');
+    setLoginPassword('');
+    setShowPassword(false);
     try {
       localStorage.removeItem('spentic_elearning_session_v2');
     } catch (e) {
@@ -1252,7 +1258,7 @@ export default function ELearningPage() {
               </div>
 
               {/* Clean Form */}
-              <form onSubmit={handleFormLoginSubmit} className="space-y-4">
+              <form onSubmit={handleFormLoginSubmit} className="space-y-4" autoComplete="off">
                 
                 {loginRole === 'guru' && (
                   <>
@@ -1266,7 +1272,7 @@ export default function ELearningPage() {
                         onChange={(e) => setLoginIdentifier(e.target.value)}
                         className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition"
                         placeholder="Username atau NIP"
-                        autoComplete="username"
+                        autoComplete="off"
                         required
                       />
                     </div>
@@ -1282,7 +1288,7 @@ export default function ELearningPage() {
                           onChange={(e) => setLoginPassword(e.target.value)}
                           className="w-full px-3.5 py-2.5 pr-10 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition"
                           placeholder="Masukkan kata sandi"
-                          autoComplete="current-password"
+                          autoComplete="new-password"
                           required
                         />
                         <button
@@ -1317,6 +1323,7 @@ export default function ELearningPage() {
                         onChange={(e) => setLoginIdentifier(e.target.value)}
                         className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition font-mono"
                         placeholder="ID stasiun piket"
+                        autoComplete="off"
                         required
                       />
                     </div>
@@ -1332,6 +1339,7 @@ export default function ELearningPage() {
                           onChange={(e) => setLoginPassword(e.target.value)}
                           className="w-full px-3.5 py-2.5 pr-10 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition"
                           placeholder="Masukkan kata sandi"
+                          autoComplete="new-password"
                           required
                         />
                         <button
@@ -1367,6 +1375,7 @@ export default function ELearningPage() {
                         className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-purple-500 focus:bg-white focus:ring-2 focus:ring-purple-500/20 transition font-mono"
                         placeholder="10 digit NISN"
                         maxLength={12}
+                        autoComplete="off"
                         required
                       />
                     </div>
@@ -1382,6 +1391,7 @@ export default function ELearningPage() {
                           onChange={(e) => setLoginPassword(e.target.value)}
                           className="w-full px-3.5 py-2.5 pr-10 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-purple-500 focus:bg-white focus:ring-2 focus:ring-purple-500/20 transition"
                           placeholder="Masukkan kata sandi"
+                          autoComplete="new-password"
                           required
                         />
                         <button
