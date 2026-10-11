@@ -606,6 +606,9 @@ export default function DashboardPage() {
             {activeTab === 'pengaturan' && (
               <TabPengaturan
                 onResetSchoolData={resetSchoolData}
+                onResetStudents={handleResetStudents}
+                onResetAgenda={resetAgenda}
+                onResetGallery={resetGallery}
                 showToast={showToast}
               />
             )}
