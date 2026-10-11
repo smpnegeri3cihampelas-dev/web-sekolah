@@ -4699,7 +4699,7 @@ export const OFFICIAL_TEACHERS: TeacherUser[] = [
     nip: '19700608 199802 1 001',
     name: 'H. Rustandi, S.Pd., M.Pd.',
     role: 'both',
-    subject: 'Manajemen Pendidikan',
+    subject: 'Kepala Sekolah',
     classes: ['7-A', '8-A', '9-A']
   }
 ];

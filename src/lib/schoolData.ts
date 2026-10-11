@@ -104,7 +104,7 @@ export const DEFAULT_TEACHERS: Teacher[] = [
     id: 1,
     name: 'H. Rustandi, S.Pd., M.Pd.',
     role: 'Kepala Sekolah',
-    subject: 'Manajemen Pendidikan',
+    subject: 'Kepala Sekolah',
     category: 'Pimpinan',
     nip: '19700608 199802 1 001',
     photo: '/teachers/default_avatar.svg',
