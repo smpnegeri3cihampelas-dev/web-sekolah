@@ -42,7 +42,9 @@ export default function About() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isTeacherModalOpen]);
 
-  const filteredTeachers = teachers.filter(teacher => {
+  const activeTeachers = teachers.filter(t => t.active !== false);
+
+  const filteredTeachers = activeTeachers.filter(teacher => {
     const matchSearch = teacher.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                         teacher.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
                         (teacher.role && teacher.role.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -216,7 +218,7 @@ export default function About() {
                       onClick={() => setIsTeacherModalOpen(true)}
                       className="w-full py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium flex items-center justify-center gap-2 transition-all group shadow-md shadow-indigo-600/25 cursor-pointer"
                     >
-                      <span>👥 Lihat Seluruh Dewan Guru &amp; Tenaga Pendidik ({teachers.length} GTK)</span>
+                      <span>👥 Lihat Seluruh Dewan Guru &amp; Tenaga Pendidik ({activeTeachers.length} GTK)</span>
                       <span className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-[11px] group-hover:translate-x-1 transition-transform">
                         →
                       </span>

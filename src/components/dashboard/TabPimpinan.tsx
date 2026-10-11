@@ -341,7 +341,11 @@ export function TabPimpinan({
                         </button>
                         <button
                           type="button"
-                          onClick={() => onDeleteTeacher(teacher.id)}
+                          onClick={() => {
+                            if (confirm(`Yakin ingin menghapus data guru "${teacher.name}" dari sistem?`)) {
+                              onDeleteTeacher(teacher.id);
+                            }
+                          }}
                           className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-800 border-2 border-rose-300 transition-all cursor-pointer shadow-xs"
                           title="Hapus Guru dari Sistem"
                         >
