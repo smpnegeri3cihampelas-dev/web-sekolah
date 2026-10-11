@@ -194,20 +194,6 @@ export default function LoginPage() {
                 </button>
               </div>
 
-              {/* Forgot password link */}
-              <div className="flex justify-end -mt-1">
-                <a 
-                  href="#" 
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setErrorMessage('Silakan hubungi administrator sekolah untuk reset kata sandi.');
-                  }}
-                  className="text-[11px] text-indigo-600 hover:text-indigo-800 transition-colors font-medium"
-                >
-                  Lupa kata sandi?
-                </a>
-              </div>
-
               {/* Submit Button */}
               <button 
                 type="submit"
