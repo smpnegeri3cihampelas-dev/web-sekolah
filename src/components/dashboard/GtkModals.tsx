@@ -762,7 +762,8 @@ export function ResetTeacherPasswordModal({
         let map: Record<string, string> = {};
         const raw = localStorage.getItem('smpn3_teacher_passwords');
         if (raw) map = JSON.parse(raw);
-        map[cleanNip] = password.trim();
+        if (cleanNip && cleanNip !== '-') map[cleanNip] = password.trim();
+        map[teacher.name] = password.trim();
         map[teacher.id] = password.trim();
         localStorage.setItem('smpn3_teacher_passwords', JSON.stringify(map));
       } catch {}
@@ -771,9 +772,11 @@ export function ResetTeacherPasswordModal({
     showToast(`🔑 Kata sandi akun "${teacher.name}" berhasil diperbarui!`);
   };
 
+  const usernameDisplay = teacher.nip && teacher.nip !== '-' ? teacher.nip : teacher.name;
+
   const shareMessage = `Yth. Bapak/Ibu ${teacher.name},
 Berikut informasi akun masuk portal SIAP SPENTIC Anda:
-• NIP / Username : ${teacher.nip || '-'}
+• Username Masuk : ${usernameDisplay}
 • Kata Sandi Baru: ${password}
 • Tautan Masuk   : https://smpn3cihampelas.sch.id/elearning
 

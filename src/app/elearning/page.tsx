@@ -1161,34 +1161,38 @@ export default function ELearningPage() {
                       </div>
                       <select
                         onChange={(e) => {
-                          const t = DEMO_TEACHERS.find(teach => teach.nip === e.target.value);
+                          const val = e.target.value;
+                          const t = DEMO_TEACHERS.find(teach => (teach.nip && teach.nip !== '-' ? teach.nip : teach.name) === val || teach.name === val);
                           if (t) {
-                            setLoginIdentifier(t.nip);
+                            setLoginIdentifier(t.nip && t.nip !== '-' ? t.nip : t.name);
                           }
                         }}
                         className="w-full mb-3 px-3.5 py-2.5 rounded-xl bg-indigo-50/70 border border-indigo-200 text-indigo-950 text-xs font-semibold focus:outline-none focus:border-indigo-500 cursor-pointer shadow-xs"
                       >
                         <option value="">-- Pilih Guru dari Roster Sekolah --</option>
-                        {DEMO_TEACHERS.map((t, idx) => (
-                          <option key={t.nip} value={t.nip}>
-                            {idx + 1}. {t.name} — {t.subject}
-                          </option>
-                        ))}
+                        {DEMO_TEACHERS.map((t, idx) => {
+                          const optionVal = t.nip && t.nip !== '-' ? t.nip : t.name;
+                          return (
+                            <option key={`${t.name}-${idx}`} value={optionVal}>
+                              {idx + 1}. {t.name} — {t.subject} {!t.nip || t.nip === '-' ? '(GTT/Honorer)' : ''}
+                            </option>
+                          );
+                        })}
                       </select>
 
                       <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                        Nomor Induk Pegawai (NIP) / NUPTK Guru
+                        Username Masuk (NIP atau Nama Guru)
                       </label>
                       <input
                         type="text"
                         value={loginIdentifier}
                         onChange={(e) => setLoginIdentifier(e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition font-mono"
-                        placeholder="Contoh: 19720412 199703 1 002"
+                        className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition font-sans"
+                        placeholder="Masukkan NIP atau Nama Guru..."
                         required
                       />
                       <span className="text-[11px] text-slate-500 mt-1 block font-medium">
-                        *Pilih nama guru pada menu dropdown di atas agar NIP terisi otomatis
+                        *Guru yang belum memiliki NIP (GTT/Honorer) dapat login menggunakan <span className="font-bold text-indigo-700">Nama Guru</span> atau pilih dari dropdown di atas.
                       </span>
                     </div>
 
