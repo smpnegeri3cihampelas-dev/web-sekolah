@@ -607,9 +607,8 @@ export default function DashboardPage() {
                 teachersList={teachers}
                 agendaList={agendaList}
                 messagesList={messagesList}
+                studentsList={studentsList}
                 onNavigateTab={setActiveTab}
-                onOpenAddNews={() => setIsNewsModalOpen(true)}
-                onOpenAddAgenda={() => setActiveTab('agenda')}
               />
             )}
 
