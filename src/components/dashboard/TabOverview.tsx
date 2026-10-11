@@ -2,7 +2,6 @@
 
 import React from 'react';
 import Image from 'next/image';
-import Link from 'next/link';
 import { Leader, Teacher } from '@/lib/schoolData';
 import { WartaItem } from '@/lib/wartaData';
 import { Student } from '@/lib/elearningData';
@@ -177,7 +176,7 @@ export function TabOverview({
             </div>
           </div>
 
-          {/* Status Akademik & Portal E-Learning */}
+          {/* Status Akademik */}
           <div className="p-5 rounded-2xl bg-gradient-to-br from-indigo-50/80 via-white to-slate-50 border-2 border-indigo-100 shadow-sm flex items-center justify-between gap-3">
             <div className="flex items-center gap-3.5">
               <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center text-lg font-black shadow-md shadow-indigo-600/25 shrink-0">
@@ -188,15 +187,9 @@ export function TabOverview({
                 <p className="text-xs text-indigo-700 font-bold">Semester Genap · Kurikulum Merdeka</p>
               </div>
             </div>
-            <Link
-              href="/elearning"
-              target="_blank"
-              className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black transition-all flex items-center gap-1 shadow-sm shadow-indigo-600/20 shrink-0"
-              title="Buka Portal E-Learning Siswa"
-            >
-              <span>E-Learning</span>
-              <span>→</span>
-            </Link>
+            <span className="px-3 py-1 rounded-full text-[11px] font-mono font-extrabold text-emerald-800 bg-emerald-100 border border-emerald-300 shrink-0">
+              ● Aktif
+            </span>
           </div>
 
         </div>
