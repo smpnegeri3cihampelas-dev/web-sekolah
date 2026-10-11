@@ -32,11 +32,20 @@ export default function LoginPage() {
     // Simulasi verifikasi login
     setTimeout(() => {
       setIsLoading(false);
-      // Demo password check: Jika password bukan "smpn3juara" atau "admin123", tampilkan error password salah warna merah
-      if (password !== 'smpn3juara' && password !== 'admin123') {
+      let customPassword = '';
+      if (typeof window !== 'undefined') {
+        try {
+          customPassword = localStorage.getItem('smpn3_admin_password') || '';
+        } catch {}
+      }
+      const validPasswords = ['smpn3juara', 'admin123'];
+      if (customPassword) {
+        validPasswords.push(customPassword);
+      }
+
+      if (!validPasswords.includes(password)) {
         setErrorMessage('Password salah! Periksa kembali kata sandi Anda.');
       } else {
-        // Berhasil login -> langsung arahkan ke /dashboard
         router.push('/dashboard');
       }
     }, 600);
