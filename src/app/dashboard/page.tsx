@@ -24,6 +24,7 @@ import { TabGaleri } from '@/components/dashboard/TabGaleri';
 import { TabPesan } from '@/components/dashboard/TabPesan';
 import { TabPengaturan } from '@/components/dashboard/TabPengaturan';
 import { useAgendaData, AgendaItem } from '@/lib/agendaData';
+import { useGalleryData, GalleryItem } from '@/lib/galleryData';
 
 // Isolated Clock Component to prevent whole dashboard re-renders every 1000ms
 const DashboardClock = React.memo(function DashboardClock() {
@@ -40,18 +41,6 @@ const DashboardClock = React.memo(function DashboardClock() {
 
   return <span>{time || 'Memuat...'}</span>;
 });
-
-
-const DEFAULT_GALLERY = [
-  { id: 1, title: 'Laboratorium Komputer & Praktikum TIK', category: 'FASILITAS', src: '/gallery_2.jpg', desc: 'Sarana pembelajaran komputasi, literasi digital, dan pelaksanaan asesmen nasional ANBK.' },
-  { id: 2, title: 'Perpustakaan & Pojok Baca Siswa', category: 'FASILITAS', src: '/gallery_1.jpg', desc: 'Pusat sumber belajar, koleksi buku literasi harian, dan ruang baca yang nyaman bagi siswa.' },
-  { id: 3, title: 'Upacara Bendera & Apel Kedisiplinan', category: 'KEGIATAN', src: '/slide1.jpeg', desc: 'Pembiasaan rutin hari Senin untuk menanamkan jiwa patriotisme, budi pekerti, dan kepemimpinan.' },
-  { id: 4, title: 'Kegiatan Olahraga & Pengembangan Bakat', category: 'EKSTRAKURIKULER', src: '/slide3.jpeg', desc: 'Wadah pembinaan bakat olahraga, sportivitas, dan kebugaran jasmani seluruh siswa.' },
-  { id: 5, title: 'Pentas Seni & Gelar Budaya Sunda', category: 'KEGIATAN', src: '/slide4.jpeg', desc: 'Apresiasi bakat seni budaya daerah, pelestarian kearifan lokal, dan unjuk kreativitas siswa.' },
-  { id: 6, title: 'Praktikum Sains & Diskusi Berdiferensiasi', category: 'AKADEMIK', src: '/slide7.jpeg', desc: 'Pembelajaran kontekstual melalui observasi langsung, eksperimen ilmiah, dan kerja sama tim.' },
-  { id: 7, title: 'Gelar Karya Projek Penguatan P5', category: 'AKADEMIK', src: '/slide2.jpeg', desc: 'Pameran hasil karya inovatif, daur ulang ramah lingkungan, dan kewirausahaan siswa.' },
-  { id: 8, title: 'Senam Sehat & Jumat Bersih Lingkungan', category: 'KEGIATAN', src: '/slide6.jpeg', desc: 'Pembiasaan rutin hidup sehat dan gotong royong memelihara keasrian lingkungan sekolah.' },
-];
 
 const DEFAULT_MESSAGES = [
   {
@@ -250,32 +239,27 @@ export default function DashboardPage() {
     showToast('🗑️ Agenda berhasil dihapus dari sistem.');
   };
 
-  // 5. Galeri & Fasilitas
-  const [galleryList, setGalleryList] = useState<typeof DEFAULT_GALLERY>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('smpn3_gallery_data_v1');
-        if (saved) return JSON.parse(saved);
-      } catch {}
-    }
-    return DEFAULT_GALLERY;
-  });
+  // 5. Galeri & Fasilitas (Terintegrasi Penuh dengan Landing Page)
+  const {
+    galleryList,
+    addGallery,
+    updateGallery,
+    deleteGallery,
+    resetGallery
+  } = useGalleryData();
 
   const handleAddGallery = (data: { title: string; category: string; src: string; desc?: string }) => {
-    const newItem = {
-      id: Date.now(),
-      desc: data.desc || '',
-      ...data
-    };
-    const updated = [newItem, ...galleryList];
-    setGalleryList(updated);
-    try { localStorage.setItem('smpn3_gallery_data_v1', JSON.stringify(updated)); } catch {}
+    addGallery(data);
+    showToast('📸 Foto berhasil ditambahkan ke Galeri & Fasilitas.');
+  };
+
+  const handleUpdateGallery = (id: number, data: Partial<GalleryItem>) => {
+    updateGallery(id, data);
+    showToast('✏️ Informasi foto galeri berhasil diperbarui.');
   };
 
   const handleDeleteGallery = (id: number) => {
-    const updated = galleryList.filter(g => g.id !== id);
-    setGalleryList(updated);
-    try { localStorage.setItem('smpn3_gallery_data_v1', JSON.stringify(updated)); } catch {}
+    deleteGallery(id);
     showToast('🗑️ Foto telah dihapus dari galeri.');
   };
 
@@ -675,7 +659,9 @@ export default function DashboardPage() {
               <TabGaleri
                 galleryList={galleryList}
                 onAddGallery={handleAddGallery}
+                onUpdateGallery={handleUpdateGallery}
                 onDeleteGallery={handleDeleteGallery}
+                onResetGallery={resetGallery}
                 showToast={showToast}
               />
             )}

@@ -2,73 +2,13 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
+import { 
+  DEFAULT_GALLERY_PHOTOS, 
+  GalleryItem, 
+  useGalleryData 
+} from '@/lib/galleryData';
 
-interface PhotoItem {
-  id: number;
-  src: string;
-  category: string;
-  title: string;
-  desc?: string;
-}
-
-const DEFAULT_PHOTOS: PhotoItem[] = [
-  { 
-    id: 1, 
-    src: '/gallery_2.jpg', 
-    category: 'FASILITAS', 
-    title: 'Laboratorium Komputer & Praktikum TIK',
-    desc: 'Sarana pembelajaran komputasi, literasi digital, dan pelaksanaan asesmen nasional ANBK.'
-  },
-  { 
-    id: 2, 
-    src: '/gallery_1.jpg', 
-    category: 'FASILITAS', 
-    title: 'Perpustakaan & Pojok Baca Siswa',
-    desc: 'Pusat sumber belajar, koleksi buku literasi harian, dan ruang baca yang nyaman bagi siswa.'
-  },
-  { 
-    id: 3, 
-    src: '/slide1.jpeg', 
-    category: 'KEGIATAN', 
-    title: 'Upacara Bendera & Apel Kedisiplinan',
-    desc: 'Pembiasaan rutin hari Senin untuk menanamkan jiwa patriotisme, budi pekerti, dan kepemimpinan.'
-  },
-  { 
-    id: 4, 
-    src: '/slide3.jpeg', 
-    category: 'EKSTRAKURIKULER', 
-    title: 'Kegiatan Olahraga & Pengembangan Bakat',
-    desc: 'Wadah pembinaan bakat olahraga, sportivitas, dan kebugaran jasmani seluruh siswa.'
-  },
-  { 
-    id: 5, 
-    src: '/slide4.jpeg', 
-    category: 'KEGIATAN', 
-    title: 'Pentas Seni & Gelar Budaya Sunda',
-    desc: 'Apresiasi bakat seni budaya daerah, pelestarian kearifan lokal, dan unjuk kreativitas siswa.'
-  },
-  { 
-    id: 6, 
-    src: '/slide7.jpeg', 
-    category: 'AKADEMIK', 
-    title: 'Praktikum Sains & Diskusi Berdiferensiasi',
-    desc: 'Pembelajaran kontekstual melalui observasi langsung, eksperimen ilmiah, dan kerja sama tim.'
-  },
-  { 
-    id: 7, 
-    src: '/slide2.jpeg', 
-    category: 'AKADEMIK', 
-    title: 'Gelar Karya Projek Penguatan P5',
-    desc: 'Pameran hasil karya inovatif, daur ulang ramah lingkungan, dan kewirausahaan siswa.'
-  },
-  { 
-    id: 8, 
-    src: '/slide6.jpeg', 
-    category: 'KEGIATAN', 
-    title: 'Senam Sehat & Jumat Bersih Lingkungan',
-    desc: 'Pembiasaan rutin hidup sehat dan gotong royong memelihara keasrian lingkungan sekolah.'
-  },
-];
+export { DEFAULT_GALLERY_PHOTOS, type GalleryItem };
 
 const CATEGORIES = [
   { key: 'SEMUA', label: 'Semua' },
@@ -81,37 +21,14 @@ const CATEGORIES = [
 const INITIAL_LIMIT = 6;
 
 export default function Gallery() {
-  const [photos, setPhotos] = useState<PhotoItem[]>(DEFAULT_PHOTOS);
+  const { galleryList } = useGalleryData();
   const [filter, setFilter] = useState('SEMUA');
   const [visibleCount, setVisibleCount] = useState(INITIAL_LIMIT);
-  const [selectedPhoto, setSelectedPhoto] = useState<PhotoItem | null>(null);
-
-  // Sync with Dashboard LocalStorage if available
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('smpn3_gallery_data_v1');
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setPhotos(
-              parsed.map((p) => ({
-                id: p.id || Date.now(),
-                src: p.src || '/gallery_2.jpg',
-                category: (p.category || 'KEGIATAN').toUpperCase(),
-                title: p.title || 'Dokumentasi Sekolah',
-                desc: p.desc || (p.category === 'FASILITAS' ? 'Sarana penunjang kegiatan di SMPN 3 Cihampelas.' : 'Dokumentasi kegiatan siswa dan guru SMP Negeri 3 Cihampelas.')
-              }))
-            );
-          }
-        }
-      } catch {}
-    }
-  }, []);
+  const [selectedPhoto, setSelectedPhoto] = useState<GalleryItem | null>(null);
 
   const filteredPhotos = filter === 'SEMUA' 
-    ? photos 
-    : photos.filter((p) => p.category === filter);
+    ? galleryList 
+    : galleryList.filter((p) => (p.category || '').toUpperCase() === filter);
 
   const displayedPhotos = filteredPhotos.slice(0, visibleCount);
   const remainingCount = filteredPhotos.length - visibleCount;
@@ -157,8 +74,8 @@ export default function Gallery() {
   }, [selectedPhoto, handlePrev, handleNext]);
 
   const getCategoryCount = (key: string) => {
-    if (key === 'SEMUA') return photos.length;
-    return photos.filter((p) => p.category === key).length;
+    if (key === 'SEMUA') return galleryList.length;
+    return galleryList.filter((p) => (p.category || '').toUpperCase() === key).length;
   };
 
   return (
@@ -228,11 +145,11 @@ export default function Gallery() {
               {/* Photo Viewport */}
               <div className="relative aspect-[16/10] w-full overflow-hidden bg-slate-100">
                 <Image 
-                  src={photo.src}
-                  alt={photo.title}
-                  fill
+                  src={photo.src} 
+                  alt={photo.title} 
+                  fill 
                   sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                  className="object-cover group-hover:scale-105 transition-transform duration-500"
+                  className="object-cover group-hover:scale-105 transition-transform duration-500" 
                 />
                 
                 {/* Category Pill Tag */}
@@ -323,12 +240,18 @@ export default function Gallery() {
       {/* Lightbox Modal (Zoom Layar Penuh) */}
       {selectedPhoto && (
         <div 
+          data-lenis-prevent="true"
+          data-lenis-prevent-wheel="true"
+          data-lenis-prevent-touch="true"
           className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200"
           onClick={() => setSelectedPhoto(null)}
           role="dialog"
           aria-modal="true"
         >
           <div 
+            data-lenis-prevent="true"
+            data-lenis-prevent-wheel="true"
+            data-lenis-prevent-touch="true"
             className="relative max-w-4xl w-full bg-slate-900 rounded-3xl overflow-hidden shadow-2xl border border-slate-800 flex flex-col max-h-[92vh]"
             onClick={(e) => e.stopPropagation()}
           >
