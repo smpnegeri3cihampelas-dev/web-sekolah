@@ -216,22 +216,20 @@ const DailyReportTable = React.memo(function DailyReportTable({
 
       {/* Table Content */}
       <div className="overflow-x-auto relative will-change-scroll [transform:translateZ(0)]">
-        <table className="w-full text-xs text-left border-collapse table-fixed min-w-[780px]">
+        <table className="w-full text-xs text-left border-collapse table-fixed min-w-[720px]">
           <colgroup>
             <col className="w-12" />
             <col className="w-32" />
-            <col className="w-56" />
-            <col className="w-28" />
-            <col className="w-36" />
+            <col className="w-64" />
+            <col className="w-40" />
             <col className="w-auto" />
           </colgroup>
           <thead className="bg-slate-100 text-slate-700 font-bold sticky top-0 z-10 shadow-xs border-b border-slate-200">
             <tr>
               <th className="px-3 py-3 text-center w-12 border-r border-slate-200">No</th>
               <th className="px-3 py-3 w-32 border-r border-slate-200 font-mono text-[11px]">NISN</th>
-              <th className="px-4 py-3 w-56 border-r border-slate-200">Nama Siswa</th>
-              <th className="px-3 py-3 text-center w-28 border-r border-slate-200">Jenis Kelamin</th>
-              <th className="px-3 py-3 text-center w-36 border-r border-slate-200">Status Kehadiran</th>
+              <th className="px-4 py-3 w-64 border-r border-slate-200">Nama Siswa</th>
+              <th className="px-3 py-3 text-center w-40 border-r border-slate-200">Status Kehadiran</th>
               <th className="px-4 py-3">Catatan / Keterangan Guru</th>
             </tr>
           </thead>
@@ -250,13 +248,6 @@ const DailyReportTable = React.memo(function DailyReportTable({
                   </td>
                   <td className="px-4 py-2.5 font-bold text-slate-800 border-r border-slate-100">
                     {student.name}
-                  </td>
-                  <td className="px-3 py-2.5 text-center text-slate-600 border-r border-slate-100">
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                      student.gender === 'L' ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-pink-50 text-pink-700 border border-pink-200'
-                    }`}>
-                      {student.gender === 'L' ? 'Laki-laki' : 'Perempuan'}
-                    </span>
                   </td>
                   <td className="px-3 py-2.5 text-center border-r border-slate-100">
                     {status === 'H' && (
@@ -311,10 +302,7 @@ const DailyReportTable = React.memo(function DailyReportTable({
           <tfoot className="bg-slate-100 text-slate-900 font-extrabold sticky bottom-0 z-10 border-t-2 border-slate-300 shadow-sm">
             <tr>
               <td colSpan={3} className="px-4 py-3 text-right uppercase text-xs tracking-wider">
-                Rekapitulasi Kehadiran Hari Ini:
-              </td>
-              <td className="px-3 py-3 text-center text-xs font-bold text-slate-600">
-                Total {students.length} Siswa
+                Rekapitulasi Kehadiran Hari Ini ({students.length} Siswa):
               </td>
               <td className="px-3 py-3 text-center text-xs">
                 <div className="flex items-center justify-center gap-1 font-mono text-[11px]">
