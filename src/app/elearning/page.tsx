@@ -2522,14 +2522,13 @@ export default function ELearningPage() {
                 <button
                   type="button"
                   onClick={() => setActiveMenu('laporan')}
-                  className={`px-3 py-1.5 rounded-lg font-medium transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                  className={`px-3 py-1.5 rounded-lg font-medium transition cursor-pointer whitespace-nowrap ${
                     activeMenu === 'laporan' 
                       ? 'bg-indigo-600 text-white font-bold shadow-sm' 
                       : 'text-slate-600 hover:text-slate-900 hover:bg-white'
                   }`}
                 >
-                  <span>📊</span>
-                  <span>Laporan Rekap</span>
+                  Rekap Kehadiran
                 </button>
                 <button
                   type="button"
@@ -2540,7 +2539,7 @@ export default function ELearningPage() {
                       : 'text-slate-600 hover:text-slate-900 hover:bg-white'
                   }`}
                 >
-                  <span>Tugas & PR Siswa</span>
+                  <span>Tugas & Asesmen</span>
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
                 </button>
                 <button
@@ -4726,7 +4725,7 @@ export default function ELearningPage() {
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-indigo-50 pb-3 gap-2 mt-4">
                     <div>
                       <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                        <span>📝 Tugas & PR Kelas {studentClass}</span>
+                        <span>📝 Tugas & Asesmen Kelas {studentClass}</span>
                         <span className="text-xs px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700 font-semibold border border-purple-200">
                           {myAssignments.length} Tugas Aktif
                         </span>
