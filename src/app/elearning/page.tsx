@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, useTransition } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { 
@@ -26,7 +26,9 @@ import {
   getStoredSubmissions,
   saveStoredSubmission,
   getTeacherUsername,
-  TeacherUser
+  TeacherUser,
+  AuthUserSession,
+  MONTH_NAMES
 } from '@/lib/elearningData';
 import {
   saveSubmissionFile,
@@ -36,14 +38,32 @@ import {
 import {
   exportMapelAttendanceToExcel,
   exportSemesterAttendanceToExcel,
+  exportMonthlyAttendanceMatrixToExcel,
   exportSchoolDailyAttendanceToExcel,
-  exportSchoolSemesterAttendanceToExcel
+  exportSchoolSemesterAttendanceToExcel,
+  formatIndonesianDate
 } from '@/lib/elearningExport';
 import SubmissionSplitPreviewModal from '@/components/SubmissionSplitPreviewModal';
 import CreateAssignmentModal from '@/components/CreateAssignmentModal';
 import StudentSubmitModal from '@/components/StudentSubmitModal';
 import TeacherSettingsModal from '@/components/TeacherSettingsModal';
 import { getStoredSchoolData } from '@/lib/schoolData';
+
+const STATUS_BADGE_STYLES: Record<string, string> = {
+  H: 'bg-emerald-500 text-white',
+  S: 'bg-blue-600 text-white',
+  I: 'bg-amber-500 text-white',
+  A: 'bg-rose-600 text-white',
+  T: 'bg-orange-500 text-white'
+};
+
+const SEMESTER_BADGE_STYLES: Record<string, string> = {
+  H: 'bg-emerald-100 text-emerald-800',
+  S: 'bg-blue-100 text-blue-800',
+  I: 'bg-amber-100 text-amber-800',
+  A: 'bg-rose-100 text-rose-800',
+  T: 'bg-orange-100 text-orange-800'
+};
 
 // Isolated Clock to keep re-renders local and lightweight
 const ELearningClock = React.memo(function ELearningClock() {
@@ -61,14 +81,685 @@ const ELearningClock = React.memo(function ELearningClock() {
   return <span className="font-mono text-slate-700 font-semibold text-xs">{time || '...'}</span>;
 });
 
-export interface AuthUserSession {
-  role: 'guru_mapel' | 'guru_piket' | 'siswa';
-  name: string;
-  nipOrNisn: string;
-  subject?: string;
-  classId?: string;
-  gender?: string;
+// Dedicated, lag-free Note Input component to prevent root re-renders on keystroke
+interface AttendanceNoteInputProps {
+  value: string;
+  placeholder?: string;
+  className?: string;
+  onCommit: (val: string) => void;
+  onInstantChange?: (val: string) => void;
 }
+
+const AttendanceNoteInput = React.memo(function AttendanceNoteInput({
+  value,
+  placeholder,
+  className,
+  onCommit,
+  onInstantChange
+}: AttendanceNoteInputProps) {
+  const [localVal, setLocalVal] = useState<string>(value || '');
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const isFocusedRef = useRef<boolean>(false);
+
+  // Sync external changes when value prop changes, but avoid overwriting while user is actively typing
+  useEffect(() => {
+    if (!isFocusedRef.current) {
+      setLocalVal(value || '');
+    }
+  }, [value]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const nextVal = e.target.value;
+    setLocalVal(nextVal);
+    if (onInstantChange) {
+      onInstantChange(nextVal);
+    }
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+    }
+    timerRef.current = setTimeout(() => {
+      onCommit(nextVal);
+    }, 250);
+  };
+
+  const handleBlur = () => {
+    isFocusedRef.current = false;
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+    }
+    onCommit(localVal);
+  };
+
+  const handleFocus = () => {
+    isFocusedRef.current = true;
+  };
+
+  return (
+    <input
+      type="text"
+      value={localVal}
+      onChange={handleChange}
+      onFocus={handleFocus}
+      onBlur={handleBlur}
+      placeholder={placeholder}
+      className={className}
+    />
+  );
+});
+
+
+// ==========================================
+// ISOLATED & MEMOIZED REPORT TABLE COMPONENTS
+// Completely prevents virtual DOM reconciliation lag on report mode switches
+// ==========================================
+
+interface DailyReportTableProps {
+  isActive: boolean;
+  students: Student[];
+  reportClassId: string;
+  reportDate: string;
+  currentTeacher: TeacherUser;
+  dailyReportData: {
+    dailySession?: SubjectSession;
+    dailyRecords: Record<string, AttendanceStatus>;
+    dailyNotes: Record<string, string>;
+    hasDailyData: boolean;
+    dayH: number;
+    dayS: number;
+    dayI: number;
+    dayA: number;
+    dayT: number;
+    dayTotal: number;
+    dayPresentPercent: number;
+  };
+}
+
+const DailyReportTable = React.memo(function DailyReportTable({
+  isActive: _isActive,
+  students,
+  reportClassId,
+  reportDate,
+  currentTeacher,
+  dailyReportData,
+}: DailyReportTableProps) {
+  return (
+    <div className="bg-white border border-indigo-100 rounded-2xl shadow-sm overflow-hidden">
+      {/* Table Banner Header */}
+      <div className="p-4 bg-slate-50 border-b border-indigo-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-sm font-extrabold text-slate-900 tracking-wide uppercase">
+              JURNAL HARIAN PRESENSI KBM - KELAS {reportClassId}
+            </h3>
+            <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-800 font-bold border border-indigo-200">
+              {formatIndonesianDate(reportDate)}
+            </span>
+          </div>
+          <p className="text-xs text-slate-500 mt-1">
+            Mata Pelajaran: <span className="text-indigo-700 font-bold">{currentTeacher.subject}</span> • Guru Pengampu: <span className="font-semibold text-slate-800">{currentTeacher.name}</span> (NIP. {currentTeacher.nip || '-'})
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {dailyReportData.hasDailyData ? (
+            <span className="px-3 py-1 rounded-lg bg-emerald-100 text-emerald-800 font-bold text-xs border border-emerald-300 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse"></span>
+              <span>Tersimpan {dailyReportData.dailySession?.submittedAt ? `(${dailyReportData.dailySession.submittedAt})` : 'Hari Ini'}</span>
+            </span>
+          ) : (
+            <span className="px-3 py-1 rounded-lg bg-amber-100 text-amber-800 font-bold text-xs border border-amber-300 flex items-center gap-1.5">
+              <span>⚠️ Belum Ada Sesi Presensi Tersimpan</span>
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Table Content */}
+      <div className="overflow-x-auto relative will-change-scroll [transform:translateZ(0)]">
+        <table className="w-full text-xs text-left border-collapse table-fixed min-w-[780px]">
+          <colgroup>
+            <col className="w-12" />
+            <col className="w-32" />
+            <col className="w-56" />
+            <col className="w-28" />
+            <col className="w-36" />
+            <col className="w-auto" />
+          </colgroup>
+          <thead className="bg-slate-100 text-slate-700 font-bold sticky top-0 z-10 shadow-xs border-b border-slate-200">
+            <tr>
+              <th className="px-3 py-3 text-center w-12 border-r border-slate-200">No</th>
+              <th className="px-3 py-3 w-32 border-r border-slate-200 font-mono text-[11px]">NISN</th>
+              <th className="px-4 py-3 w-56 border-r border-slate-200">Nama Siswa</th>
+              <th className="px-3 py-3 text-center w-28 border-r border-slate-200">Jenis Kelamin</th>
+              <th className="px-3 py-3 text-center w-36 border-r border-slate-200">Status Kehadiran</th>
+              <th className="px-4 py-3">Catatan / Keterangan Guru</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {students.map((student, idx) => {
+              const status = dailyReportData.hasDailyData ? (dailyReportData.dailyRecords[student.id] || 'H') : '-';
+              const note = dailyReportData.dailyNotes[student.id] || '-';
+
+              return (
+                <tr key={student.id} className="hover:bg-indigo-50/20">
+                  <td className="px-3 py-2.5 text-center font-bold text-slate-500 border-r border-slate-100">
+                    {idx + 1}
+                  </td>
+                  <td className="px-3 py-2.5 font-mono text-[11px] text-slate-600 border-r border-slate-100">
+                    {student.nisn}
+                  </td>
+                  <td className="px-4 py-2.5 font-bold text-slate-800 border-r border-slate-100">
+                    {student.name}
+                  </td>
+                  <td className="px-3 py-2.5 text-center text-slate-600 border-r border-slate-100">
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                      student.gender === 'L' ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-pink-50 text-pink-700 border border-pink-200'
+                    }`}>
+                      {student.gender === 'L' ? 'Laki-laki' : 'Perempuan'}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2.5 text-center border-r border-slate-100">
+                    {status === 'H' && (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-800 font-extrabold text-[11px] border border-emerald-300 shadow-xs">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                        Hadir (H)
+                      </span>
+                    )}
+                    {status === 'S' && (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-100 text-blue-800 font-extrabold text-[11px] border border-blue-300 shadow-xs">
+                        <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
+                        Sakit (S)
+                      </span>
+                    )}
+                    {status === 'I' && (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-100 text-amber-800 font-extrabold text-[11px] border border-amber-300 shadow-xs">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-600"></span>
+                        Izin (I)
+                      </span>
+                    )}
+                    {status === 'A' && (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-100 text-rose-800 font-extrabold text-[11px] border border-rose-300 shadow-xs">
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-600"></span>
+                        Alpa (A)
+                      </span>
+                    )}
+                    {status === 'T' && (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-orange-100 text-orange-800 font-extrabold text-[11px] border border-orange-300 shadow-xs">
+                        <span className="w-1.5 h-1.5 rounded-full bg-orange-600"></span>
+                        Terlambat (T)
+                      </span>
+                    )}
+                    {status === '-' && (
+                      <span className="text-slate-400 italic text-[11px]">Belum diisi</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-2.5 text-slate-700">
+                    {note && note !== '-' ? (
+                      <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-800 text-[11px] font-medium border border-slate-200">
+                        💬 {note}
+                      </span>
+                    ) : (
+                      <span className="text-slate-300">-</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+
+          {/* Footer Summary */}
+          <tfoot className="bg-slate-100 text-slate-900 font-extrabold sticky bottom-0 z-10 border-t-2 border-slate-300 shadow-sm">
+            <tr>
+              <td colSpan={3} className="px-4 py-3 text-right uppercase text-xs tracking-wider">
+                Rekapitulasi Kehadiran Hari Ini:
+              </td>
+              <td className="px-3 py-3 text-center text-xs font-bold text-slate-600">
+                Total {students.length} Siswa
+              </td>
+              <td className="px-3 py-3 text-center text-xs">
+                <div className="flex items-center justify-center gap-1 font-mono text-[11px]">
+                  <span className="px-1.5 py-0.5 rounded bg-emerald-200 text-emerald-900 font-bold" title="Hadir">H:{dailyReportData.dayH}</span>
+                  <span className="px-1.5 py-0.5 rounded bg-blue-200 text-blue-900 font-bold" title="Sakit">S:{dailyReportData.dayS}</span>
+                  <span className="px-1.5 py-0.5 rounded bg-amber-200 text-amber-900 font-bold" title="Izin">I:{dailyReportData.dayI}</span>
+                  <span className="px-1.5 py-0.5 rounded bg-rose-200 text-rose-900 font-bold" title="Alpa">A:{dailyReportData.dayA}</span>
+                  <span className="px-1.5 py-0.5 rounded bg-orange-200 text-orange-900 font-bold" title="Terlambat">T:{dailyReportData.dayT}</span>
+                </div>
+              </td>
+              <td className="px-4 py-3 text-xs font-bold text-indigo-900">
+                Kehadiran: <span className="text-emerald-700 font-extrabold">{dailyReportData.dayPresentPercent}%</span>
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  );
+}, (prev, next) => {
+  if (!next.isActive && !prev.isActive) return true;
+  if (next.isActive !== prev.isActive) return false;
+  return (
+    prev.reportClassId === next.reportClassId &&
+    prev.reportDate === next.reportDate &&
+    prev.students === next.students &&
+    prev.dailyReportData === next.dailyReportData &&
+    prev.currentTeacher === next.currentTeacher
+  );
+});
+
+interface MonthlyReportTableProps {
+  isActive: boolean;
+  students: Student[];
+  reportClassId: string;
+  monthName: string;
+  reportYear: number;
+  currentTeacher: TeacherUser;
+  daysInfoList: { day: number; isSunday: boolean; isSaturday: boolean; dayName: string }[];
+  monthlyReportData: {
+    monthSessions: SubjectSession[];
+    dateToSessionMap: Map<number, SubjectSession>;
+    dailyPresentTally: Record<number, number>;
+    totalMeetings: number;
+    totalH: number;
+    totalS: number;
+    totalI: number;
+    totalA: number;
+    totalT: number;
+    overallPercent: number;
+    studentMonthlyStats: Record<string, { H: number; S: number; I: number; A: number; T: number; meetings: number; pct: number }>;
+  };
+}
+
+const MonthlyReportTable = React.memo(function MonthlyReportTable({
+  isActive: _isActive,
+  students,
+  reportClassId,
+  monthName,
+  reportYear,
+  currentTeacher,
+  daysInfoList,
+  monthlyReportData,
+}: MonthlyReportTableProps) {
+  // Pre-associate session with day once for the whole table (prevents 1,000+ Map lookups in JSX)
+  const daysWithSession = useMemo(() => {
+    return daysInfoList.map(info => {
+      const sess = monthlyReportData.dateToSessionMap.get(info.day);
+      return {
+        ...info,
+        session: sess,
+        hasSess: Boolean(sess),
+      };
+    });
+  }, [daysInfoList, monthlyReportData.dateToSessionMap]);
+
+  return (
+    <div className="bg-white border border-indigo-100 rounded-2xl shadow-sm overflow-hidden">
+      {/* Table Banner Header */}
+      <div className="p-4 bg-slate-50 border-b border-indigo-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div>
+          <h3 className="text-sm font-extrabold text-slate-900 tracking-wide uppercase">
+            LAPORAN ABSENSI - KELAS {reportClassId} ({monthName.toUpperCase()} {reportYear})
+          </h3>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Mata Pelajaran: <span className="text-indigo-700 font-bold">{currentTeacher.subject}</span> • Guru: <span className="font-semibold text-slate-800">{currentTeacher.name}</span>
+          </p>
+        </div>
+        <div className="flex items-center gap-2 text-xs">
+          <span className="px-3 py-1 rounded-lg bg-indigo-50 text-indigo-800 font-bold border border-indigo-200 text-xs">
+            {monthlyReportData.monthSessions.length} Pertemuan Terlaksana
+          </span>
+        </div>
+      </div>
+
+      {/* Scrollable Matrix Table with GPU Compositing & Fixed Layout */}
+      <div className="overflow-x-auto relative will-change-scroll [transform:translateZ(0)]">
+        <table className="w-full text-xs text-left border-collapse table-fixed min-w-[1550px]">
+          <colgroup>
+            <col className="w-10" />
+            <col className="w-28" />
+            <col className="w-48" />
+            {daysWithSession.map(info => (
+              <col key={info.day} className="w-8" />
+            ))}
+            <col className="w-9" />
+            <col className="w-9" />
+            <col className="w-9" />
+            <col className="w-9" />
+            <col className="w-9" />
+            <col className="w-14" />
+          </colgroup>
+
+          <thead className="bg-slate-100 text-slate-700 font-bold sticky top-0 z-20 shadow-xs">
+            <tr>
+              <th className="px-2 py-2.5 text-center w-10 border-b border-r border-slate-200 sticky left-0 bg-slate-100 z-30">
+                No
+              </th>
+              <th className="px-3 py-2.5 w-28 border-b border-r border-slate-200 sticky left-10 bg-slate-100 z-30 font-mono text-[11px]">
+                NISN
+              </th>
+              <th className="px-3 py-2.5 w-48 border-b border-r-2 border-slate-200 sticky left-[152px] bg-slate-100 z-30">
+                Nama Siswa
+              </th>
+              
+              {/* Date Columns */}
+              {daysWithSession.map(info => (
+                <th
+                  key={info.day}
+                  className={`px-1 py-1.5 text-center w-8 border-b border-r border-slate-200 ${
+                    info.hasSess 
+                      ? 'bg-indigo-600 text-white font-extrabold' 
+                      : info.isSunday 
+                        ? 'bg-rose-50 text-rose-700 font-medium' 
+                        : info.isSaturday 
+                          ? 'bg-slate-200/70 text-slate-600' 
+                          : 'bg-slate-100 text-slate-700'
+                  }`}
+                  title={`Tanggal ${info.day} ${monthName} (${info.dayName})${info.hasSess ? ' - Ada KBM ' + currentTeacher.subject : ''}`}
+                >
+                  <div className="text-[11px] leading-tight">{info.day}</div>
+                  <div className={`text-[9px] font-normal leading-tight ${info.hasSess ? 'text-indigo-200' : ''}`}>
+                    {info.dayName}
+                  </div>
+                </th>
+              ))}
+
+              {/* Summary Columns */}
+              <th className="px-2 py-2.5 text-center w-9 border-b border-r border-slate-200 bg-emerald-50 text-emerald-800" title="Total Hadir">
+                H
+              </th>
+              <th className="px-2 py-2.5 text-center w-9 border-b border-r border-slate-200 bg-blue-50 text-blue-800" title="Total Sakit">
+                S
+              </th>
+              <th className="px-2 py-2.5 text-center w-9 border-b border-r border-slate-200 bg-amber-50 text-amber-800" title="Total Izin">
+                I
+              </th>
+              <th className="px-2 py-2.5 text-center w-9 border-b border-r border-slate-200 bg-rose-50 text-rose-800" title="Total Alpa">
+                A
+              </th>
+              <th className="px-2 py-2.5 text-center w-9 border-b border-r border-slate-200 bg-orange-50 text-orange-800" title="Total Terlambat">
+                T
+              </th>
+              <th className="px-2 py-2.5 text-center w-14 border-b border-slate-200 bg-indigo-50 text-indigo-900" title="Persentase Kehadiran">
+                %
+              </th>
+            </tr>
+          </thead>
+
+          <tbody className="divide-y divide-slate-100 text-slate-800">
+            {students.map((student, idx) => {
+              const stats = monthlyReportData.studentMonthlyStats[student.id] || { H: 0, S: 0, I: 0, A: 0, T: 0, meetings: 0, pct: 100 };
+
+              return (
+                <tr key={student.id} className="hover:bg-indigo-50/30">
+                  {/* Sticky Columns */}
+                  <td className="px-2 py-2 text-center border-r border-slate-100 sticky left-0 bg-white z-10 font-mono text-[11px] text-slate-500">
+                    {idx + 1}
+                  </td>
+                  <td className="px-3 py-2 border-r border-slate-100 sticky left-10 bg-white z-10 font-mono text-[11px] text-slate-600">
+                    {student.nisn}
+                  </td>
+                  <td className="px-3 py-2 border-r-2 border-slate-200 sticky left-[152px] bg-white z-10 font-semibold text-slate-900 truncate max-w-[192px]">
+                    {student.name}
+                  </td>
+
+                  {/* Date Columns */}
+                  {daysWithSession.map(info => {
+                    const sess = info.session;
+
+                    if (!sess) {
+                      return (
+                        <td 
+                          key={info.day} 
+                          className={`px-1 py-1 text-center border-r border-slate-100 font-mono text-[11px] text-slate-300 ${
+                            info.isSunday ? 'bg-rose-50/20' : info.isSaturday ? 'bg-slate-50/40' : ''
+                          }`}
+                        >
+                          -
+                        </td>
+                      );
+                    }
+
+                    const st = sess.records?.[student.id] || 'H';
+                    const badgeClass = STATUS_BADGE_STYLES[st] || 'bg-slate-400 text-white';
+                    return (
+                      <td key={info.day} className="px-1 py-1 text-center border-r border-slate-100 bg-indigo-50/10">
+                        <span
+                          className={`inline-flex items-center justify-center w-5 h-5 rounded-md font-extrabold text-[10px] ${badgeClass}`}
+                          title={st === 'H' ? 'Hadir' : st === 'S' ? 'Sakit' : st === 'I' ? 'Izin' : st === 'A' ? 'Alpa' : 'Terlambat'}
+                        >
+                          {st}
+                        </span>
+                      </td>
+                    );
+                  })}
+
+                  {/* Summary Columns */}
+                  <td className="px-1 py-2 text-center border-r border-slate-100 font-bold text-emerald-700 bg-emerald-50/30">
+                    {stats.H}
+                  </td>
+                  <td className="px-1 py-2 text-center border-r border-slate-100 font-bold text-blue-700 bg-blue-50/30">
+                    {stats.S}
+                  </td>
+                  <td className="px-1 py-2 text-center border-r border-slate-100 font-bold text-amber-700 bg-amber-50/30">
+                    {stats.I}
+                  </td>
+                  <td className="px-1 py-2 text-center border-r border-slate-100 font-bold text-rose-700 bg-rose-50/30">
+                    {stats.A}
+                  </td>
+                  <td className="px-1 py-2 text-center border-r border-slate-100 font-bold text-orange-700 bg-orange-50/30">
+                    {stats.T}
+                  </td>
+                  <td className="px-1 py-2 text-center font-bold text-slate-800 bg-indigo-50/30">
+                    <span className={`px-1.5 py-0.5 rounded text-[10px] ${
+                      stats.pct >= 90 ? 'bg-emerald-100 text-emerald-800' :
+                      stats.pct >= 75 ? 'bg-amber-100 text-amber-800' :
+                      'bg-rose-100 text-rose-800'
+                    }`}>
+                      {stats.pct}%
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+
+          {/* Footer: Jumlah Siswa Hadir per Hari */}
+          <tfoot className="bg-slate-100 text-slate-900 font-extrabold sticky bottom-0 z-20 border-t-2 border-slate-300 shadow-md">
+            <tr>
+              <td colSpan={3} className="px-3 py-2.5 text-right border-r-2 border-slate-300 sticky left-0 bg-slate-100 z-30 uppercase text-xs tracking-wider">
+                Jumlah Siswa Hadir:
+              </td>
+
+              {daysWithSession.map(info => (
+                <td key={info.day} className="px-1 py-2 text-center border-r border-slate-200 text-xs font-black">
+                  {info.session ? (
+                    <span className="text-emerald-700">{monthlyReportData.dailyPresentTally[info.day] || 0}</span>
+                  ) : (
+                    <span className="text-slate-400 font-normal">-</span>
+                  )}
+                </td>
+              ))}
+
+              <td className="px-1 py-2 text-center border-r border-slate-200 text-emerald-800 bg-emerald-100/60 font-black">
+                {monthlyReportData.totalH}
+              </td>
+              <td className="px-1 py-2 text-center border-r border-slate-200 text-blue-800 bg-blue-100/60 font-black">
+                {monthlyReportData.totalS}
+              </td>
+              <td className="px-1 py-2 text-center border-r border-slate-200 text-amber-800 bg-amber-100/60 font-black">
+                {monthlyReportData.totalI}
+              </td>
+              <td className="px-1 py-2 text-center border-r border-slate-200 text-rose-800 bg-rose-100/60 font-black">
+                {monthlyReportData.totalA}
+              </td>
+              <td className="px-1 py-2 text-center border-r border-slate-200 text-orange-800 bg-orange-100/60 font-black">
+                {monthlyReportData.totalT}
+              </td>
+              <td className="px-1 py-2 text-center text-indigo-900 bg-indigo-100/70 font-black">
+                {monthlyReportData.overallPercent}%
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  );
+}, (prev, next) => {
+  if (!next.isActive && !prev.isActive) return true;
+  if (next.isActive !== prev.isActive) return false;
+  return (
+    prev.reportClassId === next.reportClassId &&
+    prev.reportYear === next.reportYear &&
+    prev.monthName === next.monthName &&
+    prev.students === next.students &&
+    prev.monthlyReportData === next.monthlyReportData &&
+    prev.daysInfoList === next.daysInfoList &&
+    prev.currentTeacher === next.currentTeacher
+  );
+});
+
+interface SemesterReportTableProps {
+  isActive: boolean;
+  students: Student[];
+  reportClassId: string;
+  currentTeacher: TeacherUser;
+  semesterReportData: {
+    semesterSessionsSorted: SubjectSession[];
+    semesterStudentStats: Record<string, { sH: number; sS: number; sI: number; sA: number; sT: number; sPct: number }>;
+  };
+}
+
+const SemesterReportTable = React.memo(function SemesterReportTable({
+  isActive: _isActive,
+  students,
+  reportClassId,
+  currentTeacher,
+  semesterReportData,
+}: SemesterReportTableProps) {
+  return (
+    <div className="bg-white border border-indigo-100 rounded-2xl shadow-sm overflow-hidden">
+      <div className="p-4 bg-slate-50 border-b border-indigo-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div>
+          <h3 className="text-sm font-extrabold text-slate-900 tracking-wide uppercase">
+            REKAPITULASI PRESENSI SEMESTER GANJIL TP. 2026/2027
+          </h3>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Mata Pelajaran: <span className="text-indigo-700 font-bold">{currentTeacher.subject}</span> • Kelas {reportClassId} • Guru: {currentTeacher.name}
+          </p>
+        </div>
+        <span className="text-xs px-2.5 py-1 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold">
+          {semesterReportData.semesterSessionsSorted.length} Pertemuan Tercatat
+        </span>
+      </div>
+
+      <div className="overflow-x-auto relative will-change-scroll [transform:translateZ(0)]">
+        <table className="w-full text-xs text-left border-collapse table-fixed min-w-[950px]">
+          <colgroup>
+            <col className="w-10" />
+            <col className="w-28" />
+            <col className="w-48" />
+            {(semesterReportData.semesterSessionsSorted.length > 0 
+              ? semesterReportData.semesterSessionsSorted 
+              : Array.from({ length: 16 })
+            ).map((_, i) => (
+              <col key={i} className="w-12" />
+            ))}
+            <col className="w-10" />
+            <col className="w-10" />
+            <col className="w-10" />
+            <col className="w-10" />
+            <col className="w-10" />
+            <col className="w-14" />
+          </colgroup>
+          <thead className="bg-slate-100 text-slate-700 font-bold sticky top-0 z-10">
+            <tr>
+              <th className="px-2 py-2.5 text-center w-10 border-b border-r border-slate-200">No</th>
+              <th className="px-3 py-2.5 w-28 border-b border-r border-slate-200 font-mono text-[11px]">NISN</th>
+              <th className="px-3 py-2.5 w-48 border-b border-r border-slate-200">Nama Siswa</th>
+              
+              {semesterReportData.semesterSessionsSorted.length > 0 ? (
+                semesterReportData.semesterSessionsSorted.map((sess, sIdx) => {
+                  const parts = sess.date.split('-');
+                  const dateLabel = parts.length === 3 ? `${parts[2]}/${parts[1]}` : sess.date;
+                  return (
+                    <th key={sess.id} className="px-2 py-2 text-center border-b border-r border-slate-200 min-w-[50px] bg-indigo-50 text-indigo-900" title={`${sess.date} (${sess.subject})`}>
+                      <div className="font-bold">P{sIdx + 1}</div>
+                      <div className="text-[10px] font-normal text-indigo-600">{dateLabel}</div>
+                    </th>
+                  );
+                })
+              ) : (
+                Array.from({ length: 16 }, (_, i) => (
+                  <th key={i} className="px-2 py-2 text-center border-b border-r border-slate-200 min-w-[40px] text-slate-400">
+                    P{i + 1}
+                  </th>
+                ))
+              )}
+
+              <th className="px-2 py-2.5 text-center w-10 border-b border-r border-slate-200 bg-emerald-50 text-emerald-800">H</th>
+              <th className="px-2 py-2.5 text-center w-10 border-b border-r border-slate-200 bg-blue-50 text-blue-800">S</th>
+              <th className="px-2 py-2.5 text-center w-10 border-b border-r border-slate-200 bg-amber-50 text-amber-800">I</th>
+              <th className="px-2 py-2.5 text-center w-10 border-b border-slate-200 bg-rose-50 text-rose-800">A</th>
+              <th className="px-2 py-2.5 text-center w-10 border-b border-slate-200 bg-orange-50 text-orange-800">T</th>
+              <th className="px-2 py-2.5 text-center w-14 border-b border-slate-200 bg-indigo-50 text-indigo-900">%</th>
+            </tr>
+          </thead>
+
+          <tbody className="divide-y divide-slate-100 text-slate-800">
+            {students.map((student, idx) => {
+              const sStats = semesterReportData.semesterStudentStats[student.id] || { sH: 0, sS: 0, sI: 0, sA: 0, sT: 0, sPct: 100 };
+
+              return (
+                <tr key={student.id} className="hover:bg-slate-50">
+                  <td className="px-2 py-2 text-center border-r border-slate-100 font-mono text-[11px] text-slate-500">{idx + 1}</td>
+                  <td className="px-3 py-2 border-r border-slate-100 font-mono text-[11px] text-slate-600">{student.nisn}</td>
+                  <td className="px-3 py-2 border-r border-slate-100 font-semibold text-slate-900">{student.name}</td>
+
+                  {semesterReportData.semesterSessionsSorted.length > 0 ? (
+                    semesterReportData.semesterSessionsSorted.map(sess => {
+                      const st = sess.records?.[student.id] || 'H';
+                      const badgeClass = SEMESTER_BADGE_STYLES[st] || 'bg-slate-100 text-slate-600';
+                      return (
+                        <td key={sess.id} className="px-1 py-1 text-center border-r border-slate-100">
+                          <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold ${badgeClass}`}>
+                            {st}
+                          </span>
+                        </td>
+                      );
+                    })
+                  ) : (
+                    Array.from({ length: 16 }, (_, i) => (
+                      <td key={i} className="px-1 py-1 text-center border-r border-slate-100 text-slate-300">-</td>
+                    ))
+                  )}
+
+                  <td className="px-1 py-2 text-center border-r border-slate-100 font-bold text-emerald-700 bg-emerald-50/30">{sStats.sH}</td>
+                  <td className="px-1 py-2 text-center border-r border-slate-100 font-bold text-blue-700 bg-blue-50/30">{sStats.sS}</td>
+                  <td className="px-1 py-2 text-center border-r border-slate-100 font-bold text-amber-700 bg-amber-50/30">{sStats.sI}</td>
+                  <td className="px-1 py-2 text-center border-r border-slate-100 font-bold text-rose-700 bg-rose-50/30">{sStats.sA}</td>
+                  <td className="px-1 py-2 text-center border-r border-slate-100 font-bold text-orange-700 bg-orange-50/30">{sStats.sT}</td>
+                  <td className="px-1 py-2 text-center font-bold text-slate-800 bg-indigo-50/30">
+                    <span className="px-1.5 py-0.5 rounded text-[10px] bg-indigo-100 text-indigo-800 font-bold">
+                      {sStats.sPct}%
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}, (prev, next) => {
+  if (!next.isActive && !prev.isActive) return true;
+  if (next.isActive !== prev.isActive) return false;
+  return (
+    prev.reportClassId === next.reportClassId &&
+    prev.students === next.students &&
+    prev.semesterReportData === next.semesterReportData &&
+    prev.currentTeacher === next.currentTeacher
+  );
+});
 
 export default function ELearningPage() {
   // Active Authenticated User Session (null = show official login portal)
@@ -105,7 +796,16 @@ export default function ELearningPage() {
   const [attendanceData, setAttendanceData] = useState<Record<string, ClassSessionAttendance>>({});
   
   // Active Tab inside Teacher view
-  const [activeMenu, setActiveMenu] = useState<'presensi' | 'tugas' | 'materi' | 'cbt'>('presensi');
+  const [activeMenu, setActiveMenu] = useState<'presensi' | 'laporan' | 'tugas' | 'materi' | 'cbt'>('presensi');
+
+  // Laporan Presensi State (Teacher & Meja Piket)
+  const [reportClassId, setReportClassId] = useState<string>('7-A');
+  const [reportDate, setReportDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
+  const [reportMonth, setReportMonth] = useState<number>(() => new Date().getMonth() + 1); // 1-12
+  const [reportYear, setReportYear] = useState<number>(() => new Date().getFullYear());
+  const [reportMode, setReportMode] = useState<'harian' | 'bulanan' | 'semester'>('bulanan');
+  const [, startReportTransition] = useTransition();
+  const [piketViewTab, setPiketViewTab] = useState<'live' | 'laporan'>('live');
   
   // Assignments & Homework State
   const [assignments, setAssignments] = useState<Assignment[]>([]);
@@ -144,14 +844,16 @@ export default function ELearningPage() {
           const merged: TeacherUser[] = stored.map(st => {
             const cleanStNip = (st.nip || '').replace(/\s+/g, '');
             const existingDemo = DEMO_TEACHERS.find(dt => 
-              (cleanStNip && cleanStNip !== '-' && (dt.nip || '').replace(/\s+/g, '') === cleanStNip) ||
-              dt.name.toLowerCase() === st.name.toLowerCase()
+              dt.name.toLowerCase() === st.name.toLowerCase() ||
+              (cleanStNip && cleanStNip !== '-' && (dt.nip || '').replace(/\s+/g, '') === cleanStNip)
             );
             return {
-              nip: st.nip || '-',
+              nip: (existingDemo?.nip && !existingDemo.nip.includes('Pembina') && !existingDemo.nip.includes('Penata'))
+                ? existingDemo.nip
+                : (st.nip || '-'),
               name: st.name,
-              role: 'mapel' as const,
-              subject: st.subject || 'Guru Mata Pelajaran',
+              role: (existingDemo?.role || (st.role === 'Kepala Sekolah' ? 'both' : 'mapel')) as 'mapel' | 'piket' | 'both',
+              subject: existingDemo?.subject || st.subject || 'Guru Mata Pelajaran',
               classes: existingDemo?.classes || ['7-A', '7-B', '8-A'],
               username: st.username || getTeacherUsername(st)
             };
@@ -173,16 +875,30 @@ export default function ELearningPage() {
 
   const activeTeachers = allTeachers.length > 0 ? allTeachers : DEMO_TEACHERS;
 
-  // Current active teacher derived from logged-in session, with graceful fallback
-  const currentTeacher = currentUser && currentUser.role === 'guru_mapel'
-    ? {
+  // Current active teacher derived from logged-in session, accurately mapped to activeTeachers
+  const loggedInTeacher = useMemo(() => {
+    if (!currentUser || currentUser.role !== 'guru_mapel') return null;
+    const cleanCurNip = (currentUser.nipOrNisn || '').replace(/\s+/g, '');
+    return activeTeachers.find(t => {
+      const cleanTNip = (t.nip || '').replace(/\s+/g, '');
+      return (cleanTNip && cleanTNip !== '-' && cleanTNip === cleanCurNip) ||
+        t.name.toLowerCase() === currentUser.name.toLowerCase();
+    }) || null;
+  }, [currentUser, activeTeachers]);
+
+  const currentTeacher: TeacherUser = useMemo(() => {
+    if (loggedInTeacher) return loggedInTeacher;
+    if (currentUser && currentUser.role === 'guru_mapel') {
+      return {
         nip: currentUser.nipOrNisn,
         name: currentUser.name,
         role: 'mapel' as const,
-        subject: currentUser.subject || 'Bahasa Inggris',
+        subject: currentUser.subject || 'Guru Mata Pelajaran',
         classes: ['7-A', '7-B', '8-A', '9-A']
-      }
-    : activeTeachers[0];
+      };
+    }
+    return activeTeachers[0] || DEMO_TEACHERS[0];
+  }, [loggedInTeacher, currentUser, activeTeachers]);
 
   // Duty officer at Pos Meja Piket for the day (from official roster)
   const [piketDutyTeacher, setPiketDutyTeacher] = useState<string>('Rohidin, S.Pd.');
@@ -201,9 +917,18 @@ export default function ELearningPage() {
 
   const activeStudents = allStudents.length > 0 ? allStudents : INITIAL_STUDENTS;
   
+  const classStudentCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    activeStudents.forEach(s => {
+      counts[s.classId] = (counts[s.classId] || 0) + 1;
+    });
+    return counts;
+  }, [activeStudents]);
+  
   // Temporary working records for the selected class (before clicking save)
   const [workingRecords, setWorkingRecords] = useState<Record<string, AttendanceStatus>>({});
   const [workingNotes, setWorkingNotes] = useState<Record<string, string>>({});
+  const workingNotesRef = useRef<Record<string, string>>({});
   
   // Piket Quick Action Form State
   const [piketSelectedClass, setPiketSelectedClass] = useState<string>('7-A');
@@ -217,6 +942,7 @@ export default function ELearningPage() {
   // Piket Interactive Class Attendance State (so duty teacher can take / edit attendance for any class)
   const [piketModalRecords, setPiketModalRecords] = useState<Record<string, AttendanceStatus>>({});
   const [piketModalNotes, setPiketModalNotes] = useState<Record<string, string>>({});
+  const piketModalNotesRef = useRef<Record<string, string>>({});
 
   // Toast feedback
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' | 'warn' } | null>(null);
@@ -279,6 +1005,7 @@ export default function ELearningPage() {
 
     setWorkingRecords(records);
     setWorkingNotes(notes);
+    workingNotesRef.current = { ...notes };
   }, [selectedClassId, currentTeacher?.nip, currentTeacher?.subject, sessions, activeStudents]);
 
   // Authentication & Session Management
@@ -466,9 +1193,10 @@ export default function ELearningPage() {
   };
 
   // Update a student's note
-  const handleSetStudentNote = (studentId: string, note: string) => {
+  const handleSetStudentNote = useCallback((studentId: string, note: string) => {
+    workingNotesRef.current[studentId] = note;
     setWorkingNotes(prev => ({ ...prev, [studentId]: note }));
-  };
+  }, []);
 
   // Quick Action: Set all students to Hadir
   const handleSetAllHadir = () => {
@@ -487,6 +1215,7 @@ export default function ELearningPage() {
     const timeString = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB';
     const today = now.toISOString().split('T')[0];
     const teacherNipClean = (currentTeacher?.nip || '').replace(/\s+/g, '');
+    const finalNotes = { ...workingNotes, ...workingNotesRef.current };
 
     // 1. Save individual isolated session log for this teacher & mapel
     const newSession: SubjectSession = {
@@ -498,7 +1227,7 @@ export default function ELearningPage() {
       teacherNip: currentTeacher.nip,
       submittedAt: timeString,
       records: { ...workingRecords },
-      notes: { ...workingNotes }
+      notes: finalNotes
     };
     saveSubjectSession(newSession);
 
@@ -517,7 +1246,7 @@ export default function ELearningPage() {
       isSubmitted: true,
       submittedAt: timeString,
       records: { ...workingRecords },
-      notes: { ...workingNotes },
+      notes: finalNotes,
     };
 
     saveStoredAttendance(updatedData);
@@ -527,34 +1256,82 @@ export default function ELearningPage() {
   };
 
   // Export Mapel Attendance to Excel (.xlsx) - Jurnal Harian
-  const handleExportMapelExcel = () => {
-    const studentsInClass = activeStudents.filter(s => s.classId === selectedClassId);
-    const cls = SCHOOL_CLASSES.find(c => c.id === selectedClassId);
-    const today = new Date().toISOString().split('T')[0];
+  const handleExportMapelExcel = (targetClass?: string, targetDate?: string) => {
+    const classToExport = targetClass || reportClassId || selectedClassId;
+    const dateToExport = targetDate || reportDate || new Date().toISOString().split('T')[0];
+    const studentsInClass = activeStudents.filter(s => s.classId === classToExport);
+    const cls = SCHOOL_CLASSES.find(c => c.id === classToExport);
+
+    // Look for session on target date for this teacher & class
+    const teacherNipClean = (currentTeacher?.nip || '').replace(/\s+/g, '');
+    const sessionOnDate = sessions.find(s => 
+      s.date === dateToExport && 
+      s.classId === classToExport && 
+      (s.teacherNip.replace(/\s+/g, '') === teacherNipClean || s.subject.toLowerCase() === (currentTeacher?.subject || '').toLowerCase())
+    );
+
+    const isCurrentActive = classToExport === selectedClassId && dateToExport === new Date().toISOString().split('T')[0];
+    const recordsToExport = isCurrentActive ? workingRecords : (sessionOnDate?.records || {});
+    const notesToExport = isCurrentActive ? { ...workingNotes, ...workingNotesRef.current } : (sessionOnDate?.notes || {});
 
     exportMapelAttendanceToExcel({
-      classId: selectedClassId,
-      className: cls?.name || `Kelas ${selectedClassId}`,
+      classId: classToExport,
+      className: cls?.name || `Kelas ${classToExport}`,
       subject: currentTeacher.subject,
       teacherName: currentTeacher.name,
       teacherNip: currentTeacher.nip,
-      date: today,
+      date: dateToExport,
       students: studentsInClass,
-      records: workingRecords,
-      notes: workingNotes
+      records: recordsToExport,
+      notes: notesToExport
     });
 
-    showToast(`File Excel Jurnal Presensi ${currentTeacher.subject} (${selectedClassId}) berhasil diunduh!`, 'success');
+    showToast(`File Excel Jurnal Presensi ${currentTeacher.subject} (${classToExport} - ${dateToExport}) berhasil diunduh!`, 'success');
+  };
+
+  // Export Monthly Calendar Matrix (Tgl 1 s/d 31) to Excel (.xlsx)
+  const handleExportMonthlyMatrixExcel = () => {
+    const studentsInClass = activeStudents.filter(s => s.classId === reportClassId);
+    const cls = SCHOOL_CLASSES.find(c => c.id === reportClassId);
+    const daysInMonth = new Date(reportYear, reportMonth, 0).getDate();
+    const monthName = MONTH_NAMES[reportMonth - 1];
+
+    // Filter sessions strictly for this teacher & this class
+    const teacherNipClean = (currentTeacher?.nip || '').replace(/\s+/g, '');
+    const teacherSessionsForClass = sessions.filter(s => {
+      const sNipClean = (s.teacherNip || '').replace(/\s+/g, '');
+      const isMyTeacher = (teacherNipClean && sNipClean && teacherNipClean === sNipClean) ||
+        s.teacherName.toLowerCase() === currentTeacher.name.toLowerCase() ||
+        s.subject.toLowerCase() === currentTeacher.subject.toLowerCase();
+      return isMyTeacher && s.classId === reportClassId;
+    });
+
+    exportMonthlyAttendanceMatrixToExcel({
+      classId: reportClassId,
+      className: cls?.name || `Kelas ${reportClassId}`,
+      subject: currentTeacher.subject,
+      teacherName: currentTeacher.name,
+      teacherNip: currentTeacher.nip,
+      year: reportYear,
+      month: reportMonth,
+      monthName: monthName,
+      daysInMonth: daysInMonth,
+      students: studentsInClass,
+      sessions: teacherSessionsForClass
+    });
+
+    showToast(`File Excel Matriks Bulanan ${monthName} ${reportYear} (${currentTeacher.subject} - ${reportClassId}) berhasil diunduh!`, 'success');
   };
 
   // Export Semester Attendance Recap (P1 - P16) to Excel (.xlsx)
   const handleExportSemesterExcel = () => {
-    const studentsInClass = activeStudents.filter(s => s.classId === selectedClassId);
-    const cls = SCHOOL_CLASSES.find(c => c.id === selectedClassId);
+    const targetClassId = reportClassId || selectedClassId;
+    const studentsInClass = activeStudents.filter(s => s.classId === targetClassId);
+    const cls = SCHOOL_CLASSES.find(c => c.id === targetClassId);
 
     exportSemesterAttendanceToExcel({
-      classId: selectedClassId,
-      className: cls?.name || `Kelas ${selectedClassId}`,
+      classId: targetClassId,
+      className: cls?.name || `Kelas ${targetClassId}`,
       subject: currentTeacher.subject,
       teacherName: currentTeacher.name,
       teacherNip: currentTeacher.nip,
@@ -564,7 +1341,33 @@ export default function ELearningPage() {
       sessions: sessions
     });
 
-    showToast(`File Rekap Semester (P1-P16) ${currentTeacher.subject} (${selectedClassId}) berhasil diunduh!`, 'success');
+    showToast(`File Rekap Semester (P1-P16) ${currentTeacher.subject} (${targetClassId}) berhasil diunduh!`, 'success');
+  };
+
+  // Export Monthly Calendar Matrix for Meja Piket (.xlsx)
+  const handleExportPiketMonthlyMatrixExcel = () => {
+    const studentsInClass = activeStudents.filter(s => s.classId === reportClassId);
+    const cls = SCHOOL_CLASSES.find(c => c.id === reportClassId);
+    const daysInMonth = new Date(reportYear, reportMonth, 0).getDate();
+    const monthName = MONTH_NAMES[reportMonth - 1];
+
+    const classSessions = sessions.filter(s => s.classId === reportClassId);
+
+    exportMonthlyAttendanceMatrixToExcel({
+      classId: reportClassId,
+      className: cls?.name || `Kelas ${reportClassId}`,
+      subject: 'Rekap Presensi Harian (Pos Piket)',
+      teacherName: `${piketDutyTeacher} (Petugas Piket)`,
+      teacherNip: '-',
+      year: reportYear,
+      month: reportMonth,
+      monthName: monthName,
+      daysInMonth: daysInMonth,
+      students: studentsInClass,
+      sessions: classSessions
+    });
+
+    showToast(`File Excel Matriks Bulanan ${monthName} ${reportYear} (${reportClassId}) berhasil diunduh!`, 'success');
   };
 
   // Export School Daily Attendance to Excel (.xlsx) for Meja Piket
@@ -910,6 +1713,7 @@ export default function ELearningPage() {
 
     setPiketModalRecords(records);
     setPiketModalNotes(notes);
+    piketModalNotesRef.current = { ...notes };
   };
 
   // Set single student status from Piket modal
@@ -918,9 +1722,10 @@ export default function ELearningPage() {
   };
 
   // Set single student note from Piket modal
-  const handleSetPiketStudentNote = (studentId: string, note: string) => {
+  const handleSetPiketStudentNote = useCallback((studentId: string, note: string) => {
+    piketModalNotesRef.current[studentId] = note;
     setPiketModalNotes(prev => ({ ...prev, [studentId]: note }));
-  };
+  }, []);
 
   // Quick action: Set all students to Hadir from Piket modal
   const handleSetPiketAllHadir = () => {
@@ -940,6 +1745,7 @@ export default function ELearningPage() {
     const now = new Date();
     const timeString = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB';
     const today = now.toISOString().split('T')[0];
+    const finalNotes = { ...piketModalNotes, ...piketModalNotesRef.current };
 
     const currentSession = attendanceData[detailModalClassId];
     const subject = currentSession?.subject || 'Jam Pertama (Inval)';
@@ -955,7 +1761,7 @@ export default function ELearningPage() {
         isSubmitted: true,
         submittedAt: timeString,
         records: piketModalRecords,
-        notes: piketModalNotes,
+        notes: finalNotes,
       }
     };
 
@@ -965,8 +1771,14 @@ export default function ELearningPage() {
     setDetailModalClassId(null); // Tutup pop-up otomatis setelah berhasil simpan
   };
 
-  // Calculate stats for Piket Dashboard
-  const calculateSchoolStats = () => {
+  // Memoized Today Date String
+  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+
+  // Calculate stats for Piket Dashboard (Only executed when Piket role is active)
+  const schoolStats = useMemo(() => {
+    if (currentUser?.role !== 'guru_piket') {
+      return { totalAssigned: 0, hadir: 0, sakit: 0, izin: 0, alpa: 0, terlambat: 0 };
+    }
     let totalAssigned = 0;
     let hadir = 0;
     let sakit = 0;
@@ -974,7 +1786,6 @@ export default function ELearningPage() {
     let alpa = 0;
     let terlambat = 0;
 
-    const todayStr = new Date().toISOString().split('T')[0];
     SCHOOL_CLASSES.forEach(cls => {
       const session = attendanceData[cls.id];
       const isTodaySession = session && session.date === todayStr && session.isSubmitted;
@@ -988,30 +1799,246 @@ export default function ELearningPage() {
         else if (status === 'I') izin++;
         else if (status === 'A') alpa++;
         else if (status === 'T') terlambat++;
-        else hadir++; // Default hadir jika belum ada laporan absen
+        else hadir++;
       });
     });
 
     return { totalAssigned, hadir, sakit, izin, alpa, terlambat };
-  };
+  }, [currentUser?.role, attendanceData, activeStudents, todayStr]);
 
-  const todayStr = new Date().toISOString().split('T')[0];
-  const schoolStats = calculateSchoolStats();
-  const currentClassStudents = activeStudents.filter(s => s.classId === selectedClassId);
+  const currentClassStudents = useMemo(() => 
+    activeStudents.filter(s => s.classId === selectedClassId),
+    [activeStudents, selectedClassId]
+  );
   
-  const teacherNipClean = (currentTeacher?.nip || '').replace(/\s+/g, '');
-  const mySubjectSession = sessions.find(s => 
-    s.date === todayStr && 
-    s.classId === selectedClassId && 
-    (s.teacherNip.replace(/\s+/g, '') === teacherNipClean || s.subject.toLowerCase() === (currentTeacher?.subject || '').toLowerCase())
+  const teacherNipClean = useMemo(() => 
+    (currentTeacher?.nip || '').replace(/\s+/g, ''),
+    [currentTeacher?.nip]
   );
 
-  const otherClassSessions = sessions.filter(s =>
-    s.date === todayStr &&
-    s.classId === selectedClassId &&
-    s.teacherNip.replace(/\s+/g, '') !== teacherNipClean &&
-    s.subject.toLowerCase() !== (currentTeacher?.subject || '').toLowerCase()
-  );
+  const mySubjectSession = useMemo(() => {
+    return sessions.find(s => 
+      s.date === todayStr && 
+      s.classId === selectedClassId && 
+      (s.teacherNip.replace(/\s+/g, '') === teacherNipClean || s.subject.toLowerCase() === (currentTeacher?.subject || '').toLowerCase())
+    );
+  }, [sessions, todayStr, selectedClassId, teacherNipClean, currentTeacher?.subject]);
+
+  const otherClassSessions = useMemo(() => {
+    return sessions.filter(s =>
+      s.date === todayStr &&
+      s.classId === selectedClassId &&
+      s.teacherNip.replace(/\s+/g, '') !== teacherNipClean &&
+      s.subject.toLowerCase() !== (currentTeacher?.subject || '').toLowerCase()
+    );
+  }, [sessions, todayStr, selectedClassId, teacherNipClean, currentTeacher?.subject]);
+
+  // ==========================================
+  // TOP-LEVEL MEMOIZED DATA UNTUK TAB LAPORAN REKAP
+  // Mencegah freeze / lag saat klik tab & toggle harian/bulanan/semester
+  // ==========================================
+  const studentsInReport = useMemo(() => {
+    return activeStudents.filter(s => s.classId === reportClassId);
+  }, [activeStudents, reportClassId]);
+
+  const daysInfoList = useMemo(() => {
+    const daysInMonth = new Date(reportYear, reportMonth, 0).getDate();
+    const days = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+    const list = [];
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dt = new Date(reportYear, reportMonth - 1, d);
+      const dayNum = dt.getDay();
+      list.push({
+        day: d,
+        dayName: days[dayNum],
+        isSunday: dayNum === 0,
+        isSaturday: dayNum === 6,
+        isWeekend: dayNum === 0 || dayNum === 6
+      });
+    }
+    return list;
+  }, [reportYear, reportMonth]);
+
+  const monthName = useMemo(() => {
+    return MONTH_NAMES[reportMonth - 1] || 'Bulan';
+  }, [reportMonth]);
+
+  // Sesi Guru Terisolasi untuk Kelas Laporan (Hanya berjalan jika di tab Laporan)
+  const myTeacherReportSessions = useMemo(() => {
+    if (activeMenu !== 'laporan') return [];
+    const tNipClean = (currentTeacher?.nip || '').replace(/\s+/g, '');
+    return sessions.filter(s => {
+      const sNipClean = (s.teacherNip || '').replace(/\s+/g, '');
+      const isMyTeacher = (tNipClean && sNipClean && tNipClean === sNipClean) ||
+        s.teacherName.toLowerCase() === (currentTeacher?.name || '').toLowerCase() ||
+        s.subject.toLowerCase() === (currentTeacher?.subject || '').toLowerCase();
+      return isMyTeacher && s.classId === reportClassId;
+    });
+  }, [activeMenu, sessions, currentTeacher?.nip, currentTeacher?.name, currentTeacher?.subject, reportClassId]);
+
+  // Data Laporan Harian (O(N) ringan, hanya berjalan jika mode harian aktif)
+  const dailyReportData = useMemo(() => {
+    if (activeMenu !== 'laporan' || reportMode !== 'harian') {
+      return {
+        dailySession: undefined as SubjectSession | undefined,
+        dailyRecords: {} as Record<string, AttendanceStatus>,
+        dailyNotes: {} as Record<string, string>,
+        hasDailyData: false,
+        dayH: 0, dayS: 0, dayI: 0, dayA: 0, dayT: 0,
+        dayTotal: 0,
+        dayPresentPercent: 0
+      };
+    }
+    const isTodayReport = reportDate === todayStr && reportClassId === selectedClassId;
+    const dailySession = myTeacherReportSessions.find(s => s.date === reportDate);
+    const dailyRecords: Record<string, AttendanceStatus> = (isTodayReport && Object.keys(workingRecords).length > 0)
+      ? workingRecords
+      : (dailySession?.records || {});
+    const dailyNotes: Record<string, string> = (isTodayReport && (Object.keys(workingNotes).length > 0 || Object.keys(workingNotesRef.current).length > 0))
+      ? { ...workingNotes, ...workingNotesRef.current }
+      : (dailySession?.notes || {});
+    const hasDailyData = Boolean(dailySession || (isTodayReport && Object.keys(workingRecords).length > 0));
+
+    let dayH = 0, dayS = 0, dayI = 0, dayA = 0, dayT = 0;
+    studentsInReport.forEach(st => {
+      if (hasDailyData) {
+        const stStatus = dailyRecords[st.id] || 'H';
+        if (stStatus === 'H') dayH++;
+        else if (stStatus === 'S') dayS++;
+        else if (stStatus === 'I') dayI++;
+        else if (stStatus === 'A') dayA++;
+        else if (stStatus === 'T') dayT++;
+      }
+    });
+    const dayTotal = studentsInReport.length;
+    const dayPresentPercent = hasDailyData && dayTotal > 0 ? Math.round(((dayH + dayT) / dayTotal) * 100) : 0;
+
+    return {
+      dailySession,
+      dailyRecords,
+      dailyNotes,
+      hasDailyData,
+      dayH, dayS, dayI, dayA, dayT,
+      dayTotal,
+      dayPresentPercent
+    };
+  }, [activeMenu, reportMode, reportDate, todayStr, reportClassId, selectedClassId, myTeacherReportSessions, workingRecords, workingNotes, studentsInReport]);
+
+  // Data Laporan Matriks Bulanan (Tgl 1 - 31, super-cepat & hanya berjalan jika mode bulanan aktif)
+  const monthlyReportData = useMemo(() => {
+    if (activeMenu !== 'laporan' || reportMode !== 'bulanan') {
+      return {
+        monthSessions: [] as SubjectSession[],
+        dateToSessionMap: new Map<number, SubjectSession>(),
+        dailyPresentTally: {} as Record<number, number>,
+        totalMeetings: 0,
+        totalH: 0, totalS: 0, totalI: 0, totalA: 0, totalT: 0,
+        overallPercent: 100,
+        studentMonthlyStats: {} as Record<string, { H: number; S: number; I: number; A: number; T: number; meetings: number; pct: number }>
+      };
+    }
+
+    const monthPadded = String(reportMonth).padStart(2, '0');
+    const monthSessions = myTeacherReportSessions.filter(s => s.date.startsWith(`${reportYear}-${monthPadded}`));
+    const dateToSessionMap = new Map<number, SubjectSession>();
+    monthSessions.forEach(sess => {
+      const parts = sess.date.split('-');
+      if (parts.length === 3) {
+        const d = parseInt(parts[2], 10);
+        dateToSessionMap.set(d, sess);
+      }
+    });
+
+    const dailyPresentTally: Record<number, number> = {};
+    monthSessions.forEach(sess => {
+      const parts = sess.date.split('-');
+      if (parts.length === 3) {
+        const d = parseInt(parts[2], 10);
+        let count = 0;
+        studentsInReport.forEach(st => {
+          const stStatus = sess.records?.[st.id] || 'H';
+          if (stStatus === 'H' || stStatus === 'T') count++;
+        });
+        dailyPresentTally[d] = count;
+      }
+    });
+
+    const totalMeetings = monthSessions.length;
+    const studentMonthlyStats: Record<string, { H: number; S: number; I: number; A: number; T: number; meetings: number; pct: number }> = {};
+    studentsInReport.forEach(st => {
+      studentMonthlyStats[st.id] = { H: 0, S: 0, I: 0, A: 0, T: 0, meetings: totalMeetings, pct: 100 };
+    });
+
+    monthSessions.forEach(sess => {
+      studentsInReport.forEach(st => {
+        const stStatus = sess.records?.[st.id] || 'H';
+        const stat = studentMonthlyStats[st.id];
+        if (stat) {
+          if (stStatus === 'H') stat.H++;
+          else if (stStatus === 'S') stat.S++;
+          else if (stStatus === 'I') stat.I++;
+          else if (stStatus === 'A') stat.A++;
+          else if (stStatus === 'T') stat.T++;
+        }
+      });
+    });
+
+    let totalH = 0, totalS = 0, totalI = 0, totalA = 0, totalT = 0;
+    studentsInReport.forEach(st => {
+      const stat = studentMonthlyStats[st.id];
+      if (stat) {
+        totalH += stat.H;
+        totalS += stat.S;
+        totalI += stat.I;
+        totalA += stat.A;
+        totalT += stat.T;
+        stat.pct = totalMeetings > 0 ? Math.round(((stat.H + stat.T) / totalMeetings) * 100) : 100;
+      }
+    });
+
+    const totalSlots = totalMeetings * studentsInReport.length;
+    const overallPercent = totalSlots > 0 ? Math.round(((totalH + totalT) / totalSlots) * 100) : 100;
+
+    return {
+      monthSessions,
+      dateToSessionMap,
+      dailyPresentTally,
+      totalMeetings,
+      totalH, totalS, totalI, totalA, totalT,
+      overallPercent,
+      studentMonthlyStats
+    };
+  }, [activeMenu, reportMode, reportMonth, reportYear, myTeacherReportSessions, studentsInReport]);
+
+  // Data Laporan Rekap Semester (P1 - P16, hanya berjalan jika mode semester aktif)
+  const semesterReportData = useMemo(() => {
+    if (activeMenu !== 'laporan' || reportMode !== 'semester') {
+      return {
+        semesterSessionsSorted: [] as SubjectSession[],
+        semesterStudentStats: {} as Record<string, { sH: number; sS: number; sI: number; sA: number; sT: number; sPct: number }>
+      };
+    }
+
+    const semesterSessionsSorted = [...myTeacherReportSessions].sort((a, b) => a.date.localeCompare(b.date));
+    const sTotalMeetings = semesterSessionsSorted.length;
+    const semesterStudentStats: Record<string, { sH: number; sS: number; sI: number; sA: number; sT: number; sPct: number }> = {};
+
+    studentsInReport.forEach(student => {
+      let sH = 0, sS = 0, sI = 0, sA = 0, sT = 0;
+      semesterSessionsSorted.forEach(sess => {
+        const st = sess.records?.[student.id] || 'H';
+        if (st === 'H') sH++;
+        else if (st === 'S') sS++;
+        else if (st === 'I') sI++;
+        else if (st === 'A') sA++;
+        else if (st === 'T') sT++;
+      });
+      const sPct = sTotalMeetings > 0 ? Math.round(((sH + sT) / sTotalMeetings) * 100) : 100;
+      semesterStudentStats[student.id] = { sH, sS, sI, sA, sT, sPct };
+    });
+
+    return { semesterSessionsSorted, semesterStudentStats };
+  }, [activeMenu, reportMode, myTeacherReportSessions, studentsInReport]);
 
   // Rekap kehadiran siswa yang login, dihitung dari data sesi presensi asli (bukan angka contoh)
   const getStudentAttendanceStats = () => {
@@ -1455,21 +2482,35 @@ export default function ELearningPage() {
                 </p>
               </div>
 
-              {/* Sub-tabs: Presensi / Tugas & PR / Bahan Ajar / CBT */}
-              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs">
+              {/* Sub-tabs: Presensi / Laporan / Tugas & PR / Bahan Ajar / CBT */}
+              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs overflow-x-auto max-w-full">
                 <button
+                  type="button"
                   onClick={() => setActiveMenu('presensi')}
-                  className={`px-3 py-1.5 rounded-lg font-medium transition cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg font-medium transition cursor-pointer whitespace-nowrap ${
                     activeMenu === 'presensi' 
                       ? 'bg-indigo-600 text-white font-bold shadow-sm' 
                       : 'text-slate-600 hover:text-slate-900 hover:bg-white'
                   }`}
                 >
-                  Presensi
+                  Presensi KBM
                 </button>
                 <button
+                  type="button"
+                  onClick={() => setActiveMenu('laporan')}
+                  className={`px-3 py-1.5 rounded-lg font-medium transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                    activeMenu === 'laporan' 
+                      ? 'bg-indigo-600 text-white font-bold shadow-sm' 
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white'
+                  }`}
+                >
+                  <span>📊</span>
+                  <span>Laporan Rekap</span>
+                </button>
+                <button
+                  type="button"
                   onClick={() => setActiveMenu('tugas')}
-                  className={`px-3 py-1.5 rounded-lg font-medium transition cursor-pointer flex items-center gap-1.5 ${
+                  className={`px-3 py-1.5 rounded-lg font-medium transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
                     activeMenu === 'tugas' 
                       ? 'bg-indigo-600 text-white font-bold shadow-sm' 
                       : 'text-slate-600 hover:text-slate-900 hover:bg-white'
@@ -1479,8 +2520,9 @@ export default function ELearningPage() {
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
                 </button>
                 <button
+                  type="button"
                   onClick={() => setActiveMenu('materi')}
-                  className={`px-3 py-1.5 rounded-lg font-medium transition cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg font-medium transition cursor-pointer whitespace-nowrap ${
                     activeMenu === 'materi' 
                       ? 'bg-indigo-600 text-white font-bold shadow-sm' 
                       : 'text-slate-600 hover:text-slate-900 hover:bg-white'
@@ -1489,8 +2531,9 @@ export default function ELearningPage() {
                   Bahan Ajar
                 </button>
                 <button
+                  type="button"
                   onClick={() => setActiveMenu('cbt')}
-                  className={`px-3 py-1.5 rounded-lg font-medium transition cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg font-medium transition cursor-pointer whitespace-nowrap ${
                     activeMenu === 'cbt' 
                       ? 'bg-indigo-600 text-white font-bold shadow-sm' 
                       : 'text-slate-600 hover:text-slate-900 hover:bg-white'
@@ -1562,7 +2605,7 @@ export default function ELearningPage() {
                       <span className="font-bold text-slate-800">Riwayat Mapel Lain di {selectedClassId} Hari Ini:</span>
                     </div>
                     <div className="flex flex-wrap items-center gap-1.5">
-                      {otherClassSessions.map((os) => (
+                      {otherClassSessions.map((os: SubjectSession) => (
                         <span key={os.id} className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-slate-700 font-medium text-[11px] shadow-xs flex items-center gap-1">
                           <span className="font-semibold text-indigo-700">{os.subject}</span>
                           <span className="text-slate-400">•</span>
@@ -1586,7 +2629,7 @@ export default function ELearningPage() {
                   </div>
 
                   <div className="divide-y divide-slate-100">
-                    {currentClassStudents.map((student, idx) => {
+                    {currentClassStudents.map((student: Student, idx: number) => {
                       const currentStatus = workingRecords[student.id] || 'H';
                       const currentNote = workingNotes[student.id] || '';
 
@@ -1680,17 +2723,19 @@ export default function ELearningPage() {
                           {/* Note input ONLY when status is NOT Hadir */}
                           <div className="w-full md:w-56">
                             {currentStatus !== 'H' ? (
-                              <input
-                                type="text"
+                              <AttendanceNoteInput
                                 value={currentNote}
-                                onChange={(e) => handleSetStudentNote(student.id, e.target.value)}
+                                onCommit={(val) => handleSetStudentNote(student.id, val)}
+                                onInstantChange={(val) => {
+                                  workingNotesRef.current[student.id] = val;
+                                }}
                                 placeholder={
                                   currentStatus === 'S' ? 'Alasan sakit...' :
                                   currentStatus === 'I' ? 'Alasan izin...' :
                                   currentStatus === 'T' ? 'Alasan terlambat...' :
                                   'Keterangan...'
                                 }
-                                className="w-full px-2.5 py-1 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-indigo-500 focus:bg-white placeholder:text-slate-400 animate-[fadeIn_0.15s_ease-out]"
+                                className="w-full px-2.5 py-1 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-indigo-500 focus:bg-white placeholder:text-slate-400"
                               />
                             ) : (
                               <div className="hidden md:block text-right">
@@ -1704,34 +2749,26 @@ export default function ELearningPage() {
                     })}
                   </div>
 
-                  {/* BOTTOM ACTION BAR */}
+                  {/* BOTTOM ACTION BAR (BERSIH & FOKUS SIMPAN PRESENSI) */}
                   <div className="p-3.5 sm:p-4 bg-slate-50 border-t border-indigo-100 flex flex-col sm:flex-row items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <div className="text-xs text-slate-500 flex flex-wrap items-center gap-1.5 text-center sm:text-left">
+                      <span className="text-emerald-700 font-semibold flex items-center gap-1">
+                        <span>✅</span> Presensi otomatis tersimpan ke Jurnal KBM.
+                      </span>
+                      <span className="text-slate-400">•</span>
                       <button
                         type="button"
-                        onClick={handleExportSemesterExcel}
-                        className="px-3.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer"
-                        title="Unduh Rekap 1 Semester (P1 s/d P16) untuk Nilai Rapor"
+                        onClick={() => setActiveMenu('laporan')}
+                        className="text-indigo-600 hover:text-indigo-800 font-bold hover:underline transition cursor-pointer"
                       >
-                        <span>📥</span>
-                        <span>Rekap Semester</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={handleExportMapelExcel}
-                        className="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 font-semibold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
-                        title="Unduh presensi harian hari ini"
-                      >
-                        <span>📄</span>
-                        <span>Jurnal Hari Ini</span>
+                        Buka Tab Laporan Rekap untuk Unduh Excel (Harian, Bulanan & Semester) →
                       </button>
                     </div>
 
                     <button
                       type="button"
                       onClick={handleSaveAttendance}
-                      className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs sm:text-sm transition shadow-lg shadow-indigo-600/25 flex items-center justify-center gap-2 cursor-pointer"
+                      className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs sm:text-sm transition shadow-lg shadow-indigo-600/25 flex items-center justify-center gap-2 cursor-pointer active:scale-95"
                     >
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
@@ -1740,6 +2777,341 @@ export default function ELearningPage() {
                     </button>
                   </div>
 
+                </div>
+
+              </div>
+            )}
+
+            {/* TAB: LAPORAN REKAP PRESENSI (BULANAN MATRIKS 1-31 & SEMESTER P1-P16) */}
+            {activeMenu === 'laporan' && (
+              <div className="space-y-4">
+                
+                {/* Top Notice: Isolation Confirmation */}
+                <div className="bg-gradient-to-r from-indigo-50 via-white to-purple-50 border border-indigo-200 rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                      <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold border border-emerald-300">
+                        🔒 Presensi Terisolasi Mandiri
+                      </span>
+                      <span className="text-xs px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-800 font-bold border border-indigo-300">
+                        Mapel: {currentTeacher.subject}
+                      </span>
+                    </div>
+                    <h2 className="text-lg font-bold text-slate-900 tracking-tight">
+                      Laporan Rekapitulasi Presensi Peserta Didik
+                    </h2>
+                    <p className="text-xs text-slate-600 mt-1">
+                      Menampilkan rekapan presensi khusus mata pelajaran <strong className="text-indigo-700">{currentTeacher.subject}</strong> yang diampu oleh <strong className="text-slate-800">{currentTeacher.name}</strong>. Sesi guru mapel lain tidak tercampur dalam laporan ini.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (reportMode === 'harian') {
+                          handleExportMapelExcel(reportClassId, reportDate);
+                        } else if (reportMode === 'bulanan') {
+                          handleExportMonthlyMatrixExcel();
+                        } else {
+                          handleExportSemesterExcel();
+                        }
+                      }}
+                      className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-md shadow-emerald-600/25 flex items-center gap-2 cursor-pointer"
+                      title="Unduh laporan ke format Excel resmi (.xlsx)"
+                    >
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/>
+                      </svg>
+                      <span>
+                        {reportMode === 'harian' ? 'Export Jurnal Harian (.xlsx)' : reportMode === 'bulanan' ? 'Export Matriks Bulanan (.xlsx)' : 'Export Rekap Semester (.xlsx)'}
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => window.print()}
+                      className="px-3.5 py-2.5 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 font-semibold text-xs transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+                      title="Cetak laporan presensi"
+                    >
+                      <span>🖨️ Cetak</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Filter Card (Pilihan Mode: Harian, Bulanan, Semester) */}
+                <div className="bg-white border border-indigo-100 rounded-2xl p-4 sm:p-5 shadow-sm space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                    <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                      <span>🔍 Filter Laporan Presensi</span>
+                    </span>
+
+                    {/* Mode Toggle: Harian vs Bulanan vs Semester */}
+                    <div className="flex flex-wrap items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs">
+                      <button
+                        type="button"
+                        onClick={() => setReportMode('harian')}
+                        className={`px-3 py-1.5 rounded-lg font-bold transition-colors duration-75 select-none active:scale-[0.98] cursor-pointer ${
+                          reportMode === 'harian'
+                            ? 'bg-indigo-600 text-white shadow-sm'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        📄 Harian (Per Tanggal)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setReportMode('bulanan')}
+                        className={`px-3 py-1.5 rounded-lg font-bold transition-colors duration-75 select-none active:scale-[0.98] cursor-pointer ${
+                          reportMode === 'bulanan'
+                            ? 'bg-indigo-600 text-white shadow-sm'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        📅 Bulanan (Tgl 1 - 31)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setReportMode('semester')}
+                        className={`px-3 py-1.5 rounded-lg font-bold transition-colors duration-75 select-none active:scale-[0.98] cursor-pointer ${
+                          reportMode === 'semester'
+                            ? 'bg-indigo-600 text-white shadow-sm'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        📚 Semester (P1 - P16)
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        1. Pilih Kelas / Rombel:
+                      </label>
+                      <select
+                        value={reportClassId}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          startReportTransition(() => setReportClassId(val));
+                        }}
+                        className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-semibold focus:outline-none focus:border-indigo-500 focus:bg-white transition-colors duration-75 cursor-pointer"
+                      >
+                        {SCHOOL_CLASSES.map(cls => (
+                          <option key={cls.id} value={cls.id}>
+                            {cls.name} ({classStudentCounts[cls.id] || 0} Siswa)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className={reportMode === 'harian' ? 'block sm:col-span-2' : 'hidden'}>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        2. Pilih Tanggal Presensi:
+                      </label>
+                      <input
+                        type="date"
+                        value={reportDate}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          startReportTransition(() => setReportDate(val));
+                        }}
+                        className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-semibold focus:outline-none focus:border-indigo-500 focus:bg-white transition-colors duration-75 cursor-pointer"
+                      />
+                    </div>
+
+                    <div className={reportMode === 'bulanan' ? 'block' : 'hidden'}>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        2. Pilih Bulan:
+                      </label>
+                      <select
+                        value={reportMonth}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          startReportTransition(() => setReportMonth(val));
+                        }}
+                        className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-semibold focus:outline-none focus:border-indigo-500 focus:bg-white transition-colors duration-75 cursor-pointer"
+                      >
+                        {MONTH_NAMES.map((name, idx) => (
+                          <option key={name} value={idx + 1}>
+                            {name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className={reportMode === 'bulanan' ? 'block' : 'hidden'}>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        3. Pilih Tahun:
+                      </label>
+                      <select
+                        value={reportYear}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          startReportTransition(() => setReportYear(val));
+                        }}
+                        className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-semibold focus:outline-none focus:border-indigo-500 focus:bg-white transition-colors duration-75 cursor-pointer"
+                      >
+                        <option value={2025}>2025</option>
+                        <option value={2026}>2026</option>
+                        <option value={2027}>2027</option>
+                      </select>
+                    </div>
+
+                    <div className={reportMode === 'semester' ? 'block sm:col-span-2' : 'hidden'}>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        2. Tahun Ajaran / Semester:
+                      </label>
+                      <div className="w-full px-3 py-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 text-xs font-semibold">
+                        Semester Ganjil TP. 2026/2027
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Summary Metric Cards (Dinamis sesuai Mode: Harian, Bulanan, Semester) */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="p-3.5 rounded-2xl bg-white border border-slate-200 shadow-sm">
+                    <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      {reportMode === 'harian' ? 'Status KBM Harian' : 'Pertemuan Mapel Terlaksana'}
+                    </div>
+                    <div className="text-xl sm:text-2xl font-black text-indigo-600 mt-0.5">
+                      {reportMode === 'harian' ? (
+                        dailyReportData.hasDailyData ? 'Terlaksana' : 'Belum Ada Sesi'
+                      ) : reportMode === 'bulanan' ? (
+                        `${monthlyReportData.totalMeetings} Sesi`
+                      ) : (
+                        `${semesterReportData.semesterSessionsSorted.length} Sesi`
+                      )}
+                    </div>
+                    <div className="text-[11px] text-slate-400 mt-0.5 truncate">
+                      {reportMode === 'harian'
+                        ? (dailyReportData.dailySession?.submittedAt ? `Dicatat pkl ${dailyReportData.dailySession.submittedAt}` : formatIndonesianDate(reportDate))
+                        : reportMode === 'bulanan'
+                        ? `${monthName} ${reportYear}`
+                        : 'Semester Ganjil'}
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl bg-white border border-slate-200 shadow-sm">
+                    <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      {reportMode === 'harian' ? 'Tingkat Kehadiran' : 'Rata-rata Kehadiran Kelas'}
+                    </div>
+                    <div className="text-2xl font-black text-emerald-600 mt-0.5">
+                      {reportMode === 'harian' ? `${dailyReportData.dayPresentPercent}%` : `${monthlyReportData.overallPercent}%`}
+                    </div>
+                    <div className="text-[11px] text-slate-400 mt-0.5">
+                      {reportMode === 'harian'
+                        ? `${dailyReportData.dayH + dailyReportData.dayT} dari ${dailyReportData.dayTotal} Siswa Hadir`
+                        : `Total ${studentsInReport.length} Siswa Terdaftar`}
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl bg-white border border-slate-200 shadow-sm">
+                    <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      Sakit (S) & Izin (I)
+                    </div>
+                    <div className="text-2xl font-black text-blue-600 mt-0.5">
+                      {reportMode === 'harian' ? dailyReportData.dayS + dailyReportData.dayI : monthlyReportData.totalS + monthlyReportData.totalI}{' '}
+                      <span className="text-xs font-semibold text-slate-500">
+                        {reportMode === 'harian' ? 'siswa' : 'kali'}
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-slate-400 mt-0.5">
+                      {reportMode === 'harian'
+                        ? `Sakit: ${dailyReportData.dayS} • Izin: ${dailyReportData.dayI}`
+                        : `Sakit: ${monthlyReportData.totalS} • Izin: ${monthlyReportData.totalI}`}
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl bg-white border border-slate-200 shadow-sm">
+                    <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      Alpa (A) & Terlambat (T)
+                    </div>
+                    <div className="text-2xl font-black text-rose-600 mt-0.5">
+                      {reportMode === 'harian' ? dailyReportData.dayA + dailyReportData.dayT : monthlyReportData.totalA + monthlyReportData.totalT}{' '}
+                      <span className="text-xs font-semibold text-slate-500">
+                        {reportMode === 'harian' ? 'siswa' : 'kali'}
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-slate-400 mt-0.5">
+                      {reportMode === 'harian'
+                        ? `Alpa: ${dailyReportData.dayA} • Terlambat: ${dailyReportData.dayT}`
+                        : `Alpa: ${monthlyReportData.totalA} • Terlambat: ${monthlyReportData.totalT}`}
+                    </div>
+                  </div>
+                </div>
+
+                {/* TABEL JURNAL HARIAN PRESENSI KBM (PER TANGGAL) */}
+                <div className={reportMode === 'harian' ? 'block' : 'hidden'}>
+                  <DailyReportTable
+                    isActive={reportMode === 'harian'}
+                    students={studentsInReport}
+                    reportClassId={reportClassId}
+                    reportDate={reportDate}
+                    currentTeacher={currentTeacher}
+                    dailyReportData={dailyReportData}
+                  />
+                </div>
+
+                {/* TABEL MATRIKS BULANAN (TANGGAL 1 - 31) */}
+                <div className={reportMode === 'bulanan' ? 'block' : 'hidden'}>
+                  <MonthlyReportTable
+                    isActive={reportMode === 'bulanan'}
+                    students={studentsInReport}
+                    reportClassId={reportClassId}
+                    monthName={monthName}
+                    reportYear={reportYear}
+                    currentTeacher={currentTeacher}
+                    daysInfoList={daysInfoList}
+                    monthlyReportData={monthlyReportData}
+                  />
+                </div>
+
+                {/* TABEL REKAP SEMESTER (P1 - P16) */}
+                <div className={reportMode === 'semester' ? 'block' : 'hidden'}>
+                  <SemesterReportTable
+                    isActive={reportMode === 'semester'}
+                    students={studentsInReport}
+                    reportClassId={reportClassId}
+                    currentTeacher={currentTeacher}
+                    semesterReportData={semesterReportData}
+                  />
+                </div>
+
+                {/* Keterangan & Legenda Warna */}
+                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="font-bold text-slate-700">Keterangan:</span>
+                    <span className="inline-flex items-center gap-1.5 text-slate-600">
+                      <span className="w-4 h-4 rounded bg-emerald-500 text-white font-bold text-[10px] flex items-center justify-center">H</span>
+                      <span>Hadir</span>
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 text-slate-600">
+                      <span className="w-4 h-4 rounded bg-blue-600 text-white font-bold text-[10px] flex items-center justify-center">S</span>
+                      <span>Sakit</span>
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 text-slate-600">
+                      <span className="w-4 h-4 rounded bg-amber-500 text-white font-bold text-[10px] flex items-center justify-center">I</span>
+                      <span>Izin</span>
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 text-slate-600">
+                      <span className="w-4 h-4 rounded bg-rose-600 text-white font-bold text-[10px] flex items-center justify-center">A</span>
+                      <span>Alpa</span>
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 text-slate-600">
+                      <span className="w-4 h-4 rounded bg-orange-500 text-white font-bold text-[10px] flex items-center justify-center">T</span>
+                      <span>Terlambat</span>
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 text-slate-400">
+                      <span className="font-mono text-slate-300">-</span>
+                      <span>Tidak ada jam KBM {currentTeacher.subject}</span>
+                    </span>
+                  </div>
+
+                  <div className="text-[11px] text-slate-500 italic">
+                    Format laporan memenuhi standar Dapodik & Kurikulum Merdeka SMPN 3 Cihampelas
+                  </div>
                 </div>
 
               </div>
@@ -2101,11 +3473,41 @@ export default function ELearningPage() {
                 >
                   <span>🔄 Refresh</span>
                 </button>
+
+                {/* Tab Switcher: Live Monitoring vs Rekap Bulanan */}
+                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setPiketViewTab('live')}
+                    className={`px-3 py-1.5 rounded-lg font-bold transition cursor-pointer whitespace-nowrap ${
+                      piketViewTab === 'live'
+                        ? 'bg-emerald-600 text-white shadow-sm'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-white'
+                    }`}
+                  >
+                    🏫 Live Hari Ini
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPiketViewTab('laporan')}
+                    className={`px-3 py-1.5 rounded-lg font-bold transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                      piketViewTab === 'laporan'
+                        ? 'bg-emerald-600 text-white shadow-sm'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-white'
+                    }`}
+                  >
+                    <span>📊</span>
+                    <span>Matriks Bulanan Kelas</span>
+                  </button>
+                </div>
               </div>
             </div>
 
-            {/* TOP STATS CARDS: CLEAN & MINIMALIST */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+            {/* TAMPILAN PIKET: LIVE MONITORING HARI INI */}
+            {piketViewTab === 'live' && (
+              <div className="space-y-6">
+                {/* TOP STATS CARDS: CLEAN & MINIMALIST */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
               <div className="p-3.5 rounded-xl bg-white border border-slate-200 shadow-sm">
                 <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Total Siswa</div>
                 <div className="text-xl font-bold text-slate-900 mt-0.5">{INITIAL_STUDENTS.length}</div>
@@ -2401,6 +3803,403 @@ export default function ELearningPage() {
               </div>
 
             </div>
+          </div>
+        )}
+
+            {/* TAMPILAN PIKET: LAPORAN MATRIKS BULANAN ROMBEL */}
+            {piketViewTab === 'laporan' && (() => {
+              const studentsInReport = activeStudents.filter(s => s.classId === reportClassId);
+              const daysInMonth = new Date(reportYear, reportMonth, 0).getDate();
+              const monthPadded = String(reportMonth).padStart(2, '0');
+              const monthName = MONTH_NAMES[reportMonth - 1] || 'Bulan';
+
+              // For Meja Piket: all sessions recorded for this class in this month
+              const classSessions = sessions.filter(s => s.classId === reportClassId);
+              const monthSessions = classSessions.filter(s => s.date.startsWith(`${reportYear}-${monthPadded}`));
+
+              // Map day of month (1..daysInMonth) to session
+              const dateToSessionMap = new Map<number, SubjectSession>();
+              monthSessions.forEach(sess => {
+                const parts = sess.date.split('-');
+                if (parts.length === 3) {
+                  const d = parseInt(parts[2], 10);
+                  dateToSessionMap.set(d, sess);
+                }
+              });
+
+              // Daily present tally for footer
+              const dailyPresentTally: Record<number, number> = {};
+              for (let d = 1; d <= daysInMonth; d++) {
+                const sess = dateToSessionMap.get(d);
+                if (sess) {
+                  let count = 0;
+                  studentsInReport.forEach(st => {
+                    const stStatus = sess.records?.[st.id] || 'H';
+                    if (stStatus === 'H' || stStatus === 'T') count++;
+                  });
+                  dailyPresentTally[d] = count;
+                }
+              }
+
+              // Totals for this month
+              const totalMeetings = monthSessions.length;
+              let totalH = 0, totalS = 0, totalI = 0, totalA = 0, totalT = 0;
+              studentsInReport.forEach(st => {
+                for (let d = 1; d <= daysInMonth; d++) {
+                  const sess = dateToSessionMap.get(d);
+                  if (sess) {
+                    const stStatus = sess.records?.[st.id] || 'H';
+                    if (stStatus === 'H') totalH++;
+                    else if (stStatus === 'S') totalS++;
+                    else if (stStatus === 'I') totalI++;
+                    else if (stStatus === 'A') totalA++;
+                    else if (stStatus === 'T') totalT++;
+                  }
+                }
+              });
+              const totalSlots = totalMeetings * studentsInReport.length;
+              const overallPercent = totalSlots > 0 ? Math.round(((totalH + totalT) / totalSlots) * 100) : 100;
+
+              // Helper for day info
+              const getDayInfo = (d: number) => {
+                const dt = new Date(reportYear, reportMonth - 1, d);
+                const dayNum = dt.getDay(); // 0 is Sunday, 6 is Saturday
+                const days = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+                return {
+                  dayName: days[dayNum],
+                  isSunday: dayNum === 0,
+                  isSaturday: dayNum === 6,
+                  isWeekend: dayNum === 0 || dayNum === 6
+                };
+              };
+
+              return (
+                <div className="space-y-4 animate-fade-in">
+                  {/* Filter Card (Meja Piket) */}
+                  <div className="bg-white border border-indigo-100 rounded-2xl p-4 sm:p-5 shadow-sm space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                      <div>
+                        <h2 className="text-base font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                          <span>📊 Rekapitulasi Matriks Presensi Bulanan Rombel</span>
+                          <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold">
+                            Pos Meja Piket
+                          </span>
+                        </h2>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Pilih rombel dan bulan untuk meninjau kalender kehadiran tgl 1 s/d 31 serta mengunduh format Excel resmi.
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={handleExportPiketMonthlyMatrixExcel}
+                          className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-md shadow-emerald-600/20 flex items-center gap-2 cursor-pointer"
+                        >
+                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/>
+                          </svg>
+                          <span>Export Excel (.xlsx)</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => window.print()}
+                          className="px-3.5 py-2.5 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 font-semibold text-xs transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+                        >
+                          <span>🖨️ Cetak</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                          1. Pilih Rombel:
+                        </label>
+                        <select
+                          value={reportClassId}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            startReportTransition(() => setReportClassId(val));
+                          }}
+                          className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-semibold focus:outline-none focus:border-indigo-500 focus:bg-white transition-colors duration-75 cursor-pointer"
+                        >
+                          {SCHOOL_CLASSES.map(cls => (
+                            <option key={cls.id} value={cls.id}>
+                              {cls.name} ({classStudentCounts[cls.id] || 0} Siswa)
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                          2. Pilih Bulan:
+                        </label>
+                        <select
+                          value={reportMonth}
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
+                            startReportTransition(() => setReportMonth(val));
+                          }}
+                          className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-semibold focus:outline-none focus:border-indigo-500 focus:bg-white transition-colors duration-75 cursor-pointer"
+                        >
+                          {MONTH_NAMES.map((name, idx) => (
+                            <option key={name} value={idx + 1}>
+                              {name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                          3. Pilih Tahun:
+                        </label>
+                        <select
+                          value={reportYear}
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
+                            startReportTransition(() => setReportYear(val));
+                          }}
+                          className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-semibold focus:outline-none focus:border-indigo-500 focus:bg-white transition-colors duration-75 cursor-pointer"
+                        >
+                          <option value={2025}>2025</option>
+                          <option value={2026}>2026</option>
+                          <option value={2027}>2027</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Summary Metric Cards */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="p-3.5 rounded-2xl bg-white border border-slate-200 shadow-sm">
+                      <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                        Sesi Presensi Tercatat
+                      </div>
+                      <div className="text-2xl font-black text-indigo-600 mt-0.5">
+                        {totalMeetings} <span className="text-xs font-semibold text-slate-500">Hari</span>
+                      </div>
+                      <div className="text-[11px] text-slate-400 mt-0.5">
+                        {monthName} {reportYear}
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 rounded-2xl bg-white border border-slate-200 shadow-sm">
+                      <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                        Tingkat Kehadiran Kelas
+                      </div>
+                      <div className="text-2xl font-black text-emerald-600 mt-0.5">
+                        {overallPercent}%
+                      </div>
+                      <div className="text-[11px] text-slate-400 mt-0.5">
+                        Total {studentsInReport.length} Siswa di {reportClassId}
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 rounded-2xl bg-white border border-slate-200 shadow-sm">
+                      <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                        Sakit (S) & Izin (I)
+                      </div>
+                      <div className="text-2xl font-black text-blue-600 mt-0.5">
+                        {totalS + totalI} <span className="text-xs font-semibold text-slate-500">kali</span>
+                      </div>
+                      <div className="text-[11px] text-slate-400 mt-0.5">
+                        Sakit: {totalS} • Izin: {totalI}
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 rounded-2xl bg-white border border-slate-200 shadow-sm">
+                      <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                        Alpa (A) & Terlambat (T)
+                      </div>
+                      <div className="text-2xl font-black text-rose-600 mt-0.5">
+                        {totalA + totalT} <span className="text-xs font-semibold text-slate-500">kali</span>
+                      </div>
+                      <div className="text-[11px] text-slate-400 mt-0.5">
+                        Alpa: {totalA} • Terlambat: {totalT}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Table Matriks Bulanan Meja Piket */}
+                  <div className="bg-white border border-indigo-100 rounded-2xl shadow-sm overflow-hidden">
+                    <div className="p-4 bg-slate-50 border-b border-indigo-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <h3 className="text-sm font-extrabold text-slate-900 tracking-wide uppercase">
+                          LAPORAN ABSENSI - KELAS {reportClassId} ({monthName.toUpperCase()} {reportYear})
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Pos Meja Piket • Petugas: <span className="font-semibold text-slate-800">{piketDutyTeacher}</span>
+                        </p>
+                      </div>
+                      <span className="text-xs px-2.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-bold border border-emerald-200">
+                        Monitoring Tingkat Sekolah
+                      </span>
+                    </div>
+
+                    <div className="overflow-x-auto relative">
+                      <table className="w-full text-xs text-left border-collapse min-w-[1100px]">
+                        <thead className="bg-slate-100 text-slate-700 font-bold sticky top-0 z-20 shadow-xs">
+                          <tr>
+                            <th className="px-2 py-2.5 text-center w-10 border-b border-r border-slate-200 sticky left-0 bg-slate-100 z-30">
+                              No
+                            </th>
+                            <th className="px-3 py-2.5 w-28 border-b border-r border-slate-200 sticky left-10 bg-slate-100 z-30 font-mono text-[11px]">
+                              NISN
+                            </th>
+                            <th className="px-3 py-2.5 min-w-[170px] max-w-[210px] border-b border-r border-slate-200 sticky left-[152px] bg-slate-100 z-30 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
+                              Nama Siswa
+                            </th>
+
+                            {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(d => {
+                              const info = getDayInfo(d);
+                              const hasSess = dateToSessionMap.has(d);
+                              return (
+                                <th
+                                  key={d}
+                                  className={`px-1 py-1.5 text-center min-w-[32px] w-[32px] border-b border-r border-slate-200 ${
+                                    hasSess 
+                                      ? 'bg-emerald-600 text-white font-extrabold' 
+                                      : info.isSunday 
+                                        ? 'bg-rose-50 text-rose-700 font-medium' 
+                                        : info.isSaturday 
+                                          ? 'bg-slate-200/70 text-slate-600' 
+                                          : 'bg-slate-100 text-slate-700'
+                                  }`}
+                                  title={`Tanggal ${d} ${monthName} (${info.dayName})`}
+                                >
+                                  <div className="text-[11px] leading-tight">{d}</div>
+                                  <div className={`text-[9px] font-normal leading-tight ${hasSess ? 'text-emerald-200' : ''}`}>
+                                    {info.dayName}
+                                  </div>
+                                </th>
+                              );
+                            })}
+
+                            <th className="px-2 py-2.5 text-center w-9 border-b border-r border-slate-200 bg-emerald-50 text-emerald-800">H</th>
+                            <th className="px-2 py-2.5 text-center w-9 border-b border-r border-slate-200 bg-blue-50 text-blue-800">S</th>
+                            <th className="px-2 py-2.5 text-center w-9 border-b border-r border-slate-200 bg-amber-50 text-amber-800">I</th>
+                            <th className="px-2 py-2.5 text-center w-9 border-b border-r border-slate-200 bg-rose-50 text-rose-800">A</th>
+                            <th className="px-2 py-2.5 text-center w-9 border-b border-r border-slate-200 bg-orange-50 text-orange-800">T</th>
+                            <th className="px-2 py-2.5 text-center w-14 border-b border-slate-200 bg-indigo-50 text-indigo-900">%</th>
+                          </tr>
+                        </thead>
+
+                        <tbody className="divide-y divide-slate-100 text-slate-800">
+                          {studentsInReport.map((student, idx) => {
+                            let sH = 0, sS = 0, sI = 0, sA = 0, sT = 0;
+                            let sMeetings = 0;
+
+                            for (let d = 1; d <= daysInMonth; d++) {
+                              const sess = dateToSessionMap.get(d);
+                              if (sess) {
+                                sMeetings++;
+                                const st = sess.records?.[student.id] || 'H';
+                                if (st === 'H') sH++;
+                                else if (st === 'S') sS++;
+                                else if (st === 'I') sI++;
+                                else if (st === 'A') sA++;
+                                else if (st === 'T') sT++;
+                              }
+                            }
+
+                            const sPct = sMeetings > 0 ? Math.round(((sH + sT) / sMeetings) * 100) : 100;
+
+                            return (
+                              <tr key={student.id} className="hover:bg-slate-50 transition">
+                                <td className="px-2 py-2 text-center border-r border-slate-100 sticky left-0 bg-white z-10 font-mono text-[11px] text-slate-500">
+                                  {idx + 1}
+                                </td>
+                                <td className="px-3 py-2 border-r border-slate-100 sticky left-10 bg-white z-10 font-mono text-[11px] text-slate-600">
+                                  {student.nisn}
+                                </td>
+                                <td className="px-3 py-2 border-r border-slate-100 sticky left-[152px] bg-white z-10 font-semibold text-slate-900 truncate max-w-[210px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
+                                  {student.name}
+                                </td>
+
+                                {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(d => {
+                                  const sess = dateToSessionMap.get(d);
+                                  const info = getDayInfo(d);
+
+                                  if (!sess) {
+                                    return (
+                                      <td 
+                                        key={d} 
+                                        className={`px-1 py-1 text-center border-r border-slate-100 ${
+                                          info.isSunday ? 'bg-rose-50/20' : info.isSaturday ? 'bg-slate-50/40' : ''
+                                        }`}
+                                      >
+                                        <span className="text-slate-300 font-mono text-[11px]">-</span>
+                                      </td>
+                                    );
+                                  }
+
+                                  const st = sess.records?.[student.id] || 'H';
+                                  return (
+                                    <td key={d} className="px-1 py-1 text-center border-r border-slate-100 bg-emerald-50/10">
+                                      {st === 'H' && <span className="inline-flex items-center justify-center w-5 h-5 rounded-md bg-emerald-500 text-white font-extrabold text-[10px] shadow-xs">H</span>}
+                                      {st === 'S' && <span className="inline-flex items-center justify-center w-5 h-5 rounded-md bg-blue-600 text-white font-extrabold text-[10px] shadow-xs">S</span>}
+                                      {st === 'I' && <span className="inline-flex items-center justify-center w-5 h-5 rounded-md bg-amber-500 text-white font-extrabold text-[10px] shadow-xs">I</span>}
+                                      {st === 'A' && <span className="inline-flex items-center justify-center w-5 h-5 rounded-md bg-rose-600 text-white font-extrabold text-[10px] shadow-xs">A</span>}
+                                      {st === 'T' && <span className="inline-flex items-center justify-center w-5 h-5 rounded-md bg-orange-500 text-white font-extrabold text-[10px] shadow-xs">T</span>}
+                                    </td>
+                                  );
+                                })}
+
+                                <td className="px-1 py-2 text-center border-r border-slate-100 font-bold text-emerald-700 bg-emerald-50/30">{sH}</td>
+                                <td className="px-1 py-2 text-center border-r border-slate-100 font-bold text-blue-700 bg-blue-50/30">{sS}</td>
+                                <td className="px-1 py-2 text-center border-r border-slate-100 font-bold text-amber-700 bg-amber-50/30">{sI}</td>
+                                <td className="px-1 py-2 text-center border-r border-slate-100 font-bold text-rose-700 bg-rose-50/30">{sA}</td>
+                                <td className="px-1 py-2 text-center border-r border-slate-100 font-bold text-orange-700 bg-orange-50/30">{sT}</td>
+                                <td className="px-1 py-2 text-center font-bold text-slate-800 bg-indigo-50/30">
+                                  <span className={`px-1.5 py-0.5 rounded text-[10px] ${
+                                    sPct >= 90 ? 'bg-emerald-100 text-emerald-800' :
+                                    sPct >= 75 ? 'bg-amber-100 text-amber-800' :
+                                    'bg-rose-100 text-rose-800'
+                                  }`}>
+                                    {sPct}%
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+
+                        <tfoot className="bg-slate-100 text-slate-900 font-extrabold sticky bottom-0 z-20 border-t-2 border-slate-300 shadow-md">
+                          <tr>
+                            <td colSpan={3} className="px-3 py-2.5 text-right border-r border-slate-200 sticky left-0 bg-slate-100 z-30 uppercase text-xs tracking-wider">
+                              Jumlah Siswa Hadir:
+                            </td>
+
+                            {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(d => {
+                              const sess = dateToSessionMap.get(d);
+                              return (
+                                <td key={d} className="px-1 py-2 text-center border-r border-slate-200 text-xs font-black">
+                                  {sess ? (
+                                    <span className="text-emerald-700">{dailyPresentTally[d] || 0}</span>
+                                  ) : (
+                                    <span className="text-slate-400 font-normal">-</span>
+                                  )}
+                                </td>
+                              );
+                            })}
+
+                            <td className="px-1 py-2 text-center border-r border-slate-200 text-emerald-800 bg-emerald-100/60 font-black">{totalH}</td>
+                            <td className="px-1 py-2 text-center border-r border-slate-200 text-blue-800 bg-blue-100/60 font-black">{totalS}</td>
+                            <td className="px-1 py-2 text-center border-r border-slate-200 text-amber-800 bg-amber-100/60 font-black">{totalI}</td>
+                            <td className="px-1 py-2 text-center border-r border-slate-200 text-rose-800 bg-rose-100/60 font-black">{totalA}</td>
+                            <td className="px-1 py-2 text-center border-r border-slate-200 text-orange-800 bg-orange-100/60 font-black">{totalT}</td>
+                            <td className="px-1 py-2 text-center text-indigo-900 bg-indigo-100/70 font-black">{overallPercent}%</td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* MODAL DETAIL & INPUT PRESENSI KELAS OLEH GURU PIKET */}
             {detailModalClassId && (
@@ -2595,17 +4394,19 @@ export default function ELearningPage() {
                           {/* Kolom Catatan Piket (Hanya saat siswa tidak Hadir) */}
                           <div className="w-full md:w-48 lg:w-52">
                             {currentStatus !== 'H' ? (
-                              <input
-                                type="text"
+                              <AttendanceNoteInput
                                 value={currentNote}
-                                onChange={(e) => handleSetPiketStudentNote(student.id, e.target.value)}
+                                onCommit={(val) => handleSetPiketStudentNote(student.id, val)}
+                                onInstantChange={(val) => {
+                                  piketModalNotesRef.current[student.id] = val;
+                                }}
                                 placeholder={
                                   currentStatus === 'S' ? 'Catatan sakit...' :
                                   currentStatus === 'I' ? 'Catatan izin...' :
                                   currentStatus === 'T' ? 'Alasan telat...' :
                                   'Keterangan...'
                                 }
-                                className="w-full px-2.5 py-1 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white placeholder:text-slate-400 animate-[fadeIn_0.15s_ease-out]"
+                                className="w-full px-2.5 py-1 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white placeholder:text-slate-400"
                               />
                             ) : (
                               <div className="hidden md:block text-right">

@@ -26,7 +26,7 @@ body {
   background: #f8fafc;
   color: #0f172a;
   font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
-  overflow-x: hidden;
+  overflow-x: clip;
   -webkit-font-smoothing: antialiased;
 }
 

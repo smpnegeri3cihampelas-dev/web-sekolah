@@ -1,8 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { AuthUserSession } from '@/app/elearning/page';
-import { getTeacherUsername } from '@/lib/elearningData';
+import { AuthUserSession, getTeacherUsername } from '@/lib/elearningData';
 
 interface TeacherSettingsModalProps {
   isOpen: boolean;

@@ -20,7 +20,7 @@ const STATUS_LABELS: Record<AttendanceStatus, string> = {
 /**
  * Format tanggal Indonesia: contoh "29 September 2026"
  */
-function formatIndonesianDate(dateStr: string): string {
+export function formatIndonesianDate(dateStr: string): string {
   try {
     const [year, month, day] = dateStr.split('-');
     const months = [
@@ -853,6 +853,167 @@ export function downloadStudentTemplateExcel() {
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, 'Format_Import_Siswa');
   XLSX.writeFile(workbook, 'Template_Import_Siswa_SMPN3Cihampelas.xlsx');
+}
+
+/**
+ * Ekspor Laporan Matriks Presensi Bulanan (Kalender Tanggal 1 s/d 31) ke Excel (.xlsx)
+ */
+export function exportMonthlyAttendanceMatrixToExcel(params: {
+  classId: string;
+  className: string;
+  subject: string;
+  teacherName: string;
+  teacherNip: string;
+  year: number;
+  month: number; // 1-12
+  monthName: string;
+  daysInMonth: number;
+  students: Student[];
+  sessions: SubjectSession[];
+}) {
+  const {
+    classId,
+    className,
+    subject,
+    teacherName,
+    teacherNip,
+    year,
+    month,
+    monthName,
+    daysInMonth,
+    students,
+    sessions
+  } = params;
+
+  // Header & Info Rows
+  const rows: (string | number)[][] = [
+    ['SMP NEGERI 3 CIHAMPELAS'],
+    ['LAPORAN MATRIKS PRESENSI MATA PELAJARAN (BULANAN)'],
+    ['Tahun Ajaran 2026/2027'],
+    [],
+    ['Mata Pelajaran', ':', subject],
+    ['Kelas', ':', `${className} (${classId})`],
+    ['Guru Pengampu', ':', teacherName],
+    ['NIP', ':', teacherNip || '-'],
+    ['Bulan / Tahun', ':', `${monthName} ${year}`],
+    ['Total Peserta Didik', ':', `${students.length} Siswa`],
+    []
+  ];
+
+  // Table Headers
+  const headerRow: (string | number)[] = ['No.', 'NISN', 'NIS', 'Nama Siswa'];
+  for (let d = 1; d <= daysInMonth; d++) {
+    headerRow.push(d);
+  }
+  headerRow.push('H', 'S', 'I', 'A', 'T', '% Hadir');
+  rows.push(headerRow);
+
+  // Map dates to sessions for this class and month
+  const monthPadded = String(month).padStart(2, '0');
+  const dateSessionsMap = new Map<number, SubjectSession>();
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dStr = `${year}-${monthPadded}-${String(d).padStart(2, '0')}`;
+    const sess = sessions.find(s => s.date === dStr && s.classId === classId);
+    if (sess) {
+      dateSessionsMap.set(d, sess);
+    }
+  }
+
+  // Daily present tally for footer
+  const dailyPresentCount = new Array(daysInMonth + 1).fill(0);
+  let classTotalH = 0;
+  let classTotalS = 0;
+  let classTotalI = 0;
+  let classTotalA = 0;
+  let classTotalT = 0;
+
+  // Student rows
+  students.forEach((student, idx) => {
+    const studentRow: (string | number)[] = [
+      idx + 1,
+      student.nisn,
+      student.nis || '-',
+      student.name
+    ];
+
+    let h = 0, s = 0, i = 0, a = 0, t = 0;
+    let meetings = 0;
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const sess = dateSessionsMap.get(d);
+      if (!sess) {
+        studentRow.push('-');
+      } else {
+        meetings++;
+        const st = sess.records?.[student.id] || 'H';
+        studentRow.push(st);
+        if (st === 'H') { h++; dailyPresentCount[d]++; }
+        else if (st === 'S') s++;
+        else if (st === 'I') i++;
+        else if (st === 'A') a++;
+        else if (st === 'T') { t++; dailyPresentCount[d]++; }
+      }
+    }
+
+    classTotalH += h;
+    classTotalS += s;
+    classTotalI += i;
+    classTotalA += a;
+    classTotalT += t;
+
+    const pct = meetings > 0 ? ((h + t) / meetings * 100).toFixed(1) + '%' : '-';
+    studentRow.push(h, s, i, a, t, pct);
+    rows.push(studentRow);
+  });
+
+  // Footer: Total Hadir per Tanggal
+  const footerRow: (string | number)[] = ['', '', '', 'Jumlah Siswa Hadir'];
+  for (let d = 1; d <= daysInMonth; d++) {
+    const sess = dateSessionsMap.get(d);
+    footerRow.push(sess ? dailyPresentCount[d] : '-');
+  }
+  footerRow.push(classTotalH, classTotalS, classTotalI, classTotalA, classTotalT, '');
+  rows.push(footerRow);
+
+  // Signatures
+  rows.push([]);
+  rows.push([]);
+  const todayStr = new Date().toISOString().split('T')[0];
+  rows.push(['', '', '', 'Mengetahui,', ...new Array(Math.max(1, daysInMonth - 5)).fill(''), 'Cihampelas, ' + formatIndonesianDate(todayStr)]);
+  rows.push(['', '', '', 'Kepala SMP Negeri 3 Cihampelas,', ...new Array(Math.max(1, daysInMonth - 5)).fill(''), 'Guru Mata Pelajaran,']);
+  rows.push([]);
+  rows.push([]);
+  rows.push(['', '', '', 'H. Rustandi, S.Pd., M.Pd.', ...new Array(Math.max(1, daysInMonth - 5)).fill(''), teacherName]);
+  rows.push(['', '', '', 'NIP. 19700608 199802 1 001', ...new Array(Math.max(1, daysInMonth - 5)).fill(''), 'NIP. ' + (teacherNip || '-')]);
+
+  const worksheet = XLSX.utils.aoa_to_sheet(rows);
+
+  // Column widths
+  const colWidths: { wch: number }[] = [
+    { wch: 5 },  // No
+    { wch: 14 }, // NISN
+    { wch: 12 }, // NIS
+    { wch: 28 }, // Nama Siswa
+  ];
+  for (let d = 1; d <= daysInMonth; d++) {
+    colWidths.push({ wch: 4 }); // Date columns
+  }
+  colWidths.push(
+    { wch: 6 }, // H
+    { wch: 6 }, // S
+    { wch: 6 }, // I
+    { wch: 6 }, // A
+    { wch: 6 }, // T
+    { wch: 10 } // % Hadir
+  );
+  worksheet['!cols'] = colWidths;
+
+  const workbook = XLSX.utils.book_new();
+  const safeSheetName = sanitizeFileName(`${classId}_${monthName}`).slice(0, 31);
+  XLSX.utils.book_append_sheet(workbook, worksheet, safeSheetName);
+
+  const fileName = sanitizeFileName(`Laporan_Presensi_${classId}_${subject}_${monthName}_${year}.xlsx`);
+  XLSX.writeFile(workbook, fileName);
 }
 
 

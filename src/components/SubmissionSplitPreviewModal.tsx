@@ -1,8 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Assignment, AssignmentSubmission } from '@/lib/elearningData';
-import { AuthUserSession } from '@/app/elearning/page';
+import { Assignment, AssignmentSubmission, AuthUserSession } from '@/lib/elearningData';
 
 interface SubmissionSplitPreviewModalProps {
   previewSubmission: { sub: AssignmentSubmission; asg?: Assignment };

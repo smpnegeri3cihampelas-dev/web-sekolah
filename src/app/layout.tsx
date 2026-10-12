@@ -31,8 +31,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="id" className={`${inter.variable} ${plusJakarta.variable} antialiased scroll-smooth`} suppressHydrationWarning>
-      <body className="antialiased bg-zinc-950 text-stone-300 selection:bg-amber-600/30 selection:text-amber-100 overflow-x-hidden" suppressHydrationWarning>
+    <html lang="id" className={`${inter.variable} ${plusJakarta.variable} antialiased`} suppressHydrationWarning>
+      <body className="antialiased bg-zinc-950 text-stone-300 selection:bg-amber-600/30 selection:text-amber-100 overflow-x-clip" suppressHydrationWarning>
         <SmoothScroll>
           {children}
         </SmoothScroll>

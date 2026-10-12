@@ -41,6 +41,20 @@ export interface TeacherUser {
   classes: string[];
 }
 
+export interface AuthUserSession {
+  role: 'guru_mapel' | 'guru_piket' | 'siswa';
+  name: string;
+  nipOrNisn: string;
+  subject?: string;
+  classId?: string;
+  gender?: string;
+}
+
+export const MONTH_NAMES = [
+  'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+  'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+];
+
 export function getTeacherUsername(teacher: { name: string; username?: string }): string {
   if (teacher.username) return teacher.username.toLowerCase().trim();
   const clean = teacher.name
