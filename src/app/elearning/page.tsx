@@ -626,6 +626,7 @@ interface SemesterReportTableProps {
     semesterSessionsSorted: SubjectSession[];
     semesterStudentStats: Record<string, { sH: number; sS: number; sI: number; sA: number; sT: number; sPct: number }>;
   };
+  semesterName?: string;
 }
 
 const SemesterReportTable = React.memo(function SemesterReportTable({
@@ -634,13 +635,14 @@ const SemesterReportTable = React.memo(function SemesterReportTable({
   reportClassId,
   currentTeacher,
   semesterReportData,
+  semesterName,
 }: SemesterReportTableProps) {
   return (
     <div className="bg-white border border-indigo-100 rounded-2xl shadow-sm overflow-hidden">
       <div className="p-4 bg-slate-50 border-b border-indigo-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <div>
           <h3 className="text-sm font-extrabold text-slate-900 tracking-wide uppercase">
-            REKAPITULASI PRESENSI SEMESTER GANJIL TP. 2026/2027
+            REKAPITULASI PRESENSI {semesterName ? semesterName.toUpperCase() : 'SEMESTER GANJIL TP. 2026/2027'}
           </h3>
           <p className="text-xs text-slate-500 mt-0.5">
             Mata Pelajaran: <span className="text-indigo-700 font-bold">{currentTeacher.subject}</span> • Kelas {reportClassId} • Guru: {currentTeacher.name}
@@ -757,7 +759,8 @@ const SemesterReportTable = React.memo(function SemesterReportTable({
     prev.reportClassId === next.reportClassId &&
     prev.students === next.students &&
     prev.semesterReportData === next.semesterReportData &&
-    prev.currentTeacher === next.currentTeacher
+    prev.currentTeacher === next.currentTeacher &&
+    prev.semesterName === next.semesterName
   );
 });
 
@@ -804,6 +807,15 @@ export default function ELearningPage() {
   const [reportMonth, setReportMonth] = useState<number>(() => new Date().getMonth() + 1); // 1-12
   const [reportYear, setReportYear] = useState<number>(() => new Date().getFullYear());
   const [reportMode, setReportMode] = useState<'harian' | 'bulanan' | 'semester'>('bulanan');
+  const [reportSemester, setReportSemester] = useState<'ganjil' | 'genap'>(() => {
+    const m = new Date().getMonth() + 1;
+    return m >= 7 ? 'ganjil' : 'genap';
+  });
+  const [reportAcademicYear, setReportAcademicYear] = useState<string>(() => {
+    const y = new Date().getFullYear();
+    const m = new Date().getMonth() + 1;
+    return m >= 7 ? `${y}/${y + 1}` : `${y - 1}/${y}`;
+  });
   const [, startReportTransition] = useTransition();
   const [piketViewTab, setPiketViewTab] = useState<'live' | 'laporan'>('live');
   
@@ -1324,8 +1336,8 @@ export default function ELearningPage() {
   };
 
   // Export Semester Attendance Recap (P1 - P16) to Excel (.xlsx)
-  const handleExportSemesterExcel = () => {
-    const targetClassId = reportClassId || selectedClassId;
+  const handleExportSemesterExcel = (targetClass?: string) => {
+    const targetClassId = targetClass || reportClassId || selectedClassId;
     const studentsInClass = activeStudents.filter(s => s.classId === targetClassId);
     const cls = SCHOOL_CLASSES.find(c => c.id === targetClassId);
 
@@ -1335,13 +1347,13 @@ export default function ELearningPage() {
       subject: currentTeacher.subject,
       teacherName: currentTeacher.name,
       teacherNip: currentTeacher.nip,
-      semesterName: 'Semester Ganjil TP. 2026/2027',
+      semesterName: semesterFullName,
       students: studentsInClass,
       currentRecords: workingRecords,
-      sessions: sessions
+      sessions: semesterReportData.semesterSessionsSorted
     });
 
-    showToast(`File Rekap Semester (P1-P16) ${currentTeacher.subject} (${targetClassId}) berhasil diunduh!`, 'success');
+    showToast(`File Rekap ${semesterFullName} (P1-P16) ${currentTeacher.subject} (${targetClassId}) berhasil diunduh!`, 'success');
   };
 
   // Export Monthly Calendar Matrix for Meja Piket (.xlsx)
@@ -1387,13 +1399,13 @@ export default function ELearningPage() {
   // Export School Semester Attendance Recap (17 Rombel, 535 Siswa) to Excel (.xlsx) for Meja Piket / Kesiswaan / BK
   const handleExportSchoolSemesterExcel = () => {
     exportSchoolSemesterAttendanceToExcel({
-      semesterName: 'Semester Ganjil TP. 2026/2027',
+      semesterName: semesterFullName,
       classes: SCHOOL_CLASSES,
       students: activeStudents,
       piketOfficer: `${piketDutyTeacher} (Petugas Piket / Kesiswaan)`
     });
 
-    showToast('File Rekapitulasi Presensi Semester Tingkat Sekolah (17 Rombel & 535 Siswa) berhasil diunduh!', 'success');
+    showToast(`File Rekapitulasi Presensi ${semesterFullName} Tingkat Sekolah (17 Rombel & 535 Siswa) berhasil diunduh!`, 'success');
   };
 
   // -------------------------------------------------------------
@@ -1863,6 +1875,11 @@ export default function ELearningPage() {
     return MONTH_NAMES[reportMonth - 1] || 'Bulan';
   }, [reportMonth]);
 
+  const semesterFullName = useMemo(() => {
+    const semLabel = reportSemester === 'ganjil' ? 'Semester Ganjil' : 'Semester Genap';
+    return `${semLabel} TP. ${reportAcademicYear}`;
+  }, [reportSemester, reportAcademicYear]);
+
   // Sesi Guru Terisolasi untuk Kelas Laporan (Hanya berjalan jika di tab Laporan)
   const myTeacherReportSessions = useMemo(() => {
     if (activeMenu !== 'laporan') return [];
@@ -2019,7 +2036,26 @@ export default function ELearningPage() {
       };
     }
 
-    const semesterSessionsSorted = [...myTeacherReportSessions].sort((a, b) => a.date.localeCompare(b.date));
+    const [startYearStr, endYearStr] = reportAcademicYear.split('/');
+    const startYear = parseInt(startYearStr, 10) || 2026;
+    const endYear = parseInt(endYearStr, 10) || (startYear + 1);
+
+    // Filter sesi sesuai rentang semester & tahun ajaran
+    const filteredSessions = myTeacherReportSessions.filter(s => {
+      const parts = s.date.split('-');
+      if (parts.length < 3) return false;
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10);
+      if (reportSemester === 'ganjil') {
+        // Semester Ganjil: Bulan Juli (7) s/d Desember (12) di tahun awal Tahun Ajaran
+        return y === startYear && m >= 7 && m <= 12;
+      } else {
+        // Semester Genap: Bulan Januari (1) s/d Juni (6) di tahun kedua Tahun Ajaran
+        return y === endYear && m >= 1 && m <= 6;
+      }
+    });
+
+    const semesterSessionsSorted = [...filteredSessions].sort((a, b) => a.date.localeCompare(b.date));
     const sTotalMeetings = semesterSessionsSorted.length;
     const semesterStudentStats: Record<string, { sH: number; sS: number; sI: number; sA: number; sT: number; sPct: number }> = {};
 
@@ -2038,7 +2074,7 @@ export default function ELearningPage() {
     });
 
     return { semesterSessionsSorted, semesterStudentStats };
-  }, [activeMenu, reportMode, myTeacherReportSessions, studentsInReport]);
+  }, [activeMenu, reportMode, reportSemester, reportAcademicYear, myTeacherReportSessions, studentsInReport]);
 
   // Rekap kehadiran siswa yang login, dihitung dari data sesi presensi asli (bukan angka contoh)
   const getStudentAttendanceStats = () => {
@@ -2814,7 +2850,7 @@ export default function ELearningPage() {
                         } else if (reportMode === 'bulanan') {
                           handleExportMonthlyMatrixExcel();
                         } else {
-                          handleExportSemesterExcel();
+                          handleExportSemesterExcel(reportClassId);
                         }
                       }}
                       className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-md shadow-emerald-600/25 flex items-center gap-2 cursor-pointer"
@@ -2958,13 +2994,39 @@ export default function ELearningPage() {
                       </select>
                     </div>
 
-                    <div className={reportMode === 'semester' ? 'block sm:col-span-2' : 'hidden'}>
+                    <div className={reportMode === 'semester' ? 'block' : 'hidden'}>
                       <label className="block text-xs font-bold text-slate-700 mb-1">
-                        2. Tahun Ajaran / Semester:
+                        2. Pilih Semester:
                       </label>
-                      <div className="w-full px-3 py-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 text-xs font-semibold">
-                        Semester Ganjil TP. 2026/2027
-                      </div>
+                      <select
+                        value={reportSemester}
+                        onChange={(e) => {
+                          const val = e.target.value as 'ganjil' | 'genap';
+                          startReportTransition(() => setReportSemester(val));
+                        }}
+                        className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-semibold focus:outline-none focus:border-indigo-500 focus:bg-white transition-colors duration-75 cursor-pointer"
+                      >
+                        <option value="ganjil">Semester Ganjil (Juli - Des)</option>
+                        <option value="genap">Semester Genap (Jan - Jun)</option>
+                      </select>
+                    </div>
+
+                    <div className={reportMode === 'semester' ? 'block' : 'hidden'}>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        3. Tahun Ajaran:
+                      </label>
+                      <select
+                        value={reportAcademicYear}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          startReportTransition(() => setReportAcademicYear(val));
+                        }}
+                        className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-semibold focus:outline-none focus:border-indigo-500 focus:bg-white transition-colors duration-75 cursor-pointer"
+                      >
+                        <option value="2025/2026">TP. 2025/2026</option>
+                        <option value="2026/2027">TP. 2026/2027</option>
+                        <option value="2027/2028">TP. 2027/2028</option>
+                      </select>
                     </div>
                   </div>
                 </div>
@@ -2989,7 +3051,7 @@ export default function ELearningPage() {
                         ? (dailyReportData.dailySession?.submittedAt ? `Dicatat pkl ${dailyReportData.dailySession.submittedAt}` : formatIndonesianDate(reportDate))
                         : reportMode === 'bulanan'
                         ? `${monthName} ${reportYear}`
-                        : 'Semester Ganjil'}
+                        : semesterFullName}
                     </div>
                   </div>
 
@@ -3076,6 +3138,7 @@ export default function ELearningPage() {
                     reportClassId={reportClassId}
                     currentTeacher={currentTeacher}
                     semesterReportData={semesterReportData}
+                    semesterName={semesterFullName}
                   />
                 </div>
 
@@ -4468,7 +4531,9 @@ export default function ELearningPage() {
                       <span className="px-2 py-0.5 text-[10px] font-bold rounded-md bg-purple-100 text-purple-800 border border-purple-200">
                         PESERTA DIDIK AKTIF
                       </span>
-                      <span className="text-xs text-slate-500 font-medium">Kelas {currentUser.classId || '7-A'} • Semester Ganjil 2026/2027</span>
+                      <span className="text-xs text-slate-500 font-medium">
+                        Kelas {currentUser.classId || '7-A'} • {new Date().getMonth() + 1 >= 7 ? 'Semester Ganjil' : 'Semester Genap'} TP. {new Date().getMonth() + 1 >= 7 ? `${new Date().getFullYear()}/${new Date().getFullYear() + 1}` : `${new Date().getFullYear() - 1}/${new Date().getFullYear()}`}
+                      </span>
                     </div>
                     <h1 className="text-xl font-bold text-slate-900">{currentUser.name}</h1>
                     <p className="text-xs text-slate-600 font-mono">NISN: {currentUser.nipOrNisn} • SMP Negeri 3 Cihampelas</p>

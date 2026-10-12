@@ -702,11 +702,27 @@ export function exportSemesterAttendanceToExcel(params: {
     teacherNip,
     semesterName = 'Semester Ganjil 2026/2027',
     students,
-    currentRecords
+    currentRecords,
+    sessions
   } = params;
 
-  // We have 16 meetings (P1 to P16)
+  // We have standard 16 meetings (P1 to P16)
   const TOTAL_MEETINGS = 16;
+  const hasRealSessions = Array.isArray(sessions) && sessions.length > 0;
+  const numSessions = hasRealSessions ? sessions.length : 0;
+  const displayColsCount = Math.max(TOTAL_MEETINGS, numSessions);
+
+  // Generate meeting headers (P1..P16) with dates if available
+  const meetingHeaders: string[] = [];
+  for (let idx = 0; idx < displayColsCount; idx++) {
+    if (hasRealSessions && idx < sessions.length) {
+      const parts = sessions[idx].date.split('-');
+      const dateStr = parts.length === 3 ? `${parts[2]}/${parts[1]}` : sessions[idx].date;
+      meetingHeaders.push(`P${idx + 1} (${dateStr})`);
+    } else {
+      meetingHeaders.push(`P${idx + 1}`);
+    }
+  }
 
   // Build Header & Info rows
   const rows: (string | number)[][] = [
@@ -719,6 +735,7 @@ export function exportSemesterAttendanceToExcel(params: {
     ['Guru Pengampu', ':', teacherName],
     ['NIP Guru', ':', teacherNip || '-'],
     ['Tahun Ajaran / Semester', ':', semesterName],
+    ['Total Pertemuan Tercatat', ':', `${numSessions} Sesi KBM`],
     ['Total Siswa', ':', `${students.length} Siswa`],
     [],
     // Table Header Row
@@ -727,8 +744,7 @@ export function exportSemesterAttendanceToExcel(params: {
       'NISN',
       'NIS',
       'Nama Siswa',
-      'P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8',
-      'P9', 'P10', 'P11', 'P12', 'P13', 'P14', 'P15', 'P16',
+      ...meetingHeaders,
       'Total H',
       'Total S',
       'Total I',
@@ -739,38 +755,32 @@ export function exportSemesterAttendanceToExcel(params: {
   ];
 
   // For meetings P1..P16:
-  // P1 takes today's real attendance
-  // P2..P16 uses deterministic pseudo-pattern based on student data
+  // If real sessions exist, use them. If not, fill with '-'
   students.forEach((student, index) => {
-    const pStatus: AttendanceStatus[] = [];
-    
-    // Meeting 1 is current live session
-    pStatus.push(currentRecords[student.id] || 'H');
+    const pStatus: (AttendanceStatus | string)[] = [];
+    let h = 0, s = 0, i = 0, a = 0, t = 0;
 
-    // Meetings 2 to 16
-    for (let m = 2; m <= TOTAL_MEETINGS; m++) {
-      const pseudoHash = (student.id.charCodeAt(student.id.length - 1) * 7 + m * 13) % 100;
-      if (pseudoHash === 1) {
-        pStatus.push('S');
-      } else if (pseudoHash === 2) {
-        pStatus.push('I');
-      } else if (pseudoHash === 3 && pseudoHash % 2 === 0) {
-        pStatus.push('A');
+    for (let m = 0; m < displayColsCount; m++) {
+      if (hasRealSessions) {
+        if (m < sessions.length) {
+          const st = sessions[m].records?.[student.id] || 'H';
+          pStatus.push(st);
+          if (st === 'H') h++;
+          else if (st === 'S') s++;
+          else if (st === 'I') i++;
+          else if (st === 'A') a++;
+          else if (st === 'T') t++;
+        } else {
+          pStatus.push('-');
+        }
       } else {
-        pStatus.push('H');
+        pStatus.push('-');
       }
     }
 
-    let h = 0, s = 0, i = 0, a = 0, t = 0;
-    pStatus.forEach(st => {
-      if (st === 'H') h++;
-      else if (st === 'S') s++;
-      else if (st === 'I') i++;
-      else if (st === 'A') a++;
-      else if (st === 'T') t++;
-    });
-
-    const pct = ((h / TOTAL_MEETINGS) * 100).toFixed(1) + '%';
+    const pct = numSessions > 0
+      ? `${Math.round(((h + t) / numSessions) * 100)}%`
+      : '100%';
 
     rows.push([
       index + 1,
@@ -789,19 +799,20 @@ export function exportSemesterAttendanceToExcel(params: {
 
   // Footer: Summary statistics
   rows.push([]);
-  rows.push(['Keterangan Status: H = Hadir, S = Sakit, I = Izin, A = Alpa, T = Terlambat']);
-  rows.push(['Total Pertemuan Semester: 16 Jam Pelajaran Efektif']);
+  rows.push(['Keterangan Status: H = Hadir, S = Sakit, I = Izin, A = Alpa, T = Terlambat, - = Belum Ada Sesi']);
+  rows.push([`Total Pertemuan Semester: ${numSessions} Sesi dari Target 16 Pertemuan Efektif`]);
   rows.push([]);
   rows.push([]);
 
   // Signature Block
   const todayStr = formatIndonesianDate(new Date().toISOString().split('T')[0]);
-  rows.push(['', '', '', 'Mengetahui,', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', 'Cihampelas, ' + todayStr]);
-  rows.push(['', '', '', 'Kepala SMP Negeri 3 Cihampelas,', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', 'Guru Mata Pelajaran,']);
+  const emptyCols = Array.from({ length: Math.max(0, displayColsCount - 4) }, () => '');
+  rows.push(['', '', '', 'Mengetahui,', ...emptyCols, '', '', '', '', '', 'Cihampelas, ' + todayStr]);
+  rows.push(['', '', '', 'Kepala SMP Negeri 3 Cihampelas,', ...emptyCols, '', '', '', '', '', 'Guru Mata Pelajaran,']);
   rows.push([]);
   rows.push([]);
-  rows.push(['', '', '', 'H. Rustandi, S.Pd., M.Pd.', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', teacherName]);
-  rows.push(['', '', '', 'NIP. 19670815 199003 1 004', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', 'NIP. ' + (teacherNip || '-')]);
+  rows.push(['', '', '', 'H. Rustandi, S.Pd., M.Pd.', ...emptyCols, '', '', '', '', '', teacherName]);
+  rows.push(['', '', '', 'NIP. 19670815 199003 1 004', ...emptyCols, '', '', '', '', '', 'NIP. ' + (teacherNip || '-')]);
 
   const worksheet = XLSX.utils.aoa_to_sheet(rows);
 
@@ -811,11 +822,8 @@ export function exportSemesterAttendanceToExcel(params: {
     { wch: 14 }, // NISN
     { wch: 12 }, // NIS
     { wch: 32 }, // Nama Siswa
-    // P1 to P16
-    { wch: 4 }, { wch: 4 }, { wch: 4 }, { wch: 4 },
-    { wch: 4 }, { wch: 4 }, { wch: 4 }, { wch: 4 },
-    { wch: 4 }, { wch: 4 }, { wch: 4 }, { wch: 4 },
-    { wch: 4 }, { wch: 4 }, { wch: 4 }, { wch: 4 },
+    // Dynamic meeting cols
+    ...Array.from({ length: displayColsCount }, () => ({ wch: 8 })),
     // Summary
     { wch: 8 },  // H
     { wch: 8 },  // S
@@ -828,7 +836,8 @@ export function exportSemesterAttendanceToExcel(params: {
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, `Rekap Semester ${classId}`);
 
-  const fileName = sanitizeFileName(`Rekap_Semester_${classId}_${subject}_2026-2027.xlsx`);
+  const safeSem = (semesterName || 'Semester').replace(/[^a-zA-Z0-9]/g, '_');
+  const fileName = sanitizeFileName(`Rekap_${safeSem}_${classId}_${subject}.xlsx`);
   XLSX.writeFile(workbook, fileName);
 }
 
