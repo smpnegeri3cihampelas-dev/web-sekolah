@@ -914,13 +914,13 @@ const PiketMonthlyReportSection = React.memo(function PiketMonthlyReportSection(
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
           <div>
             <h2 className="text-base font-bold text-slate-900 tracking-tight flex items-center gap-2">
-              <span>📊 Rekapitulasi Matriks Presensi Bulanan Rombel</span>
-              <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold">
-                Pos Meja Piket
+              <span>📊 Matriks Presensi Bulanan</span>
+              <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 font-semibold">
+                Kelas {selectedClassId}
               </span>
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              Pilih rombel dan bulan untuk meninjau kalender kehadiran tgl 1 s/d 31 serta mengunduh format Excel resmi.
+              Tinjau kalender kehadiran tgl 1 s/d 31 serta unduh berkas laporan presensi.
             </p>
           </div>
 
@@ -948,7 +948,7 @@ const PiketMonthlyReportSection = React.memo(function PiketMonthlyReportSection(
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">
-              1. Pilih Rombel:
+              Rombel:
             </label>
             <select
               value={selectedClassId}
@@ -965,7 +965,7 @@ const PiketMonthlyReportSection = React.memo(function PiketMonthlyReportSection(
 
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">
-              2. Pilih Bulan:
+              Bulan:
             </label>
             <select
               value={selectedMonth}
@@ -982,7 +982,7 @@ const PiketMonthlyReportSection = React.memo(function PiketMonthlyReportSection(
 
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">
-              3. Pilih Tahun:
+              Tahun:
             </label>
             <select
               value={selectedYear}
@@ -1053,14 +1053,14 @@ const PiketMonthlyReportSection = React.memo(function PiketMonthlyReportSection(
         <div className="p-4 bg-slate-50 border-b border-indigo-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
             <h3 className="text-sm font-extrabold text-slate-900 tracking-wide uppercase">
-              LAPORAN ABSENSI - KELAS {selectedClassId} ({monthName.toUpperCase()} {selectedYear})
+              LAPORAN ABSENSI — KELAS {selectedClassId} ({monthName.toUpperCase()} {selectedYear})
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              Pos Meja Piket • Petugas: <span className="font-semibold text-slate-800">{piketDutyTeacher}</span>
+              Petugas Jaga: <span className="font-semibold text-slate-800">{piketDutyTeacher}</span> • Total {studentsInReport.length} Siswa
             </p>
           </div>
-          <span className="text-xs px-2.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-bold border border-emerald-200">
-            Monitoring Tingkat Sekolah
+          <span className="text-xs text-slate-500 font-medium hidden sm:inline-block">
+            Format Kalender Presensi Resmi
           </span>
         </div>
 
@@ -3854,93 +3854,106 @@ export default function ELearningPage() {
           <div className="space-y-6">
 
             {/* Piket Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-indigo-100">
-              <div>
-                <h1 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-                  <span>Pusat Meja Piket</span>
-                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold">
-                    Live Monitoring 17 Rombel
-                  </span>
-                </h1>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Stasiun Meja Piket & Gerbang Utama • SMP Negeri 3 Cihampelas
-                </p>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2.5">
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-xs shadow-sm">
-                  <span className="text-slate-500 font-medium">Petugas Jaga:</span>
-                  <select
-                    value={piketDutyTeacher}
-                    onChange={(e) => setPiketDutyTeacher(e.target.value)}
-                    className="bg-transparent text-emerald-700 font-bold focus:outline-none cursor-pointer max-w-[220px] truncate"
-                  >
-                    {DEMO_TEACHERS.map((teacher) => (
-                      <option key={teacher.nip} value={teacher.name} className="bg-white text-slate-900">
-                        {teacher.name} ({teacher.subject})
-                      </option>
-                    ))}
-                  </select>
+            <div className="space-y-3 pb-3 border-b border-indigo-100">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h1 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                    <span>Pusat Meja Piket</span>
+                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 font-semibold">
+                      17 Rombel
+                    </span>
+                  </h1>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    SMP Negeri 3 Cihampelas • Layanan Presensi & Ketertiban
+                  </p>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={handleExportPiketExcel}
-                  className="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 font-semibold text-xs transition flex items-center gap-1.5 cursor-pointer shadow-sm"
-                  title="Unduh rekapitulasi presensi harian seluruh rombel hari ini (.xlsx)"
-                >
-                  <span>📋</span>
-                  <span>Export Harian</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-xs shadow-sm">
+                    <span className="text-slate-500 font-medium">Petugas:</span>
+                    <select
+                      value={piketDutyTeacher}
+                      onChange={(e) => setPiketDutyTeacher(e.target.value)}
+                      className="bg-transparent text-emerald-700 font-bold focus:outline-none cursor-pointer max-w-[200px] truncate"
+                    >
+                      {DEMO_TEACHERS.map((teacher) => (
+                        <option key={teacher.nip} value={teacher.name} className="bg-white text-slate-900">
+                          {teacher.name} ({teacher.subject})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-                <button
-                  type="button"
-                  onClick={handleExportSchoolSemesterExcel}
-                  className="px-3.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer shadow-sm"
-                  title="Unduh rekapitulasi kehadiran 1 semester seluruh sekolah (17 rombel & 535 siswa) untuk Kesiswaan / BK (.xlsx)"
-                >
-                  <span>📥</span>
-                  <span>Rekap 1 Semester</span>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const stored = getStoredAttendance();
+                      setAttendanceData(stored);
+                      const storedSess = getStoredSessions();
+                      setSessions(storedSess);
+                      showToast('Data kehadiran diperbarui!', 'success');
+                    }}
+                    className="p-2 sm:px-3 sm:py-1.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-semibold text-xs transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+                    title="Muat ulang data presensi terbaru"
+                  >
+                    <span>🔄</span>
+                    <span className="hidden sm:inline">Refresh</span>
+                  </button>
+                </div>
+              </div>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    const stored = getStoredAttendance();
-                    setAttendanceData(stored);
-                    const storedSess = getStoredSessions();
-                    setSessions(storedSess);
-                    showToast('Data kehadiran diperbarui!', 'success');
-                  }}
-                  className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-md shadow-emerald-600/20 flex items-center gap-1.5 cursor-pointer"
-                >
-                  <span>🔄 Refresh</span>
-                </button>
-
-                {/* Tab Switcher: Live Monitoring vs Rekap Bulanan */}
-                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs">
+              {/* Navigation Tabs & Actions Bar */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-1">
+                {/* Tab Switcher: Live Hari Ini vs Matriks Bulanan Kelas */}
+                <div className="inline-flex items-center p-1 rounded-xl bg-slate-100 border border-slate-200 text-xs font-semibold">
                   <button
                     type="button"
                     onClick={() => setPiketViewTab('live')}
-                    className={`px-3 py-1.5 rounded-lg font-bold transition cursor-pointer whitespace-nowrap ${
+                    className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer flex items-center gap-1.5 ${
                       piketViewTab === 'live'
-                        ? 'bg-emerald-600 text-white shadow-sm'
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-white'
+                        ? 'bg-white text-emerald-700 shadow-sm font-bold'
+                        : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    🏫 Live Hari Ini
+                    <span>🏫</span>
+                    <span>Live Hari Ini</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setPiketViewTab('laporan')}
-                    className={`px-3 py-1.5 rounded-lg font-bold transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                    className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer flex items-center gap-1.5 ${
                       piketViewTab === 'laporan'
-                        ? 'bg-emerald-600 text-white shadow-sm'
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-white'
+                        ? 'bg-white text-emerald-700 shadow-sm font-bold'
+                        : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
                     <span>📊</span>
                     <span>Matriks Bulanan Kelas</span>
+                  </button>
+                </div>
+
+                {/* Right Contextual Actions */}
+                <div className="flex items-center gap-2">
+                  {piketViewTab === 'live' && (
+                    <button
+                      type="button"
+                      onClick={handleExportPiketExcel}
+                      className="px-3.5 py-1.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-semibold text-xs transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+                      title="Unduh rekapitulasi presensi harian seluruh rombel hari ini (.xlsx)"
+                    >
+                      <span>📋</span>
+                      <span>Export Harian (.xlsx)</span>
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={handleExportSchoolSemesterExcel}
+                    className="px-3.5 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+                    title="Unduh rekapitulasi kehadiran 1 semester seluruh sekolah (17 rombel & 535 siswa) untuk Kesiswaan / BK (.xlsx)"
+                  >
+                    <span>📥</span>
+                    <span>Rekap 1 Semester</span>
                   </button>
                 </div>
               </div>
@@ -4138,7 +4151,7 @@ export default function ELearningPage() {
                   <form onSubmit={handlePiketActionSubmit} className="space-y-3 text-xs">
                     <div>
                       <label className="block text-slate-700 font-semibold mb-1">
-                        1. Pilih Kelas Siswa:
+                        Kelas Siswa:
                       </label>
                       <select
                         value={piketSelectedClass}
@@ -4157,7 +4170,7 @@ export default function ELearningPage() {
 
                     <div>
                       <label className="block text-slate-700 font-semibold mb-1">
-                        2. Pilih Nama Siswa:
+                        Nama Siswa:
                       </label>
                       <select
                         value={piketSelectedStudentId}
@@ -4172,7 +4185,7 @@ export default function ELearningPage() {
 
                     <div>
                       <label className="block text-slate-700 font-semibold mb-1">
-                        3. Status yang Dicatat:
+                        Status Kehadiran:
                       </label>
                       <div className="grid grid-cols-3 gap-1.5">
                         <button
@@ -4213,7 +4226,7 @@ export default function ELearningPage() {
 
                     <div>
                       <label className="block text-slate-700 font-semibold mb-1">
-                        4. Catatan Piket:
+                        Catatan Piket:
                       </label>
                       <input
                         type="text"
