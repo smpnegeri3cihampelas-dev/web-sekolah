@@ -3199,55 +3199,73 @@ export default function ELearningPage() {
                 </div>
 
                 {/* Sub-filter bar: Pilihan Rombel Kelas */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-600 px-1 bg-slate-50/80 p-3 rounded-2xl border border-slate-200 shadow-xs">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs text-slate-600 bg-slate-50/90 p-3.5 rounded-2xl border border-slate-200 shadow-xs">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-bold text-slate-700 flex items-center gap-1.5">
-                      <span>👥 Pilih Rombel:</span>
+                    <span className="font-bold text-slate-700 flex items-center gap-1.5 mr-1">
+                      <span>👥 Rombel Ajar:</span>
                     </span>
-                    <select
-                      value={teacherAsgScope === 'all_classes' ? 'ALL' : selectedClassId}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (val === 'ALL') {
-                          setTeacherAsgScope('all_classes');
-                        } else {
-                          setTeacherAsgScope('current_class');
-                          setSelectedClassId(val);
-                        }
-                      }}
-                      className="px-3 py-1.5 rounded-xl bg-white border border-slate-300 text-slate-900 text-xs font-bold focus:outline-none focus:border-indigo-500 cursor-pointer shadow-xs"
-                    >
-                      <option value="ALL">🌐 Semua Rombel Ajar (Semua Kelas)</option>
-                      {SCHOOL_CLASSES.map(cls => (
-                        <option key={cls.id} value={cls.id}>
-                          Kelas {cls.name} ({cls.totalStudents} Siswa)
-                        </option>
-                      ))}
-                    </select>
 
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => setTeacherAsgScope('all_classes')}
-                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer ${
-                          teacherAsgScope === 'all_classes'
-                            ? 'bg-indigo-600 text-white shadow-xs'
-                            : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
-                        }`}
+                    {/* Tombol Cepat: Semua Rombel Ajar Guru */}
+                    <button
+                      type="button"
+                      onClick={() => setTeacherAsgScope('all_classes')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                        teacherAsgScope === 'all_classes'
+                          ? 'bg-indigo-600 text-white shadow-xs'
+                          : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100 hover:text-slate-900'
+                      }`}
+                    >
+                      <span>🌐</span>
+                      <span>Semua Rombel Ajar</span>
+                    </button>
+
+                    {/* Tombol Pill Tiap Kelas yang Diampu Guru */}
+                    {(currentTeacher.classes && currentTeacher.classes.length > 0 ? currentTeacher.classes : ['7-A', '7-B', '8-A', '9-A']).map(clsId => {
+                      const isSelected = teacherAsgScope === 'current_class' && selectedClassId === clsId;
+                      return (
+                        <button
+                          key={clsId}
+                          type="button"
+                          onClick={() => {
+                            setSelectedClassId(clsId);
+                            setTeacherAsgScope('current_class');
+                          }}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1 ${
+                            isSelected
+                              ? 'bg-indigo-600 text-white shadow-xs'
+                              : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100 hover:text-slate-900'
+                          }`}
+                        >
+                          <span>Kelas {clsId}</span>
+                        </button>
+                      );
+                    })}
+
+                    {/* Dropdown untuk memilih rombel lainnya dari seluruh 17 kelas sekolah */}
+                    <div className="flex items-center gap-1.5 ml-1">
+                      <select
+                        value={
+                          teacherAsgScope === 'current_class' && 
+                          !(currentTeacher.classes || ['7-A', '7-B', '8-A', '9-A']).includes(selectedClassId)
+                            ? selectedClassId 
+                            : ''
+                        }
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val) {
+                            setSelectedClassId(val);
+                            setTeacherAsgScope('current_class');
+                          }
+                        }}
+                        className="px-2.5 py-1.5 rounded-xl bg-white border border-slate-300 text-slate-700 text-xs font-semibold focus:outline-none focus:border-indigo-500 cursor-pointer shadow-xs"
                       >
-                        Semua Kelas
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setTeacherAsgScope('current_class')}
-                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer ${
-                          teacherAsgScope === 'current_class'
-                            ? 'bg-indigo-600 text-white shadow-xs'
-                            : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
-                        }`}
-                      >
-                        Hanya Kelas {selectedClassId}
-                      </button>
+                        <option value="">Rombel Lainnya (7-A s.d 9-E)...</option>
+                        {SCHOOL_CLASSES.map(cls => (
+                          <option key={cls.id} value={cls.id}>
+                            Kelas {cls.name} ({cls.totalStudents} Siswa)
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   </div>
 
@@ -3261,8 +3279,8 @@ export default function ELearningPage() {
                     });
 
                     return (
-                      <div className="text-xs text-slate-500 font-medium">
-                        Menampilkan <span className="font-bold text-indigo-700">{myTasks.length}</span> tugas untuk <span className="font-bold text-slate-800">{teacherAsgScope === 'all_classes' ? 'Semua Rombel' : `Kelas ${selectedClassId}`}</span>
+                      <div className="text-xs text-slate-500 font-medium whitespace-nowrap self-end md:self-auto">
+                        Menampilkan <span className="font-bold text-indigo-700">{myTasks.length}</span> tugas untuk <span className="font-bold text-slate-800">{teacherAsgScope === 'all_classes' ? 'Semua Rombel Ajar' : `Kelas ${selectedClassId}`}</span>
                       </div>
                     );
                   })()}
