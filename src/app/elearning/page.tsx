@@ -752,6 +752,468 @@ const SemesterReportTable = React.memo(function SemesterReportTable({
   );
 });
 
+interface PiketMonthlyReportSectionProps {
+  initialClassId?: string;
+  initialMonth?: number;
+  initialYear?: number;
+  activeStudents: Student[];
+  sessions: SubjectSession[];
+  classStudentCounts: Record<string, number>;
+  piketDutyTeacher: string;
+  onExportExcel: (classId: string, month: number, year: number) => void;
+}
+
+const PiketMonthlyReportSection = React.memo(function PiketMonthlyReportSection({
+  initialClassId = '7-A',
+  initialMonth,
+  initialYear,
+  activeStudents,
+  sessions,
+  classStudentCounts,
+  piketDutyTeacher,
+  onExportExcel,
+}: PiketMonthlyReportSectionProps) {
+  const [selectedClassId, setSelectedClassId] = useState<string>(initialClassId);
+  const [selectedMonth, setSelectedMonth] = useState<number>(() => initialMonth || (new Date().getMonth() + 1));
+  const [selectedYear, setSelectedYear] = useState<number>(() => initialYear || new Date().getFullYear());
+
+  // Memoize all monthly matrix data and statistics
+  const piketMatrixData = useMemo(() => {
+    const studentsInReport = activeStudents.filter(s => s.classId === selectedClassId);
+    const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
+    const monthPadded = String(selectedMonth).padStart(2, '0');
+    const monthName = MONTH_NAMES[selectedMonth - 1] || 'Bulan';
+
+    // 1. Precalculate daysInfoList once for the whole month (1..daysInMonth)
+    const days = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+    const daysInfoList = Array.from({ length: daysInMonth }, (_, i) => {
+      const d = i + 1;
+      const dt = new Date(selectedYear, selectedMonth - 1, d);
+      const dayNum = dt.getDay();
+      return {
+        day: d,
+        dayName: days[dayNum],
+        isSunday: dayNum === 0,
+        isSaturday: dayNum === 6,
+        isWeekend: dayNum === 0 || dayNum === 6,
+      };
+    });
+
+    // 2. Class sessions for this month
+    const prefix = `${selectedYear}-${monthPadded}`;
+    const monthSessions = sessions.filter(s => s.classId === selectedClassId && s.date.startsWith(prefix));
+
+    // 3. Map day of month -> session
+    const dateToSessionMap = new Map<number, SubjectSession>();
+    monthSessions.forEach(sess => {
+      const parts = sess.date.split('-');
+      if (parts.length === 3) {
+        const d = parseInt(parts[2], 10);
+        dateToSessionMap.set(d, sess);
+      }
+    });
+
+    // 4. Precalculate daysWithSession
+    const daysWithSession = daysInfoList.map(info => {
+      const sess = dateToSessionMap.get(info.day);
+      return {
+        ...info,
+        session: sess,
+        hasSess: Boolean(sess),
+      };
+    });
+
+    // 5. Precalculate dailyPresentTally for footer
+    const dailyPresentTally: Record<number, number> = {};
+    daysWithSession.forEach(info => {
+      if (info.session) {
+        let count = 0;
+        const rec = info.session.records || {};
+        studentsInReport.forEach(st => {
+          const status = rec[st.id] || 'H';
+          if (status === 'H' || status === 'T') count++;
+        });
+        dailyPresentTally[info.day] = count;
+      }
+    });
+
+    // 6. Precalculate per-student monthly stats in O(N) rather than nested loops in JSX
+    const totalMeetings = monthSessions.length;
+    const studentStats: Record<string, { H: number; S: number; I: number; A: number; T: number; pct: number }> = {};
+    studentsInReport.forEach(st => {
+      studentStats[st.id] = { H: 0, S: 0, I: 0, A: 0, T: 0, pct: 100 };
+    });
+
+    monthSessions.forEach(sess => {
+      const rec = sess.records || {};
+      studentsInReport.forEach(st => {
+        const status = rec[st.id] || 'H';
+        const s = studentStats[st.id];
+        if (s) {
+          if (status === 'H') s.H++;
+          else if (status === 'S') s.S++;
+          else if (status === 'I') s.I++;
+          else if (status === 'A') s.A++;
+          else if (status === 'T') s.T++;
+        }
+      });
+    });
+
+    let totalH = 0, totalS = 0, totalI = 0, totalA = 0, totalT = 0;
+    studentsInReport.forEach(st => {
+      const s = studentStats[st.id];
+      if (s) {
+        totalH += s.H;
+        totalS += s.S;
+        totalI += s.I;
+        totalA += s.A;
+        totalT += s.T;
+        s.pct = totalMeetings > 0 ? Math.round(((s.H + s.T) / totalMeetings) * 100) : 100;
+      }
+    });
+
+    const totalSlots = totalMeetings * studentsInReport.length;
+    const overallPercent = totalSlots > 0 ? Math.round(((totalH + totalT) / totalSlots) * 100) : 100;
+
+    return {
+      studentsInReport,
+      daysInMonth,
+      monthName,
+      daysWithSession,
+      dailyPresentTally,
+      studentStats,
+      totalMeetings,
+      totalH,
+      totalS,
+      totalI,
+      totalA,
+      totalT,
+      overallPercent,
+    };
+  }, [activeStudents, sessions, selectedClassId, selectedMonth, selectedYear]);
+
+  const {
+    studentsInReport,
+    monthName,
+    daysWithSession,
+    dailyPresentTally,
+    studentStats,
+    totalMeetings,
+    totalH,
+    totalS,
+    totalI,
+    totalA,
+    totalT,
+    overallPercent,
+  } = piketMatrixData;
+
+  return (
+    <div className="space-y-4">
+      {/* Filter Card (Meja Piket) */}
+      <div className="bg-white border border-indigo-100 rounded-2xl p-4 sm:p-5 shadow-sm space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+          <div>
+            <h2 className="text-base font-bold text-slate-900 tracking-tight flex items-center gap-2">
+              <span>📊 Rekapitulasi Matriks Presensi Bulanan Rombel</span>
+              <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold">
+                Pos Meja Piket
+              </span>
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Pilih rombel dan bulan untuk meninjau kalender kehadiran tgl 1 s/d 31 serta mengunduh format Excel resmi.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => onExportExcel(selectedClassId, selectedMonth, selectedYear)}
+              className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-md shadow-emerald-600/20 flex items-center gap-2 cursor-pointer"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/>
+              </svg>
+              <span>Export Excel (.xlsx)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="px-3.5 py-2.5 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 font-semibold text-xs transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+            >
+              <span>🖨️ Cetak</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">
+              1. Pilih Rombel:
+            </label>
+            <select
+              value={selectedClassId}
+              onChange={(e) => setSelectedClassId(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-semibold focus:outline-none focus:border-indigo-500 focus:bg-white transition-colors duration-75 cursor-pointer"
+            >
+              {SCHOOL_CLASSES.map(cls => (
+                <option key={cls.id} value={cls.id}>
+                  {cls.name} ({classStudentCounts[cls.id] || 0} Siswa)
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">
+              2. Pilih Bulan:
+            </label>
+            <select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(Number(e.target.value))}
+              className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-semibold focus:outline-none focus:border-indigo-500 focus:bg-white transition-colors duration-75 cursor-pointer"
+            >
+              {MONTH_NAMES.map((name, idx) => (
+                <option key={name} value={idx + 1}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">
+              3. Pilih Tahun:
+            </label>
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(Number(e.target.value))}
+              className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-semibold focus:outline-none focus:border-indigo-500 focus:bg-white transition-colors duration-75 cursor-pointer"
+            >
+              <option value={2025}>2025</option>
+              <option value={2026}>2026</option>
+              <option value={2027}>2027</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Summary Metric Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="p-3.5 rounded-2xl bg-white border border-slate-200 shadow-sm">
+          <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+            Sesi Presensi Tercatat
+          </div>
+          <div className="text-2xl font-black text-indigo-600 mt-0.5">
+            {totalMeetings} <span className="text-xs font-semibold text-slate-500">Hari</span>
+          </div>
+          <div className="text-[11px] text-slate-400 mt-0.5">
+            {monthName} {selectedYear}
+          </div>
+        </div>
+
+        <div className="p-3.5 rounded-2xl bg-white border border-slate-200 shadow-sm">
+          <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+            Tingkat Kehadiran Kelas
+          </div>
+          <div className="text-2xl font-black text-emerald-600 mt-0.5">
+            {overallPercent}%
+          </div>
+          <div className="text-[11px] text-slate-400 mt-0.5">
+            Total {studentsInReport.length} Siswa di {selectedClassId}
+          </div>
+        </div>
+
+        <div className="p-3.5 rounded-2xl bg-white border border-slate-200 shadow-sm">
+          <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+            Sakit (S) & Izin (I)
+          </div>
+          <div className="text-2xl font-black text-blue-600 mt-0.5">
+            {totalS + totalI} <span className="text-xs font-semibold text-slate-500">kali</span>
+          </div>
+          <div className="text-[11px] text-slate-400 mt-0.5">
+            Sakit: {totalS} • Izin: {totalI}
+          </div>
+        </div>
+
+        <div className="p-3.5 rounded-2xl bg-white border border-slate-200 shadow-sm">
+          <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+            Alpa (A) & Terlambat (T)
+          </div>
+          <div className="text-2xl font-black text-rose-600 mt-0.5">
+            {totalA + totalT} <span className="text-xs font-semibold text-slate-500">kali</span>
+          </div>
+          <div className="text-[11px] text-slate-400 mt-0.5">
+            Alpa: {totalA} • Terlambat: {totalT}
+          </div>
+        </div>
+      </div>
+
+      {/* Table Matriks Bulanan Meja Piket */}
+      <div className="bg-white border border-indigo-100 rounded-2xl shadow-sm overflow-hidden">
+        <div className="p-4 bg-slate-50 border-b border-indigo-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <h3 className="text-sm font-extrabold text-slate-900 tracking-wide uppercase">
+              LAPORAN ABSENSI - KELAS {selectedClassId} ({monthName.toUpperCase()} {selectedYear})
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Pos Meja Piket • Petugas: <span className="font-semibold text-slate-800">{piketDutyTeacher}</span>
+            </p>
+          </div>
+          <span className="text-xs px-2.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-bold border border-emerald-200">
+            Monitoring Tingkat Sekolah
+          </span>
+        </div>
+
+        <div className="overflow-x-auto relative will-change-scroll [transform:translateZ(0)]">
+          <table className="w-full text-xs text-left border-collapse table-fixed min-w-[1550px]">
+            <colgroup>
+              <col className="w-10" />
+              <col className="w-28" />
+              <col className="w-48" />
+              {daysWithSession.map(info => (
+                <col key={info.day} className="w-8" />
+              ))}
+              <col className="w-9" />
+              <col className="w-9" />
+              <col className="w-9" />
+              <col className="w-9" />
+              <col className="w-9" />
+              <col className="w-14" />
+            </colgroup>
+
+            <thead className="bg-slate-100 text-slate-700 font-bold sticky top-0 z-20 shadow-xs">
+              <tr>
+                <th className="px-2 py-2.5 text-center w-10 border-b border-r border-slate-200 sticky left-0 bg-slate-100 z-30">
+                  No
+                </th>
+                <th className="px-3 py-2.5 w-28 border-b border-r border-slate-200 sticky left-10 bg-slate-100 z-30 font-mono text-[11px]">
+                  NISN
+                </th>
+                <th className="px-3 py-2.5 w-48 border-b border-r border-slate-200 sticky left-[152px] bg-slate-100 z-30 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
+                  Nama Siswa
+                </th>
+
+                {daysWithSession.map(info => (
+                  <th
+                    key={info.day}
+                    className={`px-1 py-1.5 text-center w-8 border-b border-r border-slate-200 ${
+                      info.hasSess 
+                        ? 'bg-emerald-600 text-white font-extrabold' 
+                        : info.isSunday 
+                          ? 'bg-rose-50 text-rose-700 font-medium' 
+                          : info.isSaturday 
+                            ? 'bg-slate-200/70 text-slate-600' 
+                            : 'bg-slate-100 text-slate-700'
+                    }`}
+                    title={`Tanggal ${info.day} ${monthName} (${info.dayName})`}
+                  >
+                    <div className="text-[11px] leading-tight">{info.day}</div>
+                    <div className={`text-[9px] font-normal leading-tight ${info.hasSess ? 'text-emerald-200' : ''}`}>
+                      {info.dayName}
+                    </div>
+                  </th>
+                ))}
+
+                <th className="px-2 py-2.5 text-center w-9 border-b border-r border-slate-200 bg-emerald-50 text-emerald-800">H</th>
+                <th className="px-2 py-2.5 text-center w-9 border-b border-r border-slate-200 bg-blue-50 text-blue-800">S</th>
+                <th className="px-2 py-2.5 text-center w-9 border-b border-r border-slate-200 bg-amber-50 text-amber-800">I</th>
+                <th className="px-2 py-2.5 text-center w-9 border-b border-r border-slate-200 bg-rose-50 text-rose-800">A</th>
+                <th className="px-2 py-2.5 text-center w-9 border-b border-r border-slate-200 bg-orange-50 text-orange-800">T</th>
+                <th className="px-2 py-2.5 text-center w-14 border-b border-slate-200 bg-indigo-50 text-indigo-900">%</th>
+              </tr>
+            </thead>
+
+            <tbody className="divide-y divide-slate-100 text-slate-800">
+              {studentsInReport.map((student, idx) => {
+                const stats = studentStats[student.id] || { H: 0, S: 0, I: 0, A: 0, T: 0, pct: 100 };
+
+                return (
+                  <tr key={student.id} className="hover:bg-slate-50 transition">
+                    <td className="px-2 py-2 text-center border-r border-slate-100 sticky left-0 bg-white z-10 font-mono text-[11px] text-slate-500">
+                      {idx + 1}
+                    </td>
+                    <td className="px-3 py-2 border-r border-slate-100 sticky left-10 bg-white z-10 font-mono text-[11px] text-slate-600">
+                      {student.nisn}
+                    </td>
+                    <td className="px-3 py-2 border-r border-slate-100 sticky left-[152px] bg-white z-10 font-semibold text-slate-900 truncate max-w-[192px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
+                      {student.name}
+                    </td>
+
+                    {daysWithSession.map(info => {
+                      if (!info.hasSess) {
+                        return (
+                          <td 
+                            key={info.day} 
+                            className={`px-1 py-1 text-center border-r border-slate-100 ${
+                              info.isSunday ? 'bg-rose-50/20' : info.isSaturday ? 'bg-slate-50/40' : ''
+                            }`}
+                          >
+                            <span className="text-slate-300 font-mono text-[11px]">-</span>
+                          </td>
+                        );
+                      }
+
+                      const st = info.session?.records?.[student.id] || 'H';
+                      const badgeClass = STATUS_BADGE_STYLES[st] || 'bg-slate-400 text-white';
+                      return (
+                        <td key={info.day} className="px-1 py-1 text-center border-r border-slate-100 bg-emerald-50/10">
+                          <span className={`inline-flex items-center justify-center w-5 h-5 rounded-md font-extrabold text-[10px] shadow-xs ${badgeClass}`}>
+                            {st}
+                          </span>
+                        </td>
+                      );
+                    })}
+
+                    <td className="px-1 py-2 text-center border-r border-slate-100 font-bold text-emerald-700 bg-emerald-50/30">{stats.H}</td>
+                    <td className="px-1 py-2 text-center border-r border-slate-100 font-bold text-blue-700 bg-blue-50/30">{stats.S}</td>
+                    <td className="px-1 py-2 text-center border-r border-slate-100 font-bold text-amber-700 bg-amber-50/30">{stats.I}</td>
+                    <td className="px-1 py-2 text-center border-r border-slate-100 font-bold text-rose-700 bg-rose-50/30">{stats.A}</td>
+                    <td className="px-1 py-2 text-center border-r border-slate-100 font-bold text-orange-700 bg-orange-50/30">{stats.T}</td>
+                    <td className="px-1 py-2 text-center font-bold text-slate-800 bg-indigo-50/30">
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                        stats.pct >= 90 ? 'bg-emerald-100 text-emerald-800' :
+                        stats.pct >= 75 ? 'bg-amber-100 text-amber-800' :
+                        'bg-rose-100 text-rose-800'
+                      }`}>
+                        {stats.pct}%
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+
+            <tfoot className="bg-slate-100 text-slate-900 font-extrabold sticky bottom-0 z-20 border-t-2 border-slate-300 shadow-md">
+              <tr>
+                <td colSpan={3} className="px-3 py-2.5 text-right border-r border-slate-200 sticky left-0 bg-slate-100 z-30 uppercase text-xs tracking-wider">
+                  Jumlah Siswa Hadir:
+                </td>
+
+                {daysWithSession.map(info => (
+                  <td key={info.day} className="px-1 py-2 text-center border-r border-slate-200 text-xs font-black">
+                    {info.hasSess ? (
+                      <span className="text-emerald-700">{dailyPresentTally[info.day] || 0}</span>
+                    ) : (
+                      <span className="text-slate-400 font-normal">-</span>
+                    )}
+                  </td>
+                ))}
+
+                <td className="px-1 py-2 text-center border-r border-slate-200 text-emerald-800 bg-emerald-100/60 font-black">{totalH}</td>
+                <td className="px-1 py-2 text-center border-r border-slate-200 text-blue-800 bg-blue-100/60 font-black">{totalS}</td>
+                <td className="px-1 py-2 text-center border-r border-slate-200 text-amber-800 bg-amber-100/60 font-black">{totalI}</td>
+                <td className="px-1 py-2 text-center border-r border-slate-200 text-rose-800 bg-rose-100/60 font-black">{totalA}</td>
+                <td className="px-1 py-2 text-center border-r border-slate-200 text-orange-800 bg-orange-100/60 font-black">{totalT}</td>
+                <td className="px-1 py-2 text-center text-indigo-900 bg-indigo-100/70 font-black">{overallPercent}%</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+});
+
 export default function ELearningPage() {
   // Active Authenticated User Session (null = show official login portal)
   const [currentUser, setCurrentUser] = useState<AuthUserSession | null>(null);
@@ -804,7 +1266,6 @@ export default function ELearningPage() {
     const m = new Date().getMonth() + 1;
     return m >= 7 ? `${y}/${y + 1}` : `${y - 1}/${y}`;
   });
-  const [, startReportTransition] = useTransition();
   const [piketViewTab, setPiketViewTab] = useState<'live' | 'laporan'>('live');
   
   // Assignments & Homework State
@@ -1345,29 +1806,32 @@ export default function ELearningPage() {
   };
 
   // Export Monthly Calendar Matrix for Meja Piket (.xlsx)
-  const handleExportPiketMonthlyMatrixExcel = () => {
-    const studentsInClass = activeStudents.filter(s => s.classId === reportClassId);
-    const cls = SCHOOL_CLASSES.find(c => c.id === reportClassId);
-    const daysInMonth = new Date(reportYear, reportMonth, 0).getDate();
-    const monthName = MONTH_NAMES[reportMonth - 1];
+  const handleExportPiketMonthlyMatrixExcel = (targetClass?: string, targetMonth?: number, targetYear?: number) => {
+    const classIdToUse = targetClass || reportClassId;
+    const monthToUse = targetMonth || reportMonth;
+    const yearToUse = targetYear || reportYear;
+    const studentsInClass = activeStudents.filter(s => s.classId === classIdToUse);
+    const cls = SCHOOL_CLASSES.find(c => c.id === classIdToUse);
+    const daysInMonth = new Date(yearToUse, monthToUse, 0).getDate();
+    const monthName = MONTH_NAMES[monthToUse - 1];
 
-    const classSessions = sessions.filter(s => s.classId === reportClassId);
+    const classSessions = sessions.filter(s => s.classId === classIdToUse);
 
     exportMonthlyAttendanceMatrixToExcel({
-      classId: reportClassId,
-      className: cls?.name || `Kelas ${reportClassId}`,
+      classId: classIdToUse,
+      className: cls?.name || `Kelas ${classIdToUse}`,
       subject: 'Rekap Presensi Harian (Pos Piket)',
       teacherName: `${piketDutyTeacher} (Petugas Piket)`,
       teacherNip: '-',
-      year: reportYear,
-      month: reportMonth,
+      year: yearToUse,
+      month: monthToUse,
       monthName: monthName,
       daysInMonth: daysInMonth,
       students: studentsInClass,
       sessions: classSessions
     });
 
-    showToast(`File Excel Matriks Bulanan ${monthName} ${reportYear} (${reportClassId}) berhasil diunduh!`, 'success');
+    showToast(`File Excel Matriks Bulanan ${monthName} ${yearToUse} (${classIdToUse}) berhasil diunduh!`, 'success');
   };
 
   // Export School Daily Attendance to Excel (.xlsx) for Meja Piket
@@ -2928,10 +3392,7 @@ export default function ELearningPage() {
                       </label>
                       <select
                         value={reportClassId}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          startReportTransition(() => setReportClassId(val));
-                        }}
+                        onChange={(e) => setReportClassId(e.target.value)}
                         className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-semibold focus:outline-none focus:border-indigo-500 focus:bg-white transition-colors duration-75 cursor-pointer"
                       >
                         {SCHOOL_CLASSES.map(cls => (
@@ -2949,10 +3410,7 @@ export default function ELearningPage() {
                       <input
                         type="date"
                         value={reportDate}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          startReportTransition(() => setReportDate(val));
-                        }}
+                        onChange={(e) => setReportDate(e.target.value)}
                         className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-semibold focus:outline-none focus:border-indigo-500 focus:bg-white transition-colors duration-75 cursor-pointer"
                       />
                     </div>
@@ -2963,10 +3421,7 @@ export default function ELearningPage() {
                       </label>
                       <select
                         value={reportMonth}
-                        onChange={(e) => {
-                          const val = Number(e.target.value);
-                          startReportTransition(() => setReportMonth(val));
-                        }}
+                        onChange={(e) => setReportMonth(Number(e.target.value))}
                         className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-semibold focus:outline-none focus:border-indigo-500 focus:bg-white transition-colors duration-75 cursor-pointer"
                       >
                         {MONTH_NAMES.map((name, idx) => (
@@ -2983,10 +3438,7 @@ export default function ELearningPage() {
                       </label>
                       <select
                         value={reportYear}
-                        onChange={(e) => {
-                          const val = Number(e.target.value);
-                          startReportTransition(() => setReportYear(val));
-                        }}
+                        onChange={(e) => setReportYear(Number(e.target.value))}
                         className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-semibold focus:outline-none focus:border-indigo-500 focus:bg-white transition-colors duration-75 cursor-pointer"
                       >
                         <option value={2025}>2025</option>
@@ -3001,10 +3453,7 @@ export default function ELearningPage() {
                       </label>
                       <select
                         value={reportSemester}
-                        onChange={(e) => {
-                          const val = e.target.value as 'ganjil' | 'genap';
-                          startReportTransition(() => setReportSemester(val));
-                        }}
+                        onChange={(e) => setReportSemester(e.target.value as 'ganjil' | 'genap')}
                         className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-semibold focus:outline-none focus:border-indigo-500 focus:bg-white transition-colors duration-75 cursor-pointer"
                       >
                         <option value="ganjil">Semester Ganjil (Juli - Des)</option>
@@ -3018,10 +3467,7 @@ export default function ELearningPage() {
                       </label>
                       <select
                         value={reportAcademicYear}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          startReportTransition(() => setReportAcademicYear(val));
-                        }}
+                        onChange={(e) => setReportAcademicYear(e.target.value)}
                         className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-semibold focus:outline-none focus:border-indigo-500 focus:bg-white transition-colors duration-75 cursor-pointer"
                       >
                         <option value="2025/2026">TP. 2025/2026</option>
@@ -3804,399 +4250,18 @@ export default function ELearningPage() {
         )}
 
             {/* TAMPILAN PIKET: LAPORAN MATRIKS BULANAN ROMBEL */}
-            {piketViewTab === 'laporan' && (() => {
-              const studentsInReport = activeStudents.filter(s => s.classId === reportClassId);
-              const daysInMonth = new Date(reportYear, reportMonth, 0).getDate();
-              const monthPadded = String(reportMonth).padStart(2, '0');
-              const monthName = MONTH_NAMES[reportMonth - 1] || 'Bulan';
-
-              // For Meja Piket: all sessions recorded for this class in this month
-              const classSessions = sessions.filter(s => s.classId === reportClassId);
-              const monthSessions = classSessions.filter(s => s.date.startsWith(`${reportYear}-${monthPadded}`));
-
-              // Map day of month (1..daysInMonth) to session
-              const dateToSessionMap = new Map<number, SubjectSession>();
-              monthSessions.forEach(sess => {
-                const parts = sess.date.split('-');
-                if (parts.length === 3) {
-                  const d = parseInt(parts[2], 10);
-                  dateToSessionMap.set(d, sess);
-                }
-              });
-
-              // Daily present tally for footer
-              const dailyPresentTally: Record<number, number> = {};
-              for (let d = 1; d <= daysInMonth; d++) {
-                const sess = dateToSessionMap.get(d);
-                if (sess) {
-                  let count = 0;
-                  studentsInReport.forEach(st => {
-                    const stStatus = sess.records?.[st.id] || 'H';
-                    if (stStatus === 'H' || stStatus === 'T') count++;
-                  });
-                  dailyPresentTally[d] = count;
-                }
-              }
-
-              // Totals for this month
-              const totalMeetings = monthSessions.length;
-              let totalH = 0, totalS = 0, totalI = 0, totalA = 0, totalT = 0;
-              studentsInReport.forEach(st => {
-                for (let d = 1; d <= daysInMonth; d++) {
-                  const sess = dateToSessionMap.get(d);
-                  if (sess) {
-                    const stStatus = sess.records?.[st.id] || 'H';
-                    if (stStatus === 'H') totalH++;
-                    else if (stStatus === 'S') totalS++;
-                    else if (stStatus === 'I') totalI++;
-                    else if (stStatus === 'A') totalA++;
-                    else if (stStatus === 'T') totalT++;
-                  }
-                }
-              });
-              const totalSlots = totalMeetings * studentsInReport.length;
-              const overallPercent = totalSlots > 0 ? Math.round(((totalH + totalT) / totalSlots) * 100) : 100;
-
-              // Helper for day info
-              const getDayInfo = (d: number) => {
-                const dt = new Date(reportYear, reportMonth - 1, d);
-                const dayNum = dt.getDay(); // 0 is Sunday, 6 is Saturday
-                const days = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
-                return {
-                  dayName: days[dayNum],
-                  isSunday: dayNum === 0,
-                  isSaturday: dayNum === 6,
-                  isWeekend: dayNum === 0 || dayNum === 6
-                };
-              };
-
-              return (
-                <div className="space-y-4 animate-fade-in">
-                  {/* Filter Card (Meja Piket) */}
-                  <div className="bg-white border border-indigo-100 rounded-2xl p-4 sm:p-5 shadow-sm space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
-                      <div>
-                        <h2 className="text-base font-bold text-slate-900 tracking-tight flex items-center gap-2">
-                          <span>📊 Rekapitulasi Matriks Presensi Bulanan Rombel</span>
-                          <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold">
-                            Pos Meja Piket
-                          </span>
-                        </h2>
-                        <p className="text-xs text-slate-500 mt-0.5">
-                          Pilih rombel dan bulan untuk meninjau kalender kehadiran tgl 1 s/d 31 serta mengunduh format Excel resmi.
-                        </p>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={handleExportPiketMonthlyMatrixExcel}
-                          className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-md shadow-emerald-600/20 flex items-center gap-2 cursor-pointer"
-                        >
-                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/>
-                          </svg>
-                          <span>Export Excel (.xlsx)</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => window.print()}
-                          className="px-3.5 py-2.5 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 font-semibold text-xs transition flex items-center gap-1.5 cursor-pointer shadow-sm"
-                        >
-                          <span>🖨️ Cetak</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 mb-1">
-                          1. Pilih Rombel:
-                        </label>
-                        <select
-                          value={reportClassId}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            startReportTransition(() => setReportClassId(val));
-                          }}
-                          className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-semibold focus:outline-none focus:border-indigo-500 focus:bg-white transition-colors duration-75 cursor-pointer"
-                        >
-                          {SCHOOL_CLASSES.map(cls => (
-                            <option key={cls.id} value={cls.id}>
-                              {cls.name} ({classStudentCounts[cls.id] || 0} Siswa)
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 mb-1">
-                          2. Pilih Bulan:
-                        </label>
-                        <select
-                          value={reportMonth}
-                          onChange={(e) => {
-                            const val = Number(e.target.value);
-                            startReportTransition(() => setReportMonth(val));
-                          }}
-                          className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-semibold focus:outline-none focus:border-indigo-500 focus:bg-white transition-colors duration-75 cursor-pointer"
-                        >
-                          {MONTH_NAMES.map((name, idx) => (
-                            <option key={name} value={idx + 1}>
-                              {name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 mb-1">
-                          3. Pilih Tahun:
-                        </label>
-                        <select
-                          value={reportYear}
-                          onChange={(e) => {
-                            const val = Number(e.target.value);
-                            startReportTransition(() => setReportYear(val));
-                          }}
-                          className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-semibold focus:outline-none focus:border-indigo-500 focus:bg-white transition-colors duration-75 cursor-pointer"
-                        >
-                          <option value={2025}>2025</option>
-                          <option value={2026}>2026</option>
-                          <option value={2027}>2027</option>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Summary Metric Cards */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <div className="p-3.5 rounded-2xl bg-white border border-slate-200 shadow-sm">
-                      <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                        Sesi Presensi Tercatat
-                      </div>
-                      <div className="text-2xl font-black text-indigo-600 mt-0.5">
-                        {totalMeetings} <span className="text-xs font-semibold text-slate-500">Hari</span>
-                      </div>
-                      <div className="text-[11px] text-slate-400 mt-0.5">
-                        {monthName} {reportYear}
-                      </div>
-                    </div>
-
-                    <div className="p-3.5 rounded-2xl bg-white border border-slate-200 shadow-sm">
-                      <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                        Tingkat Kehadiran Kelas
-                      </div>
-                      <div className="text-2xl font-black text-emerald-600 mt-0.5">
-                        {overallPercent}%
-                      </div>
-                      <div className="text-[11px] text-slate-400 mt-0.5">
-                        Total {studentsInReport.length} Siswa di {reportClassId}
-                      </div>
-                    </div>
-
-                    <div className="p-3.5 rounded-2xl bg-white border border-slate-200 shadow-sm">
-                      <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                        Sakit (S) & Izin (I)
-                      </div>
-                      <div className="text-2xl font-black text-blue-600 mt-0.5">
-                        {totalS + totalI} <span className="text-xs font-semibold text-slate-500">kali</span>
-                      </div>
-                      <div className="text-[11px] text-slate-400 mt-0.5">
-                        Sakit: {totalS} • Izin: {totalI}
-                      </div>
-                    </div>
-
-                    <div className="p-3.5 rounded-2xl bg-white border border-slate-200 shadow-sm">
-                      <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                        Alpa (A) & Terlambat (T)
-                      </div>
-                      <div className="text-2xl font-black text-rose-600 mt-0.5">
-                        {totalA + totalT} <span className="text-xs font-semibold text-slate-500">kali</span>
-                      </div>
-                      <div className="text-[11px] text-slate-400 mt-0.5">
-                        Alpa: {totalA} • Terlambat: {totalT}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Table Matriks Bulanan Meja Piket */}
-                  <div className="bg-white border border-indigo-100 rounded-2xl shadow-sm overflow-hidden">
-                    <div className="p-4 bg-slate-50 border-b border-indigo-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                      <div>
-                        <h3 className="text-sm font-extrabold text-slate-900 tracking-wide uppercase">
-                          LAPORAN ABSENSI - KELAS {reportClassId} ({monthName.toUpperCase()} {reportYear})
-                        </h3>
-                        <p className="text-xs text-slate-500 mt-0.5">
-                          Pos Meja Piket • Petugas: <span className="font-semibold text-slate-800">{piketDutyTeacher}</span>
-                        </p>
-                      </div>
-                      <span className="text-xs px-2.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-bold border border-emerald-200">
-                        Monitoring Tingkat Sekolah
-                      </span>
-                    </div>
-
-                    <div className="overflow-x-auto relative">
-                      <table className="w-full text-xs text-left border-collapse min-w-[1100px]">
-                        <thead className="bg-slate-100 text-slate-700 font-bold sticky top-0 z-20 shadow-xs">
-                          <tr>
-                            <th className="px-2 py-2.5 text-center w-10 border-b border-r border-slate-200 sticky left-0 bg-slate-100 z-30">
-                              No
-                            </th>
-                            <th className="px-3 py-2.5 w-28 border-b border-r border-slate-200 sticky left-10 bg-slate-100 z-30 font-mono text-[11px]">
-                              NISN
-                            </th>
-                            <th className="px-3 py-2.5 min-w-[170px] max-w-[210px] border-b border-r border-slate-200 sticky left-[152px] bg-slate-100 z-30 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
-                              Nama Siswa
-                            </th>
-
-                            {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(d => {
-                              const info = getDayInfo(d);
-                              const hasSess = dateToSessionMap.has(d);
-                              return (
-                                <th
-                                  key={d}
-                                  className={`px-1 py-1.5 text-center min-w-[32px] w-[32px] border-b border-r border-slate-200 ${
-                                    hasSess 
-                                      ? 'bg-emerald-600 text-white font-extrabold' 
-                                      : info.isSunday 
-                                        ? 'bg-rose-50 text-rose-700 font-medium' 
-                                        : info.isSaturday 
-                                          ? 'bg-slate-200/70 text-slate-600' 
-                                          : 'bg-slate-100 text-slate-700'
-                                  }`}
-                                  title={`Tanggal ${d} ${monthName} (${info.dayName})`}
-                                >
-                                  <div className="text-[11px] leading-tight">{d}</div>
-                                  <div className={`text-[9px] font-normal leading-tight ${hasSess ? 'text-emerald-200' : ''}`}>
-                                    {info.dayName}
-                                  </div>
-                                </th>
-                              );
-                            })}
-
-                            <th className="px-2 py-2.5 text-center w-9 border-b border-r border-slate-200 bg-emerald-50 text-emerald-800">H</th>
-                            <th className="px-2 py-2.5 text-center w-9 border-b border-r border-slate-200 bg-blue-50 text-blue-800">S</th>
-                            <th className="px-2 py-2.5 text-center w-9 border-b border-r border-slate-200 bg-amber-50 text-amber-800">I</th>
-                            <th className="px-2 py-2.5 text-center w-9 border-b border-r border-slate-200 bg-rose-50 text-rose-800">A</th>
-                            <th className="px-2 py-2.5 text-center w-9 border-b border-r border-slate-200 bg-orange-50 text-orange-800">T</th>
-                            <th className="px-2 py-2.5 text-center w-14 border-b border-slate-200 bg-indigo-50 text-indigo-900">%</th>
-                          </tr>
-                        </thead>
-
-                        <tbody className="divide-y divide-slate-100 text-slate-800">
-                          {studentsInReport.map((student, idx) => {
-                            let sH = 0, sS = 0, sI = 0, sA = 0, sT = 0;
-                            let sMeetings = 0;
-
-                            for (let d = 1; d <= daysInMonth; d++) {
-                              const sess = dateToSessionMap.get(d);
-                              if (sess) {
-                                sMeetings++;
-                                const st = sess.records?.[student.id] || 'H';
-                                if (st === 'H') sH++;
-                                else if (st === 'S') sS++;
-                                else if (st === 'I') sI++;
-                                else if (st === 'A') sA++;
-                                else if (st === 'T') sT++;
-                              }
-                            }
-
-                            const sPct = sMeetings > 0 ? Math.round(((sH + sT) / sMeetings) * 100) : 100;
-
-                            return (
-                              <tr key={student.id} className="hover:bg-slate-50 transition">
-                                <td className="px-2 py-2 text-center border-r border-slate-100 sticky left-0 bg-white z-10 font-mono text-[11px] text-slate-500">
-                                  {idx + 1}
-                                </td>
-                                <td className="px-3 py-2 border-r border-slate-100 sticky left-10 bg-white z-10 font-mono text-[11px] text-slate-600">
-                                  {student.nisn}
-                                </td>
-                                <td className="px-3 py-2 border-r border-slate-100 sticky left-[152px] bg-white z-10 font-semibold text-slate-900 truncate max-w-[210px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
-                                  {student.name}
-                                </td>
-
-                                {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(d => {
-                                  const sess = dateToSessionMap.get(d);
-                                  const info = getDayInfo(d);
-
-                                  if (!sess) {
-                                    return (
-                                      <td 
-                                        key={d} 
-                                        className={`px-1 py-1 text-center border-r border-slate-100 ${
-                                          info.isSunday ? 'bg-rose-50/20' : info.isSaturday ? 'bg-slate-50/40' : ''
-                                        }`}
-                                      >
-                                        <span className="text-slate-300 font-mono text-[11px]">-</span>
-                                      </td>
-                                    );
-                                  }
-
-                                  const st = sess.records?.[student.id] || 'H';
-                                  return (
-                                    <td key={d} className="px-1 py-1 text-center border-r border-slate-100 bg-emerald-50/10">
-                                      {st === 'H' && <span className="inline-flex items-center justify-center w-5 h-5 rounded-md bg-emerald-500 text-white font-extrabold text-[10px] shadow-xs">H</span>}
-                                      {st === 'S' && <span className="inline-flex items-center justify-center w-5 h-5 rounded-md bg-blue-600 text-white font-extrabold text-[10px] shadow-xs">S</span>}
-                                      {st === 'I' && <span className="inline-flex items-center justify-center w-5 h-5 rounded-md bg-amber-500 text-white font-extrabold text-[10px] shadow-xs">I</span>}
-                                      {st === 'A' && <span className="inline-flex items-center justify-center w-5 h-5 rounded-md bg-rose-600 text-white font-extrabold text-[10px] shadow-xs">A</span>}
-                                      {st === 'T' && <span className="inline-flex items-center justify-center w-5 h-5 rounded-md bg-orange-500 text-white font-extrabold text-[10px] shadow-xs">T</span>}
-                                    </td>
-                                  );
-                                })}
-
-                                <td className="px-1 py-2 text-center border-r border-slate-100 font-bold text-emerald-700 bg-emerald-50/30">{sH}</td>
-                                <td className="px-1 py-2 text-center border-r border-slate-100 font-bold text-blue-700 bg-blue-50/30">{sS}</td>
-                                <td className="px-1 py-2 text-center border-r border-slate-100 font-bold text-amber-700 bg-amber-50/30">{sI}</td>
-                                <td className="px-1 py-2 text-center border-r border-slate-100 font-bold text-rose-700 bg-rose-50/30">{sA}</td>
-                                <td className="px-1 py-2 text-center border-r border-slate-100 font-bold text-orange-700 bg-orange-50/30">{sT}</td>
-                                <td className="px-1 py-2 text-center font-bold text-slate-800 bg-indigo-50/30">
-                                  <span className={`px-1.5 py-0.5 rounded text-[10px] ${
-                                    sPct >= 90 ? 'bg-emerald-100 text-emerald-800' :
-                                    sPct >= 75 ? 'bg-amber-100 text-amber-800' :
-                                    'bg-rose-100 text-rose-800'
-                                  }`}>
-                                    {sPct}%
-                                  </span>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-
-                        <tfoot className="bg-slate-100 text-slate-900 font-extrabold sticky bottom-0 z-20 border-t-2 border-slate-300 shadow-md">
-                          <tr>
-                            <td colSpan={3} className="px-3 py-2.5 text-right border-r border-slate-200 sticky left-0 bg-slate-100 z-30 uppercase text-xs tracking-wider">
-                              Jumlah Siswa Hadir:
-                            </td>
-
-                            {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(d => {
-                              const sess = dateToSessionMap.get(d);
-                              return (
-                                <td key={d} className="px-1 py-2 text-center border-r border-slate-200 text-xs font-black">
-                                  {sess ? (
-                                    <span className="text-emerald-700">{dailyPresentTally[d] || 0}</span>
-                                  ) : (
-                                    <span className="text-slate-400 font-normal">-</span>
-                                  )}
-                                </td>
-                              );
-                            })}
-
-                            <td className="px-1 py-2 text-center border-r border-slate-200 text-emerald-800 bg-emerald-100/60 font-black">{totalH}</td>
-                            <td className="px-1 py-2 text-center border-r border-slate-200 text-blue-800 bg-blue-100/60 font-black">{totalS}</td>
-                            <td className="px-1 py-2 text-center border-r border-slate-200 text-amber-800 bg-amber-100/60 font-black">{totalI}</td>
-                            <td className="px-1 py-2 text-center border-r border-slate-200 text-rose-800 bg-rose-100/60 font-black">{totalA}</td>
-                            <td className="px-1 py-2 text-center border-r border-slate-200 text-orange-800 bg-orange-100/60 font-black">{totalT}</td>
-                            <td className="px-1 py-2 text-center text-indigo-900 bg-indigo-100/70 font-black">{overallPercent}%</td>
-                          </tr>
-                        </tfoot>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
+            {piketViewTab === 'laporan' && (
+              <PiketMonthlyReportSection
+                initialClassId={reportClassId}
+                initialMonth={reportMonth}
+                initialYear={reportYear}
+                activeStudents={activeStudents}
+                sessions={sessions}
+                classStudentCounts={classStudentCounts}
+                piketDutyTeacher={piketDutyTeacher}
+                onExportExcel={handleExportPiketMonthlyMatrixExcel}
+              />
+            )}
 
             {/* MODAL DETAIL & INPUT PRESENSI KELAS OLEH GURU PIKET */}
             {detailModalClassId && (
