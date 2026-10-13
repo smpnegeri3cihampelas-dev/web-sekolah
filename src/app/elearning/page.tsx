@@ -2868,6 +2868,27 @@ export default function ELearningPage() {
                     >
                       Masuk
                     </button>
+
+                    <div className="pt-2 text-center">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const demoT = activeTeachers[0] || DEMO_TEACHERS[0];
+                          handleLogin({
+                            role: 'guru_mapel',
+                            name: demoT.name,
+                            nipOrNisn: demoT.nip,
+                            subject: demoT.subject,
+                            classId: '7-A'
+                          });
+                        }}
+                        className="w-full py-2 px-3 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 font-bold text-xs transition cursor-pointer flex items-center justify-center gap-1.5 shadow-xs active:scale-[0.99]"
+                      >
+                        <span>👨‍🏫</span>
+                        <span>Masuk sbg Guru Demo ({activeTeachers[0]?.name?.split(',')[0] || 'Guru Mapel'})</span>
+                      </button>
+                      <p className="text-[10px] text-slate-400 mt-1">Username: {getTeacherUsername(activeTeachers[0] || DEMO_TEACHERS[0])} • Sandi: guru123</p>
+                    </div>
                   </>
                 )}
 
@@ -2919,6 +2940,25 @@ export default function ELearningPage() {
                     >
                       Masuk
                     </button>
+
+                    <div className="pt-2 text-center">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleLogin({
+                            role: 'guru_piket',
+                            name: 'Stasiun Meja Piket Utama',
+                            nipOrNisn: 'POSKO-PIKET',
+                            subject: 'Pusat Monitoring Rombel'
+                          });
+                        }}
+                        className="w-full py-2 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 font-bold text-xs transition cursor-pointer flex items-center justify-center gap-1.5 shadow-xs active:scale-[0.99]"
+                      >
+                        <span>🏢</span>
+                        <span>Masuk sbg Petugas Piket Demo</span>
+                      </button>
+                      <p className="text-[10px] text-slate-400 mt-1">ID: POSKO-PIKET • Sandi: piket123</p>
+                    </div>
                   </>
                 )}
 
@@ -2971,10 +3011,92 @@ export default function ELearningPage() {
                     >
                       Masuk
                     </button>
+
+                    <div className="pt-2 text-center">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const demoSt = activeStudents.find(s => s.nisn === DEMO_STUDENT.nisn) || activeStudents[0];
+                          handleLogin({
+                            role: 'siswa',
+                            name: demoSt.name,
+                            nipOrNisn: demoSt.nisn,
+                            classId: demoSt.classId
+                          });
+                        }}
+                        className="w-full py-2 px-3 rounded-xl bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 font-bold text-xs transition cursor-pointer flex items-center justify-center gap-1.5 shadow-xs active:scale-[0.99]"
+                      >
+                        <span>🎓</span>
+                        <span>Masuk sbg Siswa Demo ({DEMO_STUDENT.name} - {DEMO_STUDENT.classId})</span>
+                      </button>
+                      <p className="text-[10px] text-slate-400 mt-1">NISN: {DEMO_STUDENT.nisn} • Sandi: siswa123</p>
+                    </div>
                   </>
                 )}
 
               </form>
+
+              {/* Universal 1-Click Demo Bar (Any Role) */}
+              <div className="mt-5 pt-4 border-t border-slate-100 space-y-2">
+                <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider text-center">
+                  ⚡ Akses Uji Coba Cepat (1-Klik)
+                </div>
+                <div className="grid grid-cols-3 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const demoSt = activeStudents.find(s => s.nisn === DEMO_STUDENT.nisn) || activeStudents[0];
+                      handleLogin({
+                        role: 'siswa',
+                        name: demoSt.name,
+                        nipOrNisn: demoSt.nisn,
+                        classId: demoSt.classId
+                      });
+                    }}
+                    className="py-1.5 px-2 rounded-lg bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-800 text-[11px] font-bold transition flex flex-col items-center justify-center text-center cursor-pointer active:scale-95"
+                    title="Masuk langsung sebagai Siswa Demo"
+                  >
+                    <span className="text-sm">🎓</span>
+                    <span>Siswa</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const demoT = activeTeachers[0] || DEMO_TEACHERS[0];
+                      handleLogin({
+                        role: 'guru_mapel',
+                        name: demoT.name,
+                        nipOrNisn: demoT.nip,
+                        subject: demoT.subject,
+                        classId: '7-A'
+                      });
+                    }}
+                    className="py-1.5 px-2 rounded-lg bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-800 text-[11px] font-bold transition flex flex-col items-center justify-center text-center cursor-pointer active:scale-95"
+                    title="Masuk langsung sebagai Guru Demo"
+                  >
+                    <span className="text-sm">👨‍🏫</span>
+                    <span>Guru</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleLogin({
+                        role: 'guru_piket',
+                        name: 'Stasiun Meja Piket Utama',
+                        nipOrNisn: 'POSKO-PIKET',
+                        subject: 'Pusat Monitoring Rombel'
+                      });
+                    }}
+                    className="py-1.5 px-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 text-[11px] font-bold transition flex flex-col items-center justify-center text-center cursor-pointer active:scale-95"
+                    title="Masuk langsung sebagai Petugas Piket"
+                  >
+                    <span className="text-sm">🏢</span>
+                    <span>Piket</span>
+                  </button>
+                </div>
+              </div>
 
               {/* Minimal Helper Link */}
               <div className="mt-6 pt-4 border-t border-slate-100 text-center">
