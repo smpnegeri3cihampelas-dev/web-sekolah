@@ -1402,9 +1402,19 @@ export default function ELearningPage() {
   const isTeacherAssignment = (asg: Assignment) => {
     const cleanCurrentNip = (currentTeacher?.nip || '').replace(/\s+/g, '');
     const cleanAsgNip = (asg.teacherNip || '').replace(/\s+/g, '');
-    if (cleanCurrentNip && cleanAsgNip && cleanCurrentNip === cleanAsgNip) return true;
-    if (asg.teacherName && currentTeacher?.name && asg.teacherName.toLowerCase() === currentTeacher.name.toLowerCase()) return true;
-    if (asg.subject && currentTeacher?.subject && asg.subject.toLowerCase() === currentTeacher.subject.toLowerCase()) return true;
+    
+    // 1. Verifikasi kecocokan NIP jika keduanya memiliki NIP valid
+    if (cleanCurrentNip && cleanAsgNip && cleanCurrentNip !== '-' && cleanAsgNip !== '-') {
+      return cleanCurrentNip === cleanAsgNip;
+    }
+    // 2. Verifikasi kecocokan Nama Lengkap Guru
+    if (asg.teacherName && currentTeacher?.name) {
+      return asg.teacherName.toLowerCase().trim() === currentTeacher.name.toLowerCase().trim();
+    }
+    // 3. Fallback Mapel jika data tugas awal tidak memiliki nama/NIP eksplisit
+    if (asg.subject && currentTeacher?.subject) {
+      return asg.subject.toLowerCase().trim() === currentTeacher.subject.toLowerCase().trim();
+    }
     return false;
   };
 
