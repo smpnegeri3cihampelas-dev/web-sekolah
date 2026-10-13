@@ -2559,14 +2559,13 @@ export default function ELearningPage() {
                 <button
                   type="button"
                   onClick={() => setActiveMenu('tugas')}
-                  className={`px-3 py-1.5 rounded-lg font-medium transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                  className={`px-3 py-1.5 rounded-lg font-medium transition cursor-pointer whitespace-nowrap ${
                     activeMenu === 'tugas' 
                       ? 'bg-indigo-600 text-white font-bold shadow-sm' 
                       : 'text-slate-600 hover:text-slate-900 hover:bg-white'
                   }`}
                 >
-                  <span>Materi & Tugas</span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
+                  Materi & Tugas
                 </button>
                 <button
                   type="button"
