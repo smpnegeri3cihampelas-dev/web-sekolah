@@ -2673,18 +2673,18 @@ export default function ELearningPage() {
                       return (
                         <div 
                           key={student.id} 
-                          className={`px-4 py-2.5 sm:py-3 flex flex-col md:flex-row md:items-center justify-between gap-2.5 transition ${
+                          className={`px-4 py-2.5 sm:py-3 flex items-center justify-between gap-3 transition ${
                             currentStatus !== 'H' ? 'bg-amber-50/25' : 'hover:bg-indigo-50/30'
                           }`}
                         >
-                          {/* Student Identity */}
-                          <div className="flex items-center gap-3 min-w-[220px]">
-                            <span className="w-6 font-mono text-xs text-slate-400 text-center font-semibold">{idx + 1}</span>
-                            <div>
-                              <div className="text-xs sm:text-sm font-semibold text-slate-900 flex items-center gap-1.5">
-                                <span>{student.name}</span>
+                          {/* Student Identity: flex-1 min-w-0 absorbs name length differences */}
+                          <div className="flex items-center gap-3 min-w-0 flex-1 pr-2">
+                            <span className="w-6 shrink-0 font-mono text-xs text-slate-400 text-center font-semibold">{idx + 1}</span>
+                            <div className="min-w-0">
+                              <div className="text-xs sm:text-sm font-semibold text-slate-900 flex items-center gap-1.5 truncate">
+                                <span className="truncate">{student.name}</span>
                                 {student.gender && student.gender !== '-' && (
-                                  <span className="text-[10px] text-slate-400 font-mono">({student.gender})</span>
+                                  <span className="text-[10px] text-slate-400 font-mono shrink-0">({student.gender})</span>
                                 )}
                               </div>
                               <div className="text-[10px] text-slate-400 font-mono">
@@ -2693,8 +2693,8 @@ export default function ELearningPage() {
                             </div>
                           </div>
 
-                          {/* 5 Compact Buttons [ H ] [ S ] [ I ] [ A ] [ T ] */}
-                          <div className="flex items-center gap-1 shrink-0">
+                          {/* 5 Compact Buttons [ H ] [ S ] [ I ] [ A ] [ T ]: exactly w-[176px] shrink-0 across ALL rows */}
+                          <div className="w-[176px] shrink-0 flex items-center justify-center gap-1">
                             <button
                               type="button"
                               onClick={() => handleSetStudentStatus(student.id, 'H')}
@@ -2757,8 +2757,8 @@ export default function ELearningPage() {
                             </button>
                           </div>
 
-                          {/* Note input ONLY when status is NOT Hadir */}
-                          <div className="w-full md:w-56">
+                          {/* Note input ONLY when status is NOT Hadir: exactly w-48 sm:w-56 shrink-0 across ALL rows */}
+                          <div className="w-48 sm:w-56 shrink-0 text-right">
                             {currentStatus !== 'H' ? (
                               <AttendanceNoteInput
                                 value={currentNote}
@@ -2775,7 +2775,7 @@ export default function ELearningPage() {
                                 className="w-full px-2.5 py-1 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-indigo-500 focus:bg-white placeholder:text-slate-400"
                               />
                             ) : (
-                              <div className="hidden md:block text-right">
+                              <div className="text-right pr-2">
                                 <span className="text-[11px] text-emerald-600 font-semibold">Hadir</span>
                               </div>
                             )}
@@ -4299,15 +4299,15 @@ export default function ELearningPage() {
                       const currentNote = piketModalNotes[student.id] || '';
 
                       return (
-                        <div key={student.id} className="pt-3 first:pt-0 flex flex-col md:flex-row md:items-center justify-between gap-3">
-                          {/* Nama Siswa */}
-                          <div className="flex items-center gap-2.5 min-w-[200px]">
-                            <span className="w-5 text-slate-400 font-mono font-semibold">{idx + 1}.</span>
-                            <div>
-                              <div className="font-semibold text-slate-900 flex items-center gap-1.5">
-                                <span>{student.name}</span>
+                        <div key={student.id} className="pt-3 first:pt-0 flex items-center justify-between gap-3">
+                          {/* Nama Siswa: flex-1 min-w-0 absorbs name length */}
+                          <div className="flex items-center gap-2.5 min-w-0 flex-1 pr-2">
+                            <span className="w-5 shrink-0 text-slate-400 font-mono font-semibold">{idx + 1}.</span>
+                            <div className="min-w-0">
+                              <div className="font-semibold text-slate-900 flex items-center gap-1.5 truncate">
+                                <span className="truncate">{student.name}</span>
                                 {student.gender && student.gender !== '-' && (
-                                  <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono ${
+                                  <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono shrink-0 ${
                                     student.gender === 'L' ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-pink-50 text-pink-700 border border-pink-200'
                                   }`}>
                                     {student.gender}
@@ -4320,8 +4320,8 @@ export default function ELearningPage() {
                             </div>
                           </div>
 
-                          {/* Tombol Status Interaktif untuk Piket [ H ] [ S ] [ I ] [ A ] [ T ] */}
-                          <div className="flex items-center gap-1 shrink-0">
+                          {/* Tombol Status Interaktif untuk Piket [ H ] [ S ] [ I ] [ A ] [ T ]: exactly w-[176px] shrink-0 */}
+                          <div className="w-[176px] shrink-0 flex items-center justify-center gap-1">
                             <button
                               type="button"
                               onClick={() => handleSetPiketStudentStatus(student.id, 'H')}
@@ -4388,8 +4388,8 @@ export default function ELearningPage() {
                             </button>
                           </div>
 
-                          {/* Kolom Catatan Piket (Hanya saat siswa tidak Hadir) */}
-                          <div className="w-full md:w-48 lg:w-52">
+                          {/* Kolom Catatan Piket: exactly w-44 sm:w-52 shrink-0 across ALL rows */}
+                          <div className="w-44 sm:w-52 shrink-0 text-right">
                             {currentStatus !== 'H' ? (
                               <AttendanceNoteInput
                                 value={currentNote}
@@ -4406,7 +4406,7 @@ export default function ELearningPage() {
                                 className="w-full px-2.5 py-1 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white placeholder:text-slate-400"
                               />
                             ) : (
-                              <div className="hidden md:block text-right">
+                              <div className="text-right pr-2">
                                 <span className="text-[11px] text-emerald-700 font-semibold">Hadir</span>
                               </div>
                             )}
