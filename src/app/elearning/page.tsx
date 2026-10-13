@@ -3198,11 +3198,11 @@ export default function ELearningPage() {
                   </button>
                 </div>
 
-                {/* Sub-filter bar: Pilihan Rombel Kelas (Sesuai Kelas Ajar Guru) */}
+                {/* Sub-filter bar: Pilihan Rombel Kelas (Semua Kelas Sekolah 7-A s.d 9-E) */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs bg-slate-50/90 p-3.5 rounded-2xl border border-slate-200 shadow-xs">
                   <div className="flex flex-wrap items-center gap-2.5">
                     <span className="font-bold text-slate-700 flex items-center gap-1.5">
-                      <span>👥 Rombel Kelas Ajar:</span>
+                      <span>👥 Pilih Rombel:</span>
                     </span>
 
                     <select
@@ -3210,26 +3210,21 @@ export default function ELearningPage() {
                       onChange={(e) => {
                         setSelectedClassId(e.target.value);
                       }}
-                      className="px-3.5 py-2 rounded-xl bg-white border border-slate-300 text-slate-800 text-xs font-bold focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 cursor-pointer shadow-xs min-w-[220px]"
+                      className="px-3.5 py-2 rounded-xl bg-white border border-slate-300 text-slate-800 text-xs font-bold focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 cursor-pointer shadow-xs min-w-[240px]"
                     >
-                      {(currentTeacher.classes && currentTeacher.classes.length > 0 ? currentTeacher.classes : ['7-A', '7-B', '8-A', '9-A']).map(clsId => {
-                        const clsInfo = SCHOOL_CLASSES.find(c => c.id === clsId);
-                        return (
-                          <option key={clsId} value={clsId}>
-                            Kelas {clsId} {clsInfo ? `(${clsInfo.totalStudents} Siswa)` : ''}
-                          </option>
-                        );
-                      })}
+                      <option value="ALL">🌐 Semua Kelas</option>
+                      {SCHOOL_CLASSES.map(cls => (
+                        <option key={cls.id} value={cls.id}>
+                          Kelas {cls.name} ({cls.totalStudents} Siswa)
+                        </option>
+                      ))}
                     </select>
-
-                    <span className="text-[11px] text-slate-400 hidden md:inline">
-                      (Hanya menampilkan rombel yang diampu {currentTeacher.name})
-                    </span>
                   </div>
 
                   {(() => {
                     const myTasks = assignments.filter(a => {
                       if (!isTeacherAssignment(a)) return false;
+                      if (selectedClassId === 'ALL') return true;
                       return a.targetClass === selectedClassId;
                     });
 
@@ -3241,7 +3236,7 @@ export default function ELearningPage() {
                         </span>
                         <span className="text-slate-500">untuk</span>
                         <span className="font-bold text-slate-800">
-                          Kelas {selectedClassId}
+                          {selectedClassId === 'ALL' ? 'Semua Kelas' : `Kelas ${selectedClassId}`}
                         </span>
                       </div>
                     );
@@ -3252,6 +3247,7 @@ export default function ELearningPage() {
                 {(() => {
                   const myTasks = assignments.filter(a => {
                     if (!isTeacherAssignment(a)) return false;
+                    if (selectedClassId === 'ALL') return true;
                     return a.targetClass === selectedClassId;
                   });
 
@@ -3260,17 +3256,17 @@ export default function ELearningPage() {
                       <div className="bg-white border border-indigo-100 rounded-2xl p-8 text-center space-y-3">
                         <div className="text-4xl">📝</div>
                         <h3 className="text-sm font-bold text-slate-800">
-                          Belum Ada Tugas {currentTeacher.subject} untuk Kelas {selectedClassId}
+                          Belum Ada Tugas {currentTeacher.subject} untuk {selectedClassId === 'ALL' ? 'Kelas Mana Pun' : `Kelas ${selectedClassId}`}
                         </h3>
                         <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                          Bapak/Ibu guru dapat membuat tugas mandiri, PR, atau proyek khusus peserta didik Kelas {selectedClassId}.
+                          Bapak/Ibu guru dapat membuat tugas mandiri, PR, atau proyek untuk peserta didik {selectedClassId === 'ALL' ? 'sekolah' : `Kelas ${selectedClassId}`}.
                         </p>
                         <button
                           type="button"
                           onClick={() => setIsCreateAsgModalOpen(true)}
                           className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition shadow-sm cursor-pointer"
                         >
-                          + Terbitkan Tugas untuk Kelas {selectedClassId}
+                          + Terbitkan Tugas {selectedClassId === 'ALL' ? '' : `untuk Kelas ${selectedClassId}`}
                         </button>
                       </div>
                     );
