@@ -418,7 +418,10 @@ export default function CreateAssignmentModal({
             onChange={(e) => setTargetClass(e.target.value)}
             className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:border-indigo-600 text-xs cursor-pointer"
           >
-            {SCHOOL_CLASSES.map((c) => (
+            {(currentTeacher.classes && currentTeacher.classes.length > 0
+              ? SCHOOL_CLASSES.filter(c => currentTeacher.classes.includes(c.id))
+              : SCHOOL_CLASSES
+            ).map((c) => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>

@@ -5048,6 +5048,56 @@ export const INITIAL_ASSIGNMENTS: Assignment[] = [
     ]
   },
   {
+    id: 'asg-ing-7b-1',
+    title: 'Worksheet: Family Members & Possessive Adjectives',
+    subject: 'Bahasa Inggris',
+    teacherName: 'Rohidin, S.Pd.',
+    teacherNip: '19720412 199703 1 002',
+    targetClass: '7-B',
+    dueDate: '2026-10-16',
+    description: 'Read the family tree text, answer the grammar quiz on possessive adjectives (my, your, their, our), and upload your handwritten family tree diagram.',
+    allowUpload: true,
+    createdAt: '2026-10-04',
+    materialUrl: 'https://example.com/Family_Members_Vocabulary.pdf',
+    materialName: 'Family_Members_Vocabulary.pdf',
+    videoUrl: 'https://www.youtube.com/watch?v=tiXtwF1d4i4',
+    videoTitle: 'Family Vocabulary & Possessive Adjectives Explanation',
+    quizQuestions: [
+      {
+        id: 'q-ing-7b-1',
+        question: 'Complete the sentence: "This is my sister. ___ name is Zahra."',
+        options: ['A. His', 'B. Her', 'C. Their', 'D. Its'],
+        correctOptionIndex: 1,
+        explanation: 'Pronoun for female third person is "Her".'
+      }
+    ]
+  },
+  {
+    id: 'asg-ing-8a-1',
+    title: 'Writing: My Memorable Holiday Experience (Recount Text)',
+    subject: 'Bahasa Inggris',
+    teacherName: 'Rohidin, S.Pd.',
+    teacherNip: '19720412 199703 1 002',
+    targetClass: '8-A',
+    dueDate: '2026-10-18',
+    description: 'Write a 3-paragraph recount text about your school holiday experience using Simple Past Tense (orientation, events, re-orientation).',
+    allowUpload: true,
+    createdAt: '2026-10-04',
+    materialUrl: 'https://example.com/Recount_Text_Guide_8A.pdf',
+    materialName: 'Recount_Text_Guide_8A.pdf',
+    videoUrl: 'https://www.youtube.com/watch?v=tiXtwF1d4i4',
+    videoTitle: 'Structure of Recount Text and Past Simple Verbs',
+    quizQuestions: [
+      {
+        id: 'q-ing-8a-1',
+        question: 'What is the past form (V2) of the verb "go"?',
+        options: ['A. Gone', 'B. Went', 'C. Goes', 'D. Going'],
+        correctOptionIndex: 1,
+        explanation: 'Past form (V2) of irregular verb "go" is "went".'
+      }
+    ]
+  },
+  {
     id: 'asg-pabp-7a-1',
     title: 'Refleksi Nilai Akhlak Terpuji & Kuis Doa Harian',
     subject: 'Pendidikan Agama Islam (PABP)',
