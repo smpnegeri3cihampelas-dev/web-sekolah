@@ -5163,6 +5163,56 @@ export const INITIAL_ASSIGNMENTS: Assignment[] = [
         explanation: 'Keyboard dan mouse memasukkan sinyal input ke dalam komputer.'
       }
     ]
+  },
+  {
+    id: 'asg-inf-7b-1',
+    title: 'Praktikum Berpikir Komputasional & Logika Algoritma',
+    subject: 'Informatika',
+    teacherName: 'Ichsanul Arifin, S.Kom.',
+    teacherNip: '19930115 201903 1 008',
+    targetClass: '7-B',
+    dueDate: '2026-10-18',
+    description: 'Pelajari konsep pola dekomposisi dan algoritma langkah demi langkah untuk memecahkan masalah logika sehari-hari.',
+    allowUpload: true,
+    createdAt: '2026-10-04',
+    materialUrl: 'https://example.com/Modul_Algoritma_Kelas7B.pdf',
+    materialName: 'Modul_Algoritma_Kelas7B.pdf',
+    videoUrl: 'https://www.youtube.com/watch?v=AkFi90lZmXA',
+    videoTitle: 'Pengenalan Berpikir Komputasional & Algoritma',
+    quizQuestions: [
+      {
+        id: 'q-inf-7b-1',
+        question: 'Urutan langkah-langkah logis untuk menyelesaikan suatu permasalahan dinamakan...',
+        options: ['A. Abstraksi', 'B. Algoritma', 'C. Dekomposisi', 'D. Pola'],
+        correctOptionIndex: 1,
+        explanation: 'Algoritma adalah serangkaian urutan logis dan terstruktur untuk memecahkan persoalan.'
+      }
+    ]
+  },
+  {
+    id: 'asg-inf-8a-1',
+    title: 'Analisis Data & Fungsi Rumus Spreadsheet Excel',
+    subject: 'Informatika',
+    teacherName: 'Ichsanul Arifin, S.Kom.',
+    teacherNip: '19930115 201903 1 008',
+    targetClass: '8-A',
+    dueDate: '2026-10-19',
+    description: 'Pelajari penggunaan rumus SUM, AVERAGE, IF, dan grafik pada lembar kerja Microsoft Excel.',
+    allowUpload: true,
+    createdAt: '2026-10-04',
+    materialUrl: 'https://example.com/Modul_Excel_Kelas8A.pdf',
+    materialName: 'Modul_Excel_Kelas8A.pdf',
+    videoUrl: 'https://www.youtube.com/watch?v=AkFi90lZmXA',
+    videoTitle: 'Tutorial Rumus Excel untuk Pemula & Menengah',
+    quizQuestions: [
+      {
+        id: 'q-inf-8a-1',
+        question: 'Rumus Excel yang digunakan untuk menghitung rata-rata dari sekelompok nilai adalah...',
+        options: ['A. =SUM()', 'B. =AVERAGE()', 'C. =COUNT()', 'D. =MAX()'],
+        correctOptionIndex: 1,
+        explanation: 'Fungsi =AVERAGE() menghasilkan nilai mean atau rata-rata aritmatika.'
+      }
+    ]
   }
 ];
 
