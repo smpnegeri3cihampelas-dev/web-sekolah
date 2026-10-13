@@ -47,6 +47,15 @@ import SubmissionSplitPreviewModal from '@/components/SubmissionSplitPreviewModa
 import CreateAssignmentModal from '@/components/CreateAssignmentModal';
 import StudentSubmitModal from '@/components/StudentSubmitModal';
 import TeacherSettingsModal from '@/components/TeacherSettingsModal';
+import CbtStudentExamRoom from '@/components/cbt/CbtStudentExamRoom';
+import CbtTeacherManagement from '@/components/cbt/CbtTeacherManagement';
+import CbtSupervisorRoom from '@/components/cbt/CbtSupervisorRoom';
+import {
+  CbtExamPackage,
+  CbtStudentAnswerState,
+  getStoredCbtPackages,
+  getStoredStudentCbtSessions
+} from '@/lib/cbtData';
 import { getStoredSchoolData } from '@/lib/schoolData';
 
 const STATUS_BADGE_STYLES: Record<string, string> = {
@@ -1249,7 +1258,7 @@ export default function ELearningPage() {
   const [attendanceData, setAttendanceData] = useState<Record<string, ClassSessionAttendance>>({});
   
   // Active Tab inside Teacher view
-  const [activeMenu, setActiveMenu] = useState<'presensi' | 'laporan' | 'tugas' | 'materi' | 'cbt'>('presensi');
+  const [activeMenu, setActiveMenu] = useState<'presensi' | 'laporan' | 'tugas' | 'materi' | 'cbt' | 'pengawas'>('presensi');
 
   // Laporan Presensi State (Teacher & Meja Piket)
   const [reportClassId, setReportClassId] = useState<string>('7-A');
@@ -1266,7 +1275,14 @@ export default function ELearningPage() {
     const m = new Date().getMonth() + 1;
     return m >= 7 ? `${y}/${y + 1}` : `${y - 1}/${y}`;
   });
-  const [piketViewTab, setPiketViewTab] = useState<'live' | 'laporan'>('live');
+  const [piketViewTab, setPiketViewTab] = useState<'live' | 'laporan' | 'pengawas'>('live');
+
+  // CBT Active Exam Session for Student / Teacher Preview
+  const [activeCbtExamSession, setActiveCbtExamSession] = useState<{
+    exam: CbtExamPackage;
+    student: Student;
+    roomName: string;
+  } | null>(null);
   
   // Assignments & Homework State
   const [assignments, setAssignments] = useState<Assignment[]>([]);
@@ -2585,6 +2601,21 @@ export default function ELearningPage() {
     notes: mySubjectSession.notes
   } : null;
 
+  // JIKA SISWA / GURU SEDANG DI DALAM RUANG UJIAN CBT (FOCUS MODE)
+  if (activeCbtExamSession) {
+    return (
+      <CbtStudentExamRoom
+        exam={activeCbtExamSession.exam}
+        student={activeCbtExamSession.student}
+        roomName={activeCbtExamSession.roomName}
+        onFinishExam={() => {
+          showToast(`Ujian ${activeCbtExamSession.exam.title} berhasil dikumpulkan!`, 'success');
+        }}
+        onExitRoom={() => setActiveCbtExamSession(null)}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-elearning selection:bg-indigo-500/20 selection:text-indigo-900 relative">
       
@@ -2975,6 +3006,7 @@ export default function ELearningPage() {
                     {activeMenu === 'laporan' && 'Rekap Kehadiran'}
                     {activeMenu === 'tugas' && 'Materi & Tugas Siswa'}
                     {activeMenu === 'cbt' && 'Bank Soal & Asesmen CBT'}
+                    {activeMenu === 'pengawas' && 'Mode Pengawas Ruang'}
                   </span>
                   <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
                     {currentTeacher.subject}
@@ -2993,10 +3025,13 @@ export default function ELearningPage() {
                   {activeMenu === 'cbt' && (
                     <>Bank soal evaluasi dan simulasi ujian komputer (CBT) mata pelajaran <span className="text-indigo-700 font-semibold">{currentTeacher.subject}</span></>
                   )}
+                  {activeMenu === 'pengawas' && (
+                    <>Pengawasan ruang ujian CBT, presensi peserta ruangan, dan berita acara pelaksanaan (BAP)</>
+                  )}
                 </p>
               </div>
 
-              {/* Sub-tabs: Presensi / Laporan / Materi & Tugas / CBT */}
+              {/* Sub-tabs: Presensi / Laporan / Materi & Tugas / CBT / Pengawas */}
               <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs overflow-x-auto max-w-full">
                 <button
                   type="button"
@@ -3040,7 +3075,18 @@ export default function ELearningPage() {
                       : 'text-slate-600 hover:text-slate-900 hover:bg-white'
                   }`}
                 >
-                  Bank Soal
+                  Bank Soal & CBT
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveMenu('pengawas')}
+                  className={`px-3 py-1.5 rounded-lg font-medium transition cursor-pointer whitespace-nowrap ${
+                    activeMenu === 'pengawas' 
+                      ? 'bg-indigo-600 text-white font-bold shadow-sm' 
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white'
+                  }`}
+                >
+                  Mode Pengawas
                 </button>
               </div>
             </div>
@@ -3830,20 +3876,33 @@ export default function ELearningPage() {
 
             {/* TAB: BANK SOAL & CBT */}
             {activeMenu === 'cbt' && (
-              <div className="bg-white border border-indigo-100 rounded-2xl p-6 text-center py-12 space-y-4 shadow-sm">
-                <div className="w-16 h-16 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-600 mx-auto flex items-center justify-center text-2xl">
-                  💻
-                </div>
-                <h3 className="text-lg font-bold text-slate-900">Bank Soal & Asesmen CBT Lab Komputer</h3>
-                <p className="text-xs text-slate-500 max-w-lg mx-auto leading-relaxed">
-                  Modul ini disiapkan untuk Asesmen Sumatif (STS/SAS) di Laboratorium Komputer sekolah. Siswa dapat login menggunakan NISN di komputer lab tanpa memerlukan handphone.
-                </p>
-                <div className="pt-2">
-                  <span className="px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-semibold border border-indigo-200">
-                    Fase Berikutnya: Siap Terhubung ke Bank Soal
-                  </span>
-                </div>
-              </div>
+              <CbtTeacherManagement
+                teacherName={currentTeacher.name}
+                activeStudents={activeStudents}
+                onPreviewExamAsStudent={(pkg) => {
+                  const studentToUse = activeStudents[0] || INITIAL_STUDENTS[0];
+                  setActiveCbtExamSession({
+                    exam: pkg,
+                    student: studentToUse,
+                    roomName: 'Ruang Pratinjau Guru'
+                  });
+                }}
+              />
+            )}
+
+            {/* TAB: MODE PENGAWAS RUANG CBT (UNTUK GURU) */}
+            {activeMenu === 'pengawas' && (
+              <CbtSupervisorRoom
+                currentTeacherName={currentTeacher.name}
+                activeStudents={activeStudents}
+                onOpenExamForStudent={(pkg, st, roomName) => {
+                  setActiveCbtExamSession({
+                    exam: pkg,
+                    student: st,
+                    roomName: roomName
+                  });
+                }}
+              />
             )}
 
           </div>
@@ -3929,6 +3988,18 @@ export default function ELearningPage() {
                   >
                     <span>📊</span>
                     <span>Matriks Bulanan Kelas</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPiketViewTab('pengawas')}
+                    className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer flex items-center gap-1.5 ${
+                      piketViewTab === 'pengawas'
+                        ? 'bg-white text-emerald-700 shadow-sm font-bold'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <span>📋</span>
+                    <span>Pengawas CBT</span>
                   </button>
                 </div>
 
@@ -4276,6 +4347,21 @@ export default function ELearningPage() {
               />
             )}
 
+            {/* TAMPILAN PIKET: PENGAWAS RUANG CBT */}
+            {piketViewTab === 'pengawas' && (
+              <CbtSupervisorRoom
+                currentTeacherName={piketDutyTeacher || currentUser?.name || 'Guru Pengawas Ruang'}
+                activeStudents={activeStudents}
+                onOpenExamForStudent={(pkg, st, roomName) => {
+                  setActiveCbtExamSession({
+                    exam: pkg,
+                    student: st,
+                    roomName: roomName
+                  });
+                }}
+              />
+            )}
+
             {/* MODAL DETAIL & INPUT PRESENSI KELAS OLEH GURU PIKET */}
             {detailModalClassId && (
               <div 
@@ -4570,6 +4656,147 @@ export default function ELearningPage() {
                 })()}
               </div>
             </div>
+
+            {/* UJIAN CBT AKTIF (PTS / PAS / ASESMEN SUMATIF) */}
+            {(() => {
+              const currentStudent = activeStudents.find(s => s.nisn === currentUser.nipOrNisn) ||
+                activeStudents.find(s => s.name.toLowerCase() === currentUser.name?.toLowerCase()) ||
+                activeStudents[0];
+              const studentClass = currentUser.classId || '7-A';
+              const allCbtPackages = getStoredCbtPackages();
+              const studentSessions = getStoredStudentCbtSessions();
+              
+              // Filter active or completed packages for this student's class
+              const relevantExams = allCbtPackages.filter(pkg => 
+                (pkg.targetClasses.includes(studentClass) || 
+                 pkg.targetClasses.includes('Semua') || 
+                 pkg.targetClasses.some(c => c.startsWith(studentClass.split('-')[0])))
+              );
+
+              if (relevantExams.length === 0) return null;
+
+              return (
+                <div className="bg-gradient-to-br from-indigo-900 via-indigo-950 to-slate-900 rounded-2xl p-5 sm:p-6 text-white shadow-xl border border-indigo-700/50 relative overflow-hidden space-y-4">
+                  <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+                  
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-10 border-b border-indigo-700/60 pb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center text-xl font-black shadow-md shadow-amber-400/20 flex-shrink-0">
+                        💻
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h2 className="text-base font-black tracking-wide text-white">
+                            ASESMEN & UJIAN CBT
+                          </h2>
+                          <span className="px-2 py-0.5 rounded-full bg-red-500 text-white text-[10px] font-black tracking-wider animate-pulse uppercase">
+                            LIVE CBT
+                          </span>
+                        </div>
+                        <p className="text-xs text-indigo-200">
+                          Siswa Kelas <span className="text-amber-300 font-bold">{studentClass}</span> • Kerjakan dengan jujur dan ikuti instruksi Pengawas Ruang.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-xs bg-indigo-950/80 border border-indigo-700/60 px-3 py-1.5 rounded-xl font-mono text-indigo-200 self-start sm:self-auto flex items-center gap-2">
+                      <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                      Ruangan: <span className="font-bold text-amber-300">Ruang {studentClass}</span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 relative z-10">
+                    {relevantExams.map(exam => {
+                      const sessionKey = `${exam.id}_${currentStudent?.id || ''}`;
+                      const mySession = studentSessions[sessionKey];
+                      const isSubmitted = mySession?.isSubmitted;
+                      const isPassed = (mySession?.score ?? 0) >= exam.passingGrade;
+
+                      return (
+                        <div 
+                          key={exam.id} 
+                          className={`bg-white/10 backdrop-blur-md border rounded-xl p-4 flex flex-col justify-between gap-3 transition ${
+                            isSubmitted 
+                              ? 'border-emerald-500/30 bg-emerald-950/20' 
+                              : exam.status === 'active'
+                              ? 'border-amber-400/40 bg-white/10 hover:bg-white/15'
+                              : 'border-white/10 opacity-75'
+                          }`}
+                        >
+                          <div>
+                            <div className="flex items-center justify-between gap-2 mb-1.5">
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400/20 text-amber-300 border border-amber-400/30">
+                                {exam.semester} • TP {exam.academicYear}
+                              </span>
+                              <span className="text-[11px] font-medium text-indigo-200">
+                                {exam.questions.length} Butir Soal
+                              </span>
+                            </div>
+                            <h3 className="text-sm font-bold text-white line-clamp-1">
+                              {exam.title}
+                            </h3>
+                            <p className="text-xs text-indigo-200 mb-2">
+                              Mata Pelajaran: <strong className="text-white">{exam.subject}</strong> • Pengampu: {exam.teacherName}
+                            </p>
+
+                            <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-indigo-300">
+                              <span className="bg-indigo-950/60 px-2 py-0.5 rounded border border-indigo-800">
+                                ⏱️ {exam.durationMinutes} Menit
+                              </span>
+                              <span className="bg-indigo-950/60 px-2 py-0.5 rounded border border-indigo-800">
+                                🎯 KKM {exam.passingGrade}
+                              </span>
+                              {exam.status === 'active' && (
+                                <span className="bg-amber-400/10 text-amber-300 px-2 py-0.5 rounded border border-amber-400/20 font-mono">
+                                  Token: <strong>{exam.token}</strong>
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="pt-2 border-t border-white/10 flex items-center justify-between gap-3">
+                            {isSubmitted ? (
+                              <div className="w-full flex items-center justify-between bg-emerald-500/20 border border-emerald-400/30 px-3 py-2 rounded-xl text-emerald-300 text-xs">
+                                <div className="flex items-center gap-1.5 font-bold">
+                                  <span>✓</span>
+                                  <span>Telah Selesai</span>
+                                  <span className={`text-[10px] px-1.5 py-0.2 rounded font-semibold ${
+                                    isPassed ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'
+                                  }`}>
+                                    {isPassed ? 'Tuntas' : 'Remedial'}
+                                  </span>
+                                </div>
+                                <div className="font-bold text-white bg-emerald-600/70 px-2.5 py-0.5 rounded-lg text-xs">
+                                  Skor: {mySession.score ?? 0}/100
+                                </div>
+                              </div>
+                            ) : exam.status === 'active' ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActiveCbtExamSession({
+                                    exam,
+                                    student: currentStudent,
+                                    roomName: `Ruang ${studentClass}`
+                                  });
+                                }}
+                                className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs transition shadow-lg shadow-amber-500/25 flex items-center justify-center gap-2 cursor-pointer"
+                              >
+                                <span>🚀 Masuk Ruang Ujian CBT</span>
+                                <span>➔</span>
+                              </button>
+                            ) : (
+                              <div className="w-full text-center py-1.5 text-xs text-slate-400 italic">
+                                Ujian belum dibuka oleh Guru Pengampu
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Quick Cards: Status Hari Ini & Materi */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

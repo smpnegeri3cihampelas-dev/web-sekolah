@@ -1025,4 +1025,232 @@ export function exportMonthlyAttendanceMatrixToExcel(params: {
   XLSX.writeFile(workbook, fileName);
 }
 
+/**
+ * Export Leger Nilai Asesmen CBT (PTS / PAS) untuk Guru Mata Pelajaran & Kurikulum
+ */
+export function exportCbtScoreLegerToExcel(params: {
+  examTitle: string;
+  subject: string;
+  gradeOrClass: string;
+  semester: string;
+  teacherName: string;
+  passingGrade: number;
+  totalQuestions: number;
+  results: Array<{
+    studentNisn: string;
+    studentName: string;
+    classId: string;
+    score: number;
+    correctCount: number;
+    wrongCount: number;
+    isPassed: boolean;
+    submittedAt?: string;
+  }>;
+}) {
+  const {
+    examTitle,
+    subject,
+    gradeOrClass,
+    semester,
+    teacherName,
+    passingGrade,
+    totalQuestions,
+    results
+  } = params;
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  const rows: any[][] = [];
+
+  // Official School Header
+  rows.push(['SMP NEGERI 3 CIHAMPELAS']);
+  rows.push(['LEGER NILAI ASESMEN KOMPUTER (CBT)']);
+  rows.push([`${examTitle.toUpperCase()} - TP. 2026/2027`]);
+  rows.push([]);
+  rows.push(['Mata Pelajaran:', subject, '', 'Kelas / Rombel:', gradeOrClass]);
+  rows.push(['Semester:', semester, '', 'Guru Pengampu:', teacherName]);
+  rows.push(['Kriteria Ketuntasan (KKM):', `${passingGrade}`, '', 'Total Soal Ujian:', `${totalQuestions} Butir Soal`]);
+  rows.push(['Waktu Unduh:', formatIndonesianDate(todayStr)]);
+  rows.push([]);
+
+  // Table Header
+  rows.push([
+    'NO',
+    'NISN',
+    'NAMA LENGKAP SISWA',
+    'KELAS',
+    'JML SOAL',
+    'BENAR',
+    'SALAH',
+    'NILAI AKHIR',
+    'KKM',
+    'STATUS KETUNTASAN',
+    'WAKTU SELESAI'
+  ]);
+
+  let totalScore = 0;
+  let passedCount = 0;
+
+  results.forEach((r, idx) => {
+    totalScore += r.score;
+    if (r.isPassed) passedCount++;
+
+    rows.push([
+      idx + 1,
+      r.studentNisn,
+      r.studentName,
+      r.classId,
+      totalQuestions,
+      r.correctCount,
+      r.wrongCount,
+      r.score,
+      passingGrade,
+      r.isPassed ? 'TUNTAS' : 'REMEDIAL',
+      r.submittedAt ? r.submittedAt.slice(11, 16) + ' WIB' : '-'
+    ]);
+  });
+
+  const avgScore = results.length > 0 ? Math.round((totalScore / results.length) * 10) / 10 : 0;
+  const passPercent = results.length > 0 ? Math.round((passedCount / results.length) * 100) : 0;
+
+  // Summary Statistical Rows
+  rows.push([]);
+  rows.push(['', '', 'STATISTIK KELAS', '', '', '', '', '', '', '', '']);
+  rows.push(['', '', 'Total Peserta yang Mengerjakan:', `${results.length} Siswa`]);
+  rows.push(['', '', 'Rata-Rata Nilai Kelas:', avgScore]);
+  rows.push(['', '', 'Jumlah Siswa Tuntas (>= KKM):', `${passedCount} Siswa (${passPercent}%)`]);
+  rows.push(['', '', 'Jumlah Siswa Perlu Remedial:', `${results.length - passedCount} Siswa`]);
+  rows.push([]);
+
+  // Signature Block
+  rows.push(['', '', '', 'Mengetahui,', '', '', '', 'Cihampelas, ' + formatIndonesianDate(todayStr)]);
+  rows.push(['', '', '', 'Kepala SMP Negeri 3 Cihampelas,', '', '', '', 'Guru Mata Pelajaran,']);
+  rows.push([]);
+  rows.push([]);
+  rows.push(['', '', '', 'H. Rustandi, S.Pd., M.Pd.', '', '', '', teacherName]);
+  rows.push(['', '', '', 'NIP. 19700608 199802 1 001', '', '', '', '-']);
+
+  const worksheet = XLSX.utils.aoa_to_sheet(rows);
+  worksheet['!cols'] = [
+    { wch: 5 },  // No
+    { wch: 14 }, // NISN
+    { wch: 28 }, // Nama
+    { wch: 8 },  // Kelas
+    { wch: 10 }, // Jml Soal
+    { wch: 8 },  // Benar
+    { wch: 8 },  // Salah
+    { wch: 12 }, // Nilai Akhir
+    { wch: 8 },  // KKM
+    { wch: 18 }, // Status
+    { wch: 15 }, // Waktu
+  ];
+
+  const workbook = XLSX.utils.book_new();
+  const safeSheet = sanitizeFileName(`Nilai_${gradeOrClass}_${subject}`).slice(0, 31);
+  XLSX.utils.book_append_sheet(workbook, worksheet, safeSheet);
+
+  const fileName = sanitizeFileName(`Leger_Nilai_CBT_${gradeOrClass}_${subject}_${todayStr}.xlsx`);
+  XLSX.writeFile(workbook, fileName);
+}
+
+/**
+ * Export Berita Acara Pelaksanaan (BAP) & Daftar Hadir Ruang Ujian (.xlsx)
+ */
+export function exportCbtRoomBapToExcel(params: {
+  examTitle: string;
+  subject: string;
+  roomName: string;
+  supervisorName: string;
+  token: string;
+  date: string;
+  notes?: string;
+  students: Array<{
+    nisn: string;
+    name: string;
+    classId: string;
+    status: 'H' | 'S' | 'I' | 'A';
+  }>;
+}) {
+  const {
+    examTitle,
+    subject,
+    roomName,
+    supervisorName,
+    token,
+    date,
+    notes,
+    students
+  } = params;
+
+  const rows: any[][] = [];
+
+  rows.push(['SMP NEGERI 3 CIHAMPELAS']);
+  rows.push(['DAFTAR HADIR & BERITA ACARA PELAKSANAAN UJIAN (BAP)']);
+  rows.push([examTitle.toUpperCase()]);
+  rows.push([]);
+  rows.push(['Mata Pelajaran:', subject, '', 'Ruang Ujian:', roomName]);
+  rows.push(['Guru Pengawas:', supervisorName, '', 'Token Sesi:', token]);
+  rows.push(['Hari / Tanggal:', formatIndonesianDate(date)]);
+  rows.push([]);
+
+  // Table Header
+  rows.push(['NO', 'NISN', 'NAMA PESERTA UJIAN', 'KELAS', 'STATUS KEHADIRAN', 'TANDA TANGAN / KET']);
+
+  let hadirCount = 0;
+  let sakitCount = 0;
+  let izinCount = 0;
+  let alpaCount = 0;
+
+  students.forEach((st, idx) => {
+    if (st.status === 'H') hadirCount++;
+    else if (st.status === 'S') sakitCount++;
+    else if (st.status === 'I') izinCount++;
+    else if (st.status === 'A') alpaCount++;
+
+    const statusLabel = st.status === 'H' ? 'HADIR' : st.status === 'S' ? 'SAKIT' : st.status === 'I' ? 'IZIN' : 'ALPA';
+    rows.push([
+      idx + 1,
+      st.nisn,
+      st.name,
+      st.classId,
+      statusLabel,
+      st.status === 'H' ? `${idx + 1}. .........` : `(${statusLabel})`
+    ]);
+  });
+
+  // Summary
+  rows.push([]);
+  rows.push(['', '', 'REKAPITULASI RUANG UJIAN:']);
+  rows.push(['', '', 'Jumlah Terdaftar di Ruangan:', `${students.length} Siswa`]);
+  rows.push(['', '', 'Jumlah Hadir Mengikuti Ujian:', `${hadirCount} Siswa`]);
+  rows.push(['', '', 'Jumlah Sakit (Ujian Susulan):', `${sakitCount} Siswa`]);
+  rows.push(['', '', 'Jumlah Izin (Ujian Susulan):', `${izinCount} Siswa`]);
+  rows.push(['', '', 'Jumlah Alpa / Tanpa Keterangan:', `${alpaCount} Siswa`]);
+  rows.push([]);
+  rows.push(['Catatan Kejadian Ruang Ujian:', notes || 'Ujian berjalan tertib, aman, dan lancar tanpa kendala teknis.']);
+  rows.push([]);
+
+  // Signatures
+  rows.push(['', '', 'Panitia Ujian Sekolah,', '', 'Pengawas Ruang Ujian,']);
+  rows.push([]);
+  rows.push([]);
+  rows.push(['', '', 'Ketua Pelaksana Asesmen', '', supervisorName]);
+
+  const worksheet = XLSX.utils.aoa_to_sheet(rows);
+  worksheet['!cols'] = [
+    { wch: 5 },  // No
+    { wch: 14 }, // NISN
+    { wch: 28 }, // Nama
+    { wch: 10 }, // Kelas
+    { wch: 18 }, // Status
+    { wch: 22 }, // Tanda tangan
+  ];
+
+  const workbook = XLSX.utils.book_new();
+  const safeSheet = sanitizeFileName(`BAP_${roomName}`).slice(0, 31);
+  XLSX.utils.book_append_sheet(workbook, worksheet, safeSheet);
+
+  const fileName = sanitizeFileName(`BAP_Ujian_${roomName}_${subject}_${date}.xlsx`);
+  XLSX.writeFile(workbook, fileName);
+}
+
 
