@@ -334,44 +334,6 @@ const DailyReportTable = React.memo(function DailyReportTable({
   );
 });
 
-// Hook for seamless touchpad / mouse wheel horizontal scrolling on wide matrix tables without preliminary clicks
-function useHorizontalScroll() {
-  const scrollRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-
-    const onWheel = (e: WheelEvent) => {
-      // If user is swiping horizontally natively on touchpad, let native browser handle it
-      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
-        return;
-      }
-
-      // If scrolling vertically (mouse wheel or touchpad 2-finger swipe up/down):
-      if (e.deltaY !== 0) {
-        const maxScroll = el.scrollWidth - el.clientWidth;
-        if (maxScroll <= 0) return;
-
-        const canScrollRight = e.deltaY > 0 && el.scrollLeft < maxScroll - 1;
-        const canScrollLeft = e.deltaY < 0 && el.scrollLeft > 1;
-
-        if (canScrollRight || canScrollLeft) {
-          e.preventDefault();
-          el.scrollLeft += e.deltaY;
-        }
-      }
-    };
-
-    el.addEventListener('wheel', onWheel, { passive: false });
-    return () => {
-      el.removeEventListener('wheel', onWheel);
-    };
-  }, []);
-
-  return scrollRef;
-}
-
 interface MonthlyReportTableProps {
   isActive: boolean;
   students: Student[];
@@ -405,8 +367,6 @@ const MonthlyReportTable = React.memo(function MonthlyReportTable({
   daysInfoList,
   monthlyReportData,
 }: MonthlyReportTableProps) {
-  const scrollRef = useHorizontalScroll();
-
   // Pre-associate session with day once for the whole table (prevents 1,000+ Map lookups in JSX)
   const daysWithSession = useMemo(() => {
     return daysInfoList.map(info => {
@@ -431,39 +391,7 @@ const MonthlyReportTable = React.memo(function MonthlyReportTable({
             Mata Pelajaran: <span className="text-indigo-700 font-bold">{currentTeacher.subject}</span> • Guru: <span className="font-semibold text-slate-800">{currentTeacher.name}</span>
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 shadow-xs">
-            <button
-              type="button"
-              onClick={() => scrollRef.current?.scrollTo({ left: 0, behavior: 'smooth' })}
-              className="px-2.5 py-1 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold text-[11px] transition cursor-pointer"
-              title="Geser ke Tanggal 1 - 15"
-            >
-              ⏮️ Tgl 1 - 15
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                const el = scrollRef.current;
-                if (el) el.scrollTo({ left: el.scrollWidth / 2 - el.clientWidth / 4, behavior: 'smooth' });
-              }}
-              className="px-2.5 py-1 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold text-[11px] transition cursor-pointer"
-              title="Geser ke Tanggal 16 - 31"
-            >
-              ⏭️ Tgl 16 - 31
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                const el = scrollRef.current;
-                if (el) el.scrollTo({ left: el.scrollWidth, behavior: 'smooth' });
-              }}
-              className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-[11px] transition cursor-pointer border border-indigo-200"
-              title="Geser ke Rekap Total"
-            >
-              📊 Total Rekap
-            </button>
-          </div>
+        <div className="flex items-center gap-2 text-xs">
           <span className="px-3 py-1 rounded-lg bg-indigo-50 text-indigo-800 font-bold border border-indigo-200 text-xs">
             {monthlyReportData.monthSessions.length} Pertemuan Terlaksana
           </span>
@@ -471,11 +399,7 @@ const MonthlyReportTable = React.memo(function MonthlyReportTable({
       </div>
 
       {/* Scrollable Matrix Table with GPU Compositing & Fixed Layout */}
-      <div 
-        ref={scrollRef}
-        tabIndex={0}
-        className="overflow-x-auto relative will-change-scroll [transform:translateZ(0)] [overscroll-behavior-x:contain] focus:outline-none"
-      >
+      <div className="overflow-x-auto relative will-change-scroll [transform:translateZ(0)]">
         <table className="w-full text-xs text-left border-collapse table-fixed min-w-[1550px]">
           <colgroup>
             <col className="w-10" />
@@ -852,7 +776,6 @@ const PiketMonthlyReportSection = React.memo(function PiketMonthlyReportSection(
   const [selectedClassId, setSelectedClassId] = useState<string>(initialClassId);
   const [selectedMonth, setSelectedMonth] = useState<number>(() => initialMonth || (new Date().getMonth() + 1));
   const [selectedYear, setSelectedYear] = useState<number>(() => initialYear || new Date().getFullYear());
-  const scrollRef = useHorizontalScroll();
 
   // Memoize all monthly matrix data and statistics
   const piketMatrixData = useMemo(() => {
@@ -1127,7 +1050,7 @@ const PiketMonthlyReportSection = React.memo(function PiketMonthlyReportSection(
 
       {/* Table Matriks Bulanan Meja Piket */}
       <div className="bg-white border border-indigo-100 rounded-2xl shadow-sm overflow-hidden">
-        <div className="p-4 bg-slate-50 border-b border-indigo-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="p-4 bg-slate-50 border-b border-indigo-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
             <h3 className="text-sm font-extrabold text-slate-900 tracking-wide uppercase">
               LAPORAN ABSENSI - KELAS {selectedClassId} ({monthName.toUpperCase()} {selectedYear})
@@ -1136,53 +1059,12 @@ const PiketMonthlyReportSection = React.memo(function PiketMonthlyReportSection(
               Pos Meja Piket • Petugas: <span className="font-semibold text-slate-800">{piketDutyTeacher}</span>
             </p>
           </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Quick-Jump Date Navigation Buttons */}
-            <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 shadow-xs">
-              <button
-                type="button"
-                onClick={() => scrollRef.current?.scrollTo({ left: 0, behavior: 'smooth' })}
-                className="px-2.5 py-1 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold text-[11px] transition cursor-pointer"
-                title="Geser langsung ke awal bulan (Tanggal 1 - 15)"
-              >
-                ⏮️ Tgl 1 - 15
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const el = scrollRef.current;
-                  if (el) el.scrollTo({ left: el.scrollWidth / 2 - el.clientWidth / 4, behavior: 'smooth' });
-                }}
-                className="px-2.5 py-1 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold text-[11px] transition cursor-pointer"
-                title="Geser langsung ke pertengahan bulan (Tanggal 16 - 31)"
-              >
-                ⏭️ Tgl 16 - 31
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const el = scrollRef.current;
-                  if (el) el.scrollTo({ left: el.scrollWidth, behavior: 'smooth' });
-                }}
-                className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-[11px] transition cursor-pointer border border-emerald-200"
-                title="Geser langsung ke Rekap Total (H, S, I, A, T, %)"
-              >
-                📊 Total Rekap
-              </button>
-            </div>
-
-            <span className="text-xs px-2.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-bold border border-emerald-200">
-              Monitoring Tingkat Sekolah
-            </span>
-          </div>
+          <span className="text-xs px-2.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-bold border border-emerald-200">
+            Monitoring Tingkat Sekolah
+          </span>
         </div>
 
-        <div 
-          ref={scrollRef}
-          tabIndex={0}
-          className="overflow-x-auto relative will-change-scroll [transform:translateZ(0)] [overscroll-behavior-x:contain] focus:outline-none"
-        >
+        <div className="overflow-x-auto relative will-change-scroll [transform:translateZ(0)]">
           <table className="w-full text-xs text-left border-collapse table-fixed min-w-[1550px]">
             <colgroup>
               <col className="w-10" />
