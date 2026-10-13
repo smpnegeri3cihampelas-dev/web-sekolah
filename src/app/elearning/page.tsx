@@ -3216,30 +3216,14 @@ export default function ELearningPage() {
                           setSelectedClassId(val);
                         }
                       }}
-                      className="px-3.5 py-2 rounded-xl bg-white border border-slate-300 text-slate-800 text-xs font-bold focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 cursor-pointer shadow-xs min-w-[270px]"
+                      className="px-3.5 py-2 rounded-xl bg-white border border-slate-300 text-slate-800 text-xs font-bold focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 cursor-pointer shadow-xs min-w-[240px]"
                     >
-                      <option value="ALL">🌐 Semua Rombel Ajar (Semua Kelas yang Diampu)</option>
-                      
-                      <optgroup label="── Rombel Ajar Anda ──">
-                        {(currentTeacher.classes && currentTeacher.classes.length > 0 ? currentTeacher.classes : ['7-A', '7-B', '8-A', '9-A']).map(clsId => {
-                          const clsInfo = SCHOOL_CLASSES.find(c => c.id === clsId);
-                          return (
-                            <option key={clsId} value={clsId}>
-                              Kelas {clsId} {clsInfo ? `(${clsInfo.totalStudents} Siswa)` : ''}
-                            </option>
-                          );
-                        })}
-                      </optgroup>
-
-                      <optgroup label="── Rombel Sekolah Lainnya ──">
-                        {SCHOOL_CLASSES
-                          .filter(cls => !(currentTeacher.classes || ['7-A', '7-B', '8-A', '9-A']).includes(cls.id))
-                          .map(cls => (
-                            <option key={cls.id} value={cls.id}>
-                              Kelas {cls.name} ({cls.totalStudents} Siswa)
-                            </option>
-                          ))}
-                      </optgroup>
+                      <option value="ALL">🌐 Semua Rombel Ajar</option>
+                      {SCHOOL_CLASSES.map(cls => (
+                        <option key={cls.id} value={cls.id}>
+                          Kelas {cls.name} ({cls.totalStudents} Siswa)
+                        </option>
+                      ))}
                     </select>
 
                     {/* Tombol cepat reset ke semua rombel jika sedang filter kelas spesifik */}
