@@ -2506,7 +2506,7 @@ export default function ELearningPage() {
                 </p>
               </div>
 
-              {/* Sub-tabs: Presensi / Laporan / Tugas & PR / Bahan Ajar / CBT */}
+              {/* Sub-tabs: Presensi / Laporan / Materi & Tugas / CBT */}
               <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs overflow-x-auto max-w-full">
                 <button
                   type="button"
@@ -2539,19 +2539,8 @@ export default function ELearningPage() {
                       : 'text-slate-600 hover:text-slate-900 hover:bg-white'
                   }`}
                 >
-                  <span>Tugas & Asesmen</span>
+                  <span>Materi & Tugas</span>
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveMenu('materi')}
-                  className={`px-3 py-1.5 rounded-lg font-medium transition cursor-pointer whitespace-nowrap ${
-                    activeMenu === 'materi' 
-                      ? 'bg-indigo-600 text-white font-bold shadow-sm' 
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-white'
-                  }`}
-                >
-                  Bahan Ajar
                 </button>
                 <button
                   type="button"
@@ -3167,20 +3156,20 @@ export default function ELearningPage() {
               </div>
             )}
 
-            {/* TAB: TUGAS & PR SISWA (PENGUMPULAN & PENILAIAN) */}
+            {/* TAB: MATERI & PENUGASAN SISWA */}
             {activeMenu === 'tugas' && (
-              <div className="space-y-4">
+              <div className="space-y-6">
                 {/* Header Banner */}
                 <div className="bg-white border border-indigo-100 rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div>
                     <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                      <span>Penugasan & Pemeriksaan Tugas Siswa</span>
+                      <span>Materi Pembelajaran & Penugasan Siswa</span>
                       <span className="text-xs px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 font-semibold">
                         {currentTeacher.subject}
                       </span>
                     </h2>
                     <p className="text-xs text-slate-500 mt-1">
-                      Kelola penugasan mata pelajaran {currentTeacher.subject}, periksa berkas pengerjaan siswa, dan beri nilai secara langsung.
+                      Kelola modul ajar, tayangan slide proyektor, penugasan mata pelajaran {currentTeacher.subject}, dan periksa pengerjaan siswa.
                     </p>
                   </div>
 
@@ -3189,7 +3178,7 @@ export default function ELearningPage() {
                     onClick={() => setIsCreateAsgModalOpen(true)}
                     className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-md shadow-indigo-600/20 flex items-center gap-2 cursor-pointer self-start md:self-auto"
                   >
-                    <span>+ Buat Tugas Baru</span>
+                    <span>+ Buat Tugas / Materi</span>
                   </button>
                 </div>
 
@@ -3367,70 +3356,74 @@ export default function ELearningPage() {
                     </div>
                   );
                 })()}
-              </div>
-            )}
-
-            {/* TAB: BAHAN AJAR / MODUL TAYANG PROYEKTOR */}
-            {activeMenu === 'materi' && (
-              <div className="bg-white border border-indigo-100 rounded-2xl p-6 shadow-sm space-y-6">
-                <div className="flex items-center justify-between border-b border-indigo-50 pb-4">
-                  <div>
-                    <h2 className="text-lg font-bold text-slate-900">Bahan Ajar & Modul Tayang Proyektor</h2>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Tampilkan slide materi ini di layar proyektor kelas atau bagikan ke siswa untuk belajar di rumah.
-                    </p>
-                  </div>
-                  <button 
-                    onClick={() => showToast('Fitur unggah modul ajar baru siap dikembangkan!', 'info')}
-                    className="px-4 py-2 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-bold hover:bg-indigo-100 transition cursor-pointer"
-                  >
-                    + Tambah Modul Baru
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {[
-                    {
-                      title: 'Bab 1: Struktur Sel & Mikroskop',
-                      mapel: 'IPA Kelas 7',
-                      fileType: 'PDF Presentation (14 Slide)',
-                      size: '4.2 MB',
-                      date: '24 Sep 2026',
-                    },
-                    {
-                      title: 'Bab 2: Interaksi Antar Makhluk Hidup',
-                      mapel: 'IPA Kelas 7',
-                      fileType: 'Video Edukasi YouTube & Kuis',
-                      size: '15 Menit',
-                      date: '20 Sep 2026',
-                    },
-                    {
-                      title: 'BSE Resmi Kurikulum Merdeka (Buku Pegangan)',
-                      mapel: 'IPA Kelas 7 & 8',
-                      fileType: 'E-Book Kemendikbud Lengkap',
-                      size: '28 MB',
-                      date: '10 Sep 2026',
-                    }
-                  ].map((m, i) => (
-                    <div key={i} className="p-4 rounded-xl bg-slate-50 border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/20 transition flex flex-col justify-between space-y-3">
-                      <div>
-                        <span className="text-[10px] font-bold text-indigo-700 bg-indigo-100/70 px-2 py-0.5 rounded">
-                          {m.mapel}
+                {/* Modul Tayang Proyektor & Bahan Ajar Terintegrasi */}
+                <div className="bg-white border border-indigo-100 rounded-2xl p-5 sm:p-6 shadow-sm space-y-4 pt-5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-indigo-50 pb-3 gap-2">
+                    <div>
+                      <h3 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
+                        <span>📽️ Bahan Ajar & Modul Tayang Proyektor</span>
+                        <span className="text-[10px] sm:text-xs px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 font-semibold">
+                          {currentTeacher.subject}
                         </span>
-                        <h3 className="text-sm font-bold text-slate-900 mt-2">{m.title}</h3>
-                        <p className="text-xs text-slate-500 mt-1">{m.fileType}</p>
-                      </div>
-                      <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-xs">
-                        <span className="text-slate-500 font-mono text-[11px]">{m.size}</span>
-                        <button 
-                          onClick={() => showToast('Membuka bahan ajar di mode layar penuh proyektor...', 'success')}
-                          className="text-indigo-600 hover:underline font-bold cursor-pointer"
-                        >
-                          Tayangkan ↗
-                        </button>
-                      </div>
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Tampilkan slide materi ini di layar proyektor kelas atau bagikan ke siswa untuk belajar mandiri di rumah.
+                      </p>
                     </div>
-                  ))}
+                    <button 
+                      type="button"
+                      onClick={() => showToast('Fitur unggah modul tayang baru siap digunakan!', 'info')}
+                      className="px-3 py-1.5 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-bold hover:bg-indigo-100 transition cursor-pointer self-start sm:self-auto"
+                    >
+                      + Tambah Modul Tayang
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+                    {[
+                      {
+                        title: 'Bab 1: Struktur Sel & Mikroskop',
+                        mapel: `${currentTeacher.subject} Kelas 7`,
+                        fileType: 'PDF Presentation (14 Slide)',
+                        size: '4.2 MB',
+                        date: '24 Sep 2026',
+                      },
+                      {
+                        title: 'Bab 2: Interaksi Antar Makhluk Hidup',
+                        mapel: `${currentTeacher.subject} Kelas 7`,
+                        fileType: 'Video Edukasi YouTube & Kuis',
+                        size: '15 Menit',
+                        date: '20 Sep 2026',
+                      },
+                      {
+                        title: 'BSE Resmi Kurikulum Merdeka (Buku Pegangan)',
+                        mapel: `${currentTeacher.subject} Lengkap`,
+                        fileType: 'E-Book Kemendikbud Lengkap',
+                        size: '28 MB',
+                        date: '10 Sep 2026',
+                      }
+                    ].map((m, i) => (
+                      <div key={i} className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/20 transition flex flex-col justify-between space-y-3">
+                        <div>
+                          <span className="text-[10px] font-bold text-indigo-700 bg-indigo-100/70 px-2 py-0.5 rounded">
+                            {m.mapel}
+                          </span>
+                          <h4 className="text-xs font-bold text-slate-900 mt-2 line-clamp-1">{m.title}</h4>
+                          <p className="text-[11px] text-slate-500 mt-0.5">{m.fileType}</p>
+                        </div>
+                        <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-xs">
+                          <span className="text-slate-500 font-mono text-[11px]">{m.size}</span>
+                          <button 
+                            type="button"
+                            onClick={() => showToast('Membuka bahan ajar di mode layar penuh proyektor...', 'success')}
+                            className="text-indigo-600 hover:underline font-bold text-xs cursor-pointer"
+                          >
+                            Tayangkan ↗
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
