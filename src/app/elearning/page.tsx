@@ -2524,7 +2524,7 @@ export default function ELearningPage() {
                     <>Rekapitulasi presensi harian, bulanan, dan semester mata pelajaran <span className="text-indigo-700 font-semibold">{currentTeacher.subject}</span></>
                   )}
                   {activeMenu === 'tugas' && (
-                    <>Pusat modul pembelajaran, tayangan proyektor, dan penugasan mata pelajaran <span className="text-indigo-700 font-semibold">{currentTeacher.subject}</span></>
+                    <>Pusat modul ajar, materi pembelajaran, dan penugasan mata pelajaran <span className="text-indigo-700 font-semibold">{currentTeacher.subject}</span></>
                   )}
                   {activeMenu === 'cbt' && (
                     <>Bank soal evaluasi dan simulasi ujian komputer (CBT) mata pelajaran <span className="text-indigo-700 font-semibold">{currentTeacher.subject}</span></>
@@ -3195,7 +3195,7 @@ export default function ELearningPage() {
                       </span>
                     </h2>
                     <p className="text-xs text-slate-500 mt-1">
-                      Kelola modul ajar, tayangan slide proyektor, penugasan mata pelajaran {currentTeacher.subject}, dan periksa pengerjaan siswa.
+                      Kelola modul ajar, penugasan mata pelajaran {currentTeacher.subject}, dan periksa hasil pengerjaan siswa per rombel.
                     </p>
                   </div>
 
@@ -3380,75 +3380,6 @@ export default function ELearningPage() {
                     </div>
                   );
                 })()}
-                {/* Modul Tayang Proyektor & Bahan Ajar Terintegrasi */}
-                <div className="bg-white border border-indigo-100 rounded-2xl p-5 sm:p-6 shadow-sm space-y-4 pt-5">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-indigo-50 pb-3 gap-2">
-                    <div>
-                      <h3 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
-                        <span>📽️ Bahan Ajar & Modul Tayang Proyektor</span>
-                        <span className="text-[10px] sm:text-xs px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 font-semibold">
-                          {currentTeacher.subject}
-                        </span>
-                      </h3>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        Tampilkan slide materi ini di layar proyektor kelas atau bagikan ke siswa untuk belajar mandiri di rumah.
-                      </p>
-                    </div>
-                    <button 
-                      type="button"
-                      onClick={() => showToast('Fitur unggah modul tayang baru siap digunakan!', 'info')}
-                      className="px-3 py-1.5 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-bold hover:bg-indigo-100 transition cursor-pointer self-start sm:self-auto"
-                    >
-                      + Tambah Modul Tayang
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-                    {[
-                      {
-                        title: 'Bab 1: Struktur Sel & Mikroskop',
-                        mapel: `${currentTeacher.subject} Kelas 7`,
-                        fileType: 'PDF Presentation (14 Slide)',
-                        size: '4.2 MB',
-                        date: '24 Sep 2026',
-                      },
-                      {
-                        title: 'Bab 2: Interaksi Antar Makhluk Hidup',
-                        mapel: `${currentTeacher.subject} Kelas 7`,
-                        fileType: 'Video Edukasi YouTube & Kuis',
-                        size: '15 Menit',
-                        date: '20 Sep 2026',
-                      },
-                      {
-                        title: 'BSE Resmi Kurikulum Merdeka (Buku Pegangan)',
-                        mapel: `${currentTeacher.subject} Lengkap`,
-                        fileType: 'E-Book Kemendikbud Lengkap',
-                        size: '28 MB',
-                        date: '10 Sep 2026',
-                      }
-                    ].map((m, i) => (
-                      <div key={i} className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/20 transition flex flex-col justify-between space-y-3">
-                        <div>
-                          <span className="text-[10px] font-bold text-indigo-700 bg-indigo-100/70 px-2 py-0.5 rounded">
-                            {m.mapel}
-                          </span>
-                          <h4 className="text-xs font-bold text-slate-900 mt-2 line-clamp-1">{m.title}</h4>
-                          <p className="text-[11px] text-slate-500 mt-0.5">{m.fileType}</p>
-                        </div>
-                        <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-xs">
-                          <span className="text-slate-500 font-mono text-[11px]">{m.size}</span>
-                          <button 
-                            type="button"
-                            onClick={() => showToast('Membuka bahan ajar di mode layar penuh proyektor...', 'success')}
-                            className="text-indigo-600 hover:underline font-bold text-xs cursor-pointer"
-                          >
-                            Tayangkan ↗
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
               </div>
             )}
 
