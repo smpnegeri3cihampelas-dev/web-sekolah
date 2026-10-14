@@ -45,16 +45,26 @@ export default function CbtTeacherManagement({
   const [newToken, setNewToken] = useState<string>('');
   const [newPassingGrade, setNewPassingGrade] = useState<number>(75);
 
+  const [studentSessions, setStudentSessions] = useState(() => getStoredStudentCbtSessions());
+
   // Load packages on mount & subscribe to updates
   useEffect(() => {
     setPackages(getStoredCbtPackages());
 
-    const handleUpdate = () => {
+    const handlePkgUpdate = () => {
       setPackages(getStoredCbtPackages());
     };
 
-    window.addEventListener('cbtPackagesUpdated', handleUpdate);
-    return () => window.removeEventListener('cbtPackagesUpdated', handleUpdate);
+    const handleSessUpdate = () => {
+      setStudentSessions(getStoredStudentCbtSessions());
+    };
+
+    window.addEventListener('cbtPackagesUpdated', handlePkgUpdate);
+    window.addEventListener('cbtSessionsUpdated', handleSessUpdate);
+    return () => {
+      window.removeEventListener('cbtPackagesUpdated', handlePkgUpdate);
+      window.removeEventListener('cbtSessionsUpdated', handleSessUpdate);
+    };
   }, []);
 
   // Set default selected package for scores when packages change
@@ -177,7 +187,7 @@ export default function CbtTeacherManagement({
   const studentResultsForScores = useMemo(() => {
     if (!selectedPackageForScores) return [];
 
-    const allSessions = getStoredStudentCbtSessions();
+    const allSessions = studentSessions;
     const pkgId = selectedPackageForScores.id;
 
     // Filter students targeted by this exam
@@ -210,7 +220,7 @@ export default function CbtTeacherManagement({
         hasSubmitted: Boolean(session?.isSubmitted)
       };
     }).sort((a, b) => b.score - a.score || a.studentName.localeCompare(b.studentName));
-  }, [selectedPackageForScores, activeStudents, selectedScoreClass]);
+  }, [selectedPackageForScores, activeStudents, selectedScoreClass, studentSessions]);
 
   // Handle Export Leger to Excel
   const handleExportLeger = () => {

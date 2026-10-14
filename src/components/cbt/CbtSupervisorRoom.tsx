@@ -43,11 +43,16 @@ export default function CbtSupervisorRoom({
 
   // Load packages & live sessions
   useEffect(() => {
-    const pkgs = getStoredCbtPackages();
-    setPackages(pkgs);
-    if (pkgs.length > 0 && !selectedExamId) {
-      setSelectedExamId(pkgs[0].id);
-    }
+    const handlePkgsUpdate = () => {
+      const pkgs = getStoredCbtPackages();
+      setPackages(pkgs);
+      if (pkgs.length > 0 && !selectedExamId) {
+        setSelectedExamId(pkgs[0].id);
+      }
+    };
+    handlePkgsUpdate();
+    window.addEventListener('cbtPackagesUpdated', handlePkgsUpdate);
+    return () => window.removeEventListener('cbtPackagesUpdated', handlePkgsUpdate);
   }, [selectedExamId]);
 
   const selectedExam = useMemo(() => {
