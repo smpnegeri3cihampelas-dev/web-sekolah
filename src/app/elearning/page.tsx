@@ -54,7 +54,8 @@ import {
   CbtExamPackage,
   CbtStudentAnswerState,
   getStoredCbtPackages,
-  getStoredStudentCbtSessions
+  getStoredStudentCbtSessions,
+  resetStoredStudentCbtSession
 } from '@/lib/cbtData';
 import { getStoredSchoolData } from '@/lib/schoolData';
 
@@ -1285,23 +1286,26 @@ export default function ELearningPage() {
   } | null>(null);
 
   // Realtime CBT Packages & Student Sessions
-  const [cbtPackages, setCbtPackages] = useState<CbtExamPackage[]>([]);
-  const [cbtStudentSessions, setCbtStudentSessions] = useState<Record<string, CbtStudentAnswerState>>({});
+  const [cbtPackages, setCbtPackages] = useState<CbtExamPackage[]>(() => getStoredCbtPackages());
+  const [cbtStudentSessions, setCbtStudentSessions] = useState<Record<string, CbtStudentAnswerState>>(() => getStoredStudentCbtSessions());
 
   useEffect(() => {
-    setCbtPackages(getStoredCbtPackages());
-    setCbtStudentSessions(getStoredStudentCbtSessions());
-
-    const handlePkgsUpdate = () => setCbtPackages(getStoredCbtPackages());
-    const handleSessUpdate = () => setCbtStudentSessions(getStoredStudentCbtSessions());
-
-    window.addEventListener('cbtPackagesUpdated', handlePkgsUpdate);
-    window.addEventListener('cbtSessionsUpdated', handleSessUpdate);
-    return () => {
-      window.removeEventListener('cbtPackagesUpdated', handlePkgsUpdate);
-      window.removeEventListener('cbtSessionsUpdated', handleSessUpdate);
+    const syncCbtData = () => {
+      setCbtPackages(getStoredCbtPackages());
+      setCbtStudentSessions(getStoredStudentCbtSessions());
     };
-  }, []);
+
+    syncCbtData();
+
+    window.addEventListener('cbtPackagesUpdated', syncCbtData);
+    window.addEventListener('cbtSessionsUpdated', syncCbtData);
+    window.addEventListener('storage', syncCbtData);
+    return () => {
+      window.removeEventListener('cbtPackagesUpdated', syncCbtData);
+      window.removeEventListener('cbtSessionsUpdated', syncCbtData);
+      window.removeEventListener('storage', syncCbtData);
+    };
+  }, [currentUser]);
   
   // Assignments & Homework State
   const [assignments, setAssignments] = useState<Assignment[]>([]);
@@ -4805,17 +4809,13 @@ export default function ELearningPage() {
                 activeStudents[0];
               const studentClass = currentUser.classId || '7-A';
 
-              // 1. Ujian yang saat ini AKTIF dan BELUM dikerjakan oleh siswa ini (LIVE CBT)
-              const activeExamsToTake = cbtPackages.filter(pkg => {
+              // 1. Ujian yang saat ini AKTIF untuk kelas siswa ini (Hanya yang berstatus AKTIF!)
+              const activeExamsForClass = cbtPackages.filter(pkg => {
                 const isClassMatch = pkg.targetClasses.includes(studentClass) || 
                   pkg.targetClasses.includes('Semua') || 
                   pkg.targetClasses.some(c => c.startsWith(studentClass.split('-')[0]));
                 if (!isClassMatch) return false;
-                if (pkg.status !== 'active') return false; // JIKA DIJEDA (DRAFT) -> JANGAN MUNCUL!
-                
-                const sessionKey = `${pkg.id}_${currentStudent?.id || ''}`;
-                const mySession = cbtStudentSessions[sessionKey];
-                return !mySession?.isSubmitted; // JIKA SUDAH SELESAI -> TIDAK MASUK LIVE!
+                return pkg.status === 'active'; // JIKA DIJEDA (DRAFT) -> TIDAK MUNCUL DI LIVE CBT!
               });
 
               // 2. Ujian yang SUDAH SELESAI dikumpulkan oleh siswa ini
@@ -4825,12 +4825,12 @@ export default function ELearningPage() {
                 return Boolean(mySession?.isSubmitted);
               });
 
-              if (activeExamsToTake.length === 0 && completedExams.length === 0) return null;
+              if (activeExamsForClass.length === 0 && completedExams.length === 0) return null;
 
               return (
                 <div className="space-y-4">
-                  {/* A. BANNER LIVE UJIAN CBT (HANYA MUNCUL JIKA ADA UJIAN AKTIF YANG BELUM DIKERJAKAN) */}
-                  {activeExamsToTake.length > 0 && (
+                  {/* A. BANNER LIVE UJIAN CBT (HANYA MUNCUL JIKA ADA UJIAN YANG AKTIF) */}
+                  {activeExamsForClass.length > 0 && (
                     <div className="bg-gradient-to-br from-indigo-900 via-indigo-950 to-slate-900 rounded-2xl p-5 sm:p-6 text-white shadow-xl border border-indigo-700/50 relative overflow-hidden space-y-4 animate-fade-in">
                       <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
                       
@@ -4860,58 +4860,97 @@ export default function ELearningPage() {
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 relative z-10">
-                        {activeExamsToTake.map(exam => (
-                          <div 
-                            key={exam.id} 
-                            className="bg-white/10 backdrop-blur-md border border-amber-400/40 hover:bg-white/15 rounded-xl p-4 flex flex-col justify-between gap-3 transition"
-                          >
-                            <div>
-                              <div className="flex items-center justify-between gap-2 mb-1.5">
-                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400/20 text-amber-300 border border-amber-400/30">
-                                  {exam.semester} • TP {exam.academicYear}
-                                </span>
-                                <span className="text-[11px] font-medium text-indigo-200">
-                                  {exam.questions.length} Butir Soal
-                                </span>
-                              </div>
-                              <h3 className="text-sm font-bold text-white line-clamp-1">
-                                {exam.title}
-                              </h3>
-                              <p className="text-xs text-indigo-200 mb-2">
-                                Mata Pelajaran: <strong className="text-white">{exam.subject}</strong> • Pengampu: {exam.teacherName}
-                              </p>
+                        {activeExamsForClass.map(exam => {
+                          const sessionKey = `${exam.id}_${currentStudent?.id || ''}`;
+                          const mySession = cbtStudentSessions[sessionKey];
+                          const isSubmitted = Boolean(mySession?.isSubmitted);
+                          const score = mySession?.score ?? 0;
+                          const isPassed = score >= exam.passingGrade;
 
-                              <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-indigo-300">
-                                <span className="bg-indigo-950/60 px-2 py-0.5 rounded border border-indigo-800">
-                                  ⏱️ {exam.durationMinutes} Menit
-                                </span>
-                                <span className="bg-indigo-950/60 px-2 py-0.5 rounded border border-indigo-800">
-                                  🎯 KKM {exam.passingGrade}
-                                </span>
-                                <span className="bg-amber-400/10 text-amber-300 px-2 py-0.5 rounded border border-amber-400/20 font-mono">
-                                  Token: <strong>{exam.token}</strong>
-                                </span>
+                          return (
+                            <div 
+                              key={exam.id} 
+                              className="bg-white/10 backdrop-blur-md border border-amber-400/40 hover:bg-white/15 rounded-xl p-4 flex flex-col justify-between gap-3 transition"
+                            >
+                              <div>
+                                <div className="flex items-center justify-between gap-2 mb-1.5">
+                                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400/20 text-amber-300 border border-amber-400/30">
+                                    {exam.semester} • TP {exam.academicYear}
+                                  </span>
+                                  <span className="text-[11px] font-medium text-indigo-200">
+                                    {exam.questions.length} Butir Soal
+                                  </span>
+                                </div>
+                                <h3 className="text-sm font-bold text-white line-clamp-1">
+                                  {exam.title}
+                                </h3>
+                                <p className="text-xs text-indigo-200 mb-2">
+                                  Mata Pelajaran: <strong className="text-white">{exam.subject}</strong> • Pengampu: {exam.teacherName}
+                                </p>
+
+                                <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-indigo-300">
+                                  <span className="bg-indigo-950/60 px-2 py-0.5 rounded border border-indigo-800">
+                                    ⏱️ {exam.durationMinutes} Menit
+                                  </span>
+                                  <span className="bg-indigo-950/60 px-2 py-0.5 rounded border border-indigo-800">
+                                    🎯 KKM {exam.passingGrade}
+                                  </span>
+                                  <span className="bg-amber-400/10 text-amber-300 px-2 py-0.5 rounded border border-amber-400/20 font-mono">
+                                    Token: <strong>{exam.token}</strong>
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="pt-2 border-t border-white/10">
+                                {isSubmitted ? (
+                                  <div className="space-y-2">
+                                    <div className="w-full flex items-center justify-between bg-emerald-500/20 border border-emerald-400/30 px-3 py-1.5 rounded-lg text-emerald-300 text-xs">
+                                      <span className="font-bold flex items-center gap-1">
+                                        <span>✓</span>
+                                        <span>Sudah Dikerjakan (Skor: {score}/100)</span>
+                                      </span>
+                                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isPassed ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'}`}>
+                                        {isPassed ? 'Tuntas' : 'Remedial'}
+                                      </span>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (confirm(`Ujian ini sudah pernah kamu kerjakan dengan skor ${score}/100. Apakah kamu ingin mengulang pengerjaan sekarang?`)) {
+                                          resetStoredStudentCbtSession(exam.id, currentStudent.id);
+                                          setActiveCbtExamSession({
+                                            exam,
+                                            student: currentStudent,
+                                            roomName: `Ruang ${studentClass}`
+                                          });
+                                        }
+                                      }}
+                                      className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-black text-xs transition shadow-md shadow-emerald-500/25 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                                    >
+                                      <span>🔄</span>
+                                      <span>Kerjakan Ulang Ujian CBT</span>
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActiveCbtExamSession({
+                                        exam,
+                                        student: currentStudent,
+                                        roomName: `Ruang ${studentClass}`
+                                      });
+                                    }}
+                                    className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs transition shadow-lg shadow-amber-500/25 flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                                  >
+                                    <span>🚀 Masuk Ruang Ujian CBT</span>
+                                    <span>➔</span>
+                                  </button>
+                                )}
                               </div>
                             </div>
-
-                            <div className="pt-2 border-t border-white/10">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setActiveCbtExamSession({
-                                    exam,
-                                    student: currentStudent,
-                                    roomName: `Ruang ${studentClass}`
-                                  });
-                                }}
-                                className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs transition shadow-lg shadow-amber-500/25 flex items-center justify-center gap-2 cursor-pointer active:scale-95"
-                              >
-                                <span>🚀 Masuk Ruang Ujian CBT</span>
-                                <span>➔</span>
-                              </button>
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   )}

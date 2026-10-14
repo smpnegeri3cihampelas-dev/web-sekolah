@@ -84,14 +84,14 @@ export default function CbtTeacherManagement({
     const generatedToken = newToken.trim() || `PAS${newGrade}${Math.floor(10 + Math.random() * 90)}`;
     
     // Classes for selected grade
-    const targetClasses = SCHOOL_CLASSES.filter(c => c.name.startsWith(newGrade)).map(c => c.id);
+    const targetClasses = SCHOOL_CLASSES.filter(c => c.id.startsWith(newGrade)).map(c => c.id);
 
     const newPkg: CbtExamPackage = {
       id: newId,
       title: newTitle.trim(),
       subject: newSubject,
       gradeLevel: newGrade,
-      targetClasses: targetClasses.length > 0 ? targetClasses : ['7-A', '7-B', '7-C'],
+      targetClasses: targetClasses.length > 0 ? targetClasses : ['7-A', '7-B', '7-C', '7-D', '7-E', '7-F'],
       semester: 'Ganjil (PTS/STS)',
       academicYear: '2026/2027',
       durationMinutes: newDuration,
