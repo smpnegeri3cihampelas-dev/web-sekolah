@@ -1283,6 +1283,25 @@ export default function ELearningPage() {
     student: Student;
     roomName: string;
   } | null>(null);
+
+  // Realtime CBT Packages & Student Sessions
+  const [cbtPackages, setCbtPackages] = useState<CbtExamPackage[]>([]);
+  const [cbtStudentSessions, setCbtStudentSessions] = useState<Record<string, CbtStudentAnswerState>>({});
+
+  useEffect(() => {
+    setCbtPackages(getStoredCbtPackages());
+    setCbtStudentSessions(getStoredStudentCbtSessions());
+
+    const handlePkgsUpdate = () => setCbtPackages(getStoredCbtPackages());
+    const handleSessUpdate = () => setCbtStudentSessions(getStoredStudentCbtSessions());
+
+    window.addEventListener('cbtPackagesUpdated', handlePkgsUpdate);
+    window.addEventListener('cbtSessionsUpdated', handleSessUpdate);
+    return () => {
+      window.removeEventListener('cbtPackagesUpdated', handlePkgsUpdate);
+      window.removeEventListener('cbtSessionsUpdated', handleSessUpdate);
+    };
+  }, []);
   
   // Assignments & Homework State
   const [assignments, setAssignments] = useState<Assignment[]>([]);
@@ -4779,119 +4798,103 @@ export default function ELearningPage() {
               </div>
             </div>
 
-            {/* UJIAN CBT AKTIF (PTS / PAS / ASESMEN SUMATIF) */}
+            {/* CBT SECTION: TERBAGI MENJADI LIVE CBT (SEDANG AKTIF) & RIWAYAT NILAI (SUDAH SELESAI) */}
             {(() => {
               const currentStudent = activeStudents.find(s => s.nisn === currentUser.nipOrNisn) ||
                 activeStudents.find(s => s.name.toLowerCase() === currentUser.name?.toLowerCase()) ||
                 activeStudents[0];
               const studentClass = currentUser.classId || '7-A';
-              const allCbtPackages = getStoredCbtPackages();
-              const studentSessions = getStoredStudentCbtSessions();
-              
-              // Filter active or completed packages for this student's class
-              const relevantExams = allCbtPackages.filter(pkg => 
-                (pkg.targetClasses.includes(studentClass) || 
-                 pkg.targetClasses.includes('Semua') || 
-                 pkg.targetClasses.some(c => c.startsWith(studentClass.split('-')[0])))
-              );
 
-              if (relevantExams.length === 0) return null;
+              // 1. Ujian yang saat ini AKTIF dan BELUM dikerjakan oleh siswa ini (LIVE CBT)
+              const activeExamsToTake = cbtPackages.filter(pkg => {
+                const isClassMatch = pkg.targetClasses.includes(studentClass) || 
+                  pkg.targetClasses.includes('Semua') || 
+                  pkg.targetClasses.some(c => c.startsWith(studentClass.split('-')[0]));
+                if (!isClassMatch) return false;
+                if (pkg.status !== 'active') return false; // JIKA DIJEDA (DRAFT) -> JANGAN MUNCUL!
+                
+                const sessionKey = `${pkg.id}_${currentStudent?.id || ''}`;
+                const mySession = cbtStudentSessions[sessionKey];
+                return !mySession?.isSubmitted; // JIKA SUDAH SELESAI -> TIDAK MASUK LIVE!
+              });
+
+              // 2. Ujian yang SUDAH SELESAI dikumpulkan oleh siswa ini
+              const completedExams = cbtPackages.filter(pkg => {
+                const sessionKey = `${pkg.id}_${currentStudent?.id || ''}`;
+                const mySession = cbtStudentSessions[sessionKey];
+                return Boolean(mySession?.isSubmitted);
+              });
+
+              if (activeExamsToTake.length === 0 && completedExams.length === 0) return null;
 
               return (
-                <div className="bg-gradient-to-br from-indigo-900 via-indigo-950 to-slate-900 rounded-2xl p-5 sm:p-6 text-white shadow-xl border border-indigo-700/50 relative overflow-hidden space-y-4">
-                  <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
-                  
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-10 border-b border-indigo-700/60 pb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center text-xl font-black shadow-md shadow-amber-400/20 flex-shrink-0">
-                        💻
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h2 className="text-base font-black tracking-wide text-white">
-                            ASESMEN & UJIAN CBT
-                          </h2>
-                          <span className="px-2 py-0.5 rounded-full bg-red-500 text-white text-[10px] font-black tracking-wider animate-pulse uppercase">
-                            LIVE CBT
-                          </span>
-                        </div>
-                        <p className="text-xs text-indigo-200">
-                          Siswa Kelas <span className="text-amber-300 font-bold">{studentClass}</span> • Kerjakan dengan jujur dan ikuti instruksi Pengawas Ruang.
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-xs bg-indigo-950/80 border border-indigo-700/60 px-3 py-1.5 rounded-xl font-mono text-indigo-200 self-start sm:self-auto flex items-center gap-2">
-                      <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-                      Ruangan: <span className="font-bold text-amber-300">Ruang {studentClass}</span>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 relative z-10">
-                    {relevantExams.map(exam => {
-                      const sessionKey = `${exam.id}_${currentStudent?.id || ''}`;
-                      const mySession = studentSessions[sessionKey];
-                      const isSubmitted = mySession?.isSubmitted;
-                      const isPassed = (mySession?.score ?? 0) >= exam.passingGrade;
-
-                      return (
-                        <div 
-                          key={exam.id} 
-                          className={`bg-white/10 backdrop-blur-md border rounded-xl p-4 flex flex-col justify-between gap-3 transition ${
-                            isSubmitted 
-                              ? 'border-emerald-500/30 bg-emerald-950/20' 
-                              : exam.status === 'active'
-                              ? 'border-amber-400/40 bg-white/10 hover:bg-white/15'
-                              : 'border-white/10 opacity-75'
-                          }`}
-                        >
+                <div className="space-y-4">
+                  {/* A. BANNER LIVE UJIAN CBT (HANYA MUNCUL JIKA ADA UJIAN AKTIF YANG BELUM DIKERJAKAN) */}
+                  {activeExamsToTake.length > 0 && (
+                    <div className="bg-gradient-to-br from-indigo-900 via-indigo-950 to-slate-900 rounded-2xl p-5 sm:p-6 text-white shadow-xl border border-indigo-700/50 relative overflow-hidden space-y-4 animate-fade-in">
+                      <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+                      
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-10 border-b border-indigo-700/60 pb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center text-xl font-black shadow-md shadow-amber-400/20 flex-shrink-0">
+                            💻
+                          </div>
                           <div>
-                            <div className="flex items-center justify-between gap-2 mb-1.5">
-                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400/20 text-amber-300 border border-amber-400/30">
-                                {exam.semester} • TP {exam.academicYear}
-                              </span>
-                              <span className="text-[11px] font-medium text-indigo-200">
-                                {exam.questions.length} Butir Soal
+                            <div className="flex items-center gap-2">
+                              <h2 className="text-base font-black tracking-wide text-white">
+                                ASESMEN & UJIAN CBT
+                              </h2>
+                              <span className="px-2 py-0.5 rounded-full bg-red-500 text-white text-[10px] font-black tracking-wider animate-pulse uppercase">
+                                LIVE CBT
                               </span>
                             </div>
-                            <h3 className="text-sm font-bold text-white line-clamp-1">
-                              {exam.title}
-                            </h3>
-                            <p className="text-xs text-indigo-200 mb-2">
-                              Mata Pelajaran: <strong className="text-white">{exam.subject}</strong> • Pengampu: {exam.teacherName}
+                            <p className="text-xs text-indigo-200">
+                              Siswa Kelas <span className="text-amber-300 font-bold">{studentClass}</span> • Silakan masuk dan kerjakan dengan jujur.
                             </p>
+                          </div>
+                        </div>
+                        <div className="text-xs bg-indigo-950/80 border border-indigo-700/60 px-3 py-1.5 rounded-xl font-mono text-indigo-200 self-start sm:self-auto flex items-center gap-2">
+                          <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                          Ruangan: <span className="font-bold text-amber-300">Ruang {studentClass}</span>
+                        </div>
+                      </div>
 
-                            <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-indigo-300">
-                              <span className="bg-indigo-950/60 px-2 py-0.5 rounded border border-indigo-800">
-                                ⏱️ {exam.durationMinutes} Menit
-                              </span>
-                              <span className="bg-indigo-950/60 px-2 py-0.5 rounded border border-indigo-800">
-                                🎯 KKM {exam.passingGrade}
-                              </span>
-                              {exam.status === 'active' && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 relative z-10">
+                        {activeExamsToTake.map(exam => (
+                          <div 
+                            key={exam.id} 
+                            className="bg-white/10 backdrop-blur-md border border-amber-400/40 hover:bg-white/15 rounded-xl p-4 flex flex-col justify-between gap-3 transition"
+                          >
+                            <div>
+                              <div className="flex items-center justify-between gap-2 mb-1.5">
+                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400/20 text-amber-300 border border-amber-400/30">
+                                  {exam.semester} • TP {exam.academicYear}
+                                </span>
+                                <span className="text-[11px] font-medium text-indigo-200">
+                                  {exam.questions.length} Butir Soal
+                                </span>
+                              </div>
+                              <h3 className="text-sm font-bold text-white line-clamp-1">
+                                {exam.title}
+                              </h3>
+                              <p className="text-xs text-indigo-200 mb-2">
+                                Mata Pelajaran: <strong className="text-white">{exam.subject}</strong> • Pengampu: {exam.teacherName}
+                              </p>
+
+                              <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-indigo-300">
+                                <span className="bg-indigo-950/60 px-2 py-0.5 rounded border border-indigo-800">
+                                  ⏱️ {exam.durationMinutes} Menit
+                                </span>
+                                <span className="bg-indigo-950/60 px-2 py-0.5 rounded border border-indigo-800">
+                                  🎯 KKM {exam.passingGrade}
+                                </span>
                                 <span className="bg-amber-400/10 text-amber-300 px-2 py-0.5 rounded border border-amber-400/20 font-mono">
                                   Token: <strong>{exam.token}</strong>
                                 </span>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="pt-2 border-t border-white/10 flex items-center justify-between gap-3">
-                            {isSubmitted ? (
-                              <div className="w-full flex items-center justify-between bg-emerald-500/20 border border-emerald-400/30 px-3 py-2 rounded-xl text-emerald-300 text-xs">
-                                <div className="flex items-center gap-1.5 font-bold">
-                                  <span>✓</span>
-                                  <span>Telah Selesai</span>
-                                  <span className={`text-[10px] px-1.5 py-0.2 rounded font-semibold ${
-                                    isPassed ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'
-                                  }`}>
-                                    {isPassed ? 'Tuntas' : 'Remedial'}
-                                  </span>
-                                </div>
-                                <div className="font-bold text-white bg-emerald-600/70 px-2.5 py-0.5 rounded-lg text-xs">
-                                  Skor: {mySession.score ?? 0}/100
-                                </div>
                               </div>
-                            ) : exam.status === 'active' ? (
+                            </div>
+
+                            <div className="pt-2 border-t border-white/10">
                               <button
                                 type="button"
                                 onClick={() => {
@@ -4901,21 +4904,75 @@ export default function ELearningPage() {
                                     roomName: `Ruang ${studentClass}`
                                   });
                                 }}
-                                className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs transition shadow-lg shadow-amber-500/25 flex items-center justify-center gap-2 cursor-pointer"
+                                className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs transition shadow-lg shadow-amber-500/25 flex items-center justify-center gap-2 cursor-pointer active:scale-95"
                               >
                                 <span>🚀 Masuk Ruang Ujian CBT</span>
                                 <span>➔</span>
                               </button>
-                            ) : (
-                              <div className="w-full text-center py-1.5 text-xs text-slate-400 italic">
-                                Ujian belum dibuka oleh Guru Pengampu
-                              </div>
-                            )}
+                            </div>
                           </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* B. RIWAYAT & HASIL NILAI CBT (MUNCUL JIKA ADA UJIAN YANG SUDAH SELESAI DIKERJAKAN) */}
+                  {completedExams.length > 0 && (
+                    <div className="bg-white border border-indigo-100 rounded-2xl p-5 shadow-sm space-y-3">
+                      <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                        <div className="flex items-center gap-2">
+                          <span className="text-base">📊</span>
+                          <h3 className="text-sm font-bold text-slate-900">
+                            Riwayat Nilai & Hasil Ujian CBT Saya
+                          </h3>
                         </div>
-                      );
-                    })}
-                  </div>
+                        <span className="text-[11px] text-slate-500 font-medium">
+                          {completedExams.length} Asesmen Selesai
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                        {completedExams.map(exam => {
+                          const sessionKey = `${exam.id}_${currentStudent?.id || ''}`;
+                          const mySession = cbtStudentSessions[sessionKey];
+                          const score = mySession?.score ?? 0;
+                          const isPassed = score >= exam.passingGrade;
+
+                          return (
+                            <div key={exam.id} className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex flex-col justify-between gap-2.5">
+                              <div>
+                                <div className="flex items-center justify-between gap-2 mb-1">
+                                  <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md truncate max-w-[140px]">
+                                    {exam.subject}
+                                  </span>
+                                  <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${
+                                    isPassed ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                                  }`}>
+                                    {isPassed ? '✓ TUNTAS' : '⚠️ REMEDIAL'}
+                                  </span>
+                                </div>
+                                <h4 className="text-xs font-bold text-slate-900 line-clamp-1" title={exam.title}>
+                                  {exam.title}
+                                </h4>
+                                <p className="text-[11px] text-slate-500 mt-0.5">
+                                  KKM: {exam.passingGrade} • {exam.questions.length} Soal
+                                </p>
+                              </div>
+
+                              <div className="pt-2 border-t border-slate-200/80 flex items-center justify-between">
+                                <div className="text-[11px] text-slate-400">
+                                  Nilai Diperoleh:
+                                </div>
+                                <div className="text-base font-black font-mono text-indigo-700">
+                                  {score}<span className="text-xs text-slate-400 font-normal">/100</span>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })()}

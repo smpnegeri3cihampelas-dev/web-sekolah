@@ -414,6 +414,21 @@ export function saveStoredStudentCbtSession(session: CbtStudentAnswerState) {
   }
 }
 
+export function resetStoredStudentCbtSession(examId: string, studentId: string) {
+  if (typeof window === 'undefined') return;
+  try {
+    const all = getStoredStudentCbtSessions();
+    const key = `${examId}_${studentId}`;
+    if (all[key]) {
+      delete all[key];
+      localStorage.setItem(CBT_STUDENT_SESSIONS_KEY, JSON.stringify(all));
+      window.dispatchEvent(new Event('cbtSessionsUpdated'));
+    }
+  } catch (e) {
+    console.error('Failed resetting student CBT session', e);
+  }
+}
+
 export function getStoredCbtRoomAttendances(): Record<string, CbtRoomAttendance> {
   if (typeof window === 'undefined') return {};
   try {

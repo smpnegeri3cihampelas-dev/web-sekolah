@@ -7,7 +7,8 @@ import {
   CbtQuestionType,
   getStoredCbtPackages,
   saveStoredCbtPackages,
-  getStoredStudentCbtSessions
+  getStoredStudentCbtSessions,
+  resetStoredStudentCbtSession
 } from '@/lib/cbtData';
 import { Student, SCHOOL_CLASSES } from '@/lib/elearningData';
 import { exportCbtScoreLegerToExcel } from '@/lib/elearningExport';
@@ -657,12 +658,13 @@ export default function CbtTeacherManagement({
                     <th className="px-3 py-2.5 w-24 text-center">Nilai Akhir</th>
                     <th className="px-3 py-2.5 w-28 text-center">Ketuntasan</th>
                     <th className="px-3 py-2.5 w-28 text-center">Waktu Kumpul</th>
+                    <th className="px-3 py-2.5 w-20 text-center">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {studentResultsForScores.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="text-center py-8 text-slate-400">
+                      <td colSpan={8} className="text-center py-8 text-slate-400">
                         Belum ada data siswa untuk kriteria ini.
                       </td>
                     </tr>
@@ -701,6 +703,26 @@ export default function CbtTeacherManagement({
                         </td>
                         <td className="px-3 py-2.5 text-center font-mono text-slate-500 text-[11px]">
                           {res.submittedAt ? res.submittedAt.slice(11, 16) + ' WIB' : '-'}
+                        </td>
+                        <td className="px-3 py-2.5 text-center">
+                          {res.hasSubmitted ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!selectedPackageForScores) return;
+                                if (confirm(`Reset sesi ujian untuk ${res.studentName}? Nilai dan jawaban sebelumnya akan dihapus sehingga siswa dapat mengikuti ujian kembali.`)) {
+                                  resetStoredStudentCbtSession(selectedPackageForScores.id, res.studentId);
+                                }
+                              }}
+                              className="px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-[10px] font-bold transition flex items-center justify-center gap-1 mx-auto cursor-pointer shadow-xs active:scale-95"
+                              title="Reset ujian siswa ini agar bisa mengulang"
+                            >
+                              <span>🔄</span>
+                              <span>Reset</span>
+                            </button>
+                          ) : (
+                            <span className="text-slate-300">-</span>
+                          )}
                         </td>
                       </tr>
                     ))

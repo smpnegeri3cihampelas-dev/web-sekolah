@@ -9,6 +9,7 @@ import {
   saveStoredCbtRoomAttendance,
   getStoredStudentCbtSessions,
   registerEmergencyStudentToCbt,
+  resetStoredStudentCbtSession,
   CbtRoomAttendance
 } from '@/lib/cbtData';
 import { Student } from '@/lib/elearningData';
@@ -436,16 +437,35 @@ export default function CbtSupervisorRoom({
 
                       {/* Test / Reset Button */}
                       <td className="px-3 py-2.5 text-center">
-                        {onOpenExamForStudent && (
-                          <button
-                            type="button"
-                            onClick={() => onOpenExamForStudent(selectedExam, st, selectedRoom)}
-                            className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[11px] font-bold transition cursor-pointer"
-                            title="Buka Lembar Ujian CBT untuk Siswa Ini"
-                          >
-                            🚀 Uji CBT
-                          </button>
-                        )}
+                        <div className="flex items-center justify-center gap-1.5">
+                          {session?.isSubmitted ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!selectedExam) return;
+                                if (confirm(`Reset ujian CBT untuk ${st.name}? Siswa akan dapat mengerjakan ulang ujian ini.`)) {
+                                  resetStoredStudentCbtSession(selectedExam.id, st.id);
+                                }
+                              }}
+                              className="px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-[10px] font-bold transition cursor-pointer shadow-xs active:scale-95 flex items-center gap-1"
+                              title="Reset status selesai siswa ini agar bisa mengulang ujian"
+                            >
+                              <span>🔄</span>
+                              <span>Reset</span>
+                            </button>
+                          ) : onOpenExamForStudent ? (
+                            <button
+                              type="button"
+                              onClick={() => onOpenExamForStudent(selectedExam, st, selectedRoom)}
+                              className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[11px] font-bold transition cursor-pointer"
+                              title="Buka Lembar Ujian CBT untuk Siswa Ini"
+                            >
+                              🚀 Uji CBT
+                            </button>
+                          ) : (
+                            <span className="text-slate-300">-</span>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
