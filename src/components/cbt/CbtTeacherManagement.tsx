@@ -15,12 +15,14 @@ import { exportCbtScoreLegerToExcel } from '@/lib/elearningExport';
 
 interface CbtTeacherManagementProps {
   teacherName: string;
+  teacherSubject?: string;
   activeStudents: Student[];
   onPreviewExamAsStudent?: (pkg: CbtExamPackage) => void;
 }
 
 export default function CbtTeacherManagement({
   teacherName,
+  teacherSubject,
   activeStudents,
   onPreviewExamAsStudent
 }: CbtTeacherManagementProps) {
@@ -40,11 +42,18 @@ export default function CbtTeacherManagement({
   // New package modal state
   const [showCreatePackageModal, setShowCreatePackageModal] = useState<boolean>(false);
   const [newTitle, setNewTitle] = useState<string>('');
-  const [newSubject, setNewSubject] = useState<string>('Ilmu Pengetahuan Alam (IPA)');
+  const [newSubject, setNewSubject] = useState<string>(teacherSubject || 'Informatika');
   const [newGrade, setNewGrade] = useState<'7' | '8' | '9'>('7');
   const [newDuration, setNewDuration] = useState<number>(60);
   const [newToken, setNewToken] = useState<string>('');
   const [newPassingGrade, setNewPassingGrade] = useState<number>(75);
+
+  // Keep newSubject synced if teacherSubject changes
+  useEffect(() => {
+    if (teacherSubject) {
+      setNewSubject(teacherSubject);
+    }
+  }, [teacherSubject]);
 
   const [studentSessions, setStudentSessions] = useState(() => getStoredStudentCbtSessions());
 
@@ -358,6 +367,17 @@ export default function CbtTeacherManagement({
                     <span className="font-bold text-slate-900">
                       📝 {pkg.questions.length} Butir Soal
                     </span>
+                  </div>
+                  <div className="p-2 rounded-xl bg-slate-50 border border-slate-100 col-span-2 flex items-center justify-between">
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">Guru Pengampu:</span>
+                      <span className="font-semibold text-slate-800">{pkg.teacherName || 'Guru Pengampu'}</span>
+                    </div>
+                    {teacherName && pkg.teacherName?.toLowerCase().includes(teacherName.toLowerCase().split(',')[0].trim()) && (
+                      <span className="text-[10px] bg-indigo-100 text-indigo-700 font-bold px-2 py-0.5 rounded-md">
+                        ✓ Paket Anda
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -752,6 +772,19 @@ export default function CbtTeacherManagement({
             </div>
 
             <form onSubmit={handleCreatePackage} className="space-y-3.5 text-xs">
+              {/* Teacher Info Box */}
+              <div className="bg-indigo-50/70 border border-indigo-100 rounded-xl p-3 flex items-center justify-between text-xs">
+                <div>
+                  <span className="text-slate-500 block text-[10px]">Guru Pengampu (Otomatis):</span>
+                  <span className="font-bold text-slate-900">{teacherName || 'Guru Pengampu'}</span>
+                </div>
+                {teacherSubject && (
+                  <span className="px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-bold text-[11px] shadow-xs">
+                    Mapel: {teacherSubject}
+                  </span>
+                )}
+              </div>
+
               <div>
                 <label className="block font-bold text-slate-700 mb-1">
                   Nama / Judul Ujian:
@@ -759,7 +792,7 @@ export default function CbtTeacherManagement({
                 <input
                   type="text"
                   required
-                  placeholder="Contoh: Asesmen Tengah Semester (PTS) - IPA Terpadu"
+                  placeholder={teacherSubject ? `Contoh: Asesmen Tengah Semester (PTS) - ${teacherSubject}` : "Contoh: Asesmen Tengah Semester (PTS) - Informatika"}
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
                   className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-indigo-500"
@@ -774,15 +807,24 @@ export default function CbtTeacherManagement({
                   <select
                     value={newSubject}
                     onChange={(e) => setNewSubject(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-indigo-500"
+                    className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-indigo-500 font-medium"
                   >
-                    <option value="Ilmu Pengetahuan Alam (IPA)">IPA</option>
+                    {teacherSubject && (
+                      <option value={teacherSubject}>⭐ {teacherSubject} (Mapel Anda)</option>
+                    )}
+                    <option value="Informatika">Informatika</option>
+                    <option value="Ilmu Pengetahuan Alam (IPA)">Ilmu Pengetahuan Alam (IPA)</option>
                     <option value="Matematika">Matematika</option>
-                    <option value="Bahasa Inggris">Bahasa Inggris</option>
                     <option value="Bahasa Indonesia">Bahasa Indonesia</option>
-                    <option value="Pendidikan Agama Islam">PAI</option>
-                    <option value="Pendidikan Pancasila">Pendidikan Pancasila</option>
-                    <option value="Ilmu Pengetahuan Sosial (IPS)">IPS</option>
+                    <option value="Bahasa Inggris">Bahasa Inggris</option>
+                    <option value="Pendidikan Agama Islam (PABP)">Pendidikan Agama Islam (PABP)</option>
+                    <option value="Pendidikan Pancasila">Pendidikan Pancasila (PPKn)</option>
+                    <option value="Ilmu Pengetahuan Sosial (IPS)">Ilmu Pengetahuan Sosial (IPS)</option>
+                    <option value="Prakarya">Prakarya</option>
+                    <option value="Seni Budaya">Seni Budaya</option>
+                    <option value="Pendidikan Jasmani, Olahraga & Kesehatan (PJOK)">PJOK</option>
+                    <option value="Bahasa Sunda">Bahasa Sunda</option>
+                    <option value="Bimbingan & Konseling (BK)">Bimbingan & Konseling (BK)</option>
                   </select>
                 </div>
 

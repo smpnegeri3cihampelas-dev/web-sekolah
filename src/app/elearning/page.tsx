@@ -4023,6 +4023,7 @@ export default function ELearningPage() {
             {activeMenu === 'cbt' && (
               <CbtTeacherManagement
                 teacherName={currentTeacher.name}
+                teacherSubject={currentTeacher.subject}
                 activeStudents={activeStudents}
                 onPreviewExamAsStudent={(pkg) => {
                   const studentToUse = activeStudents[0] || INITIAL_STUDENTS[0];
