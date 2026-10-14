@@ -16,6 +16,7 @@ import { exportCbtScoreLegerToExcel } from '@/lib/elearningExport';
 interface CbtTeacherManagementProps {
   teacherName: string;
   teacherSubject?: string;
+  teacherClasses?: string[];
   activeStudents: Student[];
   onPreviewExamAsStudent?: (pkg: CbtExamPackage) => void;
 }
@@ -23,6 +24,7 @@ interface CbtTeacherManagementProps {
 export default function CbtTeacherManagement({
   teacherName,
   teacherSubject,
+  teacherClasses,
   activeStudents,
   onPreviewExamAsStudent
 }: CbtTeacherManagementProps) {
@@ -44,9 +46,25 @@ export default function CbtTeacherManagement({
   const [newTitle, setNewTitle] = useState<string>('');
   const [newSubject, setNewSubject] = useState<string>(teacherSubject || 'Informatika');
   const [newGrade, setNewGrade] = useState<'7' | '8' | '9'>('7');
+  const [selectedTargetClasses, setSelectedTargetClasses] = useState<string[]>(() => {
+    const grade7Classes = SCHOOL_CLASSES.filter(c => c.id.startsWith('7')).map(c => c.id);
+    return grade7Classes;
+  });
   const [newDuration, setNewDuration] = useState<number>(60);
   const [newToken, setNewToken] = useState<string>('');
   const [newPassingGrade, setNewPassingGrade] = useState<number>(75);
+
+  // Handle grade change and auto-set target classes (prefer teacher's classes if available)
+  const handleGradeChange = (grade: '7' | '8' | '9') => {
+    setNewGrade(grade);
+    const gradeClasses = SCHOOL_CLASSES.filter(c => c.id.startsWith(grade)).map(c => c.id);
+    const myClassesInGrade = teacherClasses ? teacherClasses.filter(c => c.startsWith(grade)) : [];
+    if (myClassesInGrade.length > 0) {
+      setSelectedTargetClasses(myClassesInGrade);
+    } else {
+      setSelectedTargetClasses(gradeClasses);
+    }
+  };
 
   // Keep newSubject synced if teacherSubject changes
   useEffect(() => {
@@ -92,15 +110,17 @@ export default function CbtTeacherManagement({
     const newId = `cbt_${Date.now()}`;
     const generatedToken = newToken.trim() || `PAS${newGrade}${Math.floor(10 + Math.random() * 90)}`;
     
-    // Classes for selected grade
-    const targetClasses = SCHOOL_CLASSES.filter(c => c.id.startsWith(newGrade)).map(c => c.id);
+    // Classes for selected grade: use customized selectedTargetClasses
+    const targetClasses = selectedTargetClasses.length > 0
+      ? selectedTargetClasses
+      : SCHOOL_CLASSES.filter(c => c.id.startsWith(newGrade)).map(c => c.id);
 
     const newPkg: CbtExamPackage = {
       id: newId,
       title: newTitle.trim(),
       subject: newSubject,
       gradeLevel: newGrade,
-      targetClasses: targetClasses.length > 0 ? targetClasses : ['7-A', '7-B', '7-C', '7-D', '7-E', '7-F'],
+      targetClasses: targetClasses,
       semester: 'Ganjil (PTS/STS)',
       academicYear: '2026/2027',
       durationMinutes: newDuration,
@@ -346,8 +366,8 @@ export default function CbtTeacherManagement({
                 <div className="grid grid-cols-2 gap-2 text-xs text-slate-600 pt-1">
                   <div className="p-2 rounded-xl bg-slate-50 border border-slate-100">
                     <span className="text-slate-400 block text-[10px]">Kelas Sasaran:</span>
-                    <span className="font-semibold text-slate-800">
-                      Tingkat {pkg.gradeLevel} ({pkg.targetClasses.length} Rombel)
+                    <span className="font-semibold text-slate-800" title={pkg.targetClasses.join(', ')}>
+                      {pkg.targetClasses.length >= 6 ? `Semua Kelas ${pkg.gradeLevel}` : `Kelas ${pkg.targetClasses.join(', ')}`}
                     </span>
                   </div>
                   <div className="p-2 rounded-xl bg-slate-50 border border-slate-100">
@@ -834,14 +854,81 @@ export default function CbtTeacherManagement({
                   </label>
                   <select
                     value={newGrade}
-                    onChange={(e) => setNewGrade(e.target.value as any)}
-                    className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-indigo-500"
+                    onChange={(e) => handleGradeChange(e.target.value as any)}
+                    className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-indigo-500 font-medium"
                   >
                     <option value="7">Kelas 7</option>
                     <option value="8">Kelas 8</option>
                     <option value="9">Kelas 9</option>
                   </select>
                 </div>
+              </div>
+
+              {/* Pilihan Rombel Sasaran (Multi-Checklist) */}
+              <div className="space-y-2 p-3 rounded-2xl bg-indigo-50/60 border border-indigo-100">
+                <div className="flex flex-wrap items-center justify-between gap-1.5">
+                  <label className="font-bold text-slate-800 text-[11px] flex items-center gap-1.5">
+                    <span>🎯 Rombel / Kelas Sasaran:</span>
+                    <span className="text-indigo-700 font-black">({selectedTargetClasses.length} Kelas Dipilih)</span>
+                  </label>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedTargetClasses(SCHOOL_CLASSES.filter(c => c.id.startsWith(newGrade)).map(c => c.id))}
+                      className="px-2 py-0.5 rounded text-[10px] font-bold bg-white hover:bg-slate-100 text-indigo-700 border border-indigo-200 transition cursor-pointer"
+                    >
+                      Semua Kelas {newGrade}
+                    </button>
+                    {teacherClasses && teacherClasses.some(c => c.startsWith(newGrade)) && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedTargetClasses(teacherClasses.filter(c => c.startsWith(newGrade)))}
+                        className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 hover:bg-emerald-200 text-emerald-800 transition cursor-pointer"
+                      >
+                        ⭐ Hanya Kelas Saya
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-1.5 pt-0.5">
+                  {SCHOOL_CLASSES.filter(c => c.id.startsWith(newGrade)).map(c => {
+                    const isSelected = selectedTargetClasses.includes(c.id);
+                    const isMyClass = teacherClasses?.includes(c.id);
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => {
+                          if (isSelected) {
+                            if (selectedTargetClasses.length === 1) {
+                              alert('Paket ujian harus ditujukan untuk minimal 1 rombel/kelas!');
+                              return;
+                            }
+                            setSelectedTargetClasses(selectedTargetClasses.filter(id => id !== c.id));
+                          } else {
+                            setSelectedTargetClasses([...selectedTargetClasses, c.id].sort());
+                          }
+                        }}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                          isSelected
+                            ? 'bg-indigo-600 text-white shadow-xs'
+                            : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        <span>{isSelected ? '✓' : '+'}</span>
+                        <span>{c.name}</span>
+                        {isMyClass && (
+                          <span className={`text-[9px] px-1 py-0.2 rounded font-semibold ${isSelected ? 'bg-indigo-800 text-indigo-200' : 'bg-slate-100 text-slate-500'}`}>
+                            Saya
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[10px] text-slate-500 italic">
+                  💡 Tip: Jika ada 2 guru mapel di kelas {newGrade}, pilih hanya rombel yang Anda ajar. Siswa di rombel lain tidak akan melihat ujian ini.
+                </p>
               </div>
 
               <div className="grid grid-cols-3 gap-3">

@@ -4024,6 +4024,7 @@ export default function ELearningPage() {
               <CbtTeacherManagement
                 teacherName={currentTeacher.name}
                 teacherSubject={currentTeacher.subject}
+                teacherClasses={currentTeacher.classes}
                 activeStudents={activeStudents}
                 onPreviewExamAsStudent={(pkg) => {
                   const studentToUse = activeStudents[0] || INITIAL_STUDENTS[0];
@@ -4814,7 +4815,8 @@ export default function ELearningPage() {
               const activeExamsForClass = cbtPackages.filter(pkg => {
                 const isClassMatch = pkg.targetClasses.includes(studentClass) || 
                   pkg.targetClasses.includes('Semua') || 
-                  pkg.targetClasses.some(c => c.startsWith(studentClass.split('-')[0]));
+                  pkg.targetClasses.includes(studentClass.split('-')[0]) ||
+                  pkg.targetClasses.includes(`Tingkat ${studentClass.split('-')[0]}`);
                 if (!isClassMatch) return false;
                 return pkg.status === 'active'; // JIKA DIJEDA (DRAFT) -> TIDAK MUNCUL DI LIVE CBT!
               });
