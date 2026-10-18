@@ -108,171 +108,68 @@ export interface CbtRoomAttendance {
 }
 
 // -------------------------------------------------------------
-// KONFIGURASI RUANGAN & PRESET KOMPOSISI CAMPUR PANITIA CBT
+// KONFIGURASI 17 RUANG UJIAN RESMI SMP NEGERI 3 CIHAMPELAS (SATU TINGKAT MURNI)
 // -------------------------------------------------------------
-export type CbtRoomPresetType = 'campur_7_8' | 'campur_8_9' | 'campur_7_9' | 'murni' | 'custom';
-
 export interface CbtExamRoomConfig {
   id: string; // e.g. 'ruang-01'
   name: string; // e.g. 'Ruang 01'
-  classes: string[]; // e.g. ['7-A', '8-A']
-  capacity: number; // default: 32
-  label: string; // e.g. 'Ruang 01 (Gabungan 7-A & 8-A)'
+  classes: string[]; // e.g. ['7-A'] or ['7-A', '8-A']
+  capacity: number;
+  label: string; // e.g. 'Ruang 01 (Kelas 7-A)' or 'Ruang 01 (Campur 7-A & 8-A)'
   supervisorName?: string;
+  assignedStudentIds?: string[]; // student IDs explicitly placed in this room
 }
 
 export interface CbtPanitiaConfig {
-  activePreset: CbtRoomPresetType;
   rooms: CbtExamRoomConfig[];
   examSessionName: string;
   academicYear: string;
   semester: string;
 }
 
-export function generateRoomsForPreset(preset: CbtRoomPresetType): CbtExamRoomConfig[] {
-  const rooms: CbtExamRoomConfig[] = [];
-  const letters = ['A', 'B', 'C', 'D', 'E', 'F'];
+export function getDefaultSchoolRooms(): CbtExamRoomConfig[] {
+  // 17 Rombel Resmi SMP Negeri 3 Cihampelas:
+  // Kelas 7: 7-A s.d 7-F (6 Kelas)
+  // Kelas 8: 8-A s.d 8-F (6 Kelas)
+  // Kelas 9: 9-A s.d 9-E (5 Kelas, sampai 9-E)
+  const roomList: { num: string; classId: string; capacity: number }[] = [
+    { num: '01', classId: '7-A', capacity: 35 },
+    { num: '02', classId: '7-B', capacity: 35 },
+    { num: '03', classId: '7-C', capacity: 34 },
+    { num: '04', classId: '7-D', capacity: 34 },
+    { num: '05', classId: '7-E', capacity: 33 },
+    { num: '06', classId: '7-F', capacity: 35 },
+    { num: '07', classId: '8-A', capacity: 30 },
+    { num: '08', classId: '8-B', capacity: 32 },
+    { num: '09', classId: '8-C', capacity: 32 },
+    { num: '10', classId: '8-D', capacity: 31 },
+    { num: '11', classId: '8-E', capacity: 31 },
+    { num: '12', classId: '8-F', capacity: 30 },
+    { num: '13', classId: '9-A', capacity: 27 },
+    { num: '14', classId: '9-B', capacity: 29 },
+    { num: '15', classId: '9-C', capacity: 29 },
+    { num: '16', classId: '9-D', capacity: 28 },
+    { num: '17', classId: '9-E', capacity: 30 },
+  ];
 
-  if (preset === 'campur_7_8') {
-    // Ruang 01 - 06: Gabungan Kelas 7 & 8
-    letters.forEach((l, idx) => {
-      const numStr = String(idx + 1).padStart(2, '0');
-      rooms.push({
-        id: `ruang-${numStr}`,
-        name: `Ruang ${numStr}`,
-        classes: [`7-${l}`, `8-${l}`],
-        capacity: 32,
-        label: `Ruang ${numStr} (Gabungan 7-${l} & 8-${l})`,
-        supervisorName: 'Guru Pengawas'
-      });
-    });
-    // Ruang 07 - 12: Kelas 9
-    letters.forEach((l, idx) => {
-      const numStr = String(idx + 7).padStart(2, '0');
-      rooms.push({
-        id: `ruang-${numStr}`,
-        name: `Ruang ${numStr}`,
-        classes: [`9-${l}`],
-        capacity: 32,
-        label: `Ruang ${numStr} (Kelas 9-${l})`,
-        supervisorName: 'Guru Pengawas'
-      });
-    });
-  } else if (preset === 'campur_8_9') {
-    // Ruang 01 - 06: Gabungan Kelas 8 & 9
-    letters.forEach((l, idx) => {
-      const numStr = String(idx + 1).padStart(2, '0');
-      rooms.push({
-        id: `ruang-${numStr}`,
-        name: `Ruang ${numStr}`,
-        classes: [`8-${l}`, `9-${l}`],
-        capacity: 32,
-        label: `Ruang ${numStr} (Gabungan 8-${l} & 9-${l})`,
-        supervisorName: 'Guru Pengawas'
-      });
-    });
-    // Ruang 07 - 12: Kelas 7
-    letters.forEach((l, idx) => {
-      const numStr = String(idx + 7).padStart(2, '0');
-      rooms.push({
-        id: `ruang-${numStr}`,
-        name: `Ruang ${numStr}`,
-        classes: [`7-${l}`],
-        capacity: 32,
-        label: `Ruang ${numStr} (Kelas 7-${l})`,
-        supervisorName: 'Guru Pengawas'
-      });
-    });
-  } else if (preset === 'campur_7_9') {
-    // Ruang 01 - 06: Gabungan Kelas 7 & 9
-    letters.forEach((l, idx) => {
-      const numStr = String(idx + 1).padStart(2, '0');
-      rooms.push({
-        id: `ruang-${numStr}`,
-        name: `Ruang ${numStr}`,
-        classes: [`7-${l}`, `9-${l}`],
-        capacity: 32,
-        label: `Ruang ${numStr} (Gabungan 7-${l} & 9-${l})`,
-        supervisorName: 'Guru Pengawas'
-      });
-    });
-    // Ruang 07 - 12: Kelas 8
-    letters.forEach((l, idx) => {
-      const numStr = String(idx + 7).padStart(2, '0');
-      rooms.push({
-        id: `ruang-${numStr}`,
-        name: `Ruang ${numStr}`,
-        classes: [`8-${l}`],
-        capacity: 32,
-        label: `Ruang ${numStr} (Kelas 8-${l})`,
-        supervisorName: 'Guru Pengawas'
-      });
-    });
-  } else {
-    // Murni (Satu Tingkat): Ruang 01-06 (7A-7F), Ruang 07-12 (8A-8F), Ruang 13-18 (9A-9F)
-    letters.forEach((l, idx) => {
-      const numStr = String(idx + 1).padStart(2, '0');
-      rooms.push({
-        id: `ruang-${numStr}`,
-        name: `Ruang ${numStr}`,
-        classes: [`7-${l}`],
-        capacity: 32,
-        label: `Ruang ${numStr} (Kelas 7-${l})`,
-        supervisorName: 'Guru Pengawas'
-      });
-    });
-    letters.forEach((l, idx) => {
-      const numStr = String(idx + 7).padStart(2, '0');
-      rooms.push({
-        id: `ruang-${numStr}`,
-        name: `Ruang ${numStr}`,
-        classes: [`8-${l}`],
-        capacity: 32,
-        label: `Ruang ${numStr} (Kelas 8-${l})`,
-        supervisorName: 'Guru Pengawas'
-      });
-    });
-    letters.forEach((l, idx) => {
-      const numStr = String(idx + 13).padStart(2, '0');
-      rooms.push({
-        id: `ruang-${numStr}`,
-        name: `Ruang ${numStr}`,
-        classes: [`9-${l}`],
-        capacity: 32,
-        label: `Ruang ${numStr} (Kelas 9-${l})`,
-        supervisorName: 'Guru Pengawas'
-      });
-    });
-  }
-
-  // Tambahkan Lab Komputer
-  rooms.push({
-    id: 'lab-komp-1',
-    name: 'Lab Komputer 1',
-    classes: ['Semua'],
-    capacity: 40,
-    label: 'Lab Komputer 1 (Cadangan / Susulan)',
-    supervisorName: 'Proktor CBT'
-  });
-  rooms.push({
-    id: 'lab-komp-2',
-    name: 'Lab Komputer 2',
-    classes: ['Semua'],
-    capacity: 40,
-    label: 'Lab Komputer 2 (Cadangan / Susulan)',
-    supervisorName: 'Proktor CBT'
-  });
+  const rooms: CbtExamRoomConfig[] = roomList.map(r => ({
+    id: `ruang-${r.num}`,
+    name: `Ruang ${r.num}`,
+    classes: [r.classId],
+    capacity: r.capacity,
+    label: `Ruang ${r.num} (Kelas ${r.classId})`,
+    supervisorName: 'Guru Pengawas'
+  }));
 
   return rooms;
 }
 
-const CBT_PANITIA_CONFIG_KEY = 'cbt_panitia_config_v1';
+const CBT_PANITIA_CONFIG_KEY = 'cbt_panitia_config_v2';
 
 export function getStoredCbtPanitiaConfig(): CbtPanitiaConfig {
   if (typeof window === 'undefined') {
     return {
-      activePreset: 'campur_7_8',
-      rooms: generateRoomsForPreset('campur_7_8'),
+      rooms: getDefaultSchoolRooms(),
       examSessionName: 'Sesi 1 (Pagi)',
       academicYear: '2026/2027',
       semester: 'PTS / STS Ganjil'
@@ -284,7 +181,23 @@ export function getStoredCbtPanitiaConfig(): CbtPanitiaConfig {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed.rooms && Array.isArray(parsed.rooms) && parsed.rooms.length > 0) {
-        return parsed;
+        // Filter out any legacy lab rooms to honor user preference
+        const cleanedRooms = parsed.rooms.filter(
+          (r: CbtExamRoomConfig) => !r.id.startsWith('lab') && !r.name.toLowerCase().includes('lab komputer')
+        );
+        // Automatic deduplication by id and name
+        const seenIds = new Set<string>();
+        const seenNames = new Set<string>();
+        const uniqueRooms = cleanedRooms.filter((r: CbtExamRoomConfig) => {
+          if (!r.id || seenIds.has(r.id) || seenNames.has(r.name.toLowerCase().trim())) return false;
+          seenIds.add(r.id);
+          seenNames.add(r.name.toLowerCase().trim());
+          return true;
+        });
+        return {
+          ...parsed,
+          rooms: uniqueRooms.length > 0 ? uniqueRooms : getDefaultSchoolRooms()
+        };
       }
     }
   } catch (e) {
@@ -292,8 +205,7 @@ export function getStoredCbtPanitiaConfig(): CbtPanitiaConfig {
   }
 
   const initial: CbtPanitiaConfig = {
-    activePreset: 'campur_7_8',
-    rooms: generateRoomsForPreset('campur_7_8'),
+    rooms: getDefaultSchoolRooms(),
     examSessionName: 'Sesi 1 (Pagi)',
     academicYear: '2026/2027',
     semester: 'PTS / STS Ganjil'
@@ -312,21 +224,153 @@ export function saveStoredCbtPanitiaConfig(config: CbtPanitiaConfig) {
   }
 }
 
+// -------------------------------------------------------------
+// HELPER PENEMPATAN SISWA KE RUANGAN CBT
+// -------------------------------------------------------------
+
+/**
+ * Mengambil daftar siswa yang ditempatkan di suatu ruangan tertentu.
+ * Jika ruangan memiliki assignedStudentIds eksplisit, kembalikan siswa tersebut.
+ * Jika tidak, fallback ke pencocokan kelas (room.classes).
+ */
+export function getStudentsForRoom(room: CbtExamRoomConfig | undefined | null, allStudents: Student[]): Student[] {
+  if (!room) return [];
+  if (room.assignedStudentIds && Array.isArray(room.assignedStudentIds) && room.assignedStudentIds.length > 0) {
+    const idSet = new Set(room.assignedStudentIds);
+    return allStudents.filter(s => idSet.has(s.id));
+  }
+  if (room.classes.includes('Semua')) {
+    return allStudents;
+  }
+  return allStudents.filter(s => room.classes.includes(s.classId));
+}
+
+/**
+ * Mencari ruangan tempat seorang siswa ditempatkan.
+ * Prioritas 1: Ruangan dengan assignedStudentIds yang memuat ID siswa.
+ * Prioritas 2: Ruangan reguler yang cocok kelasnya dan belum memiliki assignedStudentIds custom.
+ */
+export function getRoomForStudent(student: Student, rooms: CbtExamRoomConfig[]): CbtExamRoomConfig | undefined {
+  // 1. Cek penempatan eksplisit
+  const explicit = rooms.find(r => r.assignedStudentIds && r.assignedStudentIds.includes(student.id));
+  if (explicit) return explicit;
+
+  // 2. Cek ruangan reguler berbasis kelas yang belum dicustom
+  const regularClassMatch = rooms.find(r =>
+    (!r.assignedStudentIds || r.assignedStudentIds.length === 0) &&
+    r.classes.includes(student.classId)
+  );
+  if (regularClassMatch) return regularClassMatch;
+
+  // 3. Fallback umum jika belum pernah dicustom
+  return rooms.find(r => r.classes.includes(student.classId));
+}
+
+/**
+ * Memperbarui label dan classes pada konfigurasi ruangan berdasarkan siswa yang ada di dalamnya.
+ */
+export function updateRoomMetadata(room: CbtExamRoomConfig, roomStudents: Student[]): CbtExamRoomConfig {
+  if (roomStudents.length === 0) {
+    return {
+      ...room,
+      classes: [],
+      label: `${room.name} (Kosong)`
+    };
+  }
+  const uniqueClasses = Array.from(new Set(roomStudents.map(s => s.classId))).sort();
+  const labelSuffix = uniqueClasses.length > 1
+    ? `Campur ${uniqueClasses.join(' & ')}`
+    : `Kelas ${uniqueClasses[0]}`;
+
+  return {
+    ...room,
+    classes: uniqueClasses,
+    label: `${room.name} (${labelSuffix})`
+  };
+}
+
+/**
+ * Fitur Spesial: Pembagian Silang 2 Kelas ke 2 Ruangan (50% - 50%).
+ * Contoh: 50% 7-A + 50% 8-A ke Ruang 01, sisa 50% 7-A + 50% 8-A ke Ruang 02.
+ */
+export function splitTwoClassesAcrossTwoRooms(
+  classAId: string,
+  classBId: string,
+  roomAId: string,
+  roomBId: string,
+  currentRooms: CbtExamRoomConfig[],
+  allStudents: Student[]
+): CbtExamRoomConfig[] {
+  // Ambil siswa Kelas A dan B urut alfabetis
+  const classA = allStudents
+    .filter(s => s.classId === classAId)
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const classB = allStudents
+    .filter(s => s.classId === classBId)
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  const halfAIndex = Math.ceil(classA.length / 2);
+  const halfBIndex = Math.ceil(classB.length / 2);
+
+  const firstHalfA = classA.slice(0, halfAIndex);
+  const secondHalfA = classA.slice(halfAIndex);
+
+  const firstHalfB = classB.slice(0, halfBIndex);
+  const secondHalfB = classB.slice(halfBIndex);
+
+  const roomAStudents = [...firstHalfA, ...firstHalfB];
+  const roomBStudents = [...secondHalfA, ...secondHalfB];
+
+  const affectedStudentIds = new Set([...classA.map(s => s.id), ...classB.map(s => s.id)]);
+
+  return currentRooms.map(room => {
+    if (room.id === roomAId) {
+      const studentIds = roomAStudents.map(s => s.id);
+      return {
+        ...updateRoomMetadata(room, roomAStudents),
+        assignedStudentIds: studentIds
+      };
+    }
+    if (room.id === roomBId) {
+      const studentIds = roomBStudents.map(s => s.id);
+      return {
+        ...updateRoomMetadata(room, roomBStudents),
+        assignedStudentIds: studentIds
+      };
+    }
+
+    // Jika ruangan lain memiliki salah satu siswa ini di assignedStudentIds, bersihkan untuk hindari duplikasi
+    if (room.assignedStudentIds && room.assignedStudentIds.length > 0) {
+      const filtered = room.assignedStudentIds.filter(id => !affectedStudentIds.has(id));
+      const remainingStudents = allStudents.filter(s => filtered.includes(s.id));
+      return {
+        ...updateRoomMetadata(room, remainingStudents),
+        assignedStudentIds: filtered
+      };
+    }
+
+    return room;
+  });
+}
+
 export const CBT_EXAM_ROOMS: string[] = [
-  'Ruang 01 (Gabungan 7-A & 8-A)',
-  'Ruang 02 (Gabungan 7-B & 8-B)',
-  'Ruang 03 (Gabungan 7-C & 8-C)',
-  'Ruang 04 (Gabungan 7-D & 8-D)',
-  'Ruang 05 (Gabungan 7-E & 8-E)',
-  'Ruang 06 (Gabungan 7-F & 8-F)',
-  'Ruang 07 (Kelas 9-A)',
-  'Ruang 08 (Kelas 9-B)',
-  'Ruang 09 (Kelas 9-C)',
-  'Ruang 10 (Kelas 9-D)',
-  'Ruang 11 (Kelas 9-E)',
-  'Ruang 12 (Kelas 9-F)',
-  'Lab Komputer 1 (Cadangan / Susulan)',
-  'Lab Komputer 2 (Cadangan / Susulan)'
+  'Ruang 01 (Kelas 7-A)',
+  'Ruang 02 (Kelas 7-B)',
+  'Ruang 03 (Kelas 7-C)',
+  'Ruang 04 (Kelas 7-D)',
+  'Ruang 05 (Kelas 7-E)',
+  'Ruang 06 (Kelas 7-F)',
+  'Ruang 07 (Kelas 8-A)',
+  'Ruang 08 (Kelas 8-B)',
+  'Ruang 09 (Kelas 8-C)',
+  'Ruang 10 (Kelas 8-D)',
+  'Ruang 11 (Kelas 8-E)',
+  'Ruang 12 (Kelas 8-F)',
+  'Ruang 13 (Kelas 9-A)',
+  'Ruang 14 (Kelas 9-B)',
+  'Ruang 15 (Kelas 9-C)',
+  'Ruang 16 (Kelas 9-D)',
+  'Ruang 17 (Kelas 9-E)'
 ];
 
 // -------------------------------------------------------------
@@ -644,6 +688,7 @@ export function saveStoredCbtRoomAttendance(attendance: CbtRoomAttendance) {
     all[key] = attendance;
     localStorage.setItem(CBT_ROOM_ATTENDANCE_KEY, JSON.stringify(all));
     window.dispatchEvent(new Event('cbtAttendanceUpdated'));
+    window.dispatchEvent(new Event('cbtRoomAttendancesUpdated'));
   } catch (e) {
     console.error('Failed saving CBT room attendance', e);
   }

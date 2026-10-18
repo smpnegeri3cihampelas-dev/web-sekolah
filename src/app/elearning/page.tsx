@@ -56,7 +56,9 @@ import {
   CbtStudentAnswerState,
   getStoredCbtPackages,
   getStoredStudentCbtSessions,
-  resetStoredStudentCbtSession
+  resetStoredStudentCbtSession,
+  getStoredCbtPanitiaConfig,
+  getRoomForStudent
 } from '@/lib/cbtData';
 import { getStoredSchoolData } from '@/lib/schoolData';
 
@@ -1412,8 +1414,17 @@ export default function ELearningPage() {
   useEffect(() => {
     setAllStudents(getStoredStudents());
     const handleStudentsUpdate = () => setAllStudents(getStoredStudents());
+    const handleStorage = (e: StorageEvent) => {
+      if (!e.key || e.key.includes('students')) {
+        handleStudentsUpdate();
+      }
+    };
     window.addEventListener('elearningStudentsUpdated', handleStudentsUpdate);
-    return () => window.removeEventListener('elearningStudentsUpdated', handleStudentsUpdate);
+    window.addEventListener('storage', handleStorage);
+    return () => {
+      window.removeEventListener('elearningStudentsUpdated', handleStudentsUpdate);
+      window.removeEventListener('storage', handleStorage);
+    };
   }, []);
 
   const activeStudents = allStudents.length > 0 ? allStudents : INITIAL_STUDENTS;
@@ -5040,7 +5051,7 @@ export default function ELearningPage() {
                                           setActiveCbtExamSession({
                                             exam,
                                             student: currentStudent,
-                                            roomName: `Ruang ${studentClass}`
+                                            roomName: getRoomForStudent(currentStudent, getStoredCbtPanitiaConfig().rooms)?.name || `Ruang ${studentClass}`
                                           });
                                         }
                                       }}
@@ -5057,7 +5068,7 @@ export default function ELearningPage() {
                                       setActiveCbtExamSession({
                                         exam,
                                         student: currentStudent,
-                                        roomName: `Ruang ${studentClass}`
+                                        roomName: getRoomForStudent(currentStudent, getStoredCbtPanitiaConfig().rooms)?.name || `Ruang ${studentClass}`
                                       });
                                     }}
                                     className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs transition shadow-lg shadow-amber-500/25 flex items-center justify-center gap-2 cursor-pointer active:scale-95"

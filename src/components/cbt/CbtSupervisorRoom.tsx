@@ -11,6 +11,8 @@ import {
   registerEmergencyStudentToCbt,
   resetStoredStudentCbtSession,
   getStoredCbtPanitiaConfig,
+  saveStoredCbtPanitiaConfig,
+  getStudentsForRoom,
   CbtPanitiaConfig,
   CbtStudentAnswerState,
   CbtRoomAttendance
@@ -83,21 +85,22 @@ export default function CbtSupervisorRoom({
     return roomOptions.find(r => r.name === selectedRoom || r.label === selectedRoom) || roomOptions[0];
   }, [roomOptions, selectedRoom]);
 
+  // Students assigned to this room (mixed classes or custom assignments)
+  const roomStudents = useMemo(() => {
+    return getStudentsForRoom(currentRoomObj, activeStudents);
+  }, [currentRoomObj, activeStudents]);
+
   // Classes in this room (can be 7-A & 8-A!)
   const roomClasses = useMemo(() => {
+    if (currentRoomObj?.assignedStudentIds && currentRoomObj.assignedStudentIds.length > 0) {
+      const cls = Array.from(new Set(roomStudents.map(s => s.classId))).sort();
+      return cls.length > 0 ? cls : (currentRoomObj.classes || ['7-A']);
+    }
     return currentRoomObj?.classes || ['7-A'];
-  }, [currentRoomObj]);
+  }, [currentRoomObj, roomStudents]);
 
   // Filter specific class within the room (or 'all' for mixed view)
   const [filterClassInRoom, setFilterClassInRoom] = useState<string>('all');
-
-  // Students assigned to this room (mixed classes!)
-  const roomStudents = useMemo(() => {
-    if (roomClasses.includes('Semua')) {
-      return activeStudents;
-    }
-    return activeStudents.filter(s => roomClasses.includes(s.classId));
-  }, [activeStudents, roomClasses]);
 
   const filteredRoomStudents = useMemo(() => {
     if (filterClassInRoom === 'all') return roomStudents;
@@ -135,8 +138,19 @@ export default function CbtSupervisorRoom({
     const handleUpdate = () => {
       setStudentSessions(getStoredStudentCbtSessions());
     };
+    const handleStorage = (e: StorageEvent) => {
+      if (!e.key || e.key.includes('cbt')) {
+        handleUpdate();
+        setPanitiaConfig(getStoredCbtPanitiaConfig());
+        setPackages(getStoredCbtPackages());
+      }
+    };
     window.addEventListener('cbtSessionsUpdated', handleUpdate);
-    return () => window.removeEventListener('cbtSessionsUpdated', handleUpdate);
+    window.addEventListener('storage', handleStorage);
+    return () => {
+      window.removeEventListener('cbtSessionsUpdated', handleUpdate);
+      window.removeEventListener('storage', handleStorage);
+    };
   }, []);
 
   // Update student attendance status
@@ -206,6 +220,23 @@ export default function CbtSupervisorRoom({
       classId: emClass,
       gender: emGender
     });
+
+    // Jika ruangan ini memiliki konfigurasi assignedStudentIds khusus, masukkan juga ID siswa baru
+    if (currentRoomObj && currentRoomObj.assignedStudentIds && currentRoomObj.assignedStudentIds.length > 0) {
+      const updatedRooms = panitiaConfig.rooms.map(r => {
+        if (r.id === currentRoomObj.id) {
+          const currentIds = r.assignedStudentIds || [];
+          if (!currentIds.includes(newStudent.id)) {
+            return {
+              ...r,
+              assignedStudentIds: [...currentIds, newStudent.id]
+            };
+          }
+        }
+        return r;
+      });
+      saveStoredCbtPanitiaConfig({ ...panitiaConfig, rooms: updatedRooms });
+    }
 
     // Mark as Hadir
     setAttendanceRecords(prev => ({
@@ -293,7 +324,7 @@ export default function CbtSupervisorRoom({
             >
               {packages.map(pkg => (
                 <option key={pkg.id} value={pkg.id}>
-                  {pkg.title} ({pkg.subject})
+                  {pkg.status === 'active' ? '🟢 [AKTIF]' : '⏸️ [DIJEDA]'} {pkg.title} ({pkg.subject})
                 </option>
               ))}
             </select>
@@ -308,13 +339,19 @@ export default function CbtSupervisorRoom({
         <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-900 to-slate-900 text-white shadow-md space-y-1 flex flex-col justify-between">
           <div className="flex items-center justify-between text-indigo-300 text-[10px] font-bold uppercase tracking-wider">
             <span>Token Sesi Ruangan</span>
-            <span>🔑 AKTIF</span>
+            {selectedExam?.status === 'active' ? (
+              <span className="text-emerald-400 font-black flex items-center gap-1">🟢 AKTIF</span>
+            ) : (
+              <span className="text-amber-400 font-black flex items-center gap-1 animate-pulse">⏸️ DIJEDA PANITIA</span>
+            )}
           </div>
           <div className="text-3xl font-mono font-black tracking-widest text-emerald-400 py-1">
             {selectedExam?.token || '---'}
           </div>
           <p className="text-[10px] text-slate-400">
-            Tuliskan token ini di papan tulis agar siswa dapat memulai ujian.
+            {selectedExam?.status === 'active'
+              ? 'Tuliskan token ini di papan tulis agar siswa dapat memulai ujian.'
+              : '⚠️ Ujian ini sedang dijeda oleh Posko Panitia Pusat.'}
           </p>
         </div>
 

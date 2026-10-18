@@ -87,11 +87,20 @@ export default function CbtTeacherManagement({
       setStudentSessions(getStoredStudentCbtSessions());
     };
 
+    const handleStorage = (e: StorageEvent) => {
+      if (!e.key || e.key.includes('cbt')) {
+        handlePkgUpdate();
+        handleSessUpdate();
+      }
+    };
+
     window.addEventListener('cbtPackagesUpdated', handlePkgUpdate);
     window.addEventListener('cbtSessionsUpdated', handleSessUpdate);
+    window.addEventListener('storage', handleStorage);
     return () => {
       window.removeEventListener('cbtPackagesUpdated', handlePkgUpdate);
       window.removeEventListener('cbtSessionsUpdated', handleSessUpdate);
+      window.removeEventListener('storage', handleStorage);
     };
   }, []);
 

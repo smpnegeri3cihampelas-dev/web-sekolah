@@ -6,7 +6,8 @@ import {
   CbtQuestion,
   CbtStudentAnswerState,
   saveStoredStudentCbtSession,
-  gradeCbtAnswers
+  gradeCbtAnswers,
+  getStoredCbtPackages
 } from '@/lib/cbtData';
 import { Student } from '@/lib/elearningData';
 
@@ -66,6 +67,22 @@ export default function CbtStudentExamRoom({
     initialSession?.isSubmitted ? initialSession : null
   );
 
+  // Realtime CBT Package Status Sync (Active / Draft / Paused by Panitia)
+  const [currentPackage, setCurrentPackage] = useState<CbtExamPackage>(exam);
+  const isExamPaused = currentPackage.status === 'draft';
+
+  useEffect(() => {
+    const handlePkgsUpdate = () => {
+      const pkgs = getStoredCbtPackages();
+      const updated = pkgs.find(p => p.id === exam.id);
+      if (updated) {
+        setCurrentPackage(updated);
+      }
+    };
+    window.addEventListener('cbtPackagesUpdated', handlePkgsUpdate);
+    return () => window.removeEventListener('cbtPackagesUpdated', handlePkgsUpdate);
+  }, [exam.id]);
+
   // Audio playing ref
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isPlayingAudio, setIsPlayingAudio] = useState<boolean>(false);
@@ -74,9 +91,9 @@ export default function CbtStudentExamRoom({
     initialSession?.startedAt || new Date().toISOString()
   );
 
-  // 1. Timer countdown
+  // 1. Timer countdown (Automatically frozen when exam is paused)
   useEffect(() => {
-    if (isExamCompleted) return;
+    if (isExamCompleted || isExamPaused) return;
 
     const timer = setInterval(() => {
       setSecondsRemaining(prev => {
@@ -90,7 +107,7 @@ export default function CbtStudentExamRoom({
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [isExamCompleted]);
+  }, [isExamCompleted, isExamPaused]);
 
   // 2. Anti-Cheating: Window blur / tab switch detection
   useEffect(() => {
@@ -987,6 +1004,31 @@ export default function CbtStudentExamRoom({
               >
                 Ya, Kumpulkan Ujian
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* OVERLAY UJIAN DIJEDA OLEH PANITIA PUSAT */}
+      {isExamPaused && !isExamCompleted && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-fade-in">
+          <div className="bg-slate-900 border border-amber-500/30 rounded-3xl p-6 sm:p-8 max-w-md w-full text-center space-y-4 shadow-2xl">
+            <div className="w-16 h-16 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-3xl mx-auto animate-pulse">
+              ⏸️
+            </div>
+            <div className="space-y-1.5">
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400/20 text-amber-300 border border-amber-400/30">
+                Instruksi Posko Panitia CBT
+              </span>
+              <h3 className="text-lg font-black text-white">
+                Sesi Ujian Sedang Dijeda
+              </h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Panitia CBT pusat sedang menjeda sesi ujian ini. Waktu pengerjaan Anda otomatis dibekukan (tidak berkurang) dan seluruh jawaban Anda telah tersimpan dengan aman di server sekolah.
+              </p>
+            </div>
+            <div className="p-3 rounded-xl bg-slate-800/80 border border-slate-700 text-[11px] text-slate-400">
+              💡 Harap tetap berada di halaman ini. Layar pengerjaan akan otomatis terbuka kembali begitu panitia mengaktifkan sesi ujian.
             </div>
           </div>
         </div>
