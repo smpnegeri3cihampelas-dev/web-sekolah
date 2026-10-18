@@ -1,10 +1,12 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useDeferredValue, useRef, startTransition } from 'react';
 import {
   CbtExamPackage,
   CbtExamRoomConfig,
   CbtPanitiaConfig,
+  CbtRoomAttendance,
+  CbtStudentAnswerState,
   getStoredCbtPanitiaConfig,
   saveStoredCbtPanitiaConfig,
   getStoredCbtPackages,
@@ -13,13 +15,79 @@ import {
   resetStoredStudentCbtSession,
   getStoredCbtRoomAttendances,
   getStudentsForRoom,
-  getRoomForStudent,
   updateRoomMetadata,
   splitTwoClassesAcrossTwoRooms,
   getDefaultSchoolRooms,
   registerEmergencyStudentToCbt
 } from '@/lib/cbtData';
 import { Student, SCHOOL_CLASSES } from '@/lib/elearningData';
+
+interface FastSearchInputProps {
+  value: string;
+  onSearchChange: (val: string) => void;
+  placeholder?: string;
+  className?: string;
+  icon?: string;
+}
+
+// Dedicated Lag-Free Search Input Component
+// State lives locally to eliminate input lag and prevent parent re-renders on keystroke
+const FastSearchInput = React.memo(function FastSearchInput({
+  value,
+  onSearchChange,
+  placeholder,
+  className,
+  icon = '🔍'
+}: FastSearchInputProps) {
+  const [localVal, setLocalVal] = useState(value);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    setLocalVal(value);
+  }, [value]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const next = e.target.value;
+    setLocalVal(next); // 0ms instant local response
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      onSearchChange(next);
+    }, 120);
+  };
+
+  const handleClear = () => {
+    setLocalVal('');
+    if (timerRef.current) clearTimeout(timerRef.current);
+    onSearchChange('');
+  };
+
+  return (
+    <div className="relative w-full">
+      {icon && (
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none">
+          {icon}
+        </span>
+      )}
+      <input
+        type="text"
+        placeholder={placeholder}
+        value={localVal}
+        onChange={handleChange}
+        className={className}
+      />
+      {localVal && (
+        <button
+          type="button"
+          onClick={handleClear}
+          className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold cursor-pointer w-4 h-4 flex items-center justify-center rounded-full hover:bg-slate-100"
+          title="Hapus pencarian"
+        >
+          ✕
+        </button>
+      )}
+    </div>
+  );
+});
 
 interface CbtPanitiaCommandCenterProps {
   activeStudents: Student[];
@@ -339,18 +407,90 @@ export default function CbtPanitiaCommandCenter({
     );
   };
 
-  // Macro Statistics
+  // ==========================================
+  // HIGH-PERFORMANCE REACTIVE INDEXING (O(1))
+  // ==========================================
+
+  // Deferred values for butter-smooth 60fps typing without freezing the main thread
+  const deferredSearchQuery = useDeferredValue(searchQuery);
+  const deferredPickerSearchQuery = useDeferredValue(pickerSearchQuery);
+  const deferredRoomStudentSearch = useDeferredValue(roomStudentSearch);
+
+  // Inverted Map of studentId -> CbtStudentAnswerState[] (O(1) instant lookup)
+  const sessionsByStudentId = useMemo(() => {
+    const map = new Map<string, CbtStudentAnswerState[]>();
+    const sessionList = Object.values(studentSessions);
+    for (let i = 0; i < sessionList.length; i++) {
+      const s = sessionList[i];
+      let arr = map.get(s.studentId);
+      if (!arr) {
+        arr = [];
+        map.set(s.studentId, arr);
+      }
+      arr.push(s);
+    }
+    return map;
+  }, [studentSessions]);
+
+  // Pre-computed Map of roomId -> Student[] (O(1) instant lookup)
+  const roomStudentsMap = useMemo(() => {
+    const map = new Map<string, Student[]>();
+    for (let i = 0; i < config.rooms.length; i++) {
+      const room = config.rooms[i];
+      map.set(room.id, getStudentsForRoom(room, activeStudents));
+    }
+    return map;
+  }, [config.rooms, activeStudents]);
+
+  // Pre-computed room statistics for Monitoring Tab (O(1) instant lookup)
+  const roomStatusStatsMap = useMemo(() => {
+    const map = new Map<string, { submitted: number; inProgress: number; notStarted: number; total: number }>();
+    for (let i = 0; i < config.rooms.length; i++) {
+      const room = config.rooms[i];
+      const students = roomStudentsMap.get(room.id) || [];
+      let submitted = 0;
+      let inProgress = 0;
+      let notStarted = 0;
+
+      for (let j = 0; j < students.length; j++) {
+        const sessList = sessionsByStudentId.get(students[j].id);
+        if (!sessList || sessList.length === 0) {
+          notStarted++;
+        } else if (sessList.some(s => s.isSubmitted)) {
+          submitted++;
+        } else {
+          inProgress++;
+        }
+      }
+      map.set(room.id, { submitted, inProgress, notStarted, total: students.length });
+    }
+    return map;
+  }, [config.rooms, roomStudentsMap, sessionsByStudentId]);
+
+  // Pre-computed class student counts for dropdown options (O(1) instant lookup)
+  const classCountMap = useMemo(() => {
+    const map = new Map<string, number>();
+    for (let i = 0; i < activeStudents.length; i++) {
+      const cId = activeStudents[i].classId;
+      map.set(cId, (map.get(cId) || 0) + 1);
+    }
+    return map;
+  }, [activeStudents]);
+
+  // Macro Statistics (Header KPI)
   const macroStats = useMemo(() => {
     const totalStudents = activeStudents.length;
     let submittedCount = 0;
     let inProgressCount = 0;
     let totalViolations = 0;
 
-    Object.values(studentSessions).forEach(sess => {
+    const sessionList = Object.values(studentSessions);
+    for (let i = 0; i < sessionList.length; i++) {
+      const sess = sessionList[i];
       if (sess.isSubmitted) submittedCount++;
       else inProgressCount++;
       if (sess.violationCount) totalViolations += sess.violationCount;
-    });
+    }
 
     const activePackagesCount = packages.filter(p => p.status === 'active').length;
 
@@ -364,36 +504,135 @@ export default function CbtPanitiaCommandCenter({
     };
   }, [activeStudents, studentSessions, packages]);
 
-  // Map of studentId -> RoomConfig
+  // Fast Single-Pass Map of studentId -> RoomConfig (O(N) instead of O(N*M))
   const studentRoomMap = useMemo(() => {
     const map = new Map<string, CbtExamRoomConfig>();
-    activeStudents.forEach(st => {
-      const room = getRoomForStudent(st, config.rooms);
-      if (room) {
-        map.set(st.id, room);
+    
+    // 1. Assign students based on class match first
+    const classToRoomMap = new Map<string, CbtExamRoomConfig>();
+    for (let i = 0; i < config.rooms.length; i++) {
+      const r = config.rooms[i];
+      if (!r.assignedStudentIds || r.assignedStudentIds.length === 0) {
+        for (let j = 0; j < r.classes.length; j++) {
+          classToRoomMap.set(r.classes[j], r);
+        }
       }
-    });
+    }
+    for (let i = 0; i < activeStudents.length; i++) {
+      const st = activeStudents[i];
+      const r = classToRoomMap.get(st.classId);
+      if (r) map.set(st.id, r);
+    }
+
+    // 2. Explicit assignedStudentIds override class default
+    for (let i = 0; i < config.rooms.length; i++) {
+      const r = config.rooms[i];
+      if (r.assignedStudentIds && r.assignedStudentIds.length > 0) {
+        for (let k = 0; k < r.assignedStudentIds.length; k++) {
+          map.set(r.assignedStudentIds[k], r);
+        }
+      }
+    }
     return map;
   }, [activeStudents, config.rooms]);
 
-  // Search Tab KPI Stats
+  // Map of examId -> CbtExamPackage (O(1) instant lookup)
+  const packagesMap = useMemo(() => {
+    return new Map<string, CbtExamPackage>(packages.map(p => [p.id, p]));
+  }, [packages]);
+
+  // Pre-indexed attendances by roomName (O(1) instant lookup)
+  const attendancesByRoomMap = useMemo(() => {
+    const map = new Map<string, CbtRoomAttendance[]>();
+    const list = Object.values(roomAttendances);
+    for (let i = 0; i < list.length; i++) {
+      const a = list[i];
+      if (a.roomName) {
+        let arr = map.get(a.roomName);
+        if (!arr) {
+          arr = [];
+          map.set(a.roomName, arr);
+        }
+        arr.push(a);
+      }
+    }
+    return map;
+  }, [roomAttendances]);
+
+  // Pre-computed room unique classes and mixed status (O(1) instant lookup)
+  const roomUniqueClassesMap = useMemo(() => {
+    const map = new Map<string, { uniqueClasses: string[]; isMixed: boolean }>();
+    for (let i = 0; i < config.rooms.length; i++) {
+      const room = config.rooms[i];
+      const students = roomStudentsMap.get(room.id) || [];
+      const unique = Array.from(new Set(students.map(s => s.classId))).sort();
+      map.set(room.id, { uniqueClasses: unique, isMixed: unique.length > 1 });
+    }
+    return map;
+  }, [config.rooms, roomStudentsMap]);
+
+  // Fast Set lookups for student picker selection
+  const selectedStudentIdsToAddSet = useMemo(() => {
+    return new Set(selectedStudentIdsToAdd);
+  }, [selectedStudentIdsToAdd]);
+
+  const selectedStudentIdsToRemoveSet = useMemo(() => {
+    return new Set(selectedStudentIdsToRemove);
+  }, [selectedStudentIdsToRemove]);
+
+  // Batched Filter & Tab Handlers (prevents cascading re-renders)
+  const handleTabSwitch = (tab: 'monitoring' | 'arrangement' | 'search' | 'bap') => {
+    startTransition(() => {
+      setActiveTab(tab);
+    });
+  };
+
+  const handleSearchQueryChange = (q: string) => {
+    setSearchQuery(q);
+    setSearchPage(1);
+  };
+
+  const handleGradeFilterChange = (grade: 'all' | '7' | '8' | '9') => {
+    setSelectedGradeFilter(grade);
+    setSearchPage(1);
+  };
+
+  const handleRoomFilterChange = (roomId: string) => {
+    setSelectedRoomFilter(roomId);
+    setSearchPage(1);
+  };
+
+  const handleStatusFilterChange = (status: 'all' | 'in_progress' | 'submitted' | 'has_session' | 'no_session') => {
+    setSelectedStatusFilter(status);
+    setSearchPage(1);
+  };
+
+  const handleResetFilters = () => {
+    setSearchQuery('');
+    setSelectedGradeFilter('all');
+    setSelectedRoomFilter('all');
+    setSelectedStatusFilter('all');
+    setSearchPage(1);
+  };
+
+  // Search Tab KPI Stats (O(1) lookups per student)
   const searchKpiStats = useMemo(() => {
     const total = activeStudents.length;
     let inProgress = 0;
     let submitted = 0;
     let hasSession = 0;
 
-    activeStudents.forEach(st => {
-      const sessions = Object.values(studentSessions).filter(s => s.studentId === st.id);
-      if (sessions.length > 0) {
+    for (let i = 0; i < activeStudents.length; i++) {
+      const sessList = sessionsByStudentId.get(activeStudents[i].id);
+      if (sessList && sessList.length > 0) {
         hasSession++;
-        if (sessions.some(s => !s.isSubmitted)) {
+        if (sessList.some(s => !s.isSubmitted)) {
           inProgress++;
-        } else if (sessions.some(s => s.isSubmitted)) {
+        } else if (sessList.some(s => s.isSubmitted)) {
           submitted++;
         }
       }
-    });
+    }
 
     return {
       total,
@@ -402,11 +641,13 @@ export default function CbtPanitiaCommandCenter({
       hasSession,
       noSession: Math.max(0, total - hasSession)
     };
-  }, [activeStudents, studentSessions]);
+  }, [activeStudents, sessionsByStudentId]);
 
-  // Filtered Students for Emergency Reset Search
+  // Filtered Students for Emergency Reset Search (Only computed when activeTab === 'search')
   const filteredStudents = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
+    if (activeTab !== 'search') return [];
+    const query = deferredSearchQuery.trim().toLowerCase();
+
     return activeStudents.filter(st => {
       const assignedRoom = studentRoomMap.get(st.id);
       const roomName = assignedRoom ? assignedRoom.name.toLowerCase() : '';
@@ -417,35 +658,38 @@ export default function CbtPanitiaCommandCenter({
         st.classId.toLowerCase().includes(query) ||
         roomName.includes(query);
 
+      if (!matchQuery) return false;
+
       const matchGrade =
         selectedGradeFilter === 'all' ||
         st.classId.startsWith(selectedGradeFilter);
+
+      if (!matchGrade) return false;
 
       const matchRoom =
         selectedRoomFilter === 'all' ||
         assignedRoom?.id === selectedRoomFilter ||
         assignedRoom?.name.toLowerCase() === selectedRoomFilter.toLowerCase();
 
-      // Student sessions
-      const sessions = Object.values(studentSessions).filter(s => s.studentId === st.id);
-      const hasSubmitted = sessions.some(s => s.isSubmitted);
-      const hasInProgress = sessions.some(s => !s.isSubmitted);
+      if (!matchRoom) return false;
+
+      // Student sessions via O(1) Map lookup
+      const sessions = sessionsByStudentId.get(st.id) || [];
       const hasSession = sessions.length > 0;
 
-      let matchStatus = true;
       if (selectedStatusFilter === 'in_progress') {
-        matchStatus = hasInProgress;
+        return sessions.some(s => !s.isSubmitted);
       } else if (selectedStatusFilter === 'submitted') {
-        matchStatus = hasSubmitted;
+        return sessions.some(s => s.isSubmitted);
       } else if (selectedStatusFilter === 'has_session') {
-        matchStatus = hasSession;
+        return hasSession;
       } else if (selectedStatusFilter === 'no_session') {
-        matchStatus = !hasSession;
+        return !hasSession;
       }
 
-      return matchQuery && matchGrade && matchRoom && matchStatus;
+      return true;
     });
-  }, [activeStudents, searchQuery, selectedGradeFilter, selectedRoomFilter, selectedStatusFilter, studentRoomMap, studentSessions]);
+  }, [activeTab, activeStudents, deferredSearchQuery, selectedGradeFilter, selectedRoomFilter, selectedStatusFilter, studentRoomMap, sessionsByStudentId]);
 
   const totalSearchPages = Math.max(1, Math.ceil(filteredStudents.length / (searchPageSize === 9999 ? filteredStudents.length || 1 : searchPageSize)));
   const paginatedStudents = useMemo(() => {
@@ -454,17 +698,12 @@ export default function CbtPanitiaCommandCenter({
     return filteredStudents.slice(start, start + searchPageSize);
   }, [filteredStudents, searchPage, searchPageSize]);
 
-  // Reset page when any search filter changes
-  useEffect(() => {
-    setSearchPage(1);
-  }, [searchQuery, selectedGradeFilter, selectedRoomFilter, selectedStatusFilter, searchPageSize]);
-
   // Count unassigned students
   const unassignedStudentsCount = useMemo(() => {
     let count = 0;
-    activeStudents.forEach(st => {
-      if (!studentRoomMap.has(st.id)) count++;
-    });
+    for (let i = 0; i < activeStudents.length; i++) {
+      if (!studentRoomMap.has(activeStudents[i].id)) count++;
+    }
     return count;
   }, [activeStudents, studentRoomMap]);
 
@@ -473,25 +712,27 @@ export default function CbtPanitiaCommandCenter({
     return config.rooms.find(r => r.id === selectedArrangementRoomId) || config.rooms[0];
   }, [config.rooms, selectedArrangementRoomId]);
 
-  // Students currently in selected room
+  // Students currently in selected room (O(1) lookup)
   const currentRoomStudents = useMemo(() => {
-    return getStudentsForRoom(currentArrangementRoom, activeStudents);
-  }, [currentArrangementRoom, activeStudents]);
+    return currentArrangementRoom ? (roomStudentsMap.get(currentArrangementRoom.id) || []) : [];
+  }, [currentArrangementRoom, roomStudentsMap]);
 
   // Search filter within current room
   const filteredCurrentRoomStudents = useMemo(() => {
-    const q = roomStudentSearch.trim().toLowerCase();
+    if (activeTab !== 'arrangement') return [];
+    const q = deferredRoomStudentSearch.trim().toLowerCase();
     if (!q) return currentRoomStudents;
     return currentRoomStudents.filter(s =>
       s.name.toLowerCase().includes(q) ||
       s.nisn.includes(q) ||
       s.classId.toLowerCase().includes(q)
     );
-  }, [currentRoomStudents, roomStudentSearch]);
+  }, [activeTab, currentRoomStudents, deferredRoomStudentSearch]);
 
-  // Candidate students for the picker (who can be added to current room)
+  // Candidate students for the picker (Only computed when activeTab === 'arrangement')
   const pickerCandidates = useMemo(() => {
-    const q = pickerSearchQuery.trim().toLowerCase();
+    if (activeTab !== 'arrangement') return [];
+    const q = deferredPickerSearchQuery.trim().toLowerCase();
     return activeStudents.filter(s => {
       // Class filter
       const matchClass = pickerClassFilter === 'all' || s.classId === pickerClassFilter;
@@ -515,7 +756,7 @@ export default function CbtPanitiaCommandCenter({
 
       return true;
     });
-  }, [activeStudents, pickerClassFilter, pickerSearchQuery, pickerStatusFilter, studentRoomMap, currentArrangementRoom]);
+  }, [activeTab, activeStudents, pickerClassFilter, deferredPickerSearchQuery, pickerStatusFilter, studentRoomMap, currentArrangementRoom]);
 
   // Apply Split 50:50 Between 2 Classes and 2 Rooms
   const handleApplySplit5050 = () => {
@@ -814,7 +1055,7 @@ export default function CbtPanitiaCommandCenter({
         <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-white/10 relative z-10 text-xs">
           <button
             type="button"
-            onClick={() => setActiveTab('monitoring')}
+            onClick={() => handleTabSwitch('monitoring')}
             className={`px-4 py-2 rounded-xl font-bold transition flex items-center gap-1.5 cursor-pointer ${
               activeTab === 'monitoring'
                 ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20'
@@ -826,7 +1067,7 @@ export default function CbtPanitiaCommandCenter({
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab('arrangement')}
+            onClick={() => handleTabSwitch('arrangement')}
             className={`px-4 py-2 rounded-xl font-bold transition flex items-center gap-1.5 cursor-pointer ${
               activeTab === 'arrangement'
                 ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20'
@@ -841,7 +1082,7 @@ export default function CbtPanitiaCommandCenter({
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab('search')}
+            onClick={() => handleTabSwitch('search')}
             className={`px-4 py-2 rounded-xl font-bold transition flex items-center gap-1.5 cursor-pointer ${
               activeTab === 'search'
                 ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20'
@@ -853,7 +1094,7 @@ export default function CbtPanitiaCommandCenter({
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab('bap')}
+            onClick={() => handleTabSwitch('bap')}
             className={`px-4 py-2 rounded-xl font-bold transition flex items-center gap-1.5 cursor-pointer ${
               activeTab === 'bap'
                 ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20'
@@ -944,14 +1185,15 @@ export default function CbtPanitiaCommandCenter({
 
               <div className="space-y-2 max-h-[780px] overflow-y-auto pr-1">
                 {config.rooms.map(room => {
-                  const students = getStudentsForRoom(room, activeStudents);
+                  const students = roomStudentsMap.get(room.id) || [];
                   const isSelected = room.id === currentArrangementRoom?.id;
                   const isFull = students.length >= room.capacity;
                   const percent = Math.min(100, Math.round((students.length / room.capacity) * 100));
 
-                  // Represented classes
-                  const uniqueClasses = Array.from(new Set(students.map(s => s.classId))).sort();
-                  const isMixed = uniqueClasses.length > 1;
+                  // Represented classes via O(1) map
+                  const classInfo = roomUniqueClassesMap.get(room.id) || { uniqueClasses: [], isMixed: false };
+                  const uniqueClasses = classInfo.uniqueClasses;
+                  const isMixed = classInfo.isMixed;
 
                   return (
                     <button
@@ -1091,13 +1333,14 @@ export default function CbtPanitiaCommandCenter({
                       )}
                     </div>
 
-                    <input
-                      type="text"
-                      placeholder="Cari siswa di ruangan ini..."
-                      value={roomStudentSearch}
-                      onChange={(e) => setRoomStudentSearch(e.target.value)}
-                      className="px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:bg-white w-full sm:w-56"
-                    />
+                    <div className="w-full sm:w-56">
+                      <FastSearchInput
+                        value={roomStudentSearch}
+                        onSearchChange={setRoomStudentSearch}
+                        placeholder="Cari siswa di ruangan ini..."
+                        className="w-full pl-8 pr-7 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:bg-white"
+                      />
+                    </div>
                   </div>
 
                   {currentRoomStudents.length === 0 ? (
@@ -1114,7 +1357,7 @@ export default function CbtPanitiaCommandCenter({
                                 type="checkbox"
                                 checked={
                                   filteredCurrentRoomStudents.length > 0 &&
-                                  filteredCurrentRoomStudents.every(s => selectedStudentIdsToRemove.includes(s.id))
+                                  filteredCurrentRoomStudents.every(s => selectedStudentIdsToRemoveSet.has(s.id))
                                 }
                                 onChange={(e) => {
                                   if (e.target.checked) {
@@ -1135,7 +1378,7 @@ export default function CbtPanitiaCommandCenter({
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                           {filteredCurrentRoomStudents.map((st, idx) => {
-                            const isChecked = selectedStudentIdsToRemove.includes(st.id);
+                            const isChecked = selectedStudentIdsToRemoveSet.has(st.id);
                             return (
                               <tr key={st.id} className="hover:bg-slate-50 transition">
                                 <td className="py-2 px-3">
@@ -1253,12 +1496,11 @@ export default function CbtPanitiaCommandCenter({
                     <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
                       3. Cari Nama / NISN:
                     </label>
-                    <input
-                      type="text"
-                      placeholder="Ketik nama atau NISN..."
+                    <FastSearchInput
                       value={pickerSearchQuery}
-                      onChange={(e) => setPickerSearchQuery(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-indigo-500"
+                      onSearchChange={setPickerSearchQuery}
+                      placeholder="Ketik nama atau NISN..."
+                      className="w-full pl-8 pr-7 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-indigo-500"
                     />
                   </div>
                 </div>
@@ -1315,7 +1557,7 @@ export default function CbtPanitiaCommandCenter({
                             type="checkbox"
                             checked={
                               pickerCandidates.length > 0 &&
-                              pickerCandidates.every(s => selectedStudentIdsToAdd.includes(s.id))
+                              pickerCandidates.every(s => selectedStudentIdsToAddSet.has(s.id))
                             }
                             onChange={(e) => {
                               if (e.target.checked) {
@@ -1342,7 +1584,7 @@ export default function CbtPanitiaCommandCenter({
                         </tr>
                       ) : (
                         pickerCandidates.map(st => {
-                          const isChecked = selectedStudentIdsToAdd.includes(st.id);
+                          const isChecked = selectedStudentIdsToAddSet.has(st.id);
                           const assignedRoom = studentRoomMap.get(st.id);
                           const isAlreadyInCurrentRoom = assignedRoom?.id === currentArrangementRoom?.id;
 
@@ -1455,22 +1697,11 @@ export default function CbtPanitiaCommandCenter({
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {config.rooms.map(room => {
-                const studentsInRoom = getStudentsForRoom(room, activeStudents);
-
-                let roomSubmitted = 0;
-                let roomInProgress = 0;
-                let roomNotStarted = 0;
-
-                studentsInRoom.forEach(st => {
-                  const sessions = Object.values(studentSessions).filter(sess => sess.studentId === st.id);
-                  if (sessions.some(s => s.isSubmitted)) {
-                    roomSubmitted++;
-                  } else if (sessions.length > 0) {
-                    roomInProgress++;
-                  } else {
-                    roomNotStarted++;
-                  }
-                });
+                const studentsInRoom = roomStudentsMap.get(room.id) || [];
+                const stats = roomStatusStatsMap.get(room.id) || { submitted: 0, inProgress: 0, notStarted: 0, total: 0 };
+                const roomSubmitted = stats.submitted;
+                const roomInProgress = stats.inProgress;
+                const roomNotStarted = stats.notStarted;
 
                 const total = studentsInRoom.length;
                 const percent = total > 0 ? Math.round((roomSubmitted / total) * 100) : 0;
@@ -1668,27 +1899,13 @@ export default function CbtPanitiaCommandCenter({
           <div className="bg-slate-50/90 p-3 sm:p-3.5 rounded-2xl border border-slate-200 space-y-2.5">
             <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-center">
               {/* Search Bar */}
-              <div className="sm:col-span-7 relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">
-                  🔍
-                </span>
-                <input
-                  type="text"
-                  placeholder="Cari Nama Siswa, NISN, Kelas (misal 7-A), atau Ruang Ujian..."
+              <div className="sm:col-span-7">
+                <FastSearchInput
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onSearchChange={setSearchQuery}
+                  placeholder="Cari Nama Siswa, NISN, Kelas (misal 7-A), atau Ruang Ujian..."
                   className="w-full pl-8 pr-7 py-2 rounded-xl bg-white border border-slate-200 text-slate-900 text-xs focus:outline-none focus:border-indigo-500 transition shadow-2xs"
                 />
-                {searchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setSearchQuery('')}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold cursor-pointer w-4 h-4 flex items-center justify-center rounded-full hover:bg-slate-100"
-                    title="Hapus pencarian"
-                  >
-                    ✕
-                  </button>
-                )}
               </div>
 
               {/* Room Dropdown */}
@@ -1853,14 +2070,14 @@ export default function CbtPanitiaCommandCenter({
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {paginatedStudents.map(st => {
-                      const sessions = Object.values(studentSessions).filter(s => s.studentId === st.id);
+                      const sessions = sessionsByStudentId.get(st.id) || [];
                       // Deduplicate sessions by examId to ensure no duplicates
                       const uniqueSessions = Array.from(
                         new Map(sessions.map(s => [s.examId, s])).values()
                       );
 
                       // Determine official room based on actual assignment
-                      const assignedRoom = studentRoomMap.get(st.id) || getRoomForStudent(st, config.rooms);
+                      const assignedRoom = studentRoomMap.get(st.id);
 
                       return (
                         <tr key={st.id} className="hover:bg-slate-50/80 transition">
@@ -2103,7 +2320,7 @@ export default function CbtPanitiaCommandCenter({
                     const latestAttendance = attendances[0];
                     const isSubmitted = attendances.some(a => a.isBapSubmitted);
                     const latestNote = latestAttendance?.notes || '-';
-                    const roomStudents = getStudentsForRoom(room, activeStudents);
+                    const roomStudents = roomStudentsMap.get(room.id) || [];
                     const uniqueClasses = Array.from(new Set(roomStudents.map(s => s.classId))).sort();
 
                     // Calculate attendance breakdown if available
@@ -2493,7 +2710,7 @@ export default function CbtPanitiaCommandCenter({
                     className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-bold text-slate-900 focus:outline-none focus:border-amber-500 cursor-pointer"
                   >
                     {SCHOOL_CLASSES.map(c => (
-                      <option key={c.id} value={c.id}>{c.name} ({activeStudents.filter(s => s.classId === c.id).length} Siswa)</option>
+                      <option key={c.id} value={c.id}>{c.name} ({classCountMap.get(c.id) || 0} Siswa)</option>
                     ))}
                   </select>
                 </div>
@@ -2508,7 +2725,7 @@ export default function CbtPanitiaCommandCenter({
                     className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-bold text-slate-900 focus:outline-none focus:border-amber-500 cursor-pointer"
                   >
                     {SCHOOL_CLASSES.map(c => (
-                      <option key={c.id} value={c.id}>{c.name} ({activeStudents.filter(s => s.classId === c.id).length} Siswa)</option>
+                      <option key={c.id} value={c.id}>{c.name} ({classCountMap.get(c.id) || 0} Siswa)</option>
                     ))}
                   </select>
                 </div>
@@ -2614,12 +2831,10 @@ export default function CbtPanitiaCommandCenter({
         const st = resetModalStudent;
         const currentSessions = Array.from(
           new Map(
-            Object.values(studentSessions)
-              .filter(s => s.studentId === st.id)
-              .map(s => [s.examId, s])
+            (sessionsByStudentId.get(st.id) || []).map(s => [s.examId, s])
           ).values()
         );
-        const assignedRoom = getRoomForStudent(st, config.rooms);
+        const assignedRoom = studentRoomMap.get(st.id);
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
@@ -2762,22 +2977,11 @@ export default function CbtPanitiaCommandCenter({
       {/* 6E. MODAL LIVE DETAIL MONITORING RUANG UJIAN */}
       {previewMonitoringRoom && (() => {
         const room = previewMonitoringRoom;
-        const studentsInRoom = getStudentsForRoom(room, activeStudents);
-
-        let roomSubmitted = 0;
-        let roomInProgress = 0;
-        let roomNotStarted = 0;
-
-        studentsInRoom.forEach(st => {
-          const sessions = Object.values(studentSessions).filter(sess => sess.studentId === st.id);
-          if (sessions.some(s => s.isSubmitted)) {
-            roomSubmitted++;
-          } else if (sessions.length > 0) {
-            roomInProgress++;
-          } else {
-            roomNotStarted++;
-          }
-        });
+        const studentsInRoom = roomStudentsMap.get(room.id) || [];
+        const stats = roomStatusStatsMap.get(room.id) || { submitted: 0, inProgress: 0, notStarted: 0, total: 0 };
+        const roomSubmitted = stats.submitted;
+        const roomInProgress = stats.inProgress;
+        const roomNotStarted = stats.notStarted;
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
@@ -2844,7 +3048,7 @@ export default function CbtPanitiaCommandCenter({
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {studentsInRoom.map((st, idx) => {
-                        const sessions = Object.values(studentSessions).filter(s => s.studentId === st.id);
+                        const sessions = sessionsByStudentId.get(st.id) || [];
                         const hasSubmitted = sessions.some(s => s.isSubmitted);
                         const hasInProgress = sessions.some(s => !s.isSubmitted);
 
@@ -2916,7 +3120,7 @@ export default function CbtPanitiaCommandCenter({
         const room = previewBapRoom;
         const attendances = Object.values(roomAttendances).filter(a => a.roomName?.includes(room.name));
         const latestAttendance = attendances[0];
-        const roomStudents = getStudentsForRoom(room, activeStudents);
+        const roomStudents = roomStudentsMap.get(room.id) || [];
         const uniqueClasses = Array.from(new Set(roomStudents.map(s => s.classId))).sort();
 
         let presentCount = 0;
@@ -3086,7 +3290,7 @@ export default function CbtPanitiaCommandCenter({
           const isSubmitted = attendances.some(a => a.isBapSubmitted);
           if (isSubmitted) totalBapSubmitted++;
 
-          const roomStudents = getStudentsForRoom(room, activeStudents);
+          const roomStudents = roomStudentsMap.get(room.id) || [];
           const uniqueClasses = Array.from(new Set(roomStudents.map(s => s.classId))).sort();
           totalStudentsAll += roomStudents.length;
 
