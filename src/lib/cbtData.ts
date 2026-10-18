@@ -108,28 +108,225 @@ export interface CbtRoomAttendance {
 }
 
 // -------------------------------------------------------------
-// DEFAULT ROOMS UNTUK SMP NEGERI 3 CIHAMPELAS
+// KONFIGURASI RUANGAN & PRESET KOMPOSISI CAMPUR PANITIA CBT
 // -------------------------------------------------------------
+export type CbtRoomPresetType = 'campur_7_8' | 'campur_8_9' | 'campur_7_9' | 'murni' | 'custom';
+
+export interface CbtExamRoomConfig {
+  id: string; // e.g. 'ruang-01'
+  name: string; // e.g. 'Ruang 01'
+  classes: string[]; // e.g. ['7-A', '8-A']
+  capacity: number; // default: 32
+  label: string; // e.g. 'Ruang 01 (Gabungan 7-A & 8-A)'
+  supervisorName?: string;
+}
+
+export interface CbtPanitiaConfig {
+  activePreset: CbtRoomPresetType;
+  rooms: CbtExamRoomConfig[];
+  examSessionName: string;
+  academicYear: string;
+  semester: string;
+}
+
+export function generateRoomsForPreset(preset: CbtRoomPresetType): CbtExamRoomConfig[] {
+  const rooms: CbtExamRoomConfig[] = [];
+  const letters = ['A', 'B', 'C', 'D', 'E', 'F'];
+
+  if (preset === 'campur_7_8') {
+    // Ruang 01 - 06: Gabungan Kelas 7 & 8
+    letters.forEach((l, idx) => {
+      const numStr = String(idx + 1).padStart(2, '0');
+      rooms.push({
+        id: `ruang-${numStr}`,
+        name: `Ruang ${numStr}`,
+        classes: [`7-${l}`, `8-${l}`],
+        capacity: 32,
+        label: `Ruang ${numStr} (Gabungan 7-${l} & 8-${l})`,
+        supervisorName: 'Guru Pengawas'
+      });
+    });
+    // Ruang 07 - 12: Kelas 9
+    letters.forEach((l, idx) => {
+      const numStr = String(idx + 7).padStart(2, '0');
+      rooms.push({
+        id: `ruang-${numStr}`,
+        name: `Ruang ${numStr}`,
+        classes: [`9-${l}`],
+        capacity: 32,
+        label: `Ruang ${numStr} (Kelas 9-${l})`,
+        supervisorName: 'Guru Pengawas'
+      });
+    });
+  } else if (preset === 'campur_8_9') {
+    // Ruang 01 - 06: Gabungan Kelas 8 & 9
+    letters.forEach((l, idx) => {
+      const numStr = String(idx + 1).padStart(2, '0');
+      rooms.push({
+        id: `ruang-${numStr}`,
+        name: `Ruang ${numStr}`,
+        classes: [`8-${l}`, `9-${l}`],
+        capacity: 32,
+        label: `Ruang ${numStr} (Gabungan 8-${l} & 9-${l})`,
+        supervisorName: 'Guru Pengawas'
+      });
+    });
+    // Ruang 07 - 12: Kelas 7
+    letters.forEach((l, idx) => {
+      const numStr = String(idx + 7).padStart(2, '0');
+      rooms.push({
+        id: `ruang-${numStr}`,
+        name: `Ruang ${numStr}`,
+        classes: [`7-${l}`],
+        capacity: 32,
+        label: `Ruang ${numStr} (Kelas 7-${l})`,
+        supervisorName: 'Guru Pengawas'
+      });
+    });
+  } else if (preset === 'campur_7_9') {
+    // Ruang 01 - 06: Gabungan Kelas 7 & 9
+    letters.forEach((l, idx) => {
+      const numStr = String(idx + 1).padStart(2, '0');
+      rooms.push({
+        id: `ruang-${numStr}`,
+        name: `Ruang ${numStr}`,
+        classes: [`7-${l}`, `9-${l}`],
+        capacity: 32,
+        label: `Ruang ${numStr} (Gabungan 7-${l} & 9-${l})`,
+        supervisorName: 'Guru Pengawas'
+      });
+    });
+    // Ruang 07 - 12: Kelas 8
+    letters.forEach((l, idx) => {
+      const numStr = String(idx + 7).padStart(2, '0');
+      rooms.push({
+        id: `ruang-${numStr}`,
+        name: `Ruang ${numStr}`,
+        classes: [`8-${l}`],
+        capacity: 32,
+        label: `Ruang ${numStr} (Kelas 8-${l})`,
+        supervisorName: 'Guru Pengawas'
+      });
+    });
+  } else {
+    // Murni (Satu Tingkat): Ruang 01-06 (7A-7F), Ruang 07-12 (8A-8F), Ruang 13-18 (9A-9F)
+    letters.forEach((l, idx) => {
+      const numStr = String(idx + 1).padStart(2, '0');
+      rooms.push({
+        id: `ruang-${numStr}`,
+        name: `Ruang ${numStr}`,
+        classes: [`7-${l}`],
+        capacity: 32,
+        label: `Ruang ${numStr} (Kelas 7-${l})`,
+        supervisorName: 'Guru Pengawas'
+      });
+    });
+    letters.forEach((l, idx) => {
+      const numStr = String(idx + 7).padStart(2, '0');
+      rooms.push({
+        id: `ruang-${numStr}`,
+        name: `Ruang ${numStr}`,
+        classes: [`8-${l}`],
+        capacity: 32,
+        label: `Ruang ${numStr} (Kelas 8-${l})`,
+        supervisorName: 'Guru Pengawas'
+      });
+    });
+    letters.forEach((l, idx) => {
+      const numStr = String(idx + 13).padStart(2, '0');
+      rooms.push({
+        id: `ruang-${numStr}`,
+        name: `Ruang ${numStr}`,
+        classes: [`9-${l}`],
+        capacity: 32,
+        label: `Ruang ${numStr} (Kelas 9-${l})`,
+        supervisorName: 'Guru Pengawas'
+      });
+    });
+  }
+
+  // Tambahkan Lab Komputer
+  rooms.push({
+    id: 'lab-komp-1',
+    name: 'Lab Komputer 1',
+    classes: ['Semua'],
+    capacity: 40,
+    label: 'Lab Komputer 1 (Cadangan / Susulan)',
+    supervisorName: 'Proktor CBT'
+  });
+  rooms.push({
+    id: 'lab-komp-2',
+    name: 'Lab Komputer 2',
+    classes: ['Semua'],
+    capacity: 40,
+    label: 'Lab Komputer 2 (Cadangan / Susulan)',
+    supervisorName: 'Proktor CBT'
+  });
+
+  return rooms;
+}
+
+const CBT_PANITIA_CONFIG_KEY = 'cbt_panitia_config_v1';
+
+export function getStoredCbtPanitiaConfig(): CbtPanitiaConfig {
+  if (typeof window === 'undefined') {
+    return {
+      activePreset: 'campur_7_8',
+      rooms: generateRoomsForPreset('campur_7_8'),
+      examSessionName: 'Sesi 1 (Pagi)',
+      academicYear: '2026/2027',
+      semester: 'PTS / STS Ganjil'
+    };
+  }
+
+  try {
+    const raw = localStorage.getItem(CBT_PANITIA_CONFIG_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed.rooms && Array.isArray(parsed.rooms) && parsed.rooms.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.error('Failed to parse cbt_panitia_config', e);
+  }
+
+  const initial: CbtPanitiaConfig = {
+    activePreset: 'campur_7_8',
+    rooms: generateRoomsForPreset('campur_7_8'),
+    examSessionName: 'Sesi 1 (Pagi)',
+    academicYear: '2026/2027',
+    semester: 'PTS / STS Ganjil'
+  };
+  saveStoredCbtPanitiaConfig(initial);
+  return initial;
+}
+
+export function saveStoredCbtPanitiaConfig(config: CbtPanitiaConfig) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(CBT_PANITIA_CONFIG_KEY, JSON.stringify(config));
+    window.dispatchEvent(new CustomEvent('cbtPanitiaConfigUpdated', { detail: config }));
+  } catch (e) {
+    console.error('Failed to save cbt_panitia_config', e);
+  }
+}
+
 export const CBT_EXAM_ROOMS: string[] = [
-  'Ruang 01 (Kelas 7-A)',
-  'Ruang 02 (Kelas 7-B)',
-  'Ruang 03 (Kelas 7-C)',
-  'Ruang 04 (Kelas 7-D)',
-  'Ruang 05 (Kelas 7-E)',
-  'Ruang 06 (Kelas 7-F)',
-  'Ruang 07 (Kelas 8-A)',
-  'Ruang 08 (Kelas 8-B)',
-  'Ruang 09 (Kelas 8-C)',
-  'Ruang 10 (Kelas 8-D)',
-  'Ruang 11 (Kelas 8-E)',
-  'Ruang 12 (Kelas 8-F)',
-  'Ruang 13 (Kelas 9-A)',
-  'Ruang 14 (Kelas 9-B)',
-  'Ruang 15 (Kelas 9-C)',
-  'Ruang 16 (Kelas 9-D)',
-  'Ruang 17 (Kelas 9-E)',
-  'Lab Komputer 1 (Utama)',
-  'Lab Komputer 2 (Multimedia)'
+  'Ruang 01 (Gabungan 7-A & 8-A)',
+  'Ruang 02 (Gabungan 7-B & 8-B)',
+  'Ruang 03 (Gabungan 7-C & 8-C)',
+  'Ruang 04 (Gabungan 7-D & 8-D)',
+  'Ruang 05 (Gabungan 7-E & 8-E)',
+  'Ruang 06 (Gabungan 7-F & 8-F)',
+  'Ruang 07 (Kelas 9-A)',
+  'Ruang 08 (Kelas 9-B)',
+  'Ruang 09 (Kelas 9-C)',
+  'Ruang 10 (Kelas 9-D)',
+  'Ruang 11 (Kelas 9-E)',
+  'Ruang 12 (Kelas 9-F)',
+  'Lab Komputer 1 (Cadangan / Susulan)',
+  'Lab Komputer 2 (Cadangan / Susulan)'
 ];
 
 // -------------------------------------------------------------

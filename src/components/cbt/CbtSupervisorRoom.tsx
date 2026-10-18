@@ -10,6 +10,9 @@ import {
   getStoredStudentCbtSessions,
   registerEmergencyStudentToCbt,
   resetStoredStudentCbtSession,
+  getStoredCbtPanitiaConfig,
+  CbtPanitiaConfig,
+  CbtStudentAnswerState,
   CbtRoomAttendance
 } from '@/lib/cbtData';
 import { Student } from '@/lib/elearningData';
@@ -60,16 +63,46 @@ export default function CbtSupervisorRoom({
     return packages.find(p => p.id === selectedExamId) || packages[0];
   }, [packages, selectedExamId]);
 
-  // Determine target class from room name (e.g. "Ruang 01 (Kelas 7-A)" -> "7-A")
-  const roomTargetClass = useMemo(() => {
-    const match = selectedRoom.match(/Kelas\s*([0-9]-[A-Z])/i);
-    return match ? match[1] : '7-A';
-  }, [selectedRoom]);
+  const [panitiaConfig, setPanitiaConfig] = useState<CbtPanitiaConfig>(() => getStoredCbtPanitiaConfig());
 
-  // Students assigned to this room
+  useEffect(() => {
+    const handleConfigUpdate = () => {
+      setPanitiaConfig(getStoredCbtPanitiaConfig());
+    };
+    window.addEventListener('cbtPanitiaConfigUpdated', handleConfigUpdate);
+    return () => window.removeEventListener('cbtPanitiaConfigUpdated', handleConfigUpdate);
+  }, []);
+
+  // Room options from Panitia Config
+  const roomOptions = useMemo(() => {
+    return panitiaConfig.rooms;
+  }, [panitiaConfig]);
+
+  // Selected room object
+  const currentRoomObj = useMemo(() => {
+    return roomOptions.find(r => r.name === selectedRoom || r.label === selectedRoom) || roomOptions[0];
+  }, [roomOptions, selectedRoom]);
+
+  // Classes in this room (can be 7-A & 8-A!)
+  const roomClasses = useMemo(() => {
+    return currentRoomObj?.classes || ['7-A'];
+  }, [currentRoomObj]);
+
+  // Filter specific class within the room (or 'all' for mixed view)
+  const [filterClassInRoom, setFilterClassInRoom] = useState<string>('all');
+
+  // Students assigned to this room (mixed classes!)
   const roomStudents = useMemo(() => {
-    return activeStudents.filter(s => s.classId === roomTargetClass);
-  }, [activeStudents, roomTargetClass]);
+    if (roomClasses.includes('Semua')) {
+      return activeStudents;
+    }
+    return activeStudents.filter(s => roomClasses.includes(s.classId));
+  }, [activeStudents, roomClasses]);
+
+  const filteredRoomStudents = useMemo(() => {
+    if (filterClassInRoom === 'all') return roomStudents;
+    return roomStudents.filter(s => s.classId === filterClassInRoom);
+  }, [roomStudents, filterClassInRoom]);
 
   // Load existing room attendance if any
   useEffect(() => {
@@ -235,12 +268,15 @@ export default function CbtSupervisorRoom({
             </label>
             <select
               value={selectedRoom}
-              onChange={(e) => setSelectedRoom(e.target.value)}
+              onChange={(e) => {
+                setSelectedRoom(e.target.value);
+                setFilterClassInRoom('all');
+              }}
               className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-semibold focus:outline-none focus:border-indigo-500 cursor-pointer"
             >
-              {CBT_EXAM_ROOMS.map(room => (
-                <option key={room} value={room}>
-                  {room}
+              {roomOptions.map(room => (
+                <option key={room.id} value={room.name}>
+                  {room.label || room.name}
                 </option>
               ))}
             </select>
@@ -330,7 +366,7 @@ export default function CbtSupervisorRoom({
               Daftar Hadir & Pengerjaan Peserta: {selectedRoom}
             </h3>
             <p className="text-[11px] text-slate-500">
-              Total {roomStudents.length} peserta terdaftar di rombel {roomTargetClass}
+              Total {roomStudents.length} peserta terdaftar di rombel {roomClasses.join(' & ')}
             </p>
           </div>
 
@@ -346,6 +382,46 @@ export default function CbtSupervisorRoom({
           </div>
         </div>
 
+        {/* Sub-filter kelas campuran jika ruangan memiliki lebih dari 1 kelas */}
+        {roomClasses.length > 1 && (
+          <div className="p-3 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center gap-1.5 text-xs">
+            <span className="text-[11px] font-bold text-slate-600 px-1">Filter Rombel di Ruangan Ini:</span>
+            <button
+              type="button"
+              onClick={() => setFilterClassInRoom('all')}
+              className={`px-3 py-1 rounded-xl font-bold transition cursor-pointer ${
+                filterClassInRoom === 'all'
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+              }`}
+            >
+              Semua Peserta ({roomStudents.length})
+            </button>
+            {roomClasses.map(c => {
+              const countInClass = roomStudents.filter(s => s.classId === c).length;
+              return (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setFilterClassInRoom(c)}
+                  className={`px-3 py-1 rounded-xl font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                    filterClassInRoom === c
+                      ? 'bg-indigo-600 text-white shadow-xs'
+                      : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  <span>Kelas {c}</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                    filterClassInRoom === c ? 'bg-indigo-800 text-indigo-100' : 'bg-slate-100 text-slate-600'
+                  }`}>
+                    {countInClass}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         <div className="overflow-x-auto">
           <table className="w-full text-xs text-left border-collapse">
             <thead className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
@@ -359,19 +435,22 @@ export default function CbtSupervisorRoom({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {roomStudents.length === 0 ? (
+              {filteredRoomStudents.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="text-center py-8 text-slate-400">
                     Tidak ada siswa terdaftar di ruangan ini.
                   </td>
                 </tr>
               ) : (
-                roomStudents.map((st, idx) => {
+                filteredRoomStudents.map((st, idx) => {
                   const currentStatus = attendanceRecords[st.id] || 'H';
                   
                   // Check student live CBT session
                   const sessionKey = `${selectedExam?.id}_${st.id}`;
-                  const session = studentSessions[sessionKey];
+                  let session: CbtStudentAnswerState | undefined = studentSessions[sessionKey];
+                  if (!session) {
+                    session = Object.values(studentSessions).find(s => s.studentId === st.id);
+                  }
 
                   return (
                     <tr key={st.id} className="hover:bg-slate-50 transition">
@@ -382,9 +461,20 @@ export default function CbtSupervisorRoom({
                         {st.nisn}
                       </td>
                       <td className="px-3 py-2.5 font-semibold text-slate-900">
-                        {st.name}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span>{st.name}</span>
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                            st.classId.startsWith('7')
+                              ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                              : st.classId.startsWith('8')
+                              ? 'bg-purple-50 text-purple-700 border border-purple-200'
+                              : 'bg-teal-50 text-teal-700 border border-teal-200'
+                          }`}>
+                            {st.classId}
+                          </span>
+                        </div>
                         {currentStatus === 'S' && (
-                          <span className="ml-2 text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                          <span className="mt-1 inline-block text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
                             Ujian Susulan
                           </span>
                         )}

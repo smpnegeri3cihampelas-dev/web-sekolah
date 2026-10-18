@@ -50,6 +50,7 @@ import TeacherSettingsModal from '@/components/TeacherSettingsModal';
 import CbtStudentExamRoom from '@/components/cbt/CbtStudentExamRoom';
 import CbtTeacherManagement from '@/components/cbt/CbtTeacherManagement';
 import CbtSupervisorRoom from '@/components/cbt/CbtSupervisorRoom';
+import CbtPanitiaCommandCenter from '@/components/cbt/CbtPanitiaCommandCenter';
 import {
   CbtExamPackage,
   CbtStudentAnswerState,
@@ -1250,7 +1251,7 @@ export default function ELearningPage() {
   }, []);
 
   // Login Form Local State
-  const [loginRole, setLoginRole] = useState<'guru' | 'piket' | 'siswa'>('guru');
+  const [loginRole, setLoginRole] = useState<'guru' | 'piket' | 'panitia' | 'siswa'>('guru');
   const [loginIdentifier, setLoginIdentifier] = useState<string>('');
   const [loginPassword, setLoginPassword] = useState<string>('');
   const [showPassword, setShowPassword] = useState<boolean>(false);
@@ -1538,7 +1539,7 @@ export default function ELearningPage() {
     showToast('Sesi Anda telah berhasil diakhiri.', 'info');
   };
 
-  const switchLoginTab = (tab: 'guru' | 'piket' | 'siswa') => {
+  const switchLoginTab = (tab: 'guru' | 'piket' | 'panitia' | 'siswa') => {
     setLoginRole(tab);
     setLoginIdentifier('');
     setLoginPassword('');
@@ -1631,6 +1632,35 @@ export default function ELearningPage() {
         nipOrNisn: inputId || 'POSKO-PIKET',
         subject: 'Pusat Monitoring Rombel'
       });
+    } else if (loginRole === 'panitia') {
+      const inputId = loginIdentifier.trim().toLowerCase();
+      const trimmedPass = loginPassword.trim();
+
+      if (!inputId) {
+        showToast('⚠️ Silakan masukkan username panitia ujian CBT.', 'warn');
+        return;
+      }
+
+      if (!trimmedPass) {
+        showToast('⚠️ Silakan masukkan kata sandi panitia ujian CBT.', 'warn');
+        return;
+      }
+
+      const isValidUsername = inputId === 'panitia' || inputId === 'panitia_cbt' || inputId === 'poskocbt' || inputId === 'panitiacbt';
+      const isValidPass = trimmedPass === 'panitia123' || trimmedPass === 'panitia2026' || trimmedPass === 'smpn3cihampelas';
+
+      if (!isValidUsername || !isValidPass) {
+        showToast('⚠️ Username atau kata sandi panitia tidak sesuai! Silakan periksa kembali.', 'warn');
+        return;
+      }
+
+      handleLogin({
+        role: 'panitia',
+        name: 'Panitia Asesmen CBT (Posko Pusat)',
+        nipOrNisn: 'PANITIA-CBT',
+        subject: 'Pusat Kendali Ujian'
+      });
+      showToast('🏛️ Selamat datang di Pusat Komando Panitia Ujian CBT!', 'success');
     } else if (loginRole === 'siswa') {
       const cleanInput = loginIdentifier.trim();
       const cleanNisn = cleanInput.replace(/\D/g, '');
@@ -2702,9 +2732,11 @@ export default function ELearningPage() {
                     ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
                     : currentUser.role === 'guru_piket'
                     ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                    : currentUser.role === 'panitia'
+                    ? 'bg-amber-50 text-amber-700 border border-amber-200'
                     : 'bg-purple-50 text-purple-700 border border-purple-200'
                 }`}>
-                  {currentUser.role === 'guru_mapel' ? '👨‍🏫' : currentUser.role === 'guru_piket' ? '🏢' : '🎓'}
+                  {currentUser.role === 'guru_mapel' ? '👨‍🏫' : currentUser.role === 'guru_piket' ? '🏢' : currentUser.role === 'panitia' ? '🏛️' : '🎓'}
                 </div>
                 <div className="text-left">
                   <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
@@ -2714,6 +2746,7 @@ export default function ELearningPage() {
                   <div className="text-[10px] text-slate-500 font-medium">
                     {currentUser.role === 'guru_mapel' && (currentUser.subject || 'Guru Mata Pelajaran')}
                     {currentUser.role === 'guru_piket' && 'Stasiun Meja Piket'}
+                    {currentUser.role === 'panitia' && 'Pusat Komando Asesmen CBT'}
                     {currentUser.role === 'siswa' && `Peserta Didik (Kelas ${currentUser.classId || '7-A'})`}
                   </div>
                 </div>
@@ -2801,8 +2834,8 @@ export default function ELearningPage() {
                 </p>
               </div>
 
-              {/* 3-Role Clean Switcher */}
-              <div className="grid grid-cols-3 gap-1 p-1 bg-slate-100 rounded-xl mb-5 text-xs font-medium">
+              {/* 4-Role Clean Switcher */}
+              <div className="grid grid-cols-4 gap-1 p-1 bg-slate-100 rounded-xl mb-5 text-xs font-medium">
                 <button 
                   type="button"
                   onClick={() => switchLoginTab('guru')}
@@ -2825,6 +2858,18 @@ export default function ELearningPage() {
                   }`}
                 >
                   Piket
+                </button>
+
+                <button 
+                  type="button"
+                  onClick={() => switchLoginTab('panitia')}
+                  className={`py-2 rounded-lg transition cursor-pointer text-center ${
+                    loginRole === 'panitia'
+                      ? 'bg-white text-amber-600 font-bold shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Panitia
                 </button>
 
                 <button 
@@ -2982,6 +3027,67 @@ export default function ELearningPage() {
                       </button>
                       <p className="text-[10px] text-slate-400 mt-1">ID: POSKO-PIKET • Sandi: piket123</p>
                     </div>
+                  </>
+                )}
+
+                {loginRole === 'panitia' && (
+                  <>
+                    <div className="p-3 rounded-2xl bg-amber-50 border border-amber-200/80 text-amber-900 text-xs flex items-start gap-2.5">
+                      <span className="text-base flex-shrink-0">🏛️</span>
+                      <div>
+                        <strong className="block text-amber-950 font-bold mb-0.5">Portal Posko Panitia Asesmen CBT</strong>
+                        <p className="text-[11px] text-amber-800">
+                          Khusus tim panitia pelaksana ujian (PTS / PAS / Asesmen Sumatif). Silakan masukkan kredensial posko resmi.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                        Username Panitia
+                      </label>
+                      <input
+                        type="text"
+                        value={loginIdentifier}
+                        onChange={(e) => setLoginIdentifier(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-amber-500 focus:bg-white focus:ring-2 focus:ring-amber-500/20 transition font-mono"
+                        placeholder="Username panitia (misal: panitia)"
+                        autoComplete="off"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                        Kata Sandi
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showPassword ? "text" : "password"}
+                          value={loginPassword}
+                          onChange={(e) => setLoginPassword(e.target.value)}
+                          className="w-full px-3.5 py-2.5 pr-10 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-amber-500 focus:bg-white focus:ring-2 focus:ring-amber-500/20 transition"
+                          placeholder="Masukkan kata sandi posko"
+                          autoComplete="current-password"
+                          required
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition p-1 cursor-pointer text-xs"
+                          title={showPassword ? "Sembunyikan sandi" : "Lihat sandi"}
+                        >
+                          {showPassword ? "👁️" : "🙈"}
+                        </button>
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-sm transition shadow-md shadow-amber-500/20 flex items-center justify-center gap-1.5 cursor-pointer mt-2 active:scale-[0.99]"
+                    >
+                      Masuk sebagai Panitia CBT ➔
+                    </button>
                   </>
                 )}
 
@@ -4758,6 +4864,16 @@ export default function ELearningPage() {
             )}
 
           </div>
+        )}
+
+        {/* ----------------- VIEW: PANITIA UJIAN CBT (POSKO PUSAT & COMMAND CENTER) ----------------- */}
+        {currentUser?.role === 'panitia' && (
+          <CbtPanitiaCommandCenter
+            activeStudents={activeStudents}
+            onOpenRoomView={(roomName) => {
+              // Quick action if needed
+            }}
+          />
         )}
 
         {/* ----------------- 4. VIEW: SISWA (PORTAL BELAJAR & NILAI) ----------------- */}

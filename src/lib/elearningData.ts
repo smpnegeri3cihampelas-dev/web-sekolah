@@ -42,7 +42,7 @@ export interface TeacherUser {
 }
 
 export interface AuthUserSession {
-  role: 'guru_mapel' | 'guru_piket' | 'siswa';
+  role: 'guru_mapel' | 'guru_piket' | 'panitia' | 'siswa';
   name: string;
   nipOrNisn: string;
   subject?: string;
