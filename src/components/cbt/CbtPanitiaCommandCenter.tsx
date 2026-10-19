@@ -21,6 +21,7 @@ import {
   registerEmergencyStudentToCbt
 } from '@/lib/cbtData';
 import { Student, SCHOOL_CLASSES } from '@/lib/elearningData';
+import { exportCbtSchoolRekapBapToExcel } from '@/lib/elearningExport';
 
 interface FastSearchInputProps {
   value: string;
@@ -613,6 +614,54 @@ export default function CbtPanitiaCommandCenter({
     setSelectedRoomFilter('all');
     setSelectedStatusFilter('all');
     setSearchPage(1);
+  };
+
+  const handleExportSchoolBapExcel = () => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const roomRows = config.rooms.map((room, idx) => {
+      const attendances = attendancesByRoomMap.get(room.name) || [];
+      const latestAttendance = attendances[0];
+      const isSubmitted = attendances.some(a => a.isBapSubmitted);
+      const roomStudents = roomStudentsMap.get(room.id) || [];
+      const uniqueClasses = Array.from(new Set(roomStudents.map(s => s.classId))).sort();
+
+      let presentCount = 0;
+      let sickCount = 0;
+      let permitCount = 0;
+      let absentCount = 0;
+
+      if (latestAttendance && latestAttendance.records) {
+        Object.values(latestAttendance.records).forEach(status => {
+          if (status === 'H') presentCount++;
+          else if (status === 'S') sickCount++;
+          else if (status === 'I') permitCount++;
+          else if (status === 'A') absentCount++;
+        });
+      } else {
+        presentCount = roomStudents.length;
+      }
+
+      return {
+        no: idx + 1,
+        roomName: room.name,
+        classes: uniqueClasses.length > 0 ? uniqueClasses.join(', ') : room.classes.join(', '),
+        supervisor: room.supervisorName || 'Guru Pengawas',
+        total: roomStudents.length,
+        present: presentCount,
+        sick: sickCount,
+        permit: permitCount,
+        absent: absentCount,
+        isSubmitted,
+        notes: latestAttendance?.notes || '-'
+      };
+    });
+
+    exportCbtSchoolRekapBapToExcel({
+      academicYear: config.academicYear || '2026/2027',
+      semester: config.semester || 'PTS / STS Ganjil',
+      date: todayStr,
+      rooms: roomRows
+    });
   };
 
   // Search Tab KPI Stats (O(1) lookups per student)
@@ -2291,6 +2340,15 @@ export default function CbtPanitiaCommandCenter({
                 </span>
                 <button
                   type="button"
+                  onClick={handleExportSchoolBapExcel}
+                  className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition cursor-pointer flex items-center gap-1 shadow-xs active:scale-95"
+                  title="Unduh seluruh rekapitulasi BAP sekolah ke Excel (.xlsx)"
+                >
+                  <span>📥</span>
+                  <span>Export Excel (.xlsx)</span>
+                </button>
+                <button
+                  type="button"
                   onClick={() => setShowRekapPrintModal(true)}
                   className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition cursor-pointer flex items-center gap-1 shadow-xs active:scale-95"
                   title="Cetak seluruh rekapitulasi BAP sekolah"
@@ -3347,6 +3405,15 @@ export default function CbtPanitiaCommandCenter({
                   <span className="font-bold text-slate-900 text-sm">Dokumen Rekapitulasi BAP Pelaksanaan Asesmen Sekolah</span>
                 </div>
                 <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleExportSchoolBapExcel}
+                    className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition cursor-pointer flex items-center gap-1 shadow-xs active:scale-95"
+                    title="Unduh format spreadsheet Excel (.xlsx)"
+                  >
+                    <span>📥</span>
+                    <span>Download Excel (.xlsx)</span>
+                  </button>
                   <button
                     type="button"
                     onClick={() => window.print()}

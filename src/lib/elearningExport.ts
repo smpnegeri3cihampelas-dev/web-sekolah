@@ -1253,4 +1253,128 @@ export function exportCbtRoomBapToExcel(params: {
   XLSX.writeFile(workbook, fileName);
 }
 
+/**
+ * Export Rekapitulasi Berita Acara Pelaksanaan (BAP) Seluruh Sekolah ke Excel (.xlsx)
+ */
+export function exportCbtSchoolRekapBapToExcel(params: {
+  academicYear: string;
+  semester: string;
+  date: string;
+  rooms: Array<{
+    no: number;
+    roomName: string;
+    classes: string;
+    supervisor: string;
+    total: number;
+    present: number;
+    sick: number;
+    permit: number;
+    absent: number;
+    isSubmitted: boolean;
+    notes: string;
+  }>;
+}) {
+  const { academicYear, semester, date, rooms } = params;
+  const rows: any[][] = [];
+
+  rows.push(['PEMERINTAH DAERAH KABUPATEN BANDUNG BARAT']);
+  rows.push(['DINAS PENDIDIKAN - SMP NEGERI 3 CIHAMPELAS']);
+  rows.push(['REKAPITULASI BERITA ACARA PELAKSANAAN ASESMEN SUMATIF (CBT)']);
+  rows.push([`Tahun Ajaran ${academicYear || '2026/2027'} - ${semester || 'PTS / STS Ganjil'}`]);
+  rows.push([]);
+  rows.push(['Hari / Tanggal:', formatIndonesianDate(date), '', 'Total Ruangan:', `${rooms.length} Ruang Ujian`]);
+  rows.push([]);
+
+  // Header Table
+  rows.push([
+    'NO',
+    'RUANG UJIAN',
+    'KELAS SASARAN',
+    'GURU PENGAWAS',
+    'JML SISWA',
+    'HADIR (H)',
+    'SAKIT (S)',
+    'IZIN (I)',
+    'ALPA (A)',
+    'STATUS BAP',
+    'CATATAN KEJADIAN KHUSUS'
+  ]);
+
+  let totalSiswa = 0;
+  let totalHadir = 0;
+  let totalSakit = 0;
+  let totalIzin = 0;
+  let totalAlpa = 0;
+  let totalBapSubmitted = 0;
+
+  rooms.forEach(r => {
+    totalSiswa += r.total;
+    totalHadir += r.present;
+    totalSakit += r.sick;
+    totalIzin += r.permit;
+    totalAlpa += r.absent;
+    if (r.isSubmitted) totalBapSubmitted++;
+
+    rows.push([
+      r.no,
+      r.roomName,
+      r.classes,
+      r.supervisor,
+      r.total,
+      r.present,
+      r.sick,
+      r.permit,
+      r.absent,
+      r.isSubmitted ? 'LENGKAP' : 'BELUM DISERAHKAN',
+      r.notes || '-'
+    ]);
+  });
+
+  // Footer
+  rows.push([]);
+  rows.push([
+    '',
+    'TOTAL AKUMULASI SEKOLAH:',
+    '',
+    '',
+    totalSiswa,
+    totalHadir,
+    totalSakit,
+    totalIzin,
+    totalAlpa,
+    `${totalBapSubmitted} / ${rooms.length} Terkirim`,
+    `Tingkat Kehadiran: ${totalSiswa > 0 ? ((totalHadir / totalSiswa) * 100).toFixed(1) : 0}%`
+  ]);
+
+  rows.push([]);
+  rows.push(['', '', 'Mengetahui,', '', '', '', 'Cihampelas, ' + formatIndonesianDate(date)]);
+  rows.push(['', '', 'Kepala SMP Negeri 3 Cihampelas,', '', '', '', 'Ketua Panitia Asesmen CBT,']);
+  rows.push([]);
+  rows.push([]);
+  rows.push(['', '', 'H. Rustandi, S.Pd., M.Pd.', '', '', '', 'Panitia Asesmen SPENTIC']);
+  rows.push(['', '', 'NIP. 19700608 199802 1 001', '', '', '', 'NIP. 19850312 201101 1 004']);
+
+  const worksheet = XLSX.utils.aoa_to_sheet(rows);
+  worksheet['!cols'] = [
+    { wch: 5 },  // No
+    { wch: 14 }, // Ruang
+    { wch: 16 }, // Kelas
+    { wch: 24 }, // Pengawas
+    { wch: 10 }, // Jml
+    { wch: 10 }, // H
+    { wch: 10 }, // S
+    { wch: 10 }, // I
+    { wch: 10 }, // A
+    { wch: 18 }, // Status BAP
+    { wch: 40 }, // Catatan
+  ];
+
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Rekapitulasi_BAP');
+
+  const fileName = sanitizeFileName(`Rekapitulasi_BAP_Sekolah_${date}.xlsx`);
+  XLSX.writeFile(workbook, fileName);
+}
+
+
 
