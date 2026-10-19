@@ -21,7 +21,7 @@ import {
   registerEmergencyStudentToCbt
 } from '@/lib/cbtData';
 import { Student, SCHOOL_CLASSES } from '@/lib/elearningData';
-import { exportCbtSchoolRekapBapToExcel } from '@/lib/elearningExport';
+import { exportCbtSchoolRekapBapToExcel, exportCbtRoomBapToExcel } from '@/lib/elearningExport';
 
 interface FastSearchInputProps {
   value: string;
@@ -661,6 +661,35 @@ export default function CbtPanitiaCommandCenter({
       semester: config.semester || 'PTS / STS Ganjil',
       date: todayStr,
       rooms: roomRows
+    });
+  };
+
+  const handleExportSingleRoomBap = (targetRoom: CbtExamRoomConfig) => {
+    const attendances = attendancesByRoomMap.get(targetRoom.name) || [];
+    const latestAttendance = attendances[0];
+    const roomStudents = roomStudentsMap.get(targetRoom.id) || [];
+    const todayStr = new Date().toISOString().split('T')[0];
+    const activeExam = packages[0] || {
+      id: 'exam-cbt',
+      title: 'Asesmen Sumatif Tengah Semester (STS)',
+      subject: 'Asesmen Berbasis Komputer (CBT)',
+      token: 'SPENTIC'
+    };
+
+    exportCbtRoomBapToExcel({
+      examTitle: latestAttendance?.examTitle || activeExam.title,
+      subject: activeExam.subject || 'Asesmen CBT',
+      roomName: targetRoom.name,
+      supervisorName: targetRoom.supervisorName || 'Guru Pengawas Ruang',
+      token: latestAttendance?.token || activeExam.token || 'SPENTIC',
+      date: latestAttendance?.date || todayStr,
+      notes: latestAttendance?.notes,
+      students: roomStudents.map(st => ({
+        nisn: st.nisn,
+        name: st.name,
+        classId: st.classId,
+        status: (latestAttendance?.records?.[st.id] as any) || 'H'
+      }))
     });
   };
 
@@ -2381,22 +2410,19 @@ export default function CbtPanitiaCommandCenter({
                     const roomStudents = roomStudentsMap.get(room.id) || [];
                     const uniqueClasses = Array.from(new Set(roomStudents.map(s => s.classId))).sort();
 
-                    // Calculate attendance breakdown if available
+                    // Calculate attendance breakdown strictly for registered room students
                     let presentCount = 0;
                     let sickCount = 0;
                     let permitCount = 0;
                     let absentCount = 0;
 
-                    if (latestAttendance && latestAttendance.records) {
-                      Object.values(latestAttendance.records).forEach(status => {
-                        if (status === 'H') presentCount++;
-                        else if (status === 'S') sickCount++;
-                        else if (status === 'I') permitCount++;
-                        else if (status === 'A') absentCount++;
-                      });
-                    } else {
-                      presentCount = roomStudents.length;
-                    }
+                    roomStudents.forEach(st => {
+                      const status = latestAttendance?.records?.[st.id] || 'H';
+                      if (status === 'H') presentCount++;
+                      else if (status === 'S') sickCount++;
+                      else if (status === 'I') permitCount++;
+                      else if (status === 'A') absentCount++;
+                    });
 
                     return (
                       <tr key={room.id} className="hover:bg-slate-50 transition">
@@ -2449,15 +2475,26 @@ export default function CbtPanitiaCommandCenter({
                           {latestNote}
                         </td>
                         <td className="py-3 px-4 text-right">
-                          <button
-                            type="button"
-                            onClick={() => setPreviewBapRoom(room)}
-                            className="px-2.5 py-1 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 font-bold text-xs transition cursor-pointer active:scale-95 inline-flex items-center gap-1 shadow-2xs"
-                            title={`Buka dokumen Berita Acara ${room.name}`}
-                          >
-                            <span>📄</span>
-                            <span>Buka Dokumen</span>
-                          </button>
+                          <div className="inline-flex items-center gap-1.5 justify-end">
+                            <button
+                              type="button"
+                              onClick={() => handleExportSingleRoomBap(room)}
+                              className="px-2.5 py-1 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 font-bold text-xs transition cursor-pointer active:scale-95 inline-flex items-center gap-1 shadow-2xs"
+                              title={`Download Berita Acara & Daftar Hadir ${room.name} ke Excel (.xlsx)`}
+                            >
+                              <span>📥</span>
+                              <span>Excel</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setPreviewBapRoom(room)}
+                              className="px-2.5 py-1 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 font-bold text-xs transition cursor-pointer active:scale-95 inline-flex items-center gap-1 shadow-2xs"
+                              title={`Buka dokumen Berita Acara ${room.name}`}
+                            >
+                              <span>📄</span>
+                              <span>Buka Dokumen</span>
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -3176,7 +3213,7 @@ export default function CbtPanitiaCommandCenter({
       {/* 6F. MODAL PRATINJAU DOKUMEN RESMI BERITA ACARA PELAKSANAAN (BAP) */}
       {previewBapRoom && (() => {
         const room = previewBapRoom;
-        const attendances = Object.values(roomAttendances).filter(a => a.roomName?.includes(room.name));
+        const attendances = attendancesByRoomMap.get(room.name) || [];
         const latestAttendance = attendances[0];
         const roomStudents = roomStudentsMap.get(room.id) || [];
         const uniqueClasses = Array.from(new Set(roomStudents.map(s => s.classId))).sort();
@@ -3186,16 +3223,13 @@ export default function CbtPanitiaCommandCenter({
         let permitCount = 0;
         let absentCount = 0;
 
-        if (latestAttendance && latestAttendance.records) {
-          Object.values(latestAttendance.records).forEach(status => {
-            if (status === 'H') presentCount++;
-            else if (status === 'S') sickCount++;
-            else if (status === 'I') permitCount++;
-            else if (status === 'A') absentCount++;
-          });
-        } else {
-          presentCount = roomStudents.length;
-        }
+        roomStudents.forEach(st => {
+          const status = latestAttendance?.records?.[st.id] || 'H';
+          if (status === 'H') presentCount++;
+          else if (status === 'S') sickCount++;
+          else if (status === 'I') permitCount++;
+          else if (status === 'A') absentCount++;
+        });
 
         const currentDateStr = new Date().toLocaleDateString('id-ID', {
           weekday: 'long',
@@ -3205,15 +3239,24 @@ export default function CbtPanitiaCommandCenter({
         });
 
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
-            <div className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl border border-slate-200 space-y-6 animate-scaleUp my-8">
-              {/* Modal Control Bar */}
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100 print:hidden">
+          <div className="fixed inset-0 z-50 flex items-start justify-center p-3 sm:p-6 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
+            <div className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl border border-slate-200 space-y-6 animate-scaleUp my-4 sm:my-8 relative">
+              {/* Sticky Modal Control Bar */}
+              <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs flex items-center justify-between pb-3 border-b border-slate-100 print:hidden -mx-6 sm:-mx-8 px-6 sm:px-8 pt-1">
                 <div className="flex items-center gap-2">
                   <span className="text-xl">📄</span>
                   <span className="font-bold text-slate-900 text-sm">Dokumen Resmi Berita Acara</span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap justify-end">
+                  <button
+                    type="button"
+                    onClick={() => handleExportSingleRoomBap(room)}
+                    className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition cursor-pointer flex items-center gap-1 shadow-xs active:scale-95"
+                    title="Unduh format spreadsheet Excel (.xlsx)"
+                  >
+                    <span>📥</span>
+                    <span>Download Excel</span>
+                  </button>
                   <button
                     type="button"
                     onClick={() => window.print()}
@@ -3226,6 +3269,7 @@ export default function CbtPanitiaCommandCenter({
                     type="button"
                     onClick={() => setPreviewBapRoom(null)}
                     className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center font-bold cursor-pointer transition text-sm"
+                    title="Tutup Pratinjau"
                   >
                     ✕
                   </button>
@@ -3256,7 +3300,7 @@ export default function CbtPanitiaCommandCenter({
                     Berita Acara Pelaksanaan Asesmen Sumatif (CBT)
                   </h3>
                   <p className="text-[11px] font-mono font-medium text-slate-600">
-                    Tahun Ajaran 2026/2027 • Posko Panitia Asesmen CBT
+                    Tahun Ajaran {config.academicYear || '2026/2027'} • Posko Panitia Asesmen CBT
                   </p>
                 </div>
 
@@ -3300,7 +3344,7 @@ export default function CbtPanitiaCommandCenter({
                     </tr>
                     <tr>
                       <td className="py-2 px-3 bg-slate-50 font-bold align-top">Catatan Selama Ujian</td>
-                      <td className="py-2 px-3 italic">{latestAttendance?.notes || 'Ujian berlangsung dengan tertib, lancar, dan aman.'}</td>
+                      <td className="py-2 px-3 italic">{latestAttendance?.notes || 'Ujian berlangsung dengan tertib, aman, dan lancar tanpa kendala teknis.'}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -3318,15 +3362,36 @@ export default function CbtPanitiaCommandCenter({
                 </div>
               </div>
 
-              {/* Close Button */}
-              <div className="flex justify-end pt-2 border-t border-slate-100 print:hidden">
-                <button
-                  type="button"
-                  onClick={() => setPreviewBapRoom(null)}
-                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition cursor-pointer"
-                >
-                  Tutup
-                </button>
+              {/* Bottom Actions Bar */}
+              <div className="flex items-center justify-between pt-3 border-t border-slate-100 print:hidden flex-wrap gap-2">
+                <span className="text-[11px] text-slate-400">
+                  Dokumen resmi Berita Acara Pelaksanaan (BAP) SMP Negeri 3 Cihampelas
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleExportSingleRoomBap(room)}
+                    className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition cursor-pointer flex items-center gap-1 shadow-xs active:scale-95"
+                  >
+                    <span>📥</span>
+                    <span>Download Excel</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => window.print()}
+                    className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition cursor-pointer flex items-center gap-1 shadow-xs active:scale-95"
+                  >
+                    <span>🖨️</span>
+                    <span>Cetak Lembar BAP</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewBapRoom(null)}
+                    className="px-4 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition cursor-pointer"
+                  >
+                    Tutup
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -3343,7 +3408,7 @@ export default function CbtPanitiaCommandCenter({
         let totalBapSubmitted = 0;
 
         const roomRows = config.rooms.map((room, idx) => {
-          const attendances = Object.values(roomAttendances).filter(a => a.roomName?.includes(room.name));
+          const attendances = attendancesByRoomMap.get(room.name) || [];
           const latestAttendance = attendances[0];
           const isSubmitted = attendances.some(a => a.isBapSubmitted);
           if (isSubmitted) totalBapSubmitted++;
@@ -3357,16 +3422,13 @@ export default function CbtPanitiaCommandCenter({
           let permitCount = 0;
           let absentCount = 0;
 
-          if (latestAttendance && latestAttendance.records) {
-            Object.values(latestAttendance.records).forEach(status => {
-              if (status === 'H') presentCount++;
-              else if (status === 'S') sickCount++;
-              else if (status === 'I') permitCount++;
-              else if (status === 'A') absentCount++;
-            });
-          } else {
-            presentCount = roomStudents.length;
-          }
+          roomStudents.forEach(st => {
+            const status = latestAttendance?.records?.[st.id] || 'H';
+            if (status === 'H') presentCount++;
+            else if (status === 'S') sickCount++;
+            else if (status === 'I') permitCount++;
+            else if (status === 'A') absentCount++;
+          });
 
           totalPresentAll += presentCount;
           totalSickAll += sickCount;
@@ -3396,10 +3458,10 @@ export default function CbtPanitiaCommandCenter({
         });
 
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
-            <div className="bg-white rounded-3xl max-w-4xl w-full p-6 sm:p-8 shadow-2xl border border-slate-200 space-y-6 animate-scaleUp my-8">
-              {/* Modal Control Bar */}
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100 print:hidden">
+          <div className="fixed inset-0 z-50 flex items-start justify-center p-3 sm:p-6 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
+            <div className="bg-white rounded-3xl max-w-4xl w-full p-6 sm:p-8 shadow-2xl border border-slate-200 space-y-6 animate-scaleUp my-4 sm:my-8 relative">
+              {/* Sticky Modal Control Bar */}
+              <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs flex items-center justify-between pb-3 border-b border-slate-100 print:hidden -mx-6 sm:-mx-8 px-6 sm:px-8 pt-1">
                 <div className="flex items-center gap-2">
                   <span className="text-xl">📋</span>
                   <span className="font-bold text-slate-900 text-sm">Dokumen Rekapitulasi BAP Pelaksanaan Asesmen Sekolah</span>
@@ -3551,15 +3613,37 @@ export default function CbtPanitiaCommandCenter({
                 </div>
               </div>
 
-              {/* Close Button */}
-              <div className="flex justify-end pt-2 border-t border-slate-100 print:hidden">
-                <button
-                  type="button"
-                  onClick={() => setShowRekapPrintModal(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition cursor-pointer"
-                >
-                  Tutup
-                </button>
+              {/* Bottom Actions Bar */}
+              <div className="flex items-center justify-between pt-3 border-t border-slate-100 print:hidden flex-wrap gap-2">
+                <span className="text-[11px] text-slate-400">
+                  Dokumen resmi Rekapitulasi Berita Acara Pelaksanaan (BAP) SMP Negeri 3 Cihampelas
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleExportSchoolBapExcel}
+                    className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition cursor-pointer flex items-center gap-1 shadow-xs active:scale-95"
+                    title="Unduh format spreadsheet Excel (.xlsx)"
+                  >
+                    <span>📥</span>
+                    <span>Download Excel (.xlsx)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => window.print()}
+                    className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition cursor-pointer flex items-center gap-1 shadow-xs active:scale-95"
+                  >
+                    <span>🖨️</span>
+                    <span>Cetak Lembar Rekapitulasi</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowRekapPrintModal(false)}
+                    className="px-4 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition cursor-pointer"
+                  >
+                    Tutup
+                  </button>
+                </div>
               </div>
             </div>
           </div>
