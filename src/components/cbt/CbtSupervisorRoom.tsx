@@ -11,6 +11,7 @@ import {
   saveStoredStudentCbtSession,
   registerEmergencyStudentToCbt,
   resetStoredStudentCbtSession,
+  unlockStoredStudentCbtSession,
   getStoredCbtPanitiaConfig,
   saveStoredCbtPanitiaConfig,
   getStudentsForRoom,
@@ -1058,12 +1059,17 @@ export default function CbtSupervisorRoom({
                             <button
                               type="button"
                               onClick={() => {
-                                if (!selectedExam || !session) return;
-                                saveStoredStudentCbtSession({
-                                  ...session,
-                                  violationCount: 0
-                                });
+                                if (!session) return;
+                                const targetExamId = session.examId || selectedExam?.id || '';
+                                unlockStoredStudentCbtSession(targetExamId, st.id);
+                                unlockStoredStudentCbtSession(targetExamId, st.nisn);
+                                if (selectedExam?.id && selectedExam.id !== targetExamId) {
+                                  unlockStoredStudentCbtSession(selectedExam.id, st.id);
+                                  unlockStoredStudentCbtSession(selectedExam.id, st.nisn);
+                                }
+                                setStudentSessions(getStoredStudentCbtSessions());
                                 triggerSaveFeedback();
+                                alert(`✓ Kunci ujian untuk ${st.name} berhasil dibuka!\n\nSiswa sekarang dapat melanjutkan ujian di layarnya.`);
                               }}
                               className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black transition cursor-pointer shadow-xs active:scale-95 flex items-center gap-1"
                               title={`Buka kunci ujian untuk ${st.name} (Pelanggaran ke-${session.violationCount})`}

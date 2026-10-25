@@ -1311,6 +1311,51 @@ export function resetStoredStudentCbtSession(examId: string, studentIdOrNisn: st
   }
 }
 
+export function unlockStoredStudentCbtSession(examId: string, studentIdOrNisn: string) {
+  if (typeof window === 'undefined') return;
+  try {
+    const all = getStoredStudentCbtSessions();
+    let modified = false;
+
+    // 1. Direct key update if exists
+    const directKey = `${examId}_${studentIdOrNisn}`;
+    if (all[directKey]) {
+      all[directKey] = {
+        ...all[directKey],
+        violationCount: 0
+      };
+      modified = true;
+    }
+
+    // 2. Comprehensive scan across all session objects
+    for (const [k, sess] of Object.entries(all)) {
+      const isStudentMatch = 
+        sess.studentId === studentIdOrNisn || 
+        sess.studentNisn === studentIdOrNisn || 
+        k.includes(studentIdOrNisn) ||
+        (sess.studentName && sess.studentName.toLowerCase().trim() === studentIdOrNisn.toLowerCase().trim());
+
+      const isExamMatch = !examId || sess.examId === examId || k.startsWith(examId);
+
+      if (isStudentMatch && isExamMatch) {
+        all[k] = {
+          ...sess,
+          violationCount: 0
+        };
+        modified = true;
+      }
+    }
+
+    // Always persist and notify listeners
+    localStorage.setItem(CBT_STUDENT_SESSIONS_KEY, JSON.stringify(all));
+    window.dispatchEvent(new Event('cbtSessionsUpdated'));
+    window.dispatchEvent(new Event('storage'));
+  } catch (e) {
+    console.error('Failed unlocking student CBT session', e);
+  }
+}
+
+
 export function getStoredCbtRoomAttendances(): Record<string, CbtRoomAttendance> {
   if (typeof window === 'undefined') return {};
   try {

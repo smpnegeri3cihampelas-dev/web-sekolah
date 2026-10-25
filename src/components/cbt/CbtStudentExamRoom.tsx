@@ -63,6 +63,10 @@ export default function CbtStudentExamRoom({
   const [isLockedByViolation, setIsLockedByViolation] = useState<boolean>(() => {
     return Boolean(effectiveSession?.violationCount && effectiveSession.violationCount >= 1);
   });
+  const isLockedRef = useRef<boolean>(Boolean(effectiveSession?.violationCount && effectiveSession.violationCount >= 1));
+  useEffect(() => {
+    isLockedRef.current = isLockedByViolation;
+  }, [isLockedByViolation]);
   const [unlockTokenInput, setUnlockTokenInput] = useState<string>('');
   const [unlockError, setUnlockError] = useState<string | null>(null);
   const [unlockSuccess, setUnlockSuccess] = useState<string | null>(null);
@@ -118,11 +122,14 @@ export default function CbtStudentExamRoom({
   const isExamPaused = currentPackage.status === 'draft' || scheduleEval.scheduleState === 'emergency_paused';
 
   // Real-time listener: jika Pengawas membuka kunci dari meja pengawas/panitia secara remote
-  const handleRemoteUnlock = useCallback(() => {
+  const handleRemoteUnlock = useCallback((isManualClick: boolean = false) => {
     try {
       const sessions = getStoredStudentCbtSessions();
       const key = `${exam.id}_${student.id}`;
       let current: CbtStudentAnswerState | undefined = sessions[key];
+      if (!current && student.nisn) {
+        current = sessions[`${exam.id}_${student.nisn}`];
+      }
       if (!current) {
         current = Object.values(sessions).find(s => 
           (s.studentId === student.id || (student.nisn && (s.studentNisn === student.nisn || s.studentId === student.nisn))) &&
@@ -131,17 +138,27 @@ export default function CbtStudentExamRoom({
       }
       if (current) {
         if (!current.violationCount || current.violationCount === 0) {
-          lastViolationTimeRef.current = Date.now() + 4000;
+          lastViolationTimeRef.current = Date.now() + 10000; // 10 detik grace period
+          isLockedRef.current = false;
           setIsLockedByViolation(false);
           setViolationCount(0);
           setUnlockError(null);
           enterFullscreen();
+          if (isManualClick) {
+            alert('✅ Kunci ujian telah berhasil dibuka oleh Pengawas! Melanjutkan lembar ujian...');
+          }
         } else {
           setViolationCount(current.violationCount);
           setIsLockedByViolation(true);
+          isLockedRef.current = true;
+          if (isManualClick) {
+            alert(`ℹ️ Di Meja Pengawas, sesi ini masih berstatus terkunci (${current.violationCount}x keluar).\n\nSilakan minta Guru Pengawas menekan tombol hijau "🔓 Buka Kunci" pada baris nama Anda di Meja Pengawas.`);
+          }
         }
       } else {
         // Jika sesi telah di-reset/dihapus oleh pengawas dari Meja Pengawas:
+        lastViolationTimeRef.current = Date.now() + 10000;
+        isLockedRef.current = false;
         setIsExamCompleted(false);
         setCompletedResult(null);
         setIsLockedByViolation(false);
@@ -149,6 +166,9 @@ export default function CbtStudentExamRoom({
         setUnlockError(null);
         setAnswers({});
         setDoubtfuls({});
+        if (isManualClick) {
+          alert('✅ Sesi ujian telah di-reset oleh Pengawas! Lembar ujian dibuka kembali dari awal.');
+        }
       }
     } catch (e) {
       console.error('Remote unlock sync error', e);
@@ -164,17 +184,21 @@ export default function CbtStudentExamRoom({
       }
     };
 
+    const handleSyncSession = () => {
+      handleRemoteUnlock(false);
+    };
+
     // Sinkronkan langsung saat komponen dibuka
-    handleRemoteUnlock();
+    handleRemoteUnlock(false);
 
     window.addEventListener('cbtPackagesUpdated', handlePkgsUpdate);
-    window.addEventListener('cbtSessionsUpdated', handleRemoteUnlock);
-    window.addEventListener('storage', handleRemoteUnlock);
+    window.addEventListener('cbtSessionsUpdated', handleSyncSession);
+    window.addEventListener('storage', handleSyncSession);
 
     return () => {
       window.removeEventListener('cbtPackagesUpdated', handlePkgsUpdate);
-      window.removeEventListener('cbtSessionsUpdated', handleRemoteUnlock);
-      window.removeEventListener('storage', handleRemoteUnlock);
+      window.removeEventListener('cbtSessionsUpdated', handleSyncSession);
+      window.removeEventListener('storage', handleSyncSession);
     };
   }, [exam.id, handleRemoteUnlock]);
 
@@ -237,10 +261,11 @@ export default function CbtStudentExamRoom({
 
   // Helper: Trigger Violation with ZERO-TOLERANCE (Sekali Keluar Langsung Terkunci Mati!)
   const triggerViolation = (reasonText: string) => {
-    if (isExamCompleted || isExamPaused) return;
+    // PENTING: Jika ujian sudah selesai, dijeda, atau SUDAH TERKUNCI, JANGAN tambahkan pelanggaran lagi!
+    if (isExamCompleted || isExamPaused || isLockedRef.current || isLockedByViolation) return;
 
     const now = Date.now();
-    // Abaikan jika masih dalam masa tenggang awal (grace period 3 detik)
+    // Abaikan jika masih dalam masa tenggang awal
     if (now < lastViolationTimeRef.current) {
       return;
     }
@@ -255,6 +280,7 @@ export default function CbtStudentExamRoom({
       persistSession(answers, doubtfuls, nextCount);
 
       // ZERO-TOLERANCE: Sekali saja siswa keluar (buka Google/WA/aplikasi lain), ujian LANGSUNG TERKUNCI!
+      isLockedRef.current = true;
       setIsLockedByViolation(true);
       setWarningMessage(null);
       return nextCount;
@@ -1432,9 +1458,9 @@ export default function CbtStudentExamRoom({
                 <button
                   type="button"
                   onClick={() => {
-                    handleRemoteUnlock();
+                    handleRemoteUnlock(true);
                   }}
-                  className="w-full py-1.5 px-3 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white text-[11px] font-semibold transition border border-slate-700 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                  className="w-full py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-semibold transition border border-slate-700 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 shadow-xs"
                   title="Klik untuk sinkronisasi manual jika pengawas sudah membuka kunci"
                 >
                   <span>🔄</span>
