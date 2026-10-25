@@ -138,7 +138,7 @@ export default function CbtStudentExamRoom({
       }
       if (current) {
         if (!current.violationCount || current.violationCount === 0) {
-          lastViolationTimeRef.current = Date.now() + 10000; // 10 detik grace period
+          lastViolationTimeRef.current = Date.now() + 3000; // Standar CBT: 3 detik masa tenggang
           isLockedRef.current = false;
           setIsLockedByViolation(false);
           setViolationCount(0);
@@ -157,7 +157,7 @@ export default function CbtStudentExamRoom({
         }
       } else {
         // Jika sesi telah di-reset/dihapus oleh pengawas dari Meja Pengawas:
-        lastViolationTimeRef.current = Date.now() + 10000;
+        lastViolationTimeRef.current = Date.now() + 3000;
         isLockedRef.current = false;
         setIsExamCompleted(false);
         setCompletedResult(null);
@@ -1436,7 +1436,7 @@ export default function CbtStudentExamRoom({
                 <button
                   type="button"
                   onClick={() => {
-                    lastViolationTimeRef.current = Date.now() + 4000;
+                    lastViolationTimeRef.current = Date.now() + 3000;
                     setIsLockedByViolation(false);
                     enterFullscreen();
                   }}
