@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   CbtExamPackage,
   CBT_EXAM_ROOMS,
@@ -8,14 +8,22 @@ import {
   getStoredCbtRoomAttendances,
   saveStoredCbtRoomAttendance,
   getStoredStudentCbtSessions,
+  saveStoredStudentCbtSession,
   registerEmergencyStudentToCbt,
   resetStoredStudentCbtSession,
   getStoredCbtPanitiaConfig,
   saveStoredCbtPanitiaConfig,
   getStudentsForRoom,
+  checkInRoomSupervisor,
+  evaluateCbtPackageSchedule,
   CbtPanitiaConfig,
   CbtStudentAnswerState,
-  CbtRoomAttendance
+  CbtRoomAttendance,
+  CbtSupervisorSchedule,
+  CbtScheduleSessionSlot,
+  DEFAULT_SCHEDULE_SESSIONS,
+  getSupervisorForSlot,
+  getStoredSupervisorSchedule
 } from '@/lib/cbtData';
 import { Student } from '@/lib/elearningData';
 import { exportCbtRoomBapToExcel } from '@/lib/elearningExport';
@@ -38,7 +46,20 @@ export default function CbtSupervisorRoom({
   // Attendance records for current room & exam: studentId -> 'H' | 'S' | 'I' | 'A'
   const [attendanceRecords, setAttendanceRecords] = useState<Record<string, 'H' | 'S' | 'I' | 'A'>>({});
   const [bapNotes, setBapNotes] = useState<string>('Ujian berlangsung tertib, aman, dan lancar tanpa kendala teknis.');
+  const [supervisorNameInput, setSupervisorNameInput] = useState<string>('');
   const [isBapSaved, setIsBapSaved] = useState<boolean>(false);
+  const [isCheckedInThisRoom, setIsCheckedInThisRoom] = useState<boolean>(false);
+  const [lastSavedTime, setLastSavedTime] = useState<string>('');
+  const [showSavedPulse, setShowSavedPulse] = useState<boolean>(false);
+
+  // Helper Feedback Tersimpan Otomatis Real-time
+  const triggerSaveFeedback = () => {
+    const now = new Date();
+    const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')} WIB`;
+    setLastSavedTime(timeStr);
+    setShowSavedPulse(true);
+    setTimeout(() => setShowSavedPulse(false), 2500);
+  };
 
   // Emergency Student Modal State
   const [showEmergencyModal, setShowEmergencyModal] = useState<boolean>(false);
@@ -58,12 +79,21 @@ export default function CbtSupervisorRoom({
     };
     handlePkgsUpdate();
     window.addEventListener('cbtPackagesUpdated', handlePkgsUpdate);
-    return () => window.removeEventListener('cbtPackagesUpdated', handlePkgsUpdate);
+    window.addEventListener('storage', handlePkgsUpdate);
+    return () => {
+      window.removeEventListener('cbtPackagesUpdated', handlePkgsUpdate);
+      window.removeEventListener('storage', handlePkgsUpdate);
+    };
   }, [selectedExamId]);
 
   const selectedExam = useMemo(() => {
     return packages.find(p => p.id === selectedExamId) || packages[0];
   }, [packages, selectedExamId]);
+
+  // Evaluasi Jadwal Waktu Sesi Ujian (Tanggal & Jam)
+  const examSchedule = useMemo(() => {
+    return evaluateCbtPackageSchedule(selectedExam);
+  }, [selectedExam]);
 
   const [panitiaConfig, setPanitiaConfig] = useState<CbtPanitiaConfig>(() => getStoredCbtPanitiaConfig());
 
@@ -99,6 +129,141 @@ export default function CbtSupervisorRoom({
     return currentRoomObj?.classes || ['7-A'];
   }, [currentRoomObj, roomStudents]);
 
+  // Supervisor Schedule from Panitia
+  const [supervisorSchedule, setSupervisorSchedule] = useState<CbtSupervisorSchedule>(() => getStoredSupervisorSchedule());
+
+  useEffect(() => {
+    const handleScheduleUpdated = () => {
+      setSupervisorSchedule(getStoredSupervisorSchedule());
+    };
+    window.addEventListener('cbtSupervisorScheduleUpdated', handleScheduleUpdated);
+    window.addEventListener('storage', handleScheduleUpdated);
+    return () => {
+      window.removeEventListener('cbtSupervisorScheduleUpdated', handleScheduleUpdated);
+      window.removeEventListener('storage', handleScheduleUpdated);
+    };
+  }, []);
+
+  // Dynamic session slots from panitia schedule (Jam 1, Jam 2, Jam 3, etc.)
+  const scheduleSessions: CbtScheduleSessionSlot[] = useMemo(() => {
+    if (supervisorSchedule.sessions && supervisorSchedule.sessions.length > 0) {
+      return supervisorSchedule.sessions;
+    }
+    return DEFAULT_SCHEDULE_SESSIONS;
+  }, [supervisorSchedule.sessions]);
+
+  // Sesi Jam Mengawas Aktif: Default ke sesi yang sedang berlangsung atau sesi pertama
+  const [activeSlotId, setActiveSlotId] = useState<string>(() => {
+    const now = new Date();
+    const currentMin = now.getHours() * 60 + now.getMinutes();
+    const sched = getStoredSupervisorSchedule();
+    const sess = (sched.sessions && sched.sessions.length > 0) ? sched.sessions : DEFAULT_SCHEDULE_SESSIONS;
+    const match = sess.find(s => {
+      const [sh, sm] = (s.startTime || '00:00').split(':').map(Number);
+      const [eh, em] = (s.endTime || '23:59').split(':').map(Number);
+      const startMin = sh * 60 + sm;
+      const endMin = eh * 60 + em;
+      return currentMin >= startMin && currentMin <= endMin;
+    });
+    return match ? match.id : (sess[0]?.id || 'jam1');
+  });
+
+  // Current session slot object
+  const currentSlot: CbtScheduleSessionSlot = useMemo(() => {
+    return scheduleSessions.find(s => s.id === activeSlotId) || scheduleSessions[0] || {
+      id: 'jam1',
+      name: 'Jam Ke-1',
+      startTime: '07:30',
+      endTime: '09:00',
+      subject: ''
+    };
+  }, [scheduleSessions, activeSlotId]);
+
+  // Temukan ruangan tugas resmi guru untuk sesi jam yang sedang dipilih
+  const assignedScheduleEntry = useMemo(() => {
+    if (!currentTeacherName || currentTeacherName === 'Guru Pengawas Ruang' || !currentSlot) return null;
+    const teacherBase = currentTeacherName.toLowerCase().split(',')[0].trim();
+    return supervisorSchedule.entries.find(entry => {
+      const scheduledTeacher = getSupervisorForSlot(entry, currentSlot.id);
+      if (!scheduledTeacher) return false;
+      const schedBase = scheduledTeacher.toLowerCase().split(',')[0].trim();
+      return schedBase.includes(teacherBase) || teacherBase.includes(schedBase);
+    }) || null;
+  }, [currentTeacherName, supervisorSchedule, currentSlot]);
+
+  // Otomatis kunci selectedRoom ke ruangan tugas resmi guru
+  useEffect(() => {
+    if (assignedScheduleEntry?.roomName) {
+      setSelectedRoom(assignedScheduleEntry.roomName);
+    }
+  }, [assignedScheduleEntry]);
+
+  // Otomatis sinkronkan paket ujian dengan sesi jam aktif (HANYA saat pertama kali atau saat user berganti jam/sesi)
+  const lastSyncedSlotIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!packages || packages.length === 0 || !currentSlot) return;
+
+    const isNewSlot = lastSyncedSlotIdRef.current !== currentSlot.id;
+    const isCurrentExamValid = Boolean(selectedExamId && packages.some(p => p.id === selectedExamId));
+
+    // Jika user sudah memilih paket ujian secara manual dan slot sesi belum berganti, jangan reset!
+    if (!isNewSlot && isCurrentExamValid) {
+      return;
+    }
+
+    lastSyncedSlotIdRef.current = currentSlot.id;
+
+    // 1. Jika sesi ini tersambung ke paket tertentu
+    if (currentSlot.linkedPackageId) {
+      const pkg = packages.find(p => p.id === currentSlot.linkedPackageId);
+      if (pkg) {
+        setSelectedExamId(pkg.id);
+        return;
+      }
+    }
+
+    // 2. Jika sesi ini memiliki mapel, cocokkan dengan nama mapel paket ujian
+    if (currentSlot.subject) {
+      const subLower = currentSlot.subject.toLowerCase().trim();
+      const pkgBySubject = packages.find(p => {
+        const pSub = p.subject.toLowerCase().trim();
+        return pSub.includes(subLower) || subLower.includes(pSub);
+      });
+      if (pkgBySubject) {
+        setSelectedExamId(pkgBySubject.id);
+        return;
+      }
+    }
+
+    // 3. Fallback jika selectedExamId belum terisi atau tidak valid
+    if (!isCurrentExamValid) {
+      setSelectedExamId(packages[0].id);
+    }
+  }, [currentSlot, packages, selectedExamId]);
+
+  const isAssignedByPanitia = Boolean(assignedScheduleEntry);
+
+  // Auto-sync pengawas aktif secara real-time ke Posko Panitia secara tenang (quiet auto-sync)
+  useEffect(() => {
+    if (!selectedExam || !currentTeacherName || currentTeacherName === 'Guru Pengawas Ruang') return;
+    checkInRoomSupervisor({
+      roomName: selectedRoom,
+      supervisorName: currentTeacherName.trim(),
+      examId: selectedExam.id,
+      examTitle: selectedExam.title,
+      token: selectedExam.token,
+      initialRecords: attendanceRecords
+    });
+  }, [selectedRoom, selectedExam?.id, currentTeacherName]);
+
+  // Auto-fill supervisor name for BAP signature
+  useEffect(() => {
+    if (currentTeacherName && currentTeacherName !== 'Guru Pengawas Ruang' && !supervisorNameInput) {
+      setSupervisorNameInput(currentTeacherName);
+    }
+  }, [currentTeacherName, supervisorNameInput]);
+
   // Filter specific class within the room (or 'all' for mixed view)
   const [filterClassInRoom, setFilterClassInRoom] = useState<string>('all');
 
@@ -107,7 +272,7 @@ export default function CbtSupervisorRoom({
     return roomStudents.filter(s => s.classId === filterClassInRoom);
   }, [roomStudents, filterClassInRoom]);
 
-  // Load existing room attendance if any
+  // Load existing room attendance if any & verify check-in status
   useEffect(() => {
     if (!selectedExam) return;
 
@@ -116,10 +281,38 @@ export default function CbtSupervisorRoom({
     const key = `${selectedRoom}_${selectedExam.id}_${todayStr}`;
     const saved = all[key];
 
+    const loggedInTeacher = (currentTeacherName && currentTeacherName !== 'Guru Pengawas Ruang') ? currentTeacherName.trim() : '';
+
+    // Logika Pintar: Jika BAP belum resmi diserahkan, dahulukan nama guru yang saat ini sedang aktif login di ruangan
+    let initialSupName = '';
+    if (saved?.isBapSubmitted && saved?.supervisorName && saved.supervisorName !== 'Guru Pengawas Ruang') {
+      // Jika BAP sudah diserahkan resmi, kunci ke nama penandatangan BAP yang asli
+      initialSupName = saved.supervisorName;
+    } else if (loggedInTeacher) {
+      // Guru yang sedang membuka ruang pengawas saat ini
+      initialSupName = loggedInTeacher;
+    } else if (saved?.supervisorName && saved.supervisorName !== 'Guru Pengawas Ruang') {
+      initialSupName = saved.supervisorName;
+    } else if (currentRoomObj?.supervisorName && currentRoomObj.supervisorName !== 'Guru Pengawas') {
+      initialSupName = currentRoomObj.supervisorName;
+    } else {
+      initialSupName = 'Guru Pengawas Ruang';
+    }
+
     if (saved) {
-      setAttendanceRecords(saved.records || {});
+      const mergedRecords: Record<string, 'H' | 'S' | 'I' | 'A'> = {};
+      roomStudents.forEach(st => {
+        mergedRecords[st.id] = (saved.records && saved.records[st.id]) ? saved.records[st.id] : 'H';
+      });
+      if (saved.records) {
+        Object.keys(saved.records).forEach(stId => {
+          mergedRecords[stId] = saved.records[stId];
+        });
+      }
+      setAttendanceRecords(mergedRecords);
       setBapNotes(saved.notes || '');
       setIsBapSaved(Boolean(saved.isBapSubmitted));
+      setSupervisorNameInput(initialSupName);
     } else {
       // Default all students to Hadir (H)
       const initial: Record<string, 'H' | 'S' | 'I' | 'A'> = {};
@@ -128,8 +321,29 @@ export default function CbtSupervisorRoom({
       });
       setAttendanceRecords(initial);
       setIsBapSaved(false);
+      setSupervisorNameInput(initialSupName);
     }
-  }, [selectedRoom, selectedExam, roomStudents]);
+
+    // Tentukan apakah guru yang sedang login sudah check-in di ruangan ini
+    const activeSupervisorInConfig = (currentRoomObj?.supervisorName && currentRoomObj.supervisorName !== 'Guru Pengawas')
+      ? currentRoomObj.supervisorName
+      : '';
+    const activeSupervisorInAtt = (saved?.supervisorName && saved.supervisorName !== 'Guru Pengawas Ruang')
+      ? saved.supervisorName
+      : '';
+    const effectiveActiveSupervisor = activeSupervisorInAtt || activeSupervisorInConfig;
+
+    const teacherClean = (currentTeacherName && currentTeacherName !== 'Guru Pengawas Ruang') ? currentTeacherName.trim().toLowerCase() : '';
+    const isTeacherAlreadyActive = Boolean(
+      (effectiveActiveSupervisor && teacherClean && (
+        effectiveActiveSupervisor.toLowerCase().includes(teacherClean) ||
+        teacherClean.includes(effectiveActiveSupervisor.toLowerCase())
+      )) ||
+      Boolean(saved?.isBapSubmitted)
+    );
+
+    setIsCheckedInThisRoom(isTeacherAlreadyActive);
+  }, [selectedRoom, selectedExam, roomStudents, currentRoomObj, currentTeacherName]);
 
   // Live student exam sessions from storage
   const [studentSessions, setStudentSessions] = useState(() => getStoredStudentCbtSessions());
@@ -153,12 +367,78 @@ export default function CbtSupervisorRoom({
     };
   }, []);
 
-  // Update student attendance status
+
+  // Update student attendance status (dengan auto-save presensi real-time ke storage & auto check-in)
   const handleSetStatus = (studentId: string, status: 'H' | 'S' | 'I' | 'A') => {
-    setAttendanceRecords(prev => ({
-      ...prev,
+    const nextRecords: Record<string, 'H' | 'S' | 'I' | 'A'> = {
+      ...attendanceRecords,
       [studentId]: status
-    }));
+    };
+    setAttendanceRecords(nextRecords);
+
+    // Persist ke storage secara real-time agar jika guru logout / ganti tab / refresh, data presensi seluruh siswa tetap tersimpan!
+    if (selectedExam) {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const supNameToUse = supervisorNameInput.trim() || currentTeacherName || 'Guru Pengawas Ruang';
+      const key = `${selectedRoom}_${selectedExam.id}_${todayStr}`;
+      const allAtt = getStoredCbtRoomAttendances();
+      const existing = allAtt[key];
+
+      const updatedAtt: CbtRoomAttendance = {
+        roomName: selectedRoom,
+        examId: selectedExam.id,
+        examTitle: selectedExam.title,
+        date: todayStr,
+        supervisorName: supNameToUse,
+        token: selectedExam.token,
+        records: nextRecords, // Simpan seluruh status presensi terbaru
+        notes: bapNotes || existing?.notes || 'Ujian berlangsung tertib, aman, dan lancar tanpa kendala teknis.',
+        isBapSubmitted: Boolean(existing?.isBapSubmitted),
+        submittedAt: existing?.submittedAt
+      };
+      saveStoredCbtRoomAttendance(updatedAtt);
+      triggerSaveFeedback();
+
+      // Otomatisasi Cerdas: Jika guru belum check-in tapi sudah mulai absen siswa di ruangan ini, langsung check-in otomatis
+      if (!isCheckedInThisRoom && currentTeacherName && currentTeacherName !== 'Guru Pengawas Ruang') {
+        checkInRoomSupervisor({
+          roomName: selectedRoom,
+          supervisorName: supNameToUse,
+          examId: selectedExam.id,
+          examTitle: selectedExam.title,
+          token: selectedExam.token,
+          initialRecords: nextRecords
+        });
+        setIsCheckedInThisRoom(true);
+      }
+    }
+  };
+
+  // Auto-save Catatan Kejadian Khusus (BAP Notes) secara Real-Time
+  const handleBapNotesChange = (newNotes: string) => {
+    setBapNotes(newNotes);
+    if (selectedExam) {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const supNameToUse = supervisorNameInput.trim() || currentTeacherName || 'Guru Pengawas Ruang';
+      const key = `${selectedRoom}_${selectedExam.id}_${todayStr}`;
+      const allAtt = getStoredCbtRoomAttendances();
+      const existing = allAtt[key];
+
+      const updatedAtt: CbtRoomAttendance = {
+        roomName: selectedRoom,
+        examId: selectedExam.id,
+        examTitle: selectedExam.title,
+        date: todayStr,
+        supervisorName: supNameToUse,
+        token: selectedExam.token,
+        records: attendanceRecords,
+        notes: newNotes,
+        isBapSubmitted: Boolean(existing?.isBapSubmitted),
+        submittedAt: existing?.submittedAt
+      };
+      saveStoredCbtRoomAttendance(updatedAtt);
+      triggerSaveFeedback();
+    }
   };
 
   // Save Room BAP and Attendance
@@ -166,12 +446,13 @@ export default function CbtSupervisorRoom({
     if (!selectedExam) return;
 
     const todayStr = new Date().toISOString().split('T')[0];
+    const finalSupervisor = supervisorNameInput.trim() || currentTeacherName || 'Guru Pengawas Ruang';
     const data: CbtRoomAttendance = {
       roomName: selectedRoom,
       examId: selectedExam.id,
       examTitle: selectedExam.title,
       date: todayStr,
-      supervisorName: currentTeacherName || 'Guru Pengawas Ruang',
+      supervisorName: finalSupervisor,
       token: selectedExam.token,
       records: attendanceRecords,
       notes: bapNotes,
@@ -180,8 +461,22 @@ export default function CbtSupervisorRoom({
     };
 
     saveStoredCbtRoomAttendance(data);
+
+    // Synchronize supervisor name to room configuration in panitia config
+    if (finalSupervisor && finalSupervisor !== 'Guru Pengawas Ruang') {
+      const currentConfig = getStoredCbtPanitiaConfig();
+      const updatedRooms = currentConfig.rooms.map(r => {
+        if (r.name === selectedRoom || r.label === selectedRoom) {
+          return { ...r, supervisorName: finalSupervisor };
+        }
+        return r;
+      });
+      saveStoredCbtPanitiaConfig({ ...currentConfig, rooms: updatedRooms });
+    }
+
     setIsBapSaved(true);
-    alert('Berita Acara Pelaksanaan (BAP) dan Daftar Hadir Ruangan berhasil disimpan!');
+    triggerSaveFeedback();
+    alert(`✓ Berita Acara Pelaksanaan (BAP) dan Presensi ${selectedRoom} Berhasil Diserahkan!\n\nPengawas: ${finalSupervisor}\nMode Terkunci Diaktifkan untuk mencegah klik tidak sengaja.\nData otomatis tersinkronisasi ke Dashboard Panitia.`);
   };
 
   // Export Room BAP to Excel
@@ -189,11 +484,12 @@ export default function CbtSupervisorRoom({
     if (!selectedExam) return;
 
     const todayStr = new Date().toISOString().split('T')[0];
+    const finalSupervisor = supervisorNameInput.trim() || currentTeacherName || 'Guru Pengawas Ruang';
     exportCbtRoomBapToExcel({
       examTitle: selectedExam.title,
       subject: selectedExam.subject,
       roomName: selectedRoom,
-      supervisorName: currentTeacherName || 'Guru Pengawas Ruang',
+      supervisorName: finalSupervisor,
       token: selectedExam.token,
       date: todayStr,
       notes: bapNotes,
@@ -260,6 +556,62 @@ export default function CbtSupervisorRoom({
   }).length;
   const alpaCount = roomStudents.filter(s => attendanceRecords[s.id] === 'A').length;
 
+  // Jika guru login tidak memiliki jadwal mengawas pada sesi ini, tampilkan notifikasi ramah tanpa akses acak ke ruangan lain
+  if (currentTeacherName && currentTeacherName !== 'Guru Pengawas Ruang' && !assignedScheduleEntry) {
+    return (
+      <div className="space-y-6">
+        <div className="bg-white border border-slate-200 rounded-3xl p-8 text-center max-w-xl mx-auto shadow-sm space-y-5">
+          <div className="w-16 h-16 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center text-3xl mx-auto">
+            ☕
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-slate-900">
+              Tidak Ada Jadwal Mengawas di Sesi Ini
+            </h3>
+            <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
+              Bapak/Ibu <strong className="text-slate-800">{currentTeacherName}</strong> tidak terdaftar mengawas pada <strong>{currentSlot.name} ({currentSlot.startTime} - {currentSlot.endTime} WIB{currentSlot.subject ? ` • ${currentSlot.subject}` : ''})</strong>.
+            </p>
+          </div>
+
+          {/* Dynamic Session switcher buttons */}
+          <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+            {scheduleSessions.map((slot, idx) => {
+              const isSelected = slot.id === currentSlot.id;
+              return (
+                <button
+                  key={slot.id}
+                  type="button"
+                  onClick={() => {
+                    setActiveSlotId(slot.id);
+                    setFilterClassInRoom('all');
+                  }}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                    isSelected
+                      ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20 font-black ring-2 ring-amber-500/40'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  <span>{idx % 2 === 0 ? '☀️' : '⛅'}</span>
+                  <span>{slot.name} ({slot.startTime} - {slot.endTime})</span>
+                  {slot.subject && (
+                    <span className="text-[10px] font-semibold opacity-75">• {slot.subject}</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="p-3.5 bg-slate-50 rounded-2xl text-[11px] text-slate-500 border border-slate-100 text-left space-y-1">
+            <div className="font-bold text-slate-700">💡 Informasi Jadwal Panitia:</div>
+            <p>
+              Penugasan ruangan dikendalikan secara resmi oleh <strong>Posko Panitia CBT</strong>. Jika ada perubahan atau pertukaran jadwal tugas antar guru, silakan hubungi panitia untuk disesuaikan di Posko CBT.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
 
@@ -275,47 +627,90 @@ export default function CbtSupervisorRoom({
                 Mode Pengawas Ruang Ujian CBT
               </h2>
             </div>
-            <p className="text-xs text-slate-500 mt-1">
-              Pengawas: <span className="font-semibold text-slate-800">{currentTeacherName}</span> • Presensi, Berita Acara, & Pengawasan Peserta
-            </p>
+            <div className="flex items-center gap-2 flex-wrap text-xs text-slate-500 mt-1">
+              <span>Pengawas: <strong className="text-slate-800">{currentTeacherName}</strong></span>
+              <span>•</span>
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                Tersinkron Live ke Posko Panitia
+              </span>
+              {isAssignedByPanitia && (
+                <span className="text-[10px] bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-md font-bold">
+                  Sesuai Plotting Panitia
+                </span>
+              )}
+            </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Dynamic Session Switcher Pills (Jam 1, Jam 2, Jam 3, dst.) */}
+            <div className="flex flex-wrap items-center gap-1 p-1 bg-slate-100 rounded-xl">
+              {scheduleSessions.map((slot, idx) => {
+                const isSelected = slot.id === currentSlot.id;
+                return (
+                  <button
+                    key={slot.id}
+                    type="button"
+                    onClick={() => {
+                      setActiveSlotId(slot.id);
+                      setFilterClassInRoom('all');
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                      isSelected
+                        ? 'bg-amber-400 text-slate-950 shadow-xs font-black'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                    }`}
+                  >
+                    <span>{idx % 2 === 0 ? '☀️' : '⛅'}</span>
+                    <span>{slot.name} ({slot.startTime} - {slot.endTime})</span>
+                    {slot.subject && (
+                      <span className="text-[10px] font-semibold opacity-80 hidden sm:inline">• {slot.subject}</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
             <button
               type="button"
               onClick={() => setShowEmergencyModal(true)}
-              className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs transition shadow-md shadow-amber-500/20 flex items-center gap-1.5 cursor-pointer"
+              className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs transition shadow-md shadow-amber-500/20 flex items-center gap-1.5 cursor-pointer"
             >
-              <span>➕ Daftarkan Siswa di Ruangan Ini</span>
+              <span>➕ Daftarkan Siswa</span>
             </button>
           </div>
         </div>
 
-        {/* Pemilih Ruangan & Pemilih Paket Ujian */}
+        {/* Ruangan Tugas Resmi & Pemilih Paket Ujian */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t border-slate-100">
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">
-              1. Pilih Ruangan yang Anda Awasi:
-            </label>
-            <select
-              value={selectedRoom}
-              onChange={(e) => {
-                setSelectedRoom(e.target.value);
-                setFilterClassInRoom('all');
-              }}
-              className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-semibold focus:outline-none focus:border-indigo-500 cursor-pointer"
-            >
-              {roomOptions.map(room => (
-                <option key={room.id} value={room.name}>
-                  {room.label || room.name}
-                </option>
-              ))}
-            </select>
+          <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 flex flex-col justify-between">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                1. Ruangan Tugas Pengawas:
+              </span>
+              <span className="px-2 py-0.5 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 text-[10px] font-bold">
+                {currentSlot.name} ({currentSlot.startTime} - {currentSlot.endTime} WIB){currentSlot.subject ? ` • ${currentSlot.subject}` : ''}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-2 mt-0.5">
+              <div className="flex items-center gap-2">
+                <span className="text-base font-black text-slate-900">
+                  🚪 {assignedScheduleEntry ? assignedScheduleEntry.roomName : selectedRoom}
+                </span>
+                <span className="text-xs text-slate-500 font-semibold truncate max-w-[200px]" title={currentRoomObj?.label}>
+                  ({currentRoomObj?.classes ? `Kelas ${currentRoomObj.classes.join(', ')}` : currentRoomObj?.label})
+                </span>
+              </div>
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md shrink-0">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                Terkunci Otomatis
+              </span>
+            </div>
           </div>
 
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">
-              2. Pilih Paket Ujian yang Sedang Berlangsung:
+              2. Paket Ujian:
             </label>
             <select
               value={selectedExamId}
@@ -339,19 +734,23 @@ export default function CbtSupervisorRoom({
         <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-900 to-slate-900 text-white shadow-md space-y-1 flex flex-col justify-between">
           <div className="flex items-center justify-between text-indigo-300 text-[10px] font-bold uppercase tracking-wider">
             <span>Token Sesi Ruangan</span>
-            {selectedExam?.status === 'active' ? (
-              <span className="text-emerald-400 font-black flex items-center gap-1">🟢 AKTIF</span>
-            ) : (
-              <span className="text-amber-400 font-black flex items-center gap-1 animate-pulse">⏸️ DIJEDA PANITIA</span>
-            )}
+            <span className={`px-2 py-0.5 rounded-full text-[9px] font-black border ${examSchedule.badgeClass}`}>
+              {examSchedule.statusLabel}
+            </span>
           </div>
           <div className="text-3xl font-mono font-black tracking-widest text-emerald-400 py-1">
             {selectedExam?.token || '---'}
           </div>
-          <p className="text-[10px] text-slate-400">
-            {selectedExam?.status === 'active'
-              ? 'Tuliskan token ini di papan tulis agar siswa dapat memulai ujian.'
-              : '⚠️ Ujian ini sedang dijeda oleh Posko Panitia Pusat.'}
+          <p className="text-[10px] text-slate-300 leading-tight">
+            {examSchedule.scheduleState === 'emergency_paused' ? (
+              <span className="text-rose-300 font-bold">⚠️ Ujian sedang dijeda darurat oleh panitia.</span>
+            ) : examSchedule.scheduleState === 'upcoming' ? (
+              <span className="text-amber-300 font-bold">⏳ Ujian dijadwalkan pukul {selectedExam?.startTime || '07:30'} WIB.</span>
+            ) : examSchedule.scheduleState === 'expired' ? (
+              <span className="text-slate-400 font-bold">🏁 Batas waktu sesi ({selectedExam?.endTime || '09:00'}) telah berakhir.</span>
+            ) : (
+              <span>Tuliskan token ini di papan tulis agar siswa dapat memulai ujian ({examSchedule.scheduleText}).</span>
+            )}
           </p>
         </div>
 
@@ -399,10 +798,22 @@ export default function CbtSupervisorRoom({
       <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden space-y-0">
         <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
-            <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider">
-              Daftar Hadir & Pengerjaan Peserta: {selectedRoom}
-            </h3>
-            <p className="text-[11px] text-slate-500">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider">
+                Daftar Hadir & Pengerjaan Peserta: {selectedRoom}
+              </h3>
+              {lastSavedTime && (
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all duration-300 flex items-center gap-1.5 ${
+                  showSavedPulse
+                    ? 'bg-emerald-100 text-emerald-800 border-emerald-300 scale-105 shadow-xs'
+                    : 'bg-slate-200/70 text-slate-700 border-slate-300'
+                }`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${showSavedPulse ? 'bg-emerald-500 animate-ping' : 'bg-emerald-600'}`} />
+                  <span>💾 Tersimpan otomatis • {lastSavedTime}</span>
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-slate-500 mt-0.5">
               Total {roomStudents.length} peserta terdaftar di rombel {roomClasses.join(' & ')}
             </p>
           </div>
@@ -418,6 +829,46 @@ export default function CbtSupervisorRoom({
             </button>
           </div>
         </div>
+
+        {/* Banner Mode Terkunci Pasca Penyerahan BAP */}
+        {isBapSaved && (
+          <div className="p-3.5 bg-gradient-to-r from-emerald-50 via-teal-50 to-indigo-50 border-b border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <span className="text-xl">🔒</span>
+              <div>
+                <div className="font-extrabold text-xs text-emerald-950 flex items-center gap-2">
+                  <span>BAP & Presensi Telah Resmi Diserahkan (Mode Terkunci)</span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-200/80 text-emerald-900 border border-emerald-300">
+                    Terkunci Aman
+                  </span>
+                </div>
+                <p className="text-[11px] text-emerald-800">
+                  Data presensi ruangan telah dikunci untuk mencegah klik tidak sengaja. Klik tombol di samping jika ingin melakukan koreksi.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (confirm(`Buka kunci presensi & BAP Ruang ${selectedRoom}?\n\nGunakan ini jika Anda perlu memperbaiki status kehadiran siswa atau catatan sebelum panitia menutup sesi.`)) {
+                  setIsBapSaved(false);
+                  if (selectedExam) {
+                    const todayStr = new Date().toISOString().split('T')[0];
+                    const key = `${selectedRoom}_${selectedExam.id}_${todayStr}`;
+                    const allAtt = getStoredCbtRoomAttendances();
+                    if (allAtt[key]) {
+                      allAtt[key] = { ...allAtt[key], isBapSubmitted: false };
+                      saveStoredCbtRoomAttendance(allAtt[key]);
+                    }
+                  }
+                }
+              }}
+              className="px-3.5 py-1.5 rounded-xl bg-white hover:bg-emerald-50 border border-emerald-300 text-emerald-900 font-extrabold text-xs transition shadow-xs cursor-pointer shrink-0 flex items-center gap-1.5 active:scale-95"
+            >
+              <span>🔓 Buka Kunci untuk Koreksi</span>
+            </button>
+          </div>
+        )}
 
         {/* Sub-filter kelas campuran jika ruangan memiliki lebih dari 1 kelas */}
         {roomClasses.length > 1 && (
@@ -520,17 +971,45 @@ export default function CbtSupervisorRoom({
                             Izin
                           </span>
                         )}
+
+                        {/* Anti-Human-Error: Peringatan Kontradiksi Alpa padahal siswa aktif/selesai CBT */}
+                        {currentStatus === 'A' && Boolean(session) && (
+                          <div className="mt-1.5 p-1.5 rounded-lg bg-rose-50 border border-rose-300 text-rose-800 flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-1 text-[10px] font-extrabold">
+                              <span>⚠️</span>
+                              <span>Ditandai Alpa, tapi {session?.isSubmitted ? 'sudah selesai CBT' : 'sedang aktif CBT'}!</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleSetStatus(st.id, 'H')}
+                              className="px-2 py-0.5 rounded bg-rose-600 hover:bg-rose-700 text-white text-[9px] font-black cursor-pointer shadow-xs whitespace-nowrap active:scale-95"
+                              title="Klik untuk otomatis ubah ke Hadir (H)"
+                            >
+                              Ubah ke Hadir
+                            </button>
+                          </div>
+                        )}
                       </td>
 
                       {/* Selector Presensi: H, S, I, A */}
                       <td className="px-3 py-2.5 text-center">
-                        <div className="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50 text-[11px] font-bold">
+                        <div className={`inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50 text-[11px] font-bold ${
+                          isBapSaved ? 'opacity-80' : ''
+                        }`}>
                           {(['H', 'S', 'I', 'A'] as const).map(code => (
                             <button
                               key={code}
                               type="button"
-                              onClick={() => handleSetStatus(st.id, code)}
-                              className={`px-2 py-0.5 rounded transition cursor-pointer ${
+                              onClick={() => {
+                                if (isBapSaved) {
+                                  alert('⚠️ Presensi ruangan ini dalam Mode Terkunci karena BAP sudah diserahkan.\n\nKlik tombol "🔓 Buka Kunci untuk Koreksi" di bagian atas tabel jika Anda ingin mengubah status siswa.');
+                                  return;
+                                }
+                                handleSetStatus(st.id, code);
+                              }}
+                              className={`px-2 py-0.5 rounded transition ${
+                                isBapSaved ? 'cursor-not-allowed' : 'cursor-pointer'
+                              } ${
                                 currentStatus === code
                                   ? code === 'H' ? 'bg-emerald-600 text-white' :
                                     code === 'S' ? 'bg-blue-600 text-white' :
@@ -538,6 +1017,7 @@ export default function CbtSupervisorRoom({
                                     'bg-rose-600 text-white'
                                   : 'text-slate-500 hover:text-slate-900'
                               }`}
+                              title={isBapSaved ? 'Terkunci (Buka kunci terlebih dahulu untuk mengedit)' : undefined}
                             >
                               {code}
                             </button>
@@ -551,6 +1031,15 @@ export default function CbtSupervisorRoom({
                           <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
                             ✓ Selesai ({session.score}/100)
                           </span>
+                        ) : session?.violationCount && session.violationCount >= 1 ? (
+                          <div className="space-y-0.5">
+                            <span className="inline-block px-2 py-0.5 rounded text-[10px] font-black bg-rose-600 text-white animate-pulse shadow-xs">
+                              🔒 TERKUNCI ({session.violationCount}x Keluar)
+                            </span>
+                            <div className="text-[9px] text-rose-600 font-semibold">
+                              Pelanggaran Integritas
+                            </div>
+                          </div>
                         ) : session ? (
                           <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 animate-pulse">
                             Sedang Mengerjakan
@@ -562,35 +1051,52 @@ export default function CbtSupervisorRoom({
                         )}
                       </td>
 
-                      {/* Test / Reset Button */}
+                      {/* Action: Remote Unlock & Reset */}
                       <td className="px-3 py-2.5 text-center">
-                        <div className="flex items-center justify-center gap-1.5">
-                          {session?.isSubmitted ? (
+                        <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                          {session?.violationCount && session.violationCount >= 1 ? (
                             <button
                               type="button"
                               onClick={() => {
-                                if (!selectedExam) return;
-                                if (confirm(`Reset ujian CBT untuk ${st.name}? Siswa akan dapat mengerjakan ulang ujian ini.`)) {
-                                  resetStoredStudentCbtSession(selectedExam.id, st.id);
+                                if (!selectedExam || !session) return;
+                                saveStoredStudentCbtSession({
+                                  ...session,
+                                  violationCount: 0
+                                });
+                                triggerSaveFeedback();
+                              }}
+                              className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black transition cursor-pointer shadow-xs active:scale-95 flex items-center gap-1"
+                              title={`Buka kunci ujian untuk ${st.name} (Pelanggaran ke-${session.violationCount})`}
+                            >
+                              <span>🔓</span>
+                              <span>Buka Kunci</span>
+                            </button>
+                          ) : null}
+
+                          {session ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (confirm(`Reset sesi ujian CBT untuk ${st.name}? Siswa akan dapat login dan memulai ulang pengerjaan ujian.`)) {
+                                  const targetExamId = session?.examId || selectedExam?.id || '';
+                                  resetStoredStudentCbtSession(targetExamId, st.id);
+                                  resetStoredStudentCbtSession(targetExamId, st.nisn);
+                                  if (selectedExam?.id && selectedExam.id !== targetExamId) {
+                                    resetStoredStudentCbtSession(selectedExam.id, st.id);
+                                    resetStoredStudentCbtSession(selectedExam.id, st.nisn);
+                                  }
+                                  setStudentSessions(getStoredStudentCbtSessions());
+                                  alert(`✅ Sesi ujian untuk ${st.name} berhasil di-reset!\n\nSiswa sekarang dapat membuka kembali ruang ujian CBT dari berandanya.`);
                                 }
                               }}
                               className="px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-[10px] font-bold transition cursor-pointer shadow-xs active:scale-95 flex items-center gap-1"
-                              title="Reset status selesai siswa ini agar bisa mengulang ujian"
+                              title="Reset sesi ujian siswa jika terjadi kendala teknis"
                             >
                               <span>🔄</span>
                               <span>Reset</span>
                             </button>
-                          ) : onOpenExamForStudent ? (
-                            <button
-                              type="button"
-                              onClick={() => onOpenExamForStudent(selectedExam, st, selectedRoom)}
-                              className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[11px] font-bold transition cursor-pointer"
-                              title="Buka Lembar Ujian CBT untuk Siswa Ini"
-                            >
-                              🚀 Uji CBT
-                            </button>
                           ) : (
-                            <span className="text-slate-300">-</span>
+                            <span className="text-slate-300 font-mono text-xs">-</span>
                           )}
                         </div>
                       </td>
@@ -604,42 +1110,101 @@ export default function CbtSupervisorRoom({
       </div>
 
       {/* 4. FORM BERITA ACARA PELAKSANAAN (BAP) DIGITAL */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-3">
-        <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-          <span>📝 Berita Acara Pelaksanaan Ujian (BAP) Ruangan</span>
-          {isBapSaved && (
-            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-              ✓ Telah Disimpan
-            </span>
-          )}
-        </h3>
+      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-100">
+          <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+            <span>📝 Berita Acara Pelaksanaan Ujian (BAP) & Presensi Ruangan</span>
+            {isBapSaved && (
+              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                ✓ Telah Diserahkan ke Panitia
+              </span>
+            )}
+          </h3>
+          <span className="text-[11px] font-medium text-slate-500">
+            Ruangan: <strong className="text-indigo-600">{selectedRoom}</strong>
+          </span>
+        </div>
         
-        <div>
-          <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-            Catatan Pengawas Ruang (Kejadian Khusus / Situasi Ruang Ujian):
-          </label>
-          <textarea
-            rows={2}
-            value={bapNotes}
-            onChange={(e) => setBapNotes(e.target.value)}
-            placeholder="Tuliskan catatan kejadian di ruangan (misal: Ujian berjalan tertib, atau ada 1 siswa izin berobat)..."
-            className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 text-xs focus:outline-none focus:border-indigo-500"
-          />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="md:col-span-1">
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-[11px] font-bold text-slate-700">
+                👤 Nama Pengawas Ruang:
+              </label>
+              {currentTeacherName && currentTeacherName !== 'Guru Pengawas Ruang' && supervisorNameInput !== currentTeacherName && (
+                <button
+                  type="button"
+                  onClick={() => setSupervisorNameInput(currentTeacherName)}
+                  className="text-[10px] text-indigo-600 hover:text-indigo-800 font-bold underline cursor-pointer"
+                  title="Klik untuk menggunakan nama akun Anda yang sedang login"
+                >
+                  Gunakan Akun Saya ({currentTeacherName.split(' ')[0]})
+                </button>
+              )}
+            </div>
+            <input
+              type="text"
+              value={supervisorNameInput}
+              onChange={(e) => setSupervisorNameInput(e.target.value)}
+              placeholder="Contoh: Dra. Hj. Siti Rohmah, M.Pd."
+              className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 text-xs font-semibold focus:outline-none focus:border-indigo-500"
+            />
+            <span className="text-[10px] text-slate-400 mt-1 block">
+              Nama ini otomatis tampil di Dashboard Panitia & Rekap BAP Sekolah
+            </span>
+          </div>
+
+          <div className="md:col-span-2">
+            <label className="block text-[11px] font-bold text-slate-700 mb-1">
+              📋 Catatan Pengawas Ruang (Kejadian Khusus / Situasi Ruang):
+            </label>
+            <input
+              type="text"
+              value={bapNotes}
+              onChange={(e) => handleBapNotesChange(e.target.value)}
+              placeholder="Contoh: Ujian berlangsung tertib, aman, dan lancar tanpa kendala teknis..."
+              className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 text-xs focus:outline-none focus:border-indigo-500"
+            />
+            <span className="text-[10px] text-slate-400 mt-1 block">
+              Catatan otomatis tersimpan real-time saat Anda mengetik
+            </span>
+          </div>
         </div>
 
-        <div className="flex items-center justify-between pt-1">
-          <span className="text-[11px] text-slate-500">
-            Penandatangan: <span className="font-semibold text-slate-800">{currentTeacherName}</span> (Pengawas Ruang)
-          </span>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-slate-100">
+          <div className="text-[11px] text-slate-500 flex items-center gap-1.5 flex-wrap">
+            <span>Penandatangan:</span>
+            <strong className="text-slate-800">
+              {supervisorNameInput.trim() || currentTeacherName || 'Guru Pengawas Ruang'}
+            </strong>
+            <span className="text-slate-400">• Pengawas Ruang Ujian</span>
+          </div>
 
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleSaveBap}
-              className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-md shadow-indigo-600/20 cursor-pointer"
-            >
-              Simpan Berita Acara & Presensi Ruangan ✓
-            </button>
+            {isBapSaved ? (
+              <div className="flex items-center gap-2">
+                <span className="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold flex items-center gap-1.5">
+                  <span>✓</span>
+                  <span>BAP Resmi Diserahkan (Terkunci)</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsBapSaved(false)}
+                  className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition cursor-pointer flex items-center gap-1"
+                >
+                  <span>🔓 Buka Kunci</span>
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={handleSaveBap}
+                className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-md shadow-indigo-600/20 cursor-pointer flex items-center gap-1.5"
+              >
+                <span>Kirim Berita Acara & Presensi ke Panitia</span>
+                <span>✓</span>
+              </button>
+            )}
           </div>
         </div>
       </div>

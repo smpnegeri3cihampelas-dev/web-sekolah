@@ -58,7 +58,9 @@ import {
   getStoredStudentCbtSessions,
   resetStoredStudentCbtSession,
   getStoredCbtPanitiaConfig,
-  getRoomForStudent
+  getRoomForStudent,
+  markStudentCbtAttendancePresent,
+  evaluateCbtPackageSchedule
 } from '@/lib/cbtData';
 import { getStoredSchoolData } from '@/lib/schoolData';
 
@@ -1324,15 +1326,27 @@ export default function ELearningPage() {
   // Teacher Assignment Scope Filter (Rombel Terpilih vs Semua Rombel)
   const [teacherAsgScope, setTeacherAsgScope] = useState<'current_class' | 'all_classes'>('current_class');
 
-  // Student Assignment Upload & Quiz States
+  // Student Assignment Upload, Quiz, & Dashboard Tabs
   const [studentSubmitAsgId, setStudentSubmitAsgId] = useState<string | null>(null);
   const [studentSubjectFilter, setStudentSubjectFilter] = useState<string>('all');
+  const [studentActiveTab, setStudentActiveTab] = useState<'tugas' | 'cbt'>('tugas');
 
   // Submission File Preview Modal State (for Teacher & Student)
   const [previewSubmission, setPreviewSubmission] = useState<{ sub: AssignmentSubmission; asg?: Assignment } | null>(null);
   
   // Teacher Account Settings Modal State
   const [isTeacherSettingsOpen, setIsTeacherSettingsOpen] = useState<boolean>(false);
+
+  // Fullscreen Detection State
+  const [isBrowserFullscreen, setIsBrowserFullscreen] = useState<boolean>(false);
+  useEffect(() => {
+    const handleFs = () => {
+      setIsBrowserFullscreen(typeof document !== 'undefined' && Boolean(document.fullscreenElement));
+    };
+    handleFs();
+    document.addEventListener('fullscreenchange', handleFs);
+    return () => document.removeEventListener('fullscreenchange', handleFs);
+  }, []);
   
   // Mapel Teacher & Class State
   const [selectedClassId, setSelectedClassId] = useState<string>('7-A');
@@ -1555,6 +1569,20 @@ export default function ELearningPage() {
     setLoginIdentifier('');
     setLoginPassword('');
     setShowPassword(false);
+  };
+
+  // 1-Click Quick Login khusus Uji Coba Akun Siswa (Abdul Hanan - 7-A)
+  const handleQuickLoginStudent = () => {
+    const student = activeStudents.find(s => s.nisn === '0133138158') || activeStudents[0];
+    if (student) {
+      handleLogin({
+        role: 'siswa',
+        name: student.name,
+        nipOrNisn: student.nisn,
+        classId: student.classId || '7-A',
+        gender: student.gender
+      });
+    }
   };
 
   const handleFormLoginSubmit = (e: React.FormEvent) => {
@@ -2653,6 +2681,26 @@ export default function ELearningPage() {
     return { dateText, daysLeft };
   };
 
+  // Helper ringkas nama mata pelajaran untuk tombol filter & badge kartu agar rapi dan tidak kepanjangan
+  const formatShortSubject = (subject?: string): string => {
+    if (!subject) return '';
+    const s = subject.trim();
+    // Prioritaskan akronim dalam kurung (misal: "Ilmu Pengetahuan Alam (IPA)" -> "IPA", "Pendidikan Agama Islam (PABP)" -> "PABP")
+    const match = s.match(/\(([^)]+)\)/);
+    if (match && match[1] && match[1].trim().length <= 8) {
+      return match[1].trim();
+    }
+    // Singkat Bahasa -> B. (misal: "Bahasa Indonesia" -> "B. Indonesia", "Bahasa Inggris" -> "B. Inggris", "Bahasa Sunda" -> "B. Sunda")
+    if (/^Bahasa\s+/i.test(s)) {
+      return s.replace(/^Bahasa\s+/i, 'B. ');
+    }
+    // Singkat Pendidikan -> Pend.
+    if (/^Pendidikan\s+/i.test(s)) {
+      return s.replace(/^Pendidikan\s+/i, 'Pend. ');
+    }
+    return s;
+  };
+
   const currentClassSession = mySubjectSession ? {
     classId: selectedClassId,
     date: todayStr,
@@ -2667,15 +2715,35 @@ export default function ELearningPage() {
 
   // JIKA SISWA / GURU SEDANG DI DALAM RUANG UJIAN CBT (FOCUS MODE)
   if (activeCbtExamSession) {
+    const latestSessions = getStoredStudentCbtSessions();
+    const sessionKey = `${activeCbtExamSession.exam.id}_${activeCbtExamSession.student.id}`;
+    const myCurrentSession = latestSessions[sessionKey] || Object.values(latestSessions).find(s => 
+      s.examId === activeCbtExamSession.exam.id && (
+        s.studentId === activeCbtExamSession.student.id || 
+        (activeCbtExamSession.student.nisn && (s.studentNisn === activeCbtExamSession.student.nisn || s.studentId === activeCbtExamSession.student.nisn))
+      )
+    );
+
     return (
       <CbtStudentExamRoom
         exam={activeCbtExamSession.exam}
         student={activeCbtExamSession.student}
         roomName={activeCbtExamSession.roomName}
+        initialSession={myCurrentSession}
         onFinishExam={() => {
+          if (typeof document !== 'undefined' && document.fullscreenElement) {
+            document.exitFullscreen().catch(() => {});
+          }
+          setCbtStudentSessions(getStoredStudentCbtSessions());
           showToast(`Ujian ${activeCbtExamSession.exam.title} berhasil dikumpulkan!`, 'success');
         }}
-        onExitRoom={() => setActiveCbtExamSession(null)}
+        onExitRoom={() => {
+          if (typeof document !== 'undefined' && document.fullscreenElement) {
+            document.exitFullscreen().catch(() => {});
+          }
+          setCbtStudentSessions(getStoredStudentCbtSessions());
+          setActiveCbtExamSession(null);
+        }}
       />
     );
   }
@@ -2779,6 +2847,23 @@ export default function ELearningPage() {
                 >
                   <span>⚙️</span>
                   <span className="hidden sm:inline">Pengaturan</span>
+                </button>
+              )}
+
+              {/* Exit Fullscreen Button (if dashboard is still fullscreen) */}
+              {isBrowserFullscreen && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (document.fullscreenElement) {
+                      document.exitFullscreen().catch(() => {});
+                    }
+                  }}
+                  className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs active:scale-95 shrink-0 animate-pulse"
+                  title="Kembalikan layar ke ukuran normal browser"
+                >
+                  <span>⛶</span>
+                  <span className="hidden sm:inline">Keluar Layar Penuh</span>
                 </button>
               )}
 
@@ -2947,27 +3032,6 @@ export default function ELearningPage() {
                     >
                       Masuk
                     </button>
-
-                    <div className="pt-2 text-center">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const demoT = activeTeachers[0] || DEMO_TEACHERS[0];
-                          handleLogin({
-                            role: 'guru_mapel',
-                            name: demoT.name,
-                            nipOrNisn: demoT.nip,
-                            subject: demoT.subject,
-                            classId: '7-A'
-                          });
-                        }}
-                        className="w-full py-2 px-3 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 font-bold text-xs transition cursor-pointer flex items-center justify-center gap-1.5 shadow-xs active:scale-[0.99]"
-                      >
-                        <span>👨‍🏫</span>
-                        <span>Masuk sbg Guru Demo ({activeTeachers[0]?.name?.split(',')[0] || 'Guru Mapel'})</span>
-                      </button>
-                      <p className="text-[10px] text-slate-400 mt-1">Username: {getTeacherUsername(activeTeachers[0] || DEMO_TEACHERS[0])} • Sandi: guru123</p>
-                    </div>
                   </>
                 )}
 
@@ -3019,25 +3083,6 @@ export default function ELearningPage() {
                     >
                       Masuk
                     </button>
-
-                    <div className="pt-2 text-center">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          handleLogin({
-                            role: 'guru_piket',
-                            name: 'Stasiun Meja Piket Utama',
-                            nipOrNisn: 'POSKO-PIKET',
-                            subject: 'Pusat Monitoring Rombel'
-                          });
-                        }}
-                        className="w-full py-2 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 font-bold text-xs transition cursor-pointer flex items-center justify-center gap-1.5 shadow-xs active:scale-[0.99]"
-                      >
-                        <span>🏢</span>
-                        <span>Masuk sbg Petugas Piket Demo</span>
-                      </button>
-                      <p className="text-[10px] text-slate-400 mt-1">ID: POSKO-PIKET • Sandi: piket123</p>
-                    </div>
                   </>
                 )}
 
@@ -3152,91 +3197,30 @@ export default function ELearningPage() {
                       Masuk
                     </button>
 
-                    <div className="pt-2 text-center">
+                    {/* Tombol Uji Coba Akun Siswa Cepat (1 Siswa Saja) */}
+                    <div className="pt-2">
+                      <div className="relative flex py-1 items-center">
+                        <div className="flex-grow border-t border-slate-200"></div>
+                        <span className="flex-shrink mx-2 text-[11px] text-slate-400 font-medium">uji coba cepat</span>
+                        <div className="flex-grow border-t border-slate-200"></div>
+                      </div>
+
                       <button
                         type="button"
-                        onClick={() => {
-                          const demoSt = activeStudents.find(s => s.nisn === DEMO_STUDENT.nisn) || activeStudents[0];
-                          handleLogin({
-                            role: 'siswa',
-                            name: demoSt.name,
-                            nipOrNisn: demoSt.nisn,
-                            classId: demoSt.classId
-                          });
-                        }}
-                        className="w-full py-2 px-3 rounded-xl bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 font-bold text-xs transition cursor-pointer flex items-center justify-center gap-1.5 shadow-xs active:scale-[0.99]"
+                        onClick={handleQuickLoginStudent}
+                        className="w-full mt-1 py-2 px-3 rounded-xl bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 shadow-2xs"
                       >
-                        <span>🎓</span>
-                        <span>Masuk sbg Siswa Demo ({DEMO_STUDENT.name} - {DEMO_STUDENT.classId})</span>
+                        <span>⚡</span>
+                        <span>Masuk sebagai <b>Abdul Hanan</b> (Kelas 7-A)</span>
+                        <span>→</span>
                       </button>
-                      <p className="text-[10px] text-slate-400 mt-1">NISN: {DEMO_STUDENT.nisn} • Sandi: siswa123</p>
                     </div>
                   </>
                 )}
 
               </form>
 
-              {/* Universal 1-Click Demo Bar (Any Role) */}
-              <div className="mt-5 pt-4 border-t border-slate-100 space-y-2">
-                <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider text-center">
-                  ⚡ Akses Uji Coba Cepat (1-Klik)
-                </div>
-                <div className="grid grid-cols-3 gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const demoSt = activeStudents.find(s => s.nisn === DEMO_STUDENT.nisn) || activeStudents[0];
-                      handleLogin({
-                        role: 'siswa',
-                        name: demoSt.name,
-                        nipOrNisn: demoSt.nisn,
-                        classId: demoSt.classId
-                      });
-                    }}
-                    className="py-1.5 px-2 rounded-lg bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-800 text-[11px] font-bold transition flex flex-col items-center justify-center text-center cursor-pointer active:scale-95"
-                    title="Masuk langsung sebagai Siswa Demo"
-                  >
-                    <span className="text-sm">🎓</span>
-                    <span>Siswa</span>
-                  </button>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const demoT = activeTeachers[0] || DEMO_TEACHERS[0];
-                      handleLogin({
-                        role: 'guru_mapel',
-                        name: demoT.name,
-                        nipOrNisn: demoT.nip,
-                        subject: demoT.subject,
-                        classId: '7-A'
-                      });
-                    }}
-                    className="py-1.5 px-2 rounded-lg bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-800 text-[11px] font-bold transition flex flex-col items-center justify-center text-center cursor-pointer active:scale-95"
-                    title="Masuk langsung sebagai Guru Demo"
-                  >
-                    <span className="text-sm">👨‍🏫</span>
-                    <span>Guru</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      handleLogin({
-                        role: 'guru_piket',
-                        name: 'Stasiun Meja Piket Utama',
-                        nipOrNisn: 'POSKO-PIKET',
-                        subject: 'Pusat Monitoring Rombel'
-                      });
-                    }}
-                    className="py-1.5 px-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 text-[11px] font-bold transition flex flex-col items-center justify-center text-center cursor-pointer active:scale-95"
-                    title="Masuk langsung sebagai Petugas Piket"
-                  >
-                    <span className="text-sm">🏢</span>
-                    <span>Piket</span>
-                  </button>
-                </div>
-              </div>
 
               {/* Minimal Helper Link */}
               <div className="mt-6 pt-4 border-t border-slate-100 text-center">
@@ -4888,145 +4872,218 @@ export default function ELearningPage() {
         )}
 
         {/* ----------------- 4. VIEW: SISWA (PORTAL BELAJAR & NILAI) ----------------- */}
-        {currentUser?.role === 'siswa' && (
-          <div className="space-y-6 max-w-4xl mx-auto">
-            
-            {/* Student Profile Card */}
-            <div className="bg-gradient-to-r from-purple-50 via-white to-indigo-50 border border-purple-200/80 rounded-2xl p-5 sm:p-6 shadow-sm relative overflow-hidden">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-2xl bg-purple-100 border border-purple-200 flex items-center justify-center text-2xl font-bold text-purple-700">
-                    🎓
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <span className="px-2 py-0.5 text-[10px] font-bold rounded-md bg-purple-100 text-purple-800 border border-purple-200">
-                        PESERTA DIDIK AKTIF
-                      </span>
-                      <span className="text-xs text-slate-500 font-medium">
-                        Kelas {currentUser.classId || '7-A'} • {new Date().getMonth() + 1 >= 7 ? 'Semester Ganjil' : 'Semester Genap'} TP. {new Date().getMonth() + 1 >= 7 ? `${new Date().getFullYear()}/${new Date().getFullYear() + 1}` : `${new Date().getFullYear() - 1}/${new Date().getFullYear()}`}
-                      </span>
+        {currentUser?.role === 'siswa' && (() => {
+          const currentStudent = activeStudents.find(s => s.nisn === currentUser.nipOrNisn) ||
+            activeStudents.find(s => s.name.toLowerCase() === currentUser.name?.toLowerCase()) ||
+            activeStudents[0];
+          const studentClass = currentUser.classId || '7-A';
+
+          // 1. CBT Data
+          const activeExamsForClass = cbtPackages.filter(pkg => {
+            return pkg.targetClasses.includes(studentClass) || 
+              pkg.targetClasses.includes('Semua') || 
+              pkg.targetClasses.includes(studentClass.split('-')[0]) ||
+              pkg.targetClasses.includes(`Tingkat ${studentClass.split('-')[0]}`);
+          });
+
+          const getExamSession = (examId: string) => {
+            const sessionKey = `${examId}_${currentStudent?.id || ''}`;
+            return cbtStudentSessions[sessionKey] || Object.values(cbtStudentSessions).find(s => 
+              s.examId === examId && (
+                s.studentId === currentStudent?.id || 
+                (currentStudent?.nisn && (s.studentNisn === currentStudent.nisn || s.studentId === currentStudent.nisn))
+              )
+            );
+          };
+
+          const completedExams = cbtPackages.filter(pkg => {
+            const mySession = getExamSession(pkg.id);
+            return Boolean(mySession?.isSubmitted);
+          });
+
+          const unsubmittedExamsCount = activeExamsForClass.filter(pkg => {
+            const mySession = getExamSession(pkg.id);
+            return !mySession?.isSubmitted;
+          }).length;
+
+          // 2. Tugas & PR Data
+          const myAssignments = assignments
+            .filter(a => a.targetClass === studentClass || a.targetClass === 'Semua')
+            .map(a => {
+              if (a.subject && (a.subject.includes('&') || a.subject.includes(' dan '))) {
+                const titleLower = (a.title || '').toLowerCase();
+                const cleanSubject = (titleLower.includes('sunda') || titleLower.includes('paguneman') || titleLower.includes('pupuh') || titleLower.includes('aksara'))
+                  ? 'Bahasa Sunda'
+                  : 'Pendidikan Agama Islam (PABP)';
+                return { ...a, subject: cleanSubject };
+              }
+              return a;
+            });
+          const availableSubjects = Array.from(new Set(myAssignments.map(a => a.subject)));
+
+          const findMySub = (asgId: string) => submissions.find(
+            s => s.assignmentId === asgId && (s.studentId === currentStudent?.id || s.studentName.toLowerCase() === currentStudent?.name.toLowerCase())
+          );
+          const statusRank = (asgId: string) => {
+            const st = findMySub(asgId)?.status;
+            return st === 'graded' ? 2 : st === 'submitted' ? 1 : 0;
+          };
+          const displayedTasks = (studentSubjectFilter === 'all' || !availableSubjects.includes(studentSubjectFilter)
+            ? myAssignments
+            : myAssignments.filter(a => a.subject === studentSubjectFilter)
+          ).slice().sort((a, b) => statusRank(a.id) - statusRank(b.id) || a.dueDate.localeCompare(b.dueDate));
+
+          let notSubmittedCount = 0;
+          let waitingGradeCount = 0;
+          let gradedCount = 0;
+          myAssignments.forEach(asg => {
+            const st = findMySub(asg.id)?.status;
+            if (st === 'graded') gradedCount++;
+            else if (st === 'submitted') waitingGradeCount++;
+            else notSubmittedCount++;
+          });
+
+          const stats = getStudentAttendanceStats();
+          const assignedRoom = getRoomForStudent(currentStudent, getStoredCbtPanitiaConfig().rooms);
+          const targetRoomName = assignedRoom?.name || `Ruang ${studentClass}`;
+
+          return (
+            <div className="space-y-4 w-full">
+              
+              {/* Profile Card Ringkas */}
+              <div className="bg-gradient-to-r from-purple-50 via-white to-indigo-50 border border-purple-200/80 rounded-2xl p-4 sm:p-5 shadow-2xs relative overflow-hidden">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-10">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-purple-100 border border-purple-200 flex items-center justify-center text-xl font-bold text-purple-700 shrink-0">
+                      🎓
                     </div>
-                    <h1 className="text-xl font-bold text-slate-900">{currentUser.name}</h1>
-                    <p className="text-xs text-slate-600 font-mono">NISN: {currentUser.nipOrNisn} • SMP Negeri 3 Cihampelas</p>
+                    <div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="px-2 py-0.5 text-[10px] font-black rounded-md bg-purple-100 text-purple-800 border border-purple-200">
+                          SISWA AKTIF
+                        </span>
+                        <span className="text-xs text-slate-600 font-bold">
+                          Kelas {studentClass}
+                        </span>
+                        <span className="text-xs text-slate-400 font-medium">
+                          • TP 2026/2027
+                        </span>
+                      </div>
+                      <h1 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight mt-0.5">{currentUser.name}</h1>
+                      <p className="text-xs text-slate-500 font-mono">NISN: {currentUser.nipOrNisn}</p>
+                    </div>
+                  </div>
+
+                  <div className="px-3.5 py-1.5 rounded-xl bg-white border border-slate-200 shadow-2xs text-left sm:text-right shrink-0">
+                    <div className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Kehadiran KBM</div>
+                    {stats && stats.percent !== null ? (
+                      <div className={`text-base font-black ${stats.toneClass}`}>
+                        {stats.percent}% <span className="text-xs font-semibold">({stats.label})</span>
+                      </div>
+                    ) : (
+                      <div className="text-xs font-bold text-slate-500">Belum Ada Presensi</div>
+                    )}
                   </div>
                 </div>
-
-                {(() => {
-                  const stats = getStudentAttendanceStats();
-                  return (
-                    <div className="px-4 py-2 rounded-xl bg-white border border-slate-200 text-right shadow-sm">
-                      <div className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Kehadiran Kamu</div>
-                      {stats && stats.percent !== null ? (
-                        <>
-                          <div className={`text-lg font-black ${stats.toneClass}`}>{stats.percent}% ({stats.label})</div>
-                          <div className="text-[10px] text-slate-400">dari {stats.total} jam pelajaran tercatat</div>
-                        </>
-                      ) : (
-                        <div className="text-sm font-bold text-slate-500">Belum ada data presensi</div>
-                      )}
-                    </div>
-                  );
-                })()}
               </div>
-            </div>
 
-            {/* CBT SECTION: TERBAGI MENJADI LIVE CBT (SEDANG AKTIF) & RIWAYAT NILAI (SUDAH SELESAI) */}
-            {(() => {
-              const currentStudent = activeStudents.find(s => s.nisn === currentUser.nipOrNisn) ||
-                activeStudents.find(s => s.name.toLowerCase() === currentUser.name?.toLowerCase()) ||
-                activeStudents[0];
-              const studentClass = currentUser.classId || '7-A';
+              {/* 2 Tab Navigation Bar: Fokus Tugas & CBT */}
+              <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100/90 rounded-2xl border border-slate-200/80 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setStudentActiveTab('tugas')}
+                  className={`flex-1 py-2 px-3 rounded-xl font-bold transition flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                    studentActiveTab === 'tugas'
+                      ? 'bg-white text-slate-950 font-black shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+                  }`}
+                >
+                  <span>📝</span>
+                  <span>Tugas &amp; PR</span>
+                  {notSubmittedCount > 0 && (
+                    <span className="px-1.5 py-0.2 rounded-full bg-amber-500 text-slate-950 text-[10px] font-black">
+                      {notSubmittedCount}
+                    </span>
+                  )}
+                </button>
 
-              // 1. Ujian yang saat ini AKTIF untuk kelas siswa ini (Hanya yang berstatus AKTIF!)
-              const activeExamsForClass = cbtPackages.filter(pkg => {
-                const isClassMatch = pkg.targetClasses.includes(studentClass) || 
-                  pkg.targetClasses.includes('Semua') || 
-                  pkg.targetClasses.includes(studentClass.split('-')[0]) ||
-                  pkg.targetClasses.includes(`Tingkat ${studentClass.split('-')[0]}`);
-                if (!isClassMatch) return false;
-                return pkg.status === 'active'; // JIKA DIJEDA (DRAFT) -> TIDAK MUNCUL DI LIVE CBT!
-              });
+                <button
+                  type="button"
+                  onClick={() => setStudentActiveTab('cbt')}
+                  className={`flex-1 py-2 px-3 rounded-xl font-bold transition flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                    studentActiveTab === 'cbt'
+                      ? 'bg-white text-slate-950 font-black shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+                  }`}
+                >
+                  <span>💻</span>
+                  <span>Asesmen CBT</span>
+                  {unsubmittedExamsCount > 0 && (
+                    <span className="px-1.5 py-0.2 rounded-full bg-rose-500 text-white text-[10px] font-black animate-pulse">
+                      {unsubmittedExamsCount} Live
+                    </span>
+                  )}
+                </button>
+              </div>
 
-              // 2. Ujian yang SUDAH SELESAI dikumpulkan oleh siswa ini
-              const completedExams = cbtPackages.filter(pkg => {
-                const sessionKey = `${pkg.id}_${currentStudent?.id || ''}`;
-                const mySession = cbtStudentSessions[sessionKey];
-                return Boolean(mySession?.isSubmitted);
-              });
-
-              if (activeExamsForClass.length === 0 && completedExams.length === 0) return null;
-
-              return (
+              {/* TAB 1: ASESMEN CBT */}
+              {studentActiveTab === 'cbt' && (
                 <div className="space-y-4">
-                  {/* A. BANNER LIVE UJIAN CBT (HANYA MUNCUL JIKA ADA UJIAN YANG AKTIF) */}
-                  {activeExamsForClass.length > 0 && (
-                    <div className="bg-gradient-to-br from-indigo-900 via-indigo-950 to-slate-900 rounded-2xl p-5 sm:p-6 text-white shadow-xl border border-indigo-700/50 relative overflow-hidden space-y-4 animate-fade-in">
-                      <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
-                      
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-10 border-b border-indigo-700/60 pb-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center text-xl font-black shadow-md shadow-amber-400/20 flex-shrink-0">
-                            💻
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <h2 className="text-base font-black tracking-wide text-white">
-                                ASESMEN & UJIAN CBT
-                              </h2>
-                              <span className="px-2 py-0.5 rounded-full bg-red-500 text-white text-[10px] font-black tracking-wider animate-pulse uppercase">
-                                LIVE CBT
-                              </span>
-                            </div>
-                            <p className="text-xs text-indigo-200">
-                              Siswa Kelas <span className="text-amber-300 font-bold">{studentClass}</span> • Silakan masuk dan kerjakan dengan jujur.
-                            </p>
-                          </div>
+                  {/* Active CBT Exam Cards */}
+                  {activeExamsForClass.length > 0 ? (
+                    <div className="bg-gradient-to-br from-indigo-900 via-indigo-950 to-slate-900 rounded-2xl p-4 sm:p-5 text-white shadow-lg border border-indigo-700/50 space-y-3">
+                      <div className="flex items-center justify-between border-b border-indigo-700/60 pb-2.5">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">💻</span>
+                          <h2 className="text-sm sm:text-base font-black tracking-wide text-white">
+                            Jadwal Ujian CBT Aktif
+                          </h2>
+                          <span className="px-2 py-0.5 rounded-full bg-red-500 text-white text-[10px] font-black uppercase tracking-wider animate-pulse">
+                            LIVE CBT
+                          </span>
                         </div>
-                        <div className="text-xs bg-indigo-950/80 border border-indigo-700/60 px-3 py-1.5 rounded-xl font-mono text-indigo-200 self-start sm:self-auto flex items-center gap-2">
-                          <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-                          Ruangan: <span className="font-bold text-amber-300">Ruang {studentClass}</span>
-                        </div>
+                        <span className="text-xs text-indigo-200 font-mono">
+                          {targetRoomName}
+                        </span>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 relative z-10">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                         {activeExamsForClass.map(exam => {
-                          const sessionKey = `${exam.id}_${currentStudent?.id || ''}`;
-                          const mySession = cbtStudentSessions[sessionKey];
+                          const mySession = getExamSession(exam.id);
                           const isSubmitted = Boolean(mySession?.isSubmitted);
                           const score = mySession?.score ?? 0;
                           const isPassed = score >= exam.passingGrade;
+                          const sched = evaluateCbtPackageSchedule(exam);
 
                           return (
                             <div 
                               key={exam.id} 
-                              className="bg-white/10 backdrop-blur-md border border-amber-400/40 hover:bg-white/15 rounded-xl p-4 flex flex-col justify-between gap-3 transition"
+                              className="bg-white/10 backdrop-blur-md border border-amber-400/30 hover:bg-white/15 rounded-xl p-3.5 flex flex-col justify-between gap-3 transition"
                             >
-                              <div>
-                                <div className="flex items-center justify-between gap-2 mb-1.5">
-                                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400/20 text-amber-300 border border-amber-400/30">
-                                    {exam.semester} • TP {exam.academicYear}
+                              <div className="space-y-1.5">
+                                <div className="flex items-center justify-between gap-2 flex-wrap">
+                                  <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-amber-400/20 text-amber-300 border border-amber-400/30">
+                                    {formatShortSubject(exam.subject)}
                                   </span>
-                                  <span className="text-[11px] font-medium text-indigo-200">
-                                    {exam.questions.length} Butir Soal
+                                  <span className={`px-2 py-0.5 rounded-md text-[10px] font-black border ${sched.badgeClass}`}>
+                                    {sched.statusLabel}
                                   </span>
                                 </div>
                                 <h3 className="text-sm font-bold text-white line-clamp-1">
                                   {exam.title}
                                 </h3>
-                                <p className="text-xs text-indigo-200 mb-2">
-                                  Mata Pelajaran: <strong className="text-white">{exam.subject}</strong> • Pengampu: {exam.teacherName}
-                                </p>
-
-                                <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-indigo-300">
+                                <div className="text-[11px] text-indigo-200">
+                                  Guru: {exam.teacherName}
+                                </div>
+                                <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-indigo-300 pt-1">
+                                  <span className="bg-indigo-950/60 px-2 py-0.5 rounded border border-indigo-800 text-amber-300 font-semibold">
+                                    🕒 {exam.startTime || '07:30'} - {exam.endTime || '09:00'} WIB
+                                  </span>
                                   <span className="bg-indigo-950/60 px-2 py-0.5 rounded border border-indigo-800">
-                                    ⏱️ {exam.durationMinutes} Menit
+                                    ⏱️ {exam.durationMinutes}m
                                   </span>
                                   <span className="bg-indigo-950/60 px-2 py-0.5 rounded border border-indigo-800">
                                     🎯 KKM {exam.passingGrade}
-                                  </span>
-                                  <span className="bg-amber-400/10 text-amber-300 px-2 py-0.5 rounded border border-amber-400/20 font-mono">
-                                    Token: <strong>{exam.token}</strong>
                                   </span>
                                 </div>
                               </div>
@@ -5037,41 +5094,55 @@ export default function ELearningPage() {
                                     <div className="w-full flex items-center justify-between bg-emerald-500/20 border border-emerald-400/30 px-3 py-1.5 rounded-lg text-emerald-300 text-xs">
                                       <span className="font-bold flex items-center gap-1">
                                         <span>✓</span>
-                                        <span>Sudah Dikerjakan (Skor: {score}/100)</span>
+                                        <span>Skor: {score}/100</span>
                                       </span>
                                       <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isPassed ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'}`}>
                                         {isPassed ? 'Tuntas' : 'Remedial'}
                                       </span>
                                     </div>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        if (confirm(`Ujian ini sudah pernah kamu kerjakan dengan skor ${score}/100. Apakah kamu ingin mengulang pengerjaan sekarang?`)) {
-                                          resetStoredStudentCbtSession(exam.id, currentStudent.id);
-                                          setActiveCbtExamSession({
-                                            exam,
-                                            student: currentStudent,
-                                            roomName: getRoomForStudent(currentStudent, getStoredCbtPanitiaConfig().rooms)?.name || `Ruang ${studentClass}`
-                                          });
-                                        }
-                                      }}
-                                      className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-black text-xs transition shadow-md shadow-emerald-500/25 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
-                                    >
-                                      <span>🔄</span>
-                                      <span>Kerjakan Ulang Ujian CBT</span>
-                                    </button>
+                                    <div className="w-full py-2 px-3 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs">
+                                      <span>✅</span>
+                                      <span>Ujian Telah Selesai Dikumpulkan</span>
+                                    </div>
                                   </div>
+                                ) : !sched.canEnter ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => alert(sched.message || 'Ujian saat ini belum dapat diakses.')}
+                                    className={`w-full py-2 px-3 rounded-xl font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer border ${
+                                      sched.scheduleState === 'emergency_paused'
+                                        ? 'bg-rose-500/20 text-rose-200 border-rose-500/50'
+                                        : sched.scheduleState === 'upcoming'
+                                        ? 'bg-amber-500/20 text-amber-200 border-amber-500/50'
+                                        : 'bg-slate-700/50 text-slate-300 border-slate-600'
+                                    }`}
+                                  >
+                                    <span>{sched.scheduleState === 'emergency_paused' ? '⏸️ Ujian Dijeda' : sched.scheduleState === 'upcoming' ? `⏳ Dibuka ${exam.startTime || '07:30'} WIB` : '🏁 Waktu Berakhir'}</span>
+                                  </button>
                                 ) : (
                                   <button
                                     type="button"
                                     onClick={() => {
+                                      const inputToken = prompt(`Masukkan Token Sesi Ujian untuk ${exam.title} (lihat di papan tulis):`);
+                                      if (!inputToken) return;
+                                      if (inputToken.trim().toUpperCase() !== exam.token.toUpperCase().trim()) {
+                                        alert(`⚠️ Token Ujian Salah!\n\nToken "${inputToken.toUpperCase().trim()}" tidak valid.`);
+                                        return;
+                                      }
+                                      markStudentCbtAttendancePresent({
+                                        roomName: targetRoomName,
+                                        examId: exam.id,
+                                        studentId: currentStudent.id,
+                                        examTitle: exam.title,
+                                        token: exam.token
+                                      });
                                       setActiveCbtExamSession({
                                         exam,
                                         student: currentStudent,
-                                        roomName: getRoomForStudent(currentStudent, getStoredCbtPanitiaConfig().rooms)?.name || `Ruang ${studentClass}`
+                                        roomName: targetRoomName
                                       });
                                     }}
-                                    className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs transition shadow-lg shadow-amber-500/25 flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                                    className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs transition shadow-md shadow-amber-500/20 flex items-center justify-center gap-2 cursor-pointer active:scale-95"
                                   >
                                     <span>🚀 Masuk Ruang Ujian CBT</span>
                                     <span>➔</span>
@@ -5083,38 +5154,45 @@ export default function ELearningPage() {
                         })}
                       </div>
                     </div>
+                  ) : (
+                    <div className="p-8 text-center rounded-2xl bg-white border border-slate-200 shadow-2xs space-y-2">
+                      <span className="text-3xl">☕</span>
+                      <h3 className="text-sm font-bold text-slate-800">Tidak Ada Ujian CBT Aktif Saat Ini</h3>
+                      <p className="text-xs text-slate-500 max-w-md mx-auto">
+                        Ujian akan otomatis muncul di sini saat pengawas ruangan membuka sesi asesmen.
+                      </p>
+                    </div>
                   )}
 
-                  {/* B. RIWAYAT & HASIL NILAI CBT (MUNCUL JIKA ADA UJIAN YANG SUDAH SELESAI DIKERJAKAN) */}
+                  {/* Riwayat Nilai CBT Selesai */}
                   {completedExams.length > 0 && (
-                    <div className="bg-white border border-indigo-100 rounded-2xl p-5 shadow-sm space-y-3">
+                    <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-2xs space-y-3">
                       <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
                         <div className="flex items-center gap-2">
                           <span className="text-base">📊</span>
                           <h3 className="text-sm font-bold text-slate-900">
-                            Riwayat Nilai & Hasil Ujian CBT Saya
+                            Riwayat Nilai CBT Saya
                           </h3>
                         </div>
-                        <span className="text-[11px] text-slate-500 font-medium">
-                          {completedExams.length} Asesmen Selesai
+                        <span className="text-xs text-slate-500 font-bold">
+                          {completedExams.length} Ujian Selesai
                         </span>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
                         {completedExams.map(exam => {
-                          const sessionKey = `${exam.id}_${currentStudent?.id || ''}`;
-                          const mySession = cbtStudentSessions[sessionKey];
+                          const mySession = getExamSession(exam.id);
                           const score = mySession?.score ?? 0;
                           const isPassed = score >= exam.passingGrade;
 
                           return (
-                            <div key={exam.id} className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex flex-col justify-between gap-2.5">
+                            <div key={exam.id} className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex flex-col justify-between gap-2">
                               <div>
-                                <div className="flex items-center justify-between gap-2 mb-1">
-                                  <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md truncate max-w-[140px]">
-                                    {exam.subject}
+                                <div className="flex items-center justify-between gap-1.5 mb-1">
+                                  <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded truncate max-w-[130px]">
+                                    {formatShortSubject(exam.subject)}
                                   </span>
-                                  <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${
+                                  <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${
                                     isPassed ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
                                   }`}>
                                     {isPassed ? '✓ TUNTAS' : '⚠️ REMEDIAL'}
@@ -5123,18 +5201,16 @@ export default function ELearningPage() {
                                 <h4 className="text-xs font-bold text-slate-900 line-clamp-1" title={exam.title}>
                                   {exam.title}
                                 </h4>
-                                <p className="text-[11px] text-slate-500 mt-0.5">
-                                  KKM: {exam.passingGrade} • {exam.questions.length} Soal
-                                </p>
+                                <div className="text-[10px] text-slate-400 mt-0.5">
+                                  KKM {exam.passingGrade} • {exam.questions.length} Soal
+                                </div>
                               </div>
 
                               <div className="pt-2 border-t border-slate-200/80 flex items-center justify-between">
-                                <div className="text-[11px] text-slate-400">
-                                  Nilai Diperoleh:
-                                </div>
-                                <div className="text-base font-black font-mono text-indigo-700">
+                                <span className="text-[11px] text-slate-500">Nilai:</span>
+                                <span className="text-sm font-black font-mono text-indigo-700">
                                   {score}<span className="text-xs text-slate-400 font-normal">/100</span>
-                                </div>
+                                </span>
                               </div>
                             </div>
                           );
@@ -5143,376 +5219,217 @@ export default function ELearningPage() {
                     </div>
                   )}
                 </div>
-              );
-            })()}
+              )}
 
-            {/* Quick Cards: Status Hari Ini & Materi */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              
-              {/* Card Kehadiran Hari Ini */}
-              {(() => {
-                const currentStudent = activeStudents.find(s => s.nisn === currentUser.nipOrNisn) || activeStudents[0];
-                const studentClass = currentUser.classId || '7-A';
-                const todayClassSessions = sessions.filter(s => s.date === todayStr && s.classId === studentClass);
-                
-                // Check if student was marked absent or late in any session
-                const studentAnomalies = todayClassSessions.filter(s => s.records?.[currentStudent?.id] && s.records[currentStudent.id] !== 'H');
-                const hasSessions = todayClassSessions.length > 0;
-
-                return (
-                  <div className="p-5 rounded-2xl bg-white border border-indigo-100 shadow-sm space-y-3">
-                    <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                      <span>📅 Status Kehadiran Hari Ini</span>
-                    </h3>
-                    
-                    {studentAnomalies.length > 0 ? (
-                      <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-xs space-y-1">
-                        <div className="font-bold text-amber-800 flex items-center gap-1.5">
-                          <span>⚠️</span> Catatan Presensi: {studentAnomalies.map(s => `${s.subject} (${s.records[currentStudent.id] === 'A' ? 'Alpa' : s.records[currentStudent.id] === 'S' ? 'Sakit' : s.records[currentStudent.id] === 'I' ? 'Izin' : 'Terlambat'})`).join(', ')}
-                        </div>
-                        <p className="text-slate-600 text-[11px]">
-                          Tercatat oleh guru mata pelajaran dan tersinkron ke buku piket harian sekolah.
-                        </p>
-                      </div>
-                    ) : hasSessions ? (
-                      <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs space-y-1">
-                        <div className="font-bold text-emerald-800 flex items-center gap-1.5">
-                          <span>✓</span> Terdaftar HADIR di Seluruh Jam Pelajaran
-                        </div>
-                        <p className="text-slate-600 text-[11px]">
-                          Terverifikasi oleh guru mata pelajaran ({todayClassSessions.map(s => s.subject.split(' ')[0]).join(', ')}) dan tersinkron ke meja piket.
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-1">
-                        <div className="font-bold text-slate-700 flex items-center gap-1.5">
-                          <span>⏳</span> Menunggu KBM Dimulai
-                        </div>
-                        <p className="text-slate-500 text-[11px]">
-                          Status kehadiran harian otomatis tercatat saat guru pengampu membuka sesi presensi di kelas.
-                        </p>
-                      </div>
-                    )}
-
-                    <div className="text-[11px] text-slate-500 font-medium">
-                      {(() => { const st = getStudentAttendanceStats(); return st && st.total > 0 ? `Rekap semester ini: Hadir ${st.counts.H}x • Terlambat ${st.counts.T}x • Sakit ${st.counts.S}x • Izin ${st.counts.I}x • Alpa ${st.counts.A}x` : 'Rekap semester belum tersedia (belum ada presensi tercatat).'; })()}
+              {/* TAB 2: TUGAS & PR SEKOLAH */}
+              {studentActiveTab === 'tugas' && (
+                <div className="space-y-4">
+                  {/* KPI Status Strip */}
+                  <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                    <div className="p-3 rounded-xl bg-white border border-slate-200 shadow-2xs text-center">
+                      <div className="text-xl font-black text-amber-600">{notSubmittedCount}</div>
+                      <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mt-0.5">Belum Dikumpul</div>
+                    </div>
+                    <div className="p-3 rounded-xl bg-white border border-slate-200 shadow-2xs text-center">
+                      <div className="text-xl font-black text-blue-600">{waitingGradeCount}</div>
+                      <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mt-0.5">Menunggu Nilai</div>
+                    </div>
+                    <div className="p-3 rounded-xl bg-white border border-slate-200 shadow-2xs text-center">
+                      <div className="text-xl font-black text-emerald-600">{gradedCount}</div>
+                      <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mt-0.5">Selesai Dinilai</div>
                     </div>
                   </div>
-                );
-              })()}
 
-              {/* Card Bahan Ajar Mandiri di Rumah */}
-              <div className="p-5 rounded-2xl bg-white border border-indigo-100 shadow-sm space-y-3">
-                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                  <span>📖 Buku & Modul Pelajaran</span>
-                </h3>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  Buku Sekolah Elektronik (BSE) Kurikulum Merdeka resmi dapat diakses dan diunduh gratis untuk belajar di rumah bersama orang tua.
-                </p>
-                <div className="pt-1">
-                  <a
-                      href="https://buku.kemdikbud.go.id/"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="w-full py-2.5 rounded-xl bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer"
-                    >
-                      <span>📚 Buka Perpustakaan Digital</span>
-                      <span>↗</span>
-                    </a>
-                </div>
-              </div>
-
-            </div>
-
-            {/* Jadwal Pelajaran Hari Ini */}
-            {(() => {
-              const currentStudent = activeStudents.find(s => s.nisn === currentUser.nipOrNisn) || activeStudents[0];
-              const studentClass = currentUser.classId || '7-A';
-              
-              const todaySessions = sessions.filter(s => s.date === todayStr && s.classId === studentClass);
-
-              const getBadge = (sess?: SubjectSession) => {
-                if (!sess) return <span className="text-[10px] text-slate-400 italic">Belum absen</span>;
-                const st = sess.records?.[currentStudent?.id] || 'H';
-                if (st === 'H') return <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">✓ Hadir</span>;
-                if (st === 'S') return <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">Sakit</span>;
-                if (st === 'I') return <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">Izin</span>;
-                if (st === 'A') return <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">Alpa</span>;
-                return <span className="text-[10px] font-bold text-orange-700 bg-orange-50 px-1.5 py-0.5 rounded border border-orange-200">Telat</span>;
-              };
-
-              const timeSlots = studentClass.endsWith('A') || studentClass.endsWith('B') || studentClass.endsWith('C') || studentClass.endsWith('D') || studentClass.endsWith('E') || studentClass.endsWith('F') 
-                ? (studentClass.startsWith('7') ? ['12.15 - 13.45 WIB', '13.45 - 15.15 WIB', '15.35 - 17.05 WIB'] : ['06.30 - 08.00 WIB', '08.30 - 10.00 WIB', '10.30 - 12.00 WIB']) 
-                : ['07.15 - 08.35 WIB', '08.35 - 09.55 WIB', '10.15 - 11.35 WIB', '12.30 - 13.50 WIB'];
-
-              return (
-                <div className="bg-white border border-indigo-100 rounded-2xl p-5 shadow-sm space-y-3">
-                  <h3 className="text-sm font-bold text-slate-900">Jadwal Pelajaran Kelas {studentClass} Hari Ini</h3>
-                  {todaySessions.length === 0 ? (
-                    <div className="text-xs text-slate-500 py-3 text-center border border-dashed border-slate-300 rounded-xl bg-slate-50">
-                      Tidak ada jadwal pelajaran hari ini.
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-4 gap-3 text-xs">
-                      {todaySessions.map((sess, idx) => (
-                        <div key={sess.id} className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex flex-col justify-between">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-[10px] text-slate-500 font-mono font-medium">{timeSlots[idx % timeSlots.length]}</span>
-                            {getBadge(sess)}
-                          </div>
-                          <div>
-                            <div className="font-bold text-slate-900 leading-tight">{sess.subject}</div>
-                            <div className="text-[10px] text-slate-500 mt-0.5 line-clamp-1">{sess.teacherName}</div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
-
-            {/* SECTION: TUGAS & PR SEKOLAH SAYA */}
-            {(() => {
-              const currentStudent = activeStudents.find(s => s.nisn === currentUser.nipOrNisn) ||
-                activeStudents.find(s => s.name.toLowerCase() === currentUser.name?.toLowerCase()) ||
-                activeStudents[0];
-              const studentClass = currentUser.classId || '7-A';
-              const myAssignments = assignments.filter(a => a.targetClass === studentClass || a.targetClass === 'Semua');
-              const availableSubjects = Array.from(new Set(myAssignments.map(a => a.subject)));
-
-              const findMySub = (asgId: string) => submissions.find(
-                s => s.assignmentId === asgId && (s.studentId === currentStudent.id || s.studentName.toLowerCase() === currentStudent.name.toLowerCase())
-              );
-              const statusRank = (asgId: string) => {
-                const st = findMySub(asgId)?.status;
-                return st === 'graded' ? 2 : st === 'submitted' ? 1 : 0;
-              };
-              const displayedTasks = (studentSubjectFilter === 'all'
-                ? myAssignments
-                : myAssignments.filter(a => a.subject === studentSubjectFilter)
-              ).slice().sort((a, b) => statusRank(a.id) - statusRank(b.id) || a.dueDate.localeCompare(b.dueDate));
-
-              // Calculate Status Counts
-              let notSubmittedCount = 0;
-              let waitingGradeCount = 0;
-              let gradedCount = 0;
-              myAssignments.forEach(asg => {
-                const st = findMySub(asg.id)?.status;
-                if (st === 'graded') gradedCount++;
-                else if (st === 'submitted') waitingGradeCount++;
-                else notSubmittedCount++;
-              });
-
-
-              return (
-                <div className="bg-white border border-indigo-100 rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
-                  <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-2">
-                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-center">
-                      <div className="text-xl font-black text-slate-700">{notSubmittedCount}</div>
-                      <div className="text-[10px] sm:text-xs font-bold text-slate-500 mt-1 uppercase tracking-wider">Belum Dikumpul</div>
-                    </div>
-                    <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-center">
-                      <div className="text-xl font-black text-blue-700">{waitingGradeCount}</div>
-                      <div className="text-[10px] sm:text-xs font-bold text-blue-600 mt-1 uppercase tracking-wider">Menunggu Nilai</div>
-                    </div>
-                    <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-center">
-                      <div className="text-xl font-black text-emerald-700">{gradedCount}</div>
-                      <div className="text-[10px] sm:text-xs font-bold text-emerald-600 mt-1 uppercase tracking-wider">Selesai Dinilai</div>
-                    </div>
-                  </div>
-                  
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-indigo-50 pb-3 gap-2 mt-4">
-                    <div>
-                      <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                        <span>📝 Tugas & Asesmen Kelas {studentClass}</span>
-                        <span className="text-xs px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700 font-semibold border border-purple-200">
-                          {myAssignments.length} Tugas Aktif
+                  {/* Filter Mapel Ringkas & Rapi */}
+                  {availableSubjects.length > 1 && (
+                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs">
+                      <span className="text-[11px] font-bold text-slate-400 shrink-0 mr-0.5">Mapel:</span>
+                      <button
+                        type="button"
+                        onClick={() => setStudentSubjectFilter('all')}
+                        className={`px-2.5 py-1 rounded-xl text-xs font-bold transition shrink-0 cursor-pointer flex items-center gap-1.5 ${
+                          studentSubjectFilter === 'all'
+                            ? 'bg-purple-600 text-white shadow-2xs'
+                            : 'bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-900 border border-slate-200'
+                        }`}
+                      >
+                        <span>Semua</span>
+                        <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                          studentSubjectFilter === 'all' ? 'bg-white/25 text-white' : 'bg-slate-100 text-slate-500'
+                        }`}>
+                          {myAssignments.length}
                         </span>
-                      </h2>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        Kerjakan tugas dari Bapak/Ibu guru, lalu unggah foto buku tugas, dokumen, atau video sebelum batas waktu.
-                      </p>
-                    </div>
-
-                    {/* Filter Mapel untuk Siswa */}
-                    {availableSubjects.length > 1 && (
-                      <div className="flex flex-wrap items-center gap-1.5 self-start sm:self-auto">
-                        <button
-                          type="button"
-                          onClick={() => setStudentSubjectFilter('all')}
-                          className={`px-3 py-1 rounded-xl text-xs font-bold transition cursor-pointer ${
-                            studentSubjectFilter === 'all'
-                              ? 'bg-purple-600 text-white shadow-2xs'
-                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                          }`}
-                        >
-                          Semua ({myAssignments.length})
-                        </button>
-                        {availableSubjects.map(sub => (
+                      </button>
+                      {availableSubjects.map(sub => {
+                        const shortName = formatShortSubject(sub);
+                        const count = myAssignments.filter(a => a.subject === sub).length;
+                        const isActive = studentSubjectFilter === sub;
+                        return (
                           <button
                             key={sub}
                             type="button"
                             onClick={() => setStudentSubjectFilter(sub)}
-                            className={`px-3 py-1 rounded-xl text-xs font-bold transition cursor-pointer ${
-                              studentSubjectFilter === sub
+                            title={sub}
+                            className={`px-2.5 py-1 rounded-xl text-xs font-bold transition shrink-0 cursor-pointer flex items-center gap-1.5 ${
+                              isActive
                                 ? 'bg-purple-600 text-white shadow-2xs'
-                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                : 'bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-900 border border-slate-200'
                             }`}
                           >
-                            {sub} ({myAssignments.filter(a => a.subject === sub).length})
+                            <span>{shortName}</span>
+                            <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                              isActive ? 'bg-white/25 text-white' : 'bg-slate-100 text-slate-500'
+                            }`}>
+                              {count}
+                            </span>
                           </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                        );
+                      })}
+                    </div>
+                  )}
 
+                  {/* Tasks List */}
                   {displayedTasks.length === 0 ? (
-                    <div className="text-center py-8 text-slate-400 text-xs">
-                      🎉 Tidak ada tugas aktif untuk kategori ini. Tetap semangat belajar!
+                    <div className="p-8 text-center rounded-2xl bg-white border border-slate-200 shadow-2xs space-y-2">
+                      <span className="text-3xl">🎉</span>
+                      <h3 className="text-sm font-bold text-slate-800">Tidak Ada Tugas Aktif</h3>
+                      <p className="text-xs text-slate-500">
+                        Seluruh tugas telah diselesaikan atau belum ada tugas baru dari guru pengampu.
+                      </p>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {displayedTasks.map((asg) => {
-                        const mySub = submissions.find(
-                          s => s.assignmentId === asg.id && (s.studentId === currentStudent.id || s.studentName.toLowerCase() === currentStudent.name.toLowerCase())
-                        );
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                      {displayedTasks.map(asg => {
+                        const mySub = findMySub(asg.id);
+                        const dl = getDeadlineInfo(asg.dueDate);
+                        let dlClass = 'bg-slate-100 text-slate-600 border border-slate-200/60';
+                        let dlText = dl.dateText;
+                        if (!mySub && dl.daysLeft !== null) {
+                          if (dl.daysLeft < 0) {
+                            dlClass = 'bg-rose-50 text-rose-700 border border-rose-200';
+                            dlText = `Lewat ${Math.abs(dl.daysLeft)} hr`;
+                          } else if (dl.daysLeft === 0) {
+                            dlClass = 'bg-rose-50 text-rose-700 border border-rose-200 font-bold';
+                            dlText = 'Hari ini!';
+                          } else if (dl.daysLeft <= 2) {
+                            dlClass = 'bg-amber-50 text-amber-800 border border-amber-200';
+                            dlText = `Sisa ${dl.daysLeft} hr`;
+                          }
+                        }
+
+                        const submittedShort = mySub?.submittedAt
+                          ? mySub.submittedAt.replace(/,\s*\d{4}/, '').replace(' WIB', '')
+                          : '';
 
                         return (
                           <div
                             key={asg.id}
-                            className={`p-4 sm:p-5 rounded-2xl border transition flex flex-col justify-between space-y-3.5 ${
+                            className={`p-4 rounded-2xl border transition-all duration-200 flex flex-col justify-between space-y-3 shadow-2xs hover:shadow-xs ${
                               mySub?.status === 'graded'
-                                ? 'bg-emerald-50/40 border-emerald-200'
+                                ? 'bg-gradient-to-b from-white to-emerald-50/20 border-emerald-200/90'
                                 : mySub?.status === 'submitted'
-                                ? 'bg-blue-50/40 border-blue-200'
-                                : 'bg-slate-50 border-slate-200 hover:border-indigo-300'
+                                ? 'bg-gradient-to-b from-white to-blue-50/20 border-blue-200/90'
+                                : 'bg-white border-slate-200/90 hover:border-indigo-300'
                             }`}
                           >
-                            <div>
-                              <div className="flex items-center justify-between gap-2 mb-2">
-                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-white border border-slate-200 text-indigo-700">
-                                  {asg.subject}
+                            <div className="space-y-2">
+                              {/* Header Baris 1: Mapel & Tenggat */}
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100/80 truncate max-w-[140px]" title={asg.subject}>
+                                  {formatShortSubject(asg.subject)}
                                 </span>
-                                {(() => {
-                                  const dl = getDeadlineInfo(asg.dueDate);
-                                  let cls = 'bg-white text-slate-500 border-slate-200';
-                                  let text = `Tenggat ${dl.dateText}`;
-                                  if (!mySub && dl.daysLeft !== null) {
-                                    if (dl.daysLeft < 0) {
-                                      cls = 'bg-rose-50 text-rose-700 border-rose-200';
-                                      text = `Lewat tenggat ${Math.abs(dl.daysLeft)} hari • ${dl.dateText}`;
-                                    } else if (dl.daysLeft === 0) {
-                                      cls = 'bg-rose-50 text-rose-700 border-rose-200';
-                                      text = `Hari ini terakhir • ${dl.dateText}`;
-                                    } else if (dl.daysLeft <= 2) {
-                                      cls = 'bg-amber-50 text-amber-800 border-amber-200';
-                                      text = `Sisa ${dl.daysLeft} hari • ${dl.dateText}`;
-                                    } else {
-                                      text = `Sisa ${dl.daysLeft} hari • ${dl.dateText}`;
-                                    }
-                                  }
-                                  return (
-                                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border whitespace-nowrap ${cls}`}>
-                                      {text}
-                                    </span>
-                                  );
-                                })()}
+                                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md ${dlClass}`} title={`Tenggat: ${dl.dateText}`}>
+                                  ⏳ {dlText}
+                                </span>
                               </div>
 
-                              <h3 className="text-sm font-bold text-slate-900">{asg.title}</h3>
-                              <p className="text-xs text-slate-600 mt-1 line-clamp-3 leading-relaxed">
-                                {asg.description}
-                              </p>
-                              <div className="text-[11px] text-slate-500 mt-2">
-                                Guru Pengampu: <span className="font-semibold text-slate-700">{asg.teacherName}</span>
+                              {/* Judul & Guru */}
+                              <div>
+                                <h3 className="text-sm font-bold text-slate-900 leading-snug line-clamp-2" title={asg.title}>
+                                  {asg.title}
+                                </h3>
+                                <p className="text-[11px] text-slate-400 mt-0.5 truncate">
+                                  Guru: <span className="text-slate-600 font-medium">{asg.teacherName}</span>
+                                </p>
                               </div>
 
-                              {/* Attachment & Quiz Badges */}
-                              <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
+                              {/* Badges Kelengkapan Materi / Kuis */}
+                              <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
                                 {asg.videoUrl && (
-                                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1">
-                                    <span>🎬</span> Video Materi
+                                  <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200/70 flex items-center gap-1">
+                                    <span>🎬</span> Video
                                   </span>
                                 )}
                                 {asg.materialUrl && (
-                                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-blue-50 text-blue-800 border border-blue-200 flex items-center gap-1">
-                                    <span>📄</span> Modul / LKPD Guru
+                                  <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-blue-50 text-blue-800 border border-blue-200/70 flex items-center gap-1">
+                                    <span>📄</span> Modul
                                   </span>
                                 )}
                                 {asg.quizQuestions && asg.quizQuestions.length > 0 && (
-                                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-purple-50 text-purple-800 border border-purple-200 flex items-center gap-1">
+                                  <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-purple-50 text-purple-800 border border-purple-200/70 flex items-center gap-1">
                                     <span>📝</span> Kuis ({asg.quizQuestions.length} Soal)
                                   </span>
                                 )}
                               </div>
                             </div>
 
-                            {/* Status and Action */}
-                            <div className="pt-3 border-t border-slate-200/80 space-y-2">
+                            {/* Tombol Aksi Bawah */}
+                            <div className="pt-2.5 border-t border-slate-100">
                               {mySub?.status === 'graded' ? (
-                                <div className="p-3 rounded-xl bg-white border border-emerald-200 text-xs space-y-1.5 shadow-2xs">
-                                  <div className="flex items-center justify-between">
+                                <div className="space-y-2">
+                                  <div className="flex items-center justify-between text-xs">
                                     <span className="font-bold text-emerald-700 flex items-center gap-1">
-                                      <span>✓</span> Tugas Selesai Dinilai
+                                      <span>✓</span> Selesai Dinilai
                                     </span>
-                                    <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-black text-xs">
+                                    <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-black text-xs">
                                       {mySub.grade} / 100
                                     </span>
                                   </div>
-                                  {mySub.feedback && (
-                                    <p className="text-slate-600 text-[11px] italic bg-slate-50 p-2 rounded-lg border border-slate-100">
-                                      Catatan Guru: &ldquo;{mySub.feedback}&rdquo;
-                                    </p>
-                                  )}
                                   <button
                                     type="button"
                                     onClick={() => handleOpenPreviewSubmission(mySub, asg)}
-                                    className="text-[11px] text-indigo-600 hover:text-indigo-800 hover:underline font-mono truncate flex items-center gap-1 cursor-pointer pt-0.5"
+                                    className="w-full py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
                                   >
-                                    <span>{mySub.fileName?.startsWith('Lembar_Kuis_') ? '📝' : '📄'}</span> <span>{mySub.fileName?.startsWith('Lembar_Kuis_') ? 'Lihat Hasil Kuis' : 'Buka Berkas: ' + mySub.fileName}</span> <span className="text-[10px] bg-indigo-50 px-1 rounded">Lihat ↗</span>
+                                    <span>📊 Lihat Nilai &amp; Berkas</span>
+                                    <span>↗</span>
                                   </button>
                                 </div>
                               ) : mySub?.status === 'submitted' ? (
                                 <div className="space-y-2">
-                                  <div className="p-2.5 rounded-xl bg-white border border-blue-200 text-xs shadow-2xs">
-                                    <div className="flex items-center justify-between text-blue-700 font-bold mb-1">
-                                      <span className="flex items-center gap-1">
-                                        <span className="text-emerald-600">✓</span>
-                                        <span>Terkirim • Menunggu Penilaian</span>
-                                      </span>
-                                      <span className="text-[10px] text-slate-400 font-normal">{mySub.submittedAt}</span>
-                                    </div>
+                                  <div className="flex items-center justify-between text-xs">
+                                    <span className="font-bold text-blue-700 flex items-center gap-1 truncate">
+                                      <span>✓</span> Terkirim
+                                      {submittedShort && (
+                                        <span className="font-normal text-[11px] text-blue-600/90 ml-0.5">• {submittedShort}</span>
+                                      )}
+                                    </span>
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-1.5">
                                     <button
                                       type="button"
                                       onClick={() => handleOpenPreviewSubmission(mySub, asg)}
-                                      className="text-[11px] text-indigo-600 hover:text-indigo-800 hover:underline truncate flex items-center gap-1 cursor-pointer font-medium text-left"
+                                      className="py-1.5 px-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition flex items-center justify-center gap-1 cursor-pointer active:scale-95"
                                     >
-                                      <span>📎</span> <span>{mySub.fileName}</span> <span className="text-slate-400">({mySub.fileSize})</span> <span className="text-[10px] bg-indigo-50 px-1 rounded text-indigo-700 font-bold">Buka ↗</span>
+                                      <span>👁️ Berkas</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setStudentSubmitAsgId(asg.id)}
+                                      className="py-1.5 px-2 rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer active:scale-95"
+                                    >
+                                      <span>🔄 Ganti</span>
                                     </button>
                                   </div>
-                                  <button
-                                    type="button"
-                                    onClick={() => setStudentSubmitAsgId(asg.id)}
-                                    className="w-full py-2 rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 text-xs font-bold transition cursor-pointer"
-                                  >
-                                    🔄 Ganti / Unggah Ulang Berkas
-                                  </button>
                                 </div>
                               ) : (
-                                <div className="space-y-2">
-                                  <div className="flex items-center justify-between text-xs text-amber-700 font-semibold">
-                                    <span>⚠️ Belum Dikumpulkan</span>
-                                  </div>
-                                  <button
-                                    type="button"
-                                    onClick={() => setStudentSubmitAsgId(asg.id)}
-                                    className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-md shadow-indigo-600/20 flex items-center justify-center gap-1.5 cursor-pointer"
-                                  >
-                                    <span>📤 Kerjakan & Unggah Tugas</span>
-                                    <span>→</span>
-                                  </button>
-                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setStudentSubmitAsgId(asg.id)}
+                                  className="w-full py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                                >
+                                  <span>✏️ Kerjakan Tugas</span>
+                                  <span>→</span>
+                                </button>
                               )}
                             </div>
                           </div>
@@ -5521,11 +5438,13 @@ export default function ELearningPage() {
                     </div>
                   )}
                 </div>
-              );
-            })()}
+              )}
 
-          </div>
-        )}
+
+
+            </div>
+          );
+        })()}
 
         {/* MODAL: BUAT TUGAS BARU (GURU) - isolated component, typing never re-renders this page */}
         {isCreateAsgModalOpen && (

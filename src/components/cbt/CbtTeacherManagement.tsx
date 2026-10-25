@@ -8,7 +8,8 @@ import {
   getStoredCbtPackages,
   saveStoredCbtPackages,
   getStoredStudentCbtSessions,
-  resetStoredStudentCbtSession
+  resetStoredStudentCbtSession,
+  evaluateCbtPackageSchedule
 } from '@/lib/cbtData';
 import { Student, SCHOOL_CLASSES } from '@/lib/elearningData';
 import { exportCbtScoreLegerToExcel } from '@/lib/elearningExport';
@@ -30,6 +31,21 @@ export default function CbtTeacherManagement({
 }: CbtTeacherManagementProps) {
   const [packages, setPackages] = useState<CbtExamPackage[]>([]);
   const [activeTab, setActiveTab] = useState<'packages' | 'scores'>('packages');
+
+  // Filter packages strictly for this teacher / teacher's subject
+  const myPackages = useMemo(() => {
+    return packages.filter(pkg => {
+      if (teacherSubject) {
+        const isSubjectMatch = pkg.subject?.toLowerCase().trim() === teacherSubject.toLowerCase().trim();
+        const isNameMatch = teacherName && pkg.teacherName?.toLowerCase().includes(teacherName.toLowerCase().split(',')[0].trim());
+        return isSubjectMatch || isNameMatch;
+      }
+      if (teacherName) {
+        return pkg.teacherName?.toLowerCase().includes(teacherName.toLowerCase().split(',')[0].trim());
+      }
+      return true;
+    });
+  }, [packages, teacherSubject, teacherName]);
 
   // Selected package for Question Editor or Score Ledger
   const [selectedPackageForEdit, setSelectedPackageForEdit] = useState<CbtExamPackage | null>(null);
@@ -53,17 +69,53 @@ export default function CbtTeacherManagement({
   const [newDuration, setNewDuration] = useState<number>(60);
   const [newToken, setNewToken] = useState<string>('');
   const [newPassingGrade, setNewPassingGrade] = useState<number>(75);
+  const [newExamDate, setNewExamDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
+  const [newStartTime, setNewStartTime] = useState<string>('07:30');
+  const [newEndTime, setNewEndTime] = useState<string>('09:00');
 
-  // Handle grade change and auto-set target classes (prefer teacher's classes if available)
+  // Schedule modal state for updating existing package
+  const [scheduleModalPkg, setScheduleModalPkg] = useState<CbtExamPackage | null>(null);
+  const [editSchedDate, setEditSchedDate] = useState<string>('');
+  const [editSchedStartTime, setEditSchedStartTime] = useState<string>('07:30');
+  const [editSchedEndTime, setEditSchedEndTime] = useState<string>('09:00');
+  const [editSchedDuration, setEditSchedDuration] = useState<number>(60);
+
+  const openScheduleModal = (pkg: CbtExamPackage) => {
+    setScheduleModalPkg(pkg);
+    setEditSchedDate(pkg.examDate || new Date().toISOString().split('T')[0]);
+    setEditSchedStartTime(pkg.startTime || '07:30');
+    setEditSchedEndTime(pkg.endTime || '09:00');
+    setEditSchedDuration(pkg.durationMinutes || 60);
+  };
+
+  const handleSavePackageSchedule = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!scheduleModalPkg) return;
+
+    const updated = packages.map(p => {
+      if (p.id === scheduleModalPkg.id) {
+        return {
+          ...p,
+          examDate: editSchedDate,
+          startTime: editSchedStartTime,
+          endTime: editSchedEndTime,
+          durationMinutes: editSchedDuration,
+          status: 'active' as const
+        };
+      }
+      return p;
+    });
+
+    saveStoredCbtPackages(updated);
+    setPackages(updated);
+    setScheduleModalPkg(null);
+  };
+
+  // Handle grade change and auto-set target classes
   const handleGradeChange = (grade: '7' | '8' | '9') => {
     setNewGrade(grade);
     const gradeClasses = SCHOOL_CLASSES.filter(c => c.id.startsWith(grade)).map(c => c.id);
-    const myClassesInGrade = teacherClasses ? teacherClasses.filter(c => c.startsWith(grade)) : [];
-    if (myClassesInGrade.length > 0) {
-      setSelectedTargetClasses(myClassesInGrade);
-    } else {
-      setSelectedTargetClasses(gradeClasses);
-    }
+    setSelectedTargetClasses(gradeClasses);
   };
 
   // Keep newSubject synced if teacherSubject changes
@@ -104,12 +156,16 @@ export default function CbtTeacherManagement({
     };
   }, []);
 
-  // Set default selected package for scores when packages change
+  // Set default selected package for scores when myPackages change
   useEffect(() => {
-    if (packages.length > 0 && !selectedPackageForScores) {
-      setSelectedPackageForScores(packages[0]);
+    if (myPackages.length > 0) {
+      if (!selectedPackageForScores || !myPackages.some(p => p.id === selectedPackageForScores.id)) {
+        setSelectedPackageForScores(myPackages[0]);
+      }
+    } else {
+      setSelectedPackageForScores(null);
     }
-  }, [packages, selectedPackageForScores]);
+  }, [myPackages, selectedPackageForScores]);
 
   // Create new package handler
   const handleCreatePackage = (e: React.FormEvent) => {
@@ -127,7 +183,7 @@ export default function CbtTeacherManagement({
     const newPkg: CbtExamPackage = {
       id: newId,
       title: newTitle.trim(),
-      subject: newSubject,
+      subject: teacherSubject || newSubject || 'Informatika',
       gradeLevel: newGrade,
       targetClasses: targetClasses,
       semester: 'Ganjil (PTS/STS)',
@@ -137,7 +193,12 @@ export default function CbtTeacherManagement({
       passingGrade: newPassingGrade,
       totalQuestions: 0,
       status: 'active',
-      teacherName: teacherName || 'Guru Pengampu',
+      examDate: newExamDate || new Date().toISOString().split('T')[0],
+      startTime: newStartTime || '07:30',
+      endTime: newEndTime || '09:00',
+      emergencyPaused: false,
+      teacherName: teacherName || 'Ichsanul Arifin, S.Kom.',
+      instructions: 'Kerjakan ujian dengan jujur dan teliti. Patuhi seluruh tata tertib asesmen.',
       createdAt: new Date().toISOString().split('T')[0],
       questions: []
     };
@@ -328,7 +389,7 @@ export default function CbtTeacherManagement({
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
             }`}
           >
-            <span>📋 Daftar Paket Ujian ({packages.length})</span>
+            <span>📋 Daftar Paket Ujian ({myPackages.length})</span>
           </button>
           <button
             type="button"
@@ -347,124 +408,175 @@ export default function CbtTeacherManagement({
       {/* 2. TAB CONTENT: DAFTAR PAKET UJIAN */}
       {activeTab === 'packages' && !selectedPackageForEdit && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {packages.map(pkg => (
-            <div
-              key={pkg.id}
-              className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition space-y-4 flex flex-col justify-between"
-            >
-              <div className="space-y-2.5">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 uppercase tracking-wider">
-                      {pkg.subject}
-                    </span>
-                    <h3 className="text-base font-bold text-slate-900 mt-1">
-                      {pkg.title}
-                    </h3>
-                  </div>
-                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${
-                    pkg.status === 'active'
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                      : 'bg-slate-100 text-slate-600 border-slate-200'
-                  }`}>
-                    {pkg.status === 'active' ? '🟢 Aktif' : '⚪ Draft'}
-                  </span>
-                </div>
-
-                {/* Metadata Pills */}
-                <div className="grid grid-cols-2 gap-2 text-xs text-slate-600 pt-1">
-                  <div className="p-2 rounded-xl bg-slate-50 border border-slate-100">
-                    <span className="text-slate-400 block text-[10px]">Kelas Sasaran:</span>
-                    <span className="font-semibold text-slate-800" title={pkg.targetClasses.join(', ')}>
-                      {pkg.targetClasses.length >= 6 ? `Semua Kelas ${pkg.gradeLevel}` : `Kelas ${pkg.targetClasses.join(', ')}`}
-                    </span>
-                  </div>
-                  <div className="p-2 rounded-xl bg-slate-50 border border-slate-100">
-                    <span className="text-slate-400 block text-[10px]">Durasi & KKM:</span>
-                    <span className="font-semibold text-slate-800">
-                      {pkg.durationMinutes} Menit • KKM {pkg.passingGrade}
-                    </span>
-                  </div>
-                  <div className="p-2 rounded-xl bg-slate-50 border border-slate-100">
-                    <span className="text-slate-400 block text-[10px]">Token Ujian:</span>
-                    <span className="font-mono font-bold text-indigo-700">
-                      🔑 {pkg.token}
-                    </span>
-                  </div>
-                  <div className="p-2 rounded-xl bg-slate-50 border border-slate-100">
-                    <span className="text-slate-400 block text-[10px]">Total Soal:</span>
-                    <span className="font-bold text-slate-900">
-                      📝 {pkg.questions.length} Butir Soal
-                    </span>
-                  </div>
-                  <div className="p-2 rounded-xl bg-slate-50 border border-slate-100 col-span-2 flex items-center justify-between">
+          {myPackages.length === 0 ? (
+            <div className="col-span-full p-8 rounded-2xl bg-white border border-slate-200 text-center space-y-3">
+              <div className="text-4xl">📝</div>
+              <h3 className="font-bold text-slate-800 text-sm">Belum Ada Paket Ujian {teacherSubject || 'Informatika'}</h3>
+              <p className="text-xs text-slate-500 max-w-md mx-auto">
+                Silakan klik tombol <strong>"+ Buat Paket Ujian Baru"</strong> di atas untuk membuat asesmen bagi siswa Anda.
+              </p>
+            </div>
+          ) : (
+            myPackages.map(pkg => {
+              const schedEval = evaluateCbtPackageSchedule(pkg);
+              return (
+              <div
+                key={pkg.id}
+                className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition space-y-4 flex flex-col justify-between"
+              >
+                <div className="space-y-3">
+                  <div className="flex items-start justify-between gap-2">
                     <div>
-                      <span className="text-slate-400 block text-[10px]">Guru Pengampu:</span>
-                      <span className="font-semibold text-slate-800">{pkg.teacherName || 'Guru Pengampu'}</span>
-                    </div>
-                    {teacherName && pkg.teacherName?.toLowerCase().includes(teacherName.toLowerCase().split(',')[0].trim()) && (
-                      <span className="text-[10px] bg-indigo-100 text-indigo-700 font-bold px-2 py-0.5 rounded-md">
-                        ✓ Paket Anda
+                      <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 uppercase tracking-wider">
+                        {pkg.subject}
                       </span>
-                    )}
+                      <h3 className="text-base font-bold text-slate-900 mt-1">
+                        {pkg.title}
+                      </h3>
+                    </div>
+                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${
+                      pkg.status === 'active'
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        : 'bg-slate-100 text-slate-600 border-slate-200'
+                    }`}>
+                      {pkg.status === 'active' ? '🟢 Aktif' : '⚪ Draft'}
+                    </span>
+                  </div>
+
+                  {/* Schedule & Time Window Banner */}
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-700 flex items-center justify-center text-sm font-bold flex-shrink-0">
+                        🕒
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">
+                          Jadwal Sesi Ujian
+                        </span>
+                        <span className="font-bold text-slate-800 text-xs">
+                          📅 {pkg.examDate || 'Hari Ini'} • {pkg.startTime || '07:30'} - {pkg.endTime || '09:00'} WIB
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 self-end sm:self-center">
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black border ${schedEval.badgeClass}`}>
+                        {schedEval.statusLabel}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => openScheduleModal(pkg)}
+                        className="px-2.5 py-1 rounded-lg bg-white hover:bg-indigo-50 text-indigo-700 border border-indigo-200 hover:border-indigo-300 text-[11px] font-bold transition cursor-pointer flex items-center gap-1 shadow-2xs"
+                        title="Atur tanggal dan jam mulai-selesai untuk paket ujian ini"
+                      >
+                        <span>⚙️ Atur Jam</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Metadata Pills */}
+                  <div className="grid grid-cols-2 gap-2 text-xs text-slate-600 pt-1">
+                    <div className="p-2 rounded-xl bg-slate-50 border border-slate-100">
+                      <span className="text-slate-400 block text-[10px]">Kelas Sasaran:</span>
+                      <span className="font-semibold text-slate-800" title={pkg.targetClasses.join(', ')}>
+                        {pkg.targetClasses.length >= 6 ? `Semua Kelas ${pkg.gradeLevel}` : `Kelas ${pkg.targetClasses.join(', ')}`}
+                      </span>
+                    </div>
+                    <div className="p-2 rounded-xl bg-slate-50 border border-slate-100">
+                      <span className="text-slate-400 block text-[10px]">Durasi & KKM:</span>
+                      <span className="font-semibold text-slate-800">
+                        {pkg.durationMinutes} Menit • KKM {pkg.passingGrade}
+                      </span>
+                    </div>
+                    <div className="p-2 rounded-xl bg-slate-50 border border-slate-100">
+                      <span className="text-slate-400 block text-[10px]">Token Ujian:</span>
+                      <span className="font-mono font-bold text-indigo-700">
+                        🔑 {pkg.token}
+                      </span>
+                    </div>
+                    <div className="p-2 rounded-xl bg-slate-50 border border-slate-100">
+                      <span className="text-slate-400 block text-[10px]">Total Soal:</span>
+                      <span className="font-bold text-slate-900">
+                        📝 {pkg.questions.length} Butir Soal
+                      </span>
+                    </div>
+                    <div className="p-2 rounded-xl bg-slate-50 border border-slate-100 col-span-2 flex items-center justify-between">
+                      <div>
+                        <span className="text-slate-400 block text-[10px]">Guru Pengampu:</span>
+                        <span className="font-semibold text-slate-800">{pkg.teacherName || 'Guru Pengampu'}</span>
+                      </div>
+                      {teacherName && pkg.teacherName?.toLowerCase().includes(teacherName.toLowerCase().split(',')[0].trim()) && (
+                        <span className="text-[10px] bg-indigo-100 text-indigo-700 font-bold px-2 py-0.5 rounded-md">
+                          ✓ Paket Anda
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Action buttons */}
-              <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedPackageForEdit(pkg)}
-                    className="px-3.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs transition border border-indigo-200 cursor-pointer flex items-center gap-1.5"
-                  >
-                    <span>✏️ Edit Soal ({pkg.questions.length})</span>
-                  </button>
-
-                  {onPreviewExamAsStudent && (
+                {/* Action buttons */}
+                <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5">
                     <button
                       type="button"
-                      onClick={() => onPreviewExamAsStudent(pkg)}
-                      className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition cursor-pointer flex items-center gap-1"
-                      title="Pratinjau antarmuka pengerjaan siswa"
+                      onClick={() => setSelectedPackageForEdit(pkg)}
+                      className="px-3.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs transition border border-indigo-200 cursor-pointer flex items-center gap-1.5"
                     >
-                      <span>👁️ Preview</span>
+                      <span>✏️ Edit Soal ({pkg.questions.length})</span>
                     </button>
-                  )}
-                </div>
 
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedPackageForScores(pkg);
-                      setActiveTab('scores');
-                    }}
-                    className="px-3 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs transition border border-emerald-200 cursor-pointer flex items-center gap-1"
-                  >
-                    <span>📊 Nilai</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleToggleStatus(pkg.id)}
-                    className="p-2 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-600 text-xs transition cursor-pointer"
-                    title={pkg.status === 'active' ? 'Ubah ke Draft' : 'Aktifkan Ujian'}
-                  >
-                    {pkg.status === 'active' ? '⏸️' : '▶️'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDeletePackage(pkg.id)}
-                    className="p-2 rounded-xl bg-white hover:bg-rose-50 border border-slate-200 text-rose-600 text-xs transition cursor-pointer"
-                    title="Hapus Paket Ujian"
-                  >
-                    🗑️
-                  </button>
+                    {onPreviewExamAsStudent && (
+                      <button
+                        type="button"
+                        onClick={() => onPreviewExamAsStudent(pkg)}
+                        className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition cursor-pointer flex items-center gap-1"
+                        title="Pratinjau antarmuka pengerjaan siswa"
+                      >
+                        <span>👁️ Preview</span>
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => openScheduleModal(pkg)}
+                      className="px-3 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold text-xs transition border border-amber-200 cursor-pointer flex items-center gap-1"
+                      title="Atur Tanggal, Jam Sesi, dan Durasi Ujian"
+                    >
+                      <span>🕒 Jadwal</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedPackageForScores(pkg);
+                        setActiveTab('scores');
+                      }}
+                      className="px-3 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs transition border border-emerald-200 cursor-pointer flex items-center gap-1"
+                    >
+                      <span>📊 Nilai</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleStatus(pkg.id)}
+                      className="p-2 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-600 text-xs transition cursor-pointer"
+                      title={pkg.status === 'active' ? 'Ubah ke Draft' : 'Aktifkan Ujian'}
+                    >
+                      {pkg.status === 'active' ? '⏸️' : '▶️'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeletePackage(pkg.id)}
+                      className="p-2 rounded-xl bg-white hover:bg-rose-50 border border-slate-200 text-rose-600 text-xs transition cursor-pointer"
+                      title="Hapus Paket Ujian"
+                    >
+                      🗑️
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })
+          )}
         </div>
       )}
 
@@ -657,7 +769,7 @@ export default function CbtTeacherManagement({
                   }}
                   className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-semibold focus:outline-none focus:border-indigo-500 cursor-pointer"
                 >
-                  {packages.map(p => (
+                  {myPackages.map(p => (
                     <option key={p.id} value={p.id}>
                       {p.title} ({p.subject} - Kls {p.gradeLevel})
                     </option>
@@ -783,25 +895,39 @@ export default function CbtTeacherManagement({
         </div>
       )}
 
-      {/* 5. MODAL FORM: BUAT PAKET UJIAN BARU */}
+      {/* 5. MODAL FORM: BUAT PAKET UJIAN BARU (LANDSCAPE 2-KOLOM MODERN) */}
       {showCreatePackageModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-3xl p-6 max-w-lg w-full space-y-4 shadow-2xl border border-indigo-100">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-              <h3 className="text-base font-bold text-slate-900">
-                Buat Paket Ujian CBT Baru
-              </h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/65 backdrop-blur-sm animate-fade-in overflow-y-auto">
+          <div className="bg-white rounded-3xl p-5 sm:p-7 max-w-4xl w-full space-y-4 shadow-2xl border border-indigo-100 my-auto">
+            
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-200 text-indigo-700 flex items-center justify-center text-xl font-bold shadow-xs">
+                  📝
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-bold text-slate-900">
+                    Buat Paket Ujian CBT Baru
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Atur judul asesmen, rombel peserta, dan jam pelaksanaan secara terpadu.
+                  </p>
+                </div>
+              </div>
               <button
                 type="button"
                 onClick={() => setShowCreatePackageModal(false)}
-                className="text-slate-400 hover:text-slate-600 text-sm font-bold"
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 text-xs font-bold transition flex items-center justify-center cursor-pointer"
+                title="Tutup Modal"
               >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleCreatePackage} className="space-y-3.5 text-xs">
-              {/* Teacher Info Box */}
+            <form onSubmit={handleCreatePackage} className="space-y-4 text-xs">
+              
+              {/* Teacher Info Bar */}
               <div className="bg-indigo-50/70 border border-indigo-100 rounded-xl p-3 flex items-center justify-between text-xs">
                 <div>
                   <span className="text-slate-500 block text-[10px]">Guru Pengampu (Otomatis):</span>
@@ -814,188 +940,370 @@ export default function CbtTeacherManagement({
                 )}
               </div>
 
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">
-                  Nama / Judul Ujian:
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder={teacherSubject ? `Contoh: Asesmen Tengah Semester (PTS) - ${teacherSubject}` : "Contoh: Asesmen Tengah Semester (PTS) - Informatika"}
-                  value={newTitle}
-                  onChange={(e) => setNewTitle(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-indigo-500"
-                />
-              </div>
+              {/* LANDSCAPE 2-COLUMN GRID CONTAINER */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                
+                {/* ======================================================== */}
+                {/* KOLOM KIRI: Identitas Asesmen & Rombel Sasaran            */}
+                {/* ======================================================== */}
+                <div className="space-y-3 flex flex-col justify-between">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">
+                      Nama / Judul Ujian:
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder={teacherSubject ? `Contoh: Asesmen Tengah Semester (PTS) - ${teacherSubject}` : "Contoh: Asesmen Tengah Semester (PTS) - Informatika"}
+                      value={newTitle}
+                      onChange={(e) => setNewTitle(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-semibold focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">
-                    Mata Pelajaran:
-                  </label>
-                  <select
-                    value={newSubject}
-                    onChange={(e) => setNewSubject(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-indigo-500 font-medium"
-                  >
-                    {teacherSubject && (
-                      <option value={teacherSubject}>⭐ {teacherSubject} (Mapel Anda)</option>
-                    )}
-                    <option value="Informatika">Informatika</option>
-                    <option value="Ilmu Pengetahuan Alam (IPA)">Ilmu Pengetahuan Alam (IPA)</option>
-                    <option value="Matematika">Matematika</option>
-                    <option value="Bahasa Indonesia">Bahasa Indonesia</option>
-                    <option value="Bahasa Inggris">Bahasa Inggris</option>
-                    <option value="Pendidikan Agama Islam (PABP)">Pendidikan Agama Islam (PABP)</option>
-                    <option value="Pendidikan Pancasila">Pendidikan Pancasila (PPKn)</option>
-                    <option value="Ilmu Pengetahuan Sosial (IPS)">Ilmu Pengetahuan Sosial (IPS)</option>
-                    <option value="Prakarya">Prakarya</option>
-                    <option value="Seni Budaya">Seni Budaya</option>
-                    <option value="Pendidikan Jasmani, Olahraga & Kesehatan (PJOK)">PJOK</option>
-                    <option value="Bahasa Sunda">Bahasa Sunda</option>
-                    <option value="Bimbingan & Konseling (BK)">Bimbingan & Konseling (BK)</option>
-                  </select>
-                </div>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">
+                        Mata Pelajaran:
+                      </label>
+                      {teacherSubject ? (
+                        <div className="w-full px-3 py-2 rounded-xl bg-indigo-50/70 border border-indigo-200 text-indigo-900 font-bold flex items-center justify-between text-xs">
+                          <span className="flex items-center gap-1.5">
+                            <span>💻</span>
+                            <span>{teacherSubject}</span>
+                          </span>
+                          <span className="text-[10px] bg-indigo-600 text-white px-2 py-0.5 rounded font-semibold shadow-2xs">
+                            Mapel Anda
+                          </span>
+                        </div>
+                      ) : (
+                        <select
+                          value={newSubject}
+                          onChange={(e) => setNewSubject(e.target.value)}
+                          className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-indigo-500 font-medium"
+                        >
+                          <option value="Informatika">Informatika</option>
+                          <option value="Ilmu Pengetahuan Alam (IPA)">Ilmu Pengetahuan Alam (IPA)</option>
+                          <option value="Matematika">Matematika</option>
+                          <option value="Bahasa Indonesia">Bahasa Indonesia</option>
+                          <option value="Bahasa Inggris">Bahasa Inggris</option>
+                        </select>
+                      )}
+                    </div>
 
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">
-                    Tingkat Kelas:
-                  </label>
-                  <select
-                    value={newGrade}
-                    onChange={(e) => handleGradeChange(e.target.value as any)}
-                    className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-indigo-500 font-medium"
-                  >
-                    <option value="7">Kelas 7</option>
-                    <option value="8">Kelas 8</option>
-                    <option value="9">Kelas 9</option>
-                  </select>
-                </div>
-              </div>
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">
+                        Tingkat Kelas:
+                      </label>
+                      <select
+                        value={newGrade}
+                        onChange={(e) => handleGradeChange(e.target.value as any)}
+                        className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-indigo-500 font-medium"
+                      >
+                        <option value="7">Kelas 7</option>
+                        <option value="8">Kelas 8</option>
+                        <option value="9">Kelas 9</option>
+                      </select>
+                    </div>
+                  </div>
 
-              {/* Pilihan Rombel Sasaran (Multi-Checklist) */}
-              <div className="space-y-2 p-3 rounded-2xl bg-indigo-50/60 border border-indigo-100">
-                <div className="flex flex-wrap items-center justify-between gap-1.5">
-                  <label className="font-bold text-slate-800 text-[11px] flex items-center gap-1.5">
-                    <span>🎯 Rombel / Kelas Sasaran:</span>
-                    <span className="text-indigo-700 font-black">({selectedTargetClasses.length} Kelas Dipilih)</span>
-                  </label>
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedTargetClasses(SCHOOL_CLASSES.filter(c => c.id.startsWith(newGrade)).map(c => c.id))}
-                      className="px-2 py-0.5 rounded text-[10px] font-bold bg-white hover:bg-slate-100 text-indigo-700 border border-indigo-200 transition cursor-pointer"
-                    >
-                      Semua Kelas {newGrade}
-                    </button>
-                    {teacherClasses && teacherClasses.some(c => c.startsWith(newGrade)) && (
+                  {/* Pilihan Rombel Sasaran (Multi-Checklist) */}
+                  <div className="space-y-2 p-3 rounded-2xl bg-indigo-50/50 border border-indigo-100 flex-1">
+                    <div className="flex flex-wrap items-center justify-between gap-1.5">
+                      <label className="font-bold text-slate-800 text-[11px] flex items-center gap-1.5">
+                        <span>🎯 Rombel Sasaran:</span>
+                        <span className="text-indigo-700 font-black">({selectedTargetClasses.length} Kelas Dipilih)</span>
+                      </label>
                       <button
                         type="button"
-                        onClick={() => setSelectedTargetClasses(teacherClasses.filter(c => c.startsWith(newGrade)))}
-                        className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 hover:bg-emerald-200 text-emerald-800 transition cursor-pointer"
+                        onClick={() => setSelectedTargetClasses(SCHOOL_CLASSES.filter(c => c.id.startsWith(newGrade)).map(c => c.id))}
+                        className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-white hover:bg-slate-100 text-indigo-700 border border-indigo-200 transition cursor-pointer shadow-2xs"
                       >
-                        ⭐ Hanya Kelas Saya
+                        Pilih Semua Kelas {newGrade}
                       </button>
-                    )}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 pt-0.5">
+                      {SCHOOL_CLASSES.filter(c => c.id.startsWith(newGrade)).map(c => {
+                        const isSelected = selectedTargetClasses.includes(c.id);
+                        return (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => {
+                              if (isSelected) {
+                                if (selectedTargetClasses.length === 1) {
+                                  alert('Paket ujian harus ditujukan untuk minimal 1 rombel/kelas!');
+                                  return;
+                                }
+                                setSelectedTargetClasses(selectedTargetClasses.filter(id => id !== c.id));
+                              } else {
+                                setSelectedTargetClasses([...selectedTargetClasses, c.id].sort());
+                              }
+                            }}
+                            className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer ${
+                              isSelected
+                                ? 'bg-indigo-600 text-white shadow-xs'
+                                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                            }`}
+                          >
+                            <span>{isSelected ? '✓' : '+'}</span>
+                            <span>{c.name}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="text-[10px] text-slate-500 italic">
+                      💡 Siswa di luar rombel terpilih tidak akan melihat paket ujian ini.
+                    </p>
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-1.5 pt-0.5">
-                  {SCHOOL_CLASSES.filter(c => c.id.startsWith(newGrade)).map(c => {
-                    const isSelected = selectedTargetClasses.includes(c.id);
-                    const isMyClass = teacherClasses?.includes(c.id);
-                    return (
-                      <button
-                        key={c.id}
-                        type="button"
-                        onClick={() => {
-                          if (isSelected) {
-                            if (selectedTargetClasses.length === 1) {
-                              alert('Paket ujian harus ditujukan untuk minimal 1 rombel/kelas!');
-                              return;
-                            }
-                            setSelectedTargetClasses(selectedTargetClasses.filter(id => id !== c.id));
-                          } else {
-                            setSelectedTargetClasses([...selectedTargetClasses, c.id].sort());
-                          }
-                        }}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
-                          isSelected
-                            ? 'bg-indigo-600 text-white shadow-xs'
-                            : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
-                        }`}
-                      >
-                        <span>{isSelected ? '✓' : '+'}</span>
-                        <span>{c.name}</span>
-                        {isMyClass && (
-                          <span className={`text-[9px] px-1 py-0.2 rounded font-semibold ${isSelected ? 'bg-indigo-800 text-indigo-200' : 'bg-slate-100 text-slate-500'}`}>
-                            Saya
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
+
+                {/* ======================================================== */}
+                {/* KOLOM KANAN: Jadwal Sesi & Parameter Waktu CBT           */}
+                {/* ======================================================== */}
+                <div className="space-y-3 flex flex-col justify-between">
+                  
+                  {/* SECTION: JADWAL PELAKSANAAN & WAKTU UJIAN */}
+                  <div className="p-3.5 rounded-2xl bg-indigo-50/60 border border-indigo-200 space-y-2.5">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm">🕒</span>
+                      <label className="font-bold text-indigo-950 text-xs">
+                        Jadwal & Waktu Pelaksanaan Ujian:
+                      </label>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                          Tanggal Ujian:
+                        </label>
+                        <input
+                          type="date"
+                          required
+                          value={newExamDate}
+                          onChange={(e) => setNewExamDate(e.target.value)}
+                          className="w-full px-2.5 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-900 font-semibold focus:outline-none focus:border-indigo-500 text-xs"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                          Jam Mulai:
+                        </label>
+                        <input
+                          type="time"
+                          required
+                          value={newStartTime}
+                          onChange={(e) => setNewStartTime(e.target.value)}
+                          className="w-full px-2.5 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-900 font-mono font-bold focus:outline-none focus:border-indigo-500 text-xs"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                          Jam Selesai:
+                        </label>
+                        <input
+                          type="time"
+                          required
+                          value={newEndTime}
+                          onChange={(e) => setNewEndTime(e.target.value)}
+                          className="w-full px-2.5 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-900 font-mono font-bold focus:outline-none focus:border-indigo-500 text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    <p className="text-[10px] text-indigo-700/80">
+                      ℹ️ Sistem otomatis membuka akses ujian tepat jam mulai, dan auto-submit saat jam selesai.
+                    </p>
+                  </div>
+
+                  {/* Durasi, KKM, Token Masuk */}
+                  <div className="grid grid-cols-3 gap-2.5">
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">
+                        Durasi (Menit):
+                      </label>
+                      <input
+                        type="number"
+                        min={15}
+                        max={180}
+                        value={newDuration}
+                        onChange={(e) => setNewDuration(Number(e.target.value))}
+                        className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-bold focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">
+                        KKM / Kriteria:
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={newPassingGrade}
+                        onChange={(e) => setNewPassingGrade(Number(e.target.value))}
+                        className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-bold focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">
+                        Token Masuk:
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Contoh: PAS7A"
+                        value={newToken}
+                        onChange={(e) => setNewToken(e.target.value.toUpperCase())}
+                        className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-indigo-700 font-mono font-bold focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Next Step Information Box */}
+                  <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 text-[11px] text-slate-500 leading-relaxed flex items-center gap-2">
+                    <span className="text-base flex-shrink-0">💡</span>
+                    <span>
+                      Setelah disimpan, Anda akan langsung diarahkan ke <strong>Editor Soal</strong> untuk mengisi butir pertanyaan (PG, PG Kompleks, Benar/Salah, Menjodohkan, atau Audio Listening).
+                    </span>
+                  </div>
+
                 </div>
-                <p className="text-[10px] text-slate-500 italic">
-                  💡 Tip: Jika ada 2 guru mapel di kelas {newGrade}, pilih hanya rombel yang Anda ajar. Siswa di rombel lain tidak akan melihat ujian ini.
-                </p>
+
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">
-                    Durasi (Menit):
-                  </label>
-                  <input
-                    type="number"
-                    min={15}
-                    max={180}
-                    value={newDuration}
-                    onChange={(e) => setNewDuration(Number(e.target.value))}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">
-                    KKM / Kriteria:
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={100}
-                    value={newPassingGrade}
-                    onChange={(e) => setNewPassingGrade(Number(e.target.value))}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">
-                    Token Masuk:
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Contoh: PAS7A"
-                    value={newToken}
-                    onChange={(e) => setNewToken(e.target.value.toUpperCase())}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-indigo-700 font-mono font-bold focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
-              </div>
-
-              <div className="pt-2 flex items-center justify-end gap-2">
+              {/* Action Buttons Footer */}
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
                 <button
                   type="button"
                   onClick={() => setShowCreatePackageModal(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold transition cursor-pointer"
+                  className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold transition cursor-pointer"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold transition cursor-pointer shadow-md shadow-indigo-600/20"
+                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold transition cursor-pointer shadow-md shadow-indigo-600/20 active:scale-98 flex items-center gap-1.5"
                 >
-                  Simpan & Masuk Editor Soal →
+                  <span>Simpan & Masuk Editor Soal</span>
+                  <span>→</span>
+                </button>
+              </div>
+
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL ATUR JADWAL & JAM SPESIFIK PAKET UJIAN GURU */}
+      {scheduleModalPkg && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-5 shadow-2xl border border-slate-200">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-200 text-indigo-700 flex items-center justify-center text-xl font-bold">
+                  🕒
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    Atur Jadwal & Waktu Pelaksanaan Ujian
+                  </h3>
+                  <p className="text-xs text-slate-500 truncate max-w-xs">
+                    {scheduleModalPkg.title} ({scheduleModalPkg.subject})
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setScheduleModalPkg(null)}
+                className="text-slate-400 hover:text-slate-600 font-bold text-sm cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSavePackageSchedule} className="space-y-4 text-xs">
+              {/* Tanggal */}
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">
+                  Tanggal Pelaksanaan Ujian:
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={editSchedDate}
+                  onChange={(e) => setEditSchedDate(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-semibold focus:outline-none focus:border-indigo-500 text-xs"
+                />
+              </div>
+
+              {/* Jam Mulai & Jam Selesai */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">
+                    Jam Mulai Sesi:
+                  </label>
+                  <input
+                    type="time"
+                    required
+                    value={editSchedStartTime}
+                    onChange={(e) => setEditSchedStartTime(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono font-bold focus:outline-none focus:border-indigo-500 text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">
+                    Jam Selesai Sesi:
+                  </label>
+                  <input
+                    type="time"
+                    required
+                    value={editSchedEndTime}
+                    onChange={(e) => setEditSchedEndTime(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono font-bold focus:outline-none focus:border-indigo-500 text-xs"
+                  />
+                </div>
+              </div>
+
+              {/* Durasi Pengerjaan */}
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">
+                  Durasi Pengerjaan Siswa (Menit):
+                </label>
+                <input
+                  type="number"
+                  min={10}
+                  max={240}
+                  required
+                  value={editSchedDuration}
+                  onChange={(e) => setEditSchedDuration(Number(e.target.value))}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-bold focus:outline-none focus:border-indigo-500 text-xs"
+                />
+                <span className="text-[10px] text-slate-400 mt-1 block">
+                  Siswa memiliki waktu pengerjaan maksimal {editSchedDuration} menit di dalam ruang ujian sebelum jawaban otomatis dikumpulkan.
+                </span>
+              </div>
+
+              <div className="p-3 rounded-xl bg-indigo-50 border border-indigo-200 text-[11px] text-indigo-900 leading-relaxed">
+                💡 Perubahan jadwal dan jam sesi ini akan langsung tersinkron secara otomatis ke kartu ujian siswa dan ruang pengawas.
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setScheduleModalPkg(null)}
+                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold cursor-pointer shadow-md shadow-indigo-600/20"
+                >
+                  Simpan Jadwal Paket ✓
                 </button>
               </div>
             </form>

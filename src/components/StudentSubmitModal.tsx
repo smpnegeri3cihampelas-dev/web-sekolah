@@ -60,8 +60,9 @@ export default function StudentSubmitModal({
     ...(hasQuiz ? [{ id: 'kuis' as StudentTab, label: 'Kerjakan Kuis', icon: '📝' }] : []),
     { id: 'unggah', label: 'Unggah Tugas', icon: '📤' }
   ];
-  const [activeTab, setActiveTab] = useState<StudentTab>(hasQuiz ? 'kuis' : 'unggah');
+  const [activeTab, setActiveTab] = useState<StudentTab>('petunjuk');
   const activeIdx = tabs.findIndex(t => t.id === activeTab);
+  const prevTab = activeIdx > 0 ? tabs[activeIdx - 1] : null;
   const nextTab = activeIdx >= 0 && activeIdx < tabs.length - 1 ? tabs[activeIdx + 1] : null;
 
   const totalQuestions = asg.quizQuestions?.length || 0;
@@ -100,8 +101,7 @@ export default function StudentSubmitModal({
     return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
   };
 
-  const handleFormSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleFormSubmit = async () => {
     const hasQuizAnswered = hasQuiz && answeredCount > 0;
 
     if (!hasUpload && !hasQuizAnswered) {
@@ -137,12 +137,40 @@ export default function StudentSubmitModal({
   // ---------- TAB CONTENTS ----------
 
   const renderPetunjukTab = () => (
-    <div className="space-y-4">
-      <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-1.5">
-        <div className="font-bold text-slate-800 flex items-center gap-1.5">
-          <span>🧑‍🏫</span> Petunjuk dari {asg.teacherName}
+    <div className={`space-y-4 ${asg.videoUrl ? 'grid grid-cols-1 lg:grid-cols-12 gap-4 space-y-0 items-start' : ''}`}>
+      <div className={`space-y-3 ${asg.videoUrl ? 'lg:col-span-5' : ''}`}>
+        <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-2">
+          <div className="font-bold text-slate-800 flex items-center gap-1.5 text-sm">
+            <span>🧑‍🏫</span> Petunjuk dari {asg.teacherName}
+          </div>
+          <p className="text-slate-600 leading-relaxed whitespace-pre-line">{asg.description}</p>
         </div>
-        <p className="text-slate-600 leading-relaxed whitespace-pre-line">{asg.description}</p>
+
+        {asg.materialUrl && (
+          <div className="p-3.5 rounded-2xl bg-blue-50/80 border border-blue-200 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center text-lg flex-shrink-0">📄</div>
+              <div className="min-w-0">
+                <div className="font-bold text-blue-950 text-xs truncate">{asg.materialName || (hasQuiz ? 'Modul Referensi Kuis' : 'Bahan Ajar / LKPD Guru')}</div>
+                <div className="text-[10px] text-blue-700 font-medium">
+                  {hasQuiz ? 'Bahan bacaan & panduan materi untuk menjawab kuis.' : 'Pelajari materi atau unduh LKPD ini sebagai panduan.'}
+                </div>
+              </div>
+            </div>
+            <a
+              href={asg.materialUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1 flex-shrink-0 cursor-pointer shadow-xs"
+            >
+              {hasQuiz ? 'Buka Modul ↗' : 'Buka LKPD ↗'}
+            </a>
+          </div>
+        )}
+
+        {!hasMateri && (
+          <div className="text-[11px] text-slate-400 text-center py-2">Guru tidak melampirkan video atau modul untuk tugas ini.</div>
+        )}
       </div>
 
       {asg.videoUrl && (() => {
@@ -157,7 +185,7 @@ export default function StudentSubmitModal({
         const isEmbed = embedUrl.includes('youtube.com/embed');
 
         return (
-          <div className="p-3.5 rounded-2xl bg-amber-50/80 border border-amber-200 space-y-2">
+          <div className="lg:col-span-7 p-3.5 rounded-2xl bg-amber-50/80 border border-amber-200 space-y-2">
             <div className="flex items-center justify-between text-xs font-bold text-amber-900">
               <span className="flex items-center gap-1.5">
                 <span>🎬</span> {asg.videoTitle || 'Video Pembelajaran'}
@@ -193,30 +221,6 @@ export default function StudentSubmitModal({
           </div>
         );
       })()}
-
-      {asg.materialUrl && (
-        <div className="p-3.5 rounded-2xl bg-blue-50/80 border border-blue-200 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center text-lg flex-shrink-0">📄</div>
-            <div className="min-w-0">
-              <div className="font-bold text-blue-950 text-xs truncate">{asg.materialName || 'Bahan Ajar / LKPD Guru'}</div>
-              <div className="text-[10px] text-blue-700 font-medium">Pelajari materi atau unduh LKPD ini sebagai panduan.</div>
-            </div>
-          </div>
-          <a
-            href={asg.materialUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1 flex-shrink-0 cursor-pointer shadow-xs"
-          >
-            Buka LKPD ↗
-          </a>
-        </div>
-      )}
-
-      {!hasMateri && (
-        <div className="text-[11px] text-slate-400 text-center py-2">Guru tidak melampirkan video atau modul untuk tugas ini.</div>
-      )}
     </div>
   );
 
@@ -238,53 +242,56 @@ export default function StudentSubmitModal({
         <p className="text-[10px] text-purple-800">Pilih satu jawaban untuk setiap soal. Nilai dihitung otomatis setelah tugas dikirim.</p>
       </div>
 
-      {asg.quizQuestions?.map((q, qIdx) => {
-        const selectedOpt = quizAnswers[q.id];
-        const isAnswered = selectedOpt !== undefined;
-        return (
-          <div
-            key={q.id}
-            className={`p-3.5 bg-white rounded-2xl border space-y-2.5 transition ${isAnswered ? 'border-purple-300 shadow-xs' : 'border-slate-200'}`}
-          >
-            <div className="flex items-start gap-2">
-              <span className={`w-6 h-6 rounded-full font-black text-[11px] flex items-center justify-center flex-shrink-0 ${isAnswered ? 'bg-purple-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
-                {qIdx + 1}
-              </span>
-              <span className="font-bold text-slate-800 text-xs leading-relaxed pt-0.5">{q.question}</span>
-            </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+        {asg.quizQuestions?.map((q, qIdx) => {
+          const selectedOpt = quizAnswers[q.id];
+          const isAnswered = selectedOpt !== undefined;
+          return (
+            <div
+              key={q.id}
+              className={`p-3.5 bg-white rounded-2xl border space-y-2.5 transition flex flex-col justify-between ${isAnswered ? 'border-purple-300 shadow-xs' : 'border-slate-200'}`}
+            >
+              <div className="flex items-start gap-2">
+                <span className={`w-6 h-6 rounded-full font-black text-[11px] flex items-center justify-center flex-shrink-0 ${isAnswered ? 'bg-purple-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                  {qIdx + 1}
+                </span>
+                <span className="font-bold text-slate-800 text-xs leading-relaxed pt-0.5">{q.question}</span>
+              </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-              {q.options.map((opt, optIdx) => {
-                const isSelected = selectedOpt === optIdx;
-                return (
-                  <button
-                    key={optIdx}
-                    type="button"
-                    onClick={() => setQuizAnswers(prev => ({ ...prev, [q.id]: optIdx }))}
-                    className={`p-2.5 rounded-xl text-left text-xs transition border flex items-center gap-2 cursor-pointer ${
-                      isSelected
-                        ? 'bg-purple-600 text-white border-purple-600 shadow-xs font-semibold'
-                        : 'bg-slate-50 hover:bg-purple-50 hover:border-purple-300 text-slate-700 border-slate-200'
-                    }`}
-                  >
-                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${isSelected ? 'bg-white text-purple-700' : 'bg-slate-200 text-slate-600'}`}>
-                      {['A', 'B', 'C', 'D'][optIdx]}
-                    </span>
-                    <span>{opt.replace(/^[A-D]\.\s*/, '')}</span>
-                  </button>
-                );
-              })}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1">
+                {q.options.map((opt, optIdx) => {
+                  const isSelected = selectedOpt === optIdx;
+                  return (
+                    <button
+                      key={optIdx}
+                      type="button"
+                      onClick={() => setQuizAnswers(prev => ({ ...prev, [q.id]: optIdx }))}
+                      className={`p-2 rounded-xl text-left text-xs transition border flex items-center gap-2 cursor-pointer ${
+                        isSelected
+                          ? 'bg-purple-600 text-white border-purple-600 shadow-xs font-semibold'
+                          : 'bg-slate-50 hover:bg-purple-50 hover:border-purple-300 text-slate-700 border-slate-200'
+                      }`}
+                    >
+                      <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${isSelected ? 'bg-white text-purple-700' : 'bg-slate-200 text-slate-600'}`}>
+                        {['A', 'B', 'C', 'D'][optIdx]}
+                      </span>
+                      <span className="truncate">{opt.replace(/^[A-D]\.\s*/, '')}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 
   const renderUnggahTab = () => (
-    <div className="space-y-4 text-xs">
-      <div>
-        <label className="block font-bold text-slate-700 mb-1.5">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+      {/* Kolom Kiri: Unggah Berkas & Contoh */}
+      <div className="space-y-3">
+        <label className="block font-bold text-slate-700">
           {hasQuiz ? 'Unggah Berkas / Foto Buku Tugas (opsional jika sudah menjawab kuis)' : 'Unggah Berkas / Foto Lembar Tugas *'}
         </label>
         <div className="border-2 border-dashed border-slate-300 hover:border-purple-400 rounded-2xl p-4 text-center space-y-2 bg-purple-50/20 transition">
@@ -292,7 +299,7 @@ export default function StudentSubmitModal({
           <div className="text-xs font-semibold text-slate-700">
             {fileName ? (
               <span className="text-purple-700 font-bold flex items-center justify-center gap-1">
-                <span>✓ File Terpilih:</span> <span className="truncate max-w-[260px]">{fileName}</span>
+                <span>✓ File Terpilih:</span> <span className="truncate max-w-[240px]">{fileName}</span>
               </span>
             ) : (
               'Pilih file foto (JPG/PNG), dokumen (PDF/Word), atau video rekaman (MP4)'
@@ -318,7 +325,7 @@ export default function StudentSubmitModal({
         </div>
 
         {/* Fast Simulation Shortcuts */}
-        <div className="flex flex-wrap items-center gap-2 mt-2">
+        <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-[10px] text-slate-400 font-medium">Contoh Cepat:</span>
           <button
             type="button"
@@ -376,28 +383,31 @@ export default function StudentSubmitModal({
         </div>
       </div>
 
-      <div>
-        <label className="block font-bold text-slate-700 mb-1">
-          Atau Tautan Video (YouTube / Google Drive) <span className="text-slate-400 font-normal">· alternatif jika file video besar</span>
-        </label>
-        <input
-          type="url"
-          value={videoUrl}
-          onChange={(e) => setVideoUrl(e.target.value)}
-          placeholder="Contoh: https://drive.google.com/file/... atau https://youtu.be/..."
-          className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:border-purple-600 text-xs"
-        />
-      </div>
+      {/* Kolom Kanan: Tautan Video & Catatan Guru */}
+      <div className="space-y-3 flex flex-col justify-between">
+        <div>
+          <label className="block font-bold text-slate-700 mb-1">
+            Atau Tautan Video (YouTube / Google Drive) <span className="text-slate-400 font-normal">· alternatif jika file video besar</span>
+          </label>
+          <input
+            type="url"
+            value={videoUrl}
+            onChange={(e) => setVideoUrl(e.target.value)}
+            placeholder="Contoh: https://drive.google.com/file/... atau https://youtu.be/..."
+            className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:border-purple-600 text-xs"
+          />
+        </div>
 
-      <div>
-        <label className="block font-bold text-slate-700 mb-1">Catatan untuk Guru (Opsional)</label>
-        <textarea
-          rows={3}
-          value={answerText}
-          onChange={(e) => setAnswerText(e.target.value)}
-          placeholder="Tuliskan catatan, ringkasan jawaban, atau ucapan untuk Bapak/Ibu guru..."
-          className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:border-purple-600 text-xs resize-none"
-        />
+        <div className="flex-1 flex flex-col">
+          <label className="block font-bold text-slate-700 mb-1">Catatan untuk Guru (Opsional)</label>
+          <textarea
+            rows={4}
+            value={answerText}
+            onChange={(e) => setAnswerText(e.target.value)}
+            placeholder="Tuliskan catatan, ringkasan jawaban, atau pesan untuk Bapak/Ibu guru..."
+            className="w-full flex-1 px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:border-purple-600 text-xs resize-none"
+          />
+        </div>
       </div>
     </div>
   );
@@ -424,9 +434,8 @@ export default function StudentSubmitModal({
       data-lenis-prevent-touch="true"
       className="fixed inset-0 z-[80] bg-slate-900/80 backdrop-blur-xs p-3 sm:p-4 flex items-center justify-center animate-in fade-in duration-150 font-elearning"
     >
-      <form
-        onSubmit={handleFormSubmit}
-        className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl max-h-[92vh] flex flex-col overflow-hidden"
+      <div
+        className="bg-white rounded-3xl max-w-5xl w-full shadow-2xl max-h-[90vh] flex flex-col overflow-hidden"
       >
         {/* HEADER (fixed) */}
         <div className="px-5 sm:px-7 pt-5 pb-3 flex items-start justify-between gap-3 flex-shrink-0">
@@ -503,37 +512,64 @@ export default function StudentSubmitModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-3 py-2 rounded-xl text-slate-600 hover:bg-slate-200/60 text-xs font-semibold cursor-pointer"
+              className="px-3 py-2 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-200/60 text-xs font-semibold cursor-pointer"
             >
               Batal
             </button>
-            {nextTab && (
+            {prevTab && (
               <button
+                key={`btn-prev-${prevTab.id}`}
                 type="button"
-                onClick={() => setActiveTab(nextTab.id)}
-                className="px-3.5 py-2 rounded-xl bg-white border border-purple-300 text-purple-700 hover:bg-purple-50 text-xs font-bold cursor-pointer transition"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setActiveTab(prevTab.id);
+                }}
+                className="px-3 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold cursor-pointer transition flex items-center gap-1"
               >
-                Lanjut: {nextTab.label} →
+                <span>← {prevTab.label}</span>
               </button>
             )}
-            <button
-              id="student-submit-assignment"
-              type="submit"
-              disabled={isSubmitting}
-              className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold text-xs transition shadow-md shadow-purple-600/20 cursor-pointer flex items-center gap-1.5"
-            >
-              {isSubmitting ? (
-                <>
-                  <span className="animate-spin inline-block">⏳</span>
-                  <span>Mengirim...</span>
-                </>
-              ) : (
-                <span>🚀 Kirim Tugas</span>
-              )}
-            </button>
+            {nextTab ? (
+              <button
+                key={`btn-next-${nextTab.id}`}
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setActiveTab(nextTab.id);
+                }}
+                className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs cursor-pointer transition shadow-md shadow-purple-600/20 flex items-center gap-1.5 active:scale-95"
+              >
+                <span>Lanjut: {nextTab.label}</span>
+                <span>→</span>
+              </button>
+            ) : (
+              <button
+                key="btn-submit-task"
+                id="student-submit-assignment"
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleFormSubmit();
+                }}
+                disabled={isSubmitting}
+                className="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold text-xs transition shadow-md shadow-purple-600/20 cursor-pointer flex items-center gap-1.5 active:scale-95"
+              >
+                {isSubmitting ? (
+                  <>
+                    <span className="animate-spin inline-block">⏳</span>
+                    <span>Mengirim...</span>
+                  </>
+                ) : (
+                  <span>🚀 Kirim Tugas</span>
+                )}
+              </button>
+            )}
           </div>
         </div>
-      </form>
+      </div>
     </div>
   );
 }

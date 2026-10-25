@@ -1376,5 +1376,89 @@ export function exportCbtSchoolRekapBapToExcel(params: {
   XLSX.writeFile(workbook, fileName);
 }
 
+/**
+ * Export Daftar Siswa Berhak Ujian Susulan (Sakit / Izin) ke Excel (.xlsx)
+ */
+export function exportCbtSusulanListToExcel(params: {
+  academicYear: string;
+  semester: string;
+  date: string;
+  students: Array<{
+    no: number;
+    nisn: string;
+    name: string;
+    classId: string;
+    roomName: string;
+    subject: string;
+    status: 'S' | 'I';
+    notes?: string;
+  }>;
+}) {
+  const { academicYear, semester, date, students } = params;
+  const rows: any[][] = [];
+
+  rows.push(['PEMERINTAH DAERAH KABUPATEN BANDUNG BARAT']);
+  rows.push(['DINAS PENDIDIKAN - SMP NEGERI 3 CIHAMPELAS']);
+  rows.push(['DAFTAR PESERTA UJIAN SUSULAN ASESMEN SUMATIF (CBT)']);
+  rows.push([`Tahun Ajaran ${academicYear || '2026/2027'} - ${semester || 'PTS / STS Ganjil'}`]);
+  rows.push([]);
+  rows.push(['Tanggal Rekapitulasi:', formatIndonesianDate(date), '', 'Total Peserta Susulan:', `${students.length} Siswa`]);
+  rows.push([]);
+
+  // Header Table
+  rows.push([
+    'NO',
+    'NISN',
+    'NAMA SISWA',
+    'ROMBEL / KELAS',
+    'RUANG UJIAN ASAL',
+    'MATA PELAJARAN',
+    'KETERANGAN / ALASAN',
+    'CATATAN KEJADIAN DARI PENGAWAS',
+    'STATUS JADWAL SUSULAN'
+  ]);
+
+  students.forEach((st) => {
+    rows.push([
+      st.no,
+      st.nisn,
+      st.name,
+      st.classId,
+      st.roomName,
+      st.subject,
+      st.status === 'S' ? 'SAKIT (Surat Dokter/Ortu)' : 'IZIN RESMI',
+      st.notes || '-',
+      'Menunggu Penjadwalan Lab Komputer'
+    ]);
+  });
+
+  rows.push([]);
+  rows.push(['', '', 'Mengetahui,', '', '', '', 'Cihampelas, ' + formatIndonesianDate(date)]);
+  rows.push(['', '', 'Kepala SMP Negeri 3 Cihampelas,', '', '', '', 'Koordinator Ujian Susulan,']);
+  rows.push([]);
+  rows.push([]);
+  rows.push(['', '', 'H. Rustandi, S.Pd., M.Pd.', '', '', '', 'Panitia Asesmen SPENTIC']);
+  rows.push(['', '', 'NIP. 19700608 199802 1 001', '', '', '', 'NIP. 19850312 201101 1 004']);
+
+  const worksheet = XLSX.utils.aoa_to_sheet(rows);
+  worksheet['!cols'] = [
+    { wch: 5 },  // No
+    { wch: 14 }, // NISN
+    { wch: 28 }, // Nama
+    { wch: 16 }, // Kelas
+    { wch: 18 }, // Ruang
+    { wch: 25 }, // Mapel
+    { wch: 25 }, // Keterangan
+    { wch: 35 }, // Catatan
+    { wch: 30 }, // Status Susulan
+  ];
+
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Daftar_Ujian_Susulan');
+
+  const fileName = sanitizeFileName(`Daftar_Peserta_Ujian_Susulan_${date}.xlsx`);
+  XLSX.writeFile(workbook, fileName);
+}
+
 
 

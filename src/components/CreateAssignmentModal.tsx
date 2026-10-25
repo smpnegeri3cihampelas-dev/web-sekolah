@@ -24,6 +24,24 @@ export default function CreateAssignmentModal({
   showToast
 }: CreateAssignmentModalProps) {
   // Local isolated form states - typing here NEVER re-renders the 4000+ line main page!
+  const availableTeacherSubjects: string[] = React.useMemo(() => {
+    const raw = currentTeacher.subject || 'Umum';
+    if (raw.includes('&') || raw.includes(' dan ')) {
+      const parts = raw.split(/&|dan/i).map(s => s.trim()).filter(Boolean);
+      return parts.map(s => {
+        if (s.toLowerCase().includes('pabp') || s.toLowerCase().includes('agama')) {
+          return 'Pendidikan Agama Islam (PABP)';
+        }
+        if (s.toLowerCase().includes('sunda')) {
+          return 'Bahasa Sunda';
+        }
+        return s;
+      });
+    }
+    return [raw];
+  }, [currentTeacher.subject]);
+
+  const [selectedSubject, setSelectedSubject] = useState<string>(() => availableTeacherSubjects[0]);
   const [title, setTitle] = useState('');
   const [targetClass, setTargetClass] = useState(defaultClass || '7-A');
   const [dueDate, setDueDate] = useState(() => {
@@ -328,6 +346,7 @@ export default function CreateAssignmentModal({
     { id: 'kuis', label: 'Kuis', icon: '📝' }
   ];
   const activeIdx = tabs.findIndex(t => t.id === activeTab);
+  const prevTab = activeIdx > 0 ? tabs[activeIdx - 1] : null;
   const nextTab = activeIdx < tabs.length - 1 ? tabs[activeIdx + 1] : null;
 
   // Immutable helpers for editing quiz questions
@@ -359,8 +378,7 @@ export default function CreateAssignmentModal({
     ]);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = () => {
     if (!title.trim() || !dueDate) {
       showToast('Mohon isi judul tugas dan tenggat waktu!', 'warn');
       setActiveTab('info');
@@ -376,7 +394,7 @@ export default function CreateAssignmentModal({
     const newAssignment: Assignment = {
       id: `asg-${Date.now()}`,
       title: title.trim(),
-      subject: currentTeacher.subject,
+      subject: selectedSubject,
       teacherName: currentTeacher.name,
       teacherNip: currentTeacher.nip,
       targetClass,
@@ -397,71 +415,104 @@ export default function CreateAssignmentModal({
   // ---------- TAB CONTENTS ----------
 
   const renderInfoTab = () => (
-    <div className="space-y-4 text-xs">
-      <div>
-        <label className="block font-bold text-slate-700 mb-1">Judul Tugas / PR *</label>
-        <input
-          id="create-asg-title"
-          type="text"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="Contoh: Tugas Praktikum Uji Makanan Bab 2"
-          className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:border-indigo-600 text-xs"
-        />
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+      {/* Kolom Kiri: Judul, Kelas, Tenggat */}
+      <div className="space-y-3">
         <div>
-          <label className="block font-bold text-slate-700 mb-1">Target Kelas *</label>
-          <select
-            value={targetClass}
-            onChange={(e) => setTargetClass(e.target.value)}
-            className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:border-indigo-600 text-xs cursor-pointer"
-          >
-            {SCHOOL_CLASSES.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block font-bold text-slate-700 mb-1">Tenggat Waktu (Deadline) *</label>
+          <label className="block font-bold text-slate-700 mb-1">Judul Tugas / PR *</label>
           <input
-            type="date"
-            value={dueDate}
-            onChange={(e) => setDueDate(e.target.value)}
-            className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:border-indigo-600 text-xs"
+            id="create-asg-title"
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Contoh: Tugas Praktikum Uji Makanan Bab 2"
+            className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:border-indigo-600 text-xs bg-white"
           />
         </div>
+
+        {availableTeacherSubjects.length > 1 && (
+          <div>
+            <label className="block font-bold text-slate-700 mb-1">Mata Pelajaran *</label>
+            <div className="grid grid-cols-2 gap-2">
+              {availableTeacherSubjects.map((sub) => {
+                const isSelected = selectedSubject === sub;
+                return (
+                  <button
+                    key={sub}
+                    type="button"
+                    onClick={() => setSelectedSubject(sub)}
+                    className={`py-1.5 px-2.5 rounded-xl border text-xs font-bold transition text-left cursor-pointer flex items-center gap-1.5 ${
+                      isSelected
+                        ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-2xs'
+                        : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-white'
+                    }`}
+                  >
+                    <span>{isSelected ? '●' : '○'}</span>
+                    <span className="truncate">{sub}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block font-bold text-slate-700 mb-1">Target Kelas *</label>
+            <select
+              value={targetClass}
+              onChange={(e) => setTargetClass(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:border-indigo-600 text-xs cursor-pointer bg-white"
+            >
+              {SCHOOL_CLASSES.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block font-bold text-slate-700 mb-1">Tenggat Waktu *</label>
+            <input
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:border-indigo-600 text-xs bg-white"
+            />
+          </div>
+        </div>
+
+        <div className="p-3.5 rounded-2xl bg-indigo-50/70 border border-indigo-100 text-[11px] text-indigo-700 leading-relaxed space-y-1">
+          <div className="font-bold flex items-center gap-1 text-indigo-900">
+            <span>💡</span> Panduan Pembuatan:
+          </div>
+          <p>Setelah mengisi info tugas, Bapak/Ibu bisa menambahkan video/modul di tab <b>Lampiran Materi</b> dan soal pilihan ganda di tab <b>Kuis</b> (opsional).</p>
+        </div>
       </div>
 
-      <div>
-        <label className="block font-bold text-slate-700 mb-1">Petunjuk &amp; Deskripsi Tugas</label>
+      {/* Kolom Kanan: Petunjuk & Deskripsi Tugas */}
+      <div className="flex flex-col">
+        <label className="block font-bold text-slate-700 mb-1">Petunjuk &amp; Deskripsi Tugas untuk Siswa</label>
         <textarea
-          rows={5}
+          rows={7}
           value={desc}
           onChange={(e) => setDesc(e.target.value)}
-          placeholder="Tuliskan petunjuk pengerjaan tugas, nomor halaman buku paket, atau instruksi pengumpulan file..."
-          className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:border-indigo-600 text-xs resize-none"
+          placeholder="Tuliskan petunjuk pengerjaan tugas, nomor halaman buku paket, atau instruksi pengumpulan file untuk siswa..."
+          className="w-full flex-1 px-3 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:border-indigo-600 text-xs resize-none bg-white leading-relaxed"
         />
-      </div>
-
-      <div className="p-3 rounded-xl bg-indigo-50/70 border border-indigo-100 text-[11px] text-indigo-700 leading-relaxed">
-        💡 Setelah mengisi info tugas, Bapak/Ibu bisa menambahkan video/modul di tab <b>Lampiran Materi</b> dan soal pilihan ganda di tab <b>Kuis</b> (opsional).
       </div>
     </div>
   );
 
   const renderLampiranTab = () => (
-    <div className="space-y-4 text-xs">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
       {/* VIDEO */}
-      <div className="p-3.5 rounded-2xl bg-amber-50/70 border border-amber-200/80 space-y-2.5">
-        <div className="flex items-center justify-between">
-          <span className="font-bold text-amber-900 flex items-center gap-1.5 text-xs">
-            <span>🎬</span> Video Pembelajaran (Opsional)
-          </span>
-          <span className="text-[10px] text-amber-700 font-medium">YouTube / Google Drive / MP4</span>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+      <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200/80 space-y-3 flex flex-col justify-between">
+        <div className="space-y-2.5">
+          <div className="flex items-center justify-between">
+            <span className="font-bold text-amber-900 flex items-center gap-1.5 text-xs">
+              <span>🎬</span> Video Pembelajaran (Opsional)
+            </span>
+            <span className="text-[10px] text-amber-700 font-medium bg-amber-100/70 px-2 py-0.5 rounded font-mono">YouTube / Drive / MP4</span>
+          </div>
           <div>
             <label className="block text-[11px] font-semibold text-slate-700 mb-1">Tautan Video URL:</label>
             <input
@@ -483,8 +534,8 @@ export default function CreateAssignmentModal({
             />
           </div>
         </div>
-        <div className="flex items-center gap-2 pt-0.5">
-          <span className="text-[10px] text-slate-400">Contoh Cepat:</span>
+        <div className="flex items-center gap-2 pt-2 border-t border-amber-200/60">
+          <span className="text-[10px] text-slate-400">Contoh:</span>
           <button
             type="button"
             onClick={() => {
@@ -493,7 +544,7 @@ export default function CreateAssignmentModal({
             }}
             className="text-[10px] px-2 py-0.5 rounded bg-white hover:bg-amber-100 text-amber-800 border border-amber-300 font-medium transition cursor-pointer"
           >
-            + Isi Contoh Video YouTube
+            + Isi Video YouTube
           </button>
           {videoUrl && (
             <button
@@ -508,14 +559,14 @@ export default function CreateAssignmentModal({
       </div>
 
       {/* MODUL / LKPD */}
-      <div className="p-3.5 rounded-2xl bg-blue-50/70 border border-blue-200/80 space-y-2.5">
-        <div className="flex items-center justify-between">
-          <span className="font-bold text-blue-900 flex items-center gap-1.5 text-xs">
-            <span>📄</span> Bahan Ajar / Modul LKPD (Opsional)
-          </span>
-          <span className="text-[10px] text-blue-700 font-medium">PDF / PPT / Word</span>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+      <div className="p-4 rounded-2xl bg-blue-50/70 border border-blue-200/80 space-y-3 flex flex-col justify-between">
+        <div className="space-y-2.5">
+          <div className="flex items-center justify-between">
+            <span className="font-bold text-blue-900 flex items-center gap-1.5 text-xs">
+              <span>📄</span> Bahan Ajar / Modul LKPD (Opsional)
+            </span>
+            <span className="text-[10px] text-blue-700 font-medium bg-blue-100/70 px-2 py-0.5 rounded font-mono">PDF / PPT / Word</span>
+          </div>
           <div>
             <label className="block text-[11px] font-semibold text-slate-700 mb-1">Tautan File Dokumen URL:</label>
             <input
@@ -537,8 +588,8 @@ export default function CreateAssignmentModal({
             />
           </div>
         </div>
-        <div className="flex items-center gap-2 pt-0.5">
-          <span className="text-[10px] text-slate-400">Contoh Cepat:</span>
+        <div className="flex items-center gap-2 pt-2 border-t border-blue-200/60">
+          <span className="text-[10px] text-slate-400">Contoh:</span>
           <button
             type="button"
             onClick={() => {
@@ -547,7 +598,7 @@ export default function CreateAssignmentModal({
             }}
             className="text-[10px] px-2 py-0.5 rounded bg-white hover:bg-blue-100 text-blue-800 border border-blue-300 font-medium transition cursor-pointer"
           >
-            + Isi Contoh Modul LKPD.pdf
+            + Isi Modul LKPD.pdf
           </button>
           {materialUrl && (
             <button
@@ -566,7 +617,7 @@ export default function CreateAssignmentModal({
   const renderKuisTab = () => (
     <div className="space-y-3 text-xs">
       {/* Toggle + actions */}
-      <div className="p-3 rounded-2xl bg-purple-50/70 border border-purple-200 space-y-2.5">
+      <div className="p-3.5 rounded-2xl bg-purple-50/70 border border-purple-200 space-y-2.5">
         <label className="flex items-center gap-2 cursor-pointer">
           <input
             type="checkbox"
@@ -610,72 +661,76 @@ export default function CreateAssignmentModal({
       ) : quizQuestions.length === 0 ? (
         <div className="text-center py-8 text-slate-500 text-xs">Belum ada soal. Klik &quot;+ Tambah Soal Manual&quot;.</div>
       ) : (
-        quizQuestions.map((q, qIdx) => (
-          <div key={q.id} className="p-3.5 bg-white rounded-2xl border border-purple-200 space-y-2 shadow-2xs">
-            <div className="flex items-center justify-between gap-2">
-              <span className="font-black text-purple-800 text-xs">Soal Nomor {qIdx + 1}</span>
-              <button
-                type="button"
-                onClick={() => setQuizQuestions(prev => prev.filter((_, idx) => idx !== qIdx))}
-                className="text-rose-500 hover:text-rose-700 text-xs cursor-pointer px-1.5 py-0.5 rounded hover:bg-rose-50"
-              >
-                ✕ Hapus
-              </button>
-            </div>
-
-            <textarea
-              rows={2}
-              value={q.question}
-              onChange={(e) => updateQuestion(qIdx, { question: e.target.value })}
-              placeholder="Tuliskan pertanyaan soal kuis di sini..."
-              className="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs focus:outline-none focus:border-purple-600 resize-none"
-            />
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-              {q.options.map((opt, optIdx) => {
-                const isCorrect = q.correctOptionIndex === optIdx;
-                const optionPrefix = ['A', 'B', 'C', 'D'][optIdx];
-                return (
-                  <div
-                    key={optIdx}
-                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg border text-xs transition ${
-                      isCorrect ? 'bg-emerald-50 border-emerald-400 ring-1 ring-emerald-400' : 'bg-slate-50 border-slate-200'
-                    }`}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+          {quizQuestions.map((q, qIdx) => (
+            <div key={q.id} className="p-3.5 bg-white rounded-2xl border border-purple-200 space-y-2 shadow-2xs flex flex-col justify-between">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-black text-purple-800 text-xs">Soal Nomor {qIdx + 1}</span>
+                  <button
+                    type="button"
+                    onClick={() => setQuizQuestions(prev => prev.filter((_, idx) => idx !== qIdx))}
+                    className="text-rose-500 hover:text-rose-700 text-xs cursor-pointer px-1.5 py-0.5 rounded hover:bg-rose-50"
                   >
-                    <label className="flex items-center gap-1 cursor-pointer flex-shrink-0" title={`Tandai ${optionPrefix} sebagai kunci jawaban`}>
-                      <input
-                        type="radio"
-                        name={`correct-${q.id}`}
-                        checked={isCorrect}
-                        onChange={() => updateQuestion(qIdx, { correctOptionIndex: optIdx })}
-                        className="w-3.5 h-3.5 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
-                      />
-                      <span className={`font-bold text-[11px] ${isCorrect ? 'text-emerald-700' : 'text-slate-600'}`}>{optionPrefix}:</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={opt.replace(/^[A-D]\.\s*/, '')}
-                      onChange={(e) => updateOption(qIdx, optIdx, e.target.value)}
-                      placeholder={`Pilihan ${optionPrefix}`}
-                      className="w-full px-2 py-0.5 rounded bg-transparent text-xs focus:outline-none border-b border-transparent focus:border-purple-400"
-                    />
-                    {isCorrect && (
-                      <span className="text-[10px] font-bold text-emerald-700 flex-shrink-0 bg-emerald-100 px-1 rounded">✓ Kunci</span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+                    ✕ Hapus
+                  </button>
+                </div>
 
-            <input
-              type="text"
-              value={q.explanation || ''}
-              onChange={(e) => updateQuestion(qIdx, { explanation: e.target.value })}
-              placeholder="Pembahasan singkat / alasan jawaban benar (opsional)..."
-              className="w-full px-2.5 py-1.5 text-[11px] rounded-lg border border-slate-200 bg-slate-50 focus:outline-none focus:border-purple-500 text-slate-600 italic"
-            />
-          </div>
-        ))
+                <textarea
+                  rows={2}
+                  value={q.question}
+                  onChange={(e) => updateQuestion(qIdx, { question: e.target.value })}
+                  placeholder="Tuliskan pertanyaan soal kuis di sini..."
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs focus:outline-none focus:border-purple-600 resize-none bg-white"
+                />
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                  {q.options.map((opt, optIdx) => {
+                    const isCorrect = q.correctOptionIndex === optIdx;
+                    const optionPrefix = ['A', 'B', 'C', 'D'][optIdx];
+                    return (
+                      <div
+                        key={optIdx}
+                        className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg border text-xs transition ${
+                          isCorrect ? 'bg-emerald-50 border-emerald-400 ring-1 ring-emerald-400' : 'bg-slate-50 border-slate-200'
+                        }`}
+                      >
+                        <label className="flex items-center gap-1 cursor-pointer flex-shrink-0" title={`Tandai ${optionPrefix} sebagai kunci jawaban`}>
+                          <input
+                            type="radio"
+                            name={`correct-${q.id}`}
+                            checked={isCorrect}
+                            onChange={() => updateQuestion(qIdx, { correctOptionIndex: optIdx })}
+                            className="w-3.5 h-3.5 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                          />
+                          <span className={`font-bold text-[11px] ${isCorrect ? 'text-emerald-700' : 'text-slate-600'}`}>{optionPrefix}:</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={opt.replace(/^[A-D]\.\s*/, '')}
+                          onChange={(e) => updateOption(qIdx, optIdx, e.target.value)}
+                          placeholder={`Pilihan ${optionPrefix}`}
+                          className="w-full px-2 py-0.5 rounded bg-transparent text-xs focus:outline-none border-b border-transparent focus:border-purple-400"
+                        />
+                        {isCorrect && (
+                          <span className="text-[10px] font-bold text-emerald-700 flex-shrink-0 bg-emerald-100 px-1 rounded">✓ Kunci</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <input
+                type="text"
+                value={q.explanation || ''}
+                onChange={(e) => updateQuestion(qIdx, { explanation: e.target.value })}
+                placeholder="Pembahasan singkat / alasan jawaban benar (opsional)..."
+                className="w-full px-2.5 py-1.5 text-[11px] rounded-lg border border-slate-200 bg-slate-50 focus:outline-none focus:border-purple-500 text-slate-600 italic mt-2"
+              />
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );
@@ -700,9 +755,8 @@ export default function CreateAssignmentModal({
       data-lenis-prevent-touch="true"
       className="fixed inset-0 z-[80] bg-slate-900/80 backdrop-blur-xs p-3 sm:p-4 flex items-center justify-center animate-in fade-in duration-150 font-elearning"
     >
-      <form
-        onSubmit={handleSubmit}
-        className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl max-h-[92vh] flex flex-col overflow-hidden"
+      <div
+        className="bg-white rounded-3xl max-w-5xl w-full shadow-2xl max-h-[90vh] flex flex-col overflow-hidden"
       >
         {/* HEADER (fixed) */}
         <div className="px-5 sm:px-7 pt-5 pb-3 flex items-start justify-between gap-3 flex-shrink-0">
@@ -774,29 +828,55 @@ export default function CreateAssignmentModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-3 py-2 rounded-xl text-slate-600 hover:bg-slate-200/60 text-xs font-semibold cursor-pointer"
+              className="px-3 py-2 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-200/60 text-xs font-semibold cursor-pointer"
             >
               Batal
             </button>
+            {prevTab && (
+              <button
+                key={`btn-prev-${prevTab.id}`}
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setActiveTab(prevTab.id);
+                }}
+                className="px-3 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold cursor-pointer transition flex items-center gap-1"
+              >
+                <span>← {prevTab.label}</span>
+              </button>
+            )}
             {nextTab && (
               <button
+                key={`btn-next-${nextTab.id}`}
                 type="button"
-                onClick={() => setActiveTab(nextTab.id)}
-                className="px-3.5 py-2 rounded-xl bg-white border border-indigo-300 text-indigo-700 hover:bg-indigo-50 text-xs font-bold cursor-pointer transition"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setActiveTab(nextTab.id);
+                }}
+                className="px-3.5 py-2 rounded-xl bg-white border border-indigo-300 text-indigo-700 hover:bg-indigo-50 text-xs font-bold cursor-pointer transition shadow-xs flex items-center gap-1 active:scale-95"
               >
-                Lanjut: {nextTab.label} →
+                <span>Lanjut: {nextTab.label}</span>
+                <span>→</span>
               </button>
             )}
             <button
+              key="btn-publish-asg"
               id="create-asg-submit"
-              type="submit"
-              className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-md shadow-indigo-600/20 cursor-pointer"
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleSubmit();
+              }}
+              className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-md shadow-indigo-600/20 cursor-pointer flex items-center gap-1.5 active:scale-95"
             >
-              Terbitkan Tugas
+              <span>🚀 Terbitkan Tugas</span>
             </button>
           </div>
         </div>
-      </form>
+      </div>
     </div>
   );
 }

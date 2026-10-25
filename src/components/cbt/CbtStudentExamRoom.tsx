@@ -1,13 +1,15 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   CbtExamPackage,
   CbtQuestion,
   CbtStudentAnswerState,
   saveStoredStudentCbtSession,
+  getStoredStudentCbtSessions,
   gradeCbtAnswers,
-  getStoredCbtPackages
+  getStoredCbtPackages,
+  evaluateCbtPackageSchedule
 } from '@/lib/cbtData';
 import { Student } from '@/lib/elearningData';
 
@@ -31,26 +33,50 @@ export default function CbtStudentExamRoom({
   // Current question index (0-indexed)
   const [currentIdx, setCurrentIdx] = useState<number>(0);
 
+  // Fallback membaca session aktif siswa dari storage jika initialSession tidak diteruskan
+  const effectiveSession = useMemo(() => {
+    if (initialSession) return initialSession;
+    const all = getStoredStudentCbtSessions();
+    const key = `${exam.id}_${student.id}`;
+    if (all[key]) return all[key];
+    return Object.values(all).find(s => 
+      (s.studentId === student.id || (student.nisn && (s.studentNisn === student.nisn || s.studentId === student.nisn))) &&
+      (!s.examId || s.examId === exam.id)
+    ) || null;
+  }, [initialSession, exam.id, student.id, student.nisn]);
+
   // Student answer state
   const [answers, setAnswers] = useState<Record<string, any>>(
-    initialSession?.answers || {}
+    effectiveSession?.answers || {}
   );
   const [doubtfuls, setDoubtfuls] = useState<Record<string, boolean>>(
-    initialSession?.doubtfuls || {}
+    effectiveSession?.doubtfuls || {}
   );
   const [audioPlays, setAudioPlays] = useState<Record<string, number>>(
-    initialSession?.audioPlayCount || {}
+    effectiveSession?.audioPlayCount || {}
   );
   const [violationCount, setViolationCount] = useState<number>(
-    initialSession?.violationCount || 0
+    effectiveSession?.violationCount || 0
   );
 
+  // Model A: Zero-Tolerance Exam Lockdown (Sekali Keluar = Langsung Terkunci Mati!)
+  const [isLockedByViolation, setIsLockedByViolation] = useState<boolean>(() => {
+    return Boolean(effectiveSession?.violationCount && effectiveSession.violationCount >= 1);
+  });
+  const [unlockTokenInput, setUnlockTokenInput] = useState<string>('');
+  const [unlockError, setUnlockError] = useState<string | null>(null);
+  const [unlockSuccess, setUnlockSuccess] = useState<string | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+
   // Time remaining in seconds
-  const totalDurationSeconds = exam.durationMinutes * 60;
+  const totalDurationSeconds = Math.max(60, (exam.durationMinutes || 60) * 60);
   const [secondsRemaining, setSecondsRemaining] = useState<number>(() => {
-    if (initialSession?.startedAt) {
+    if (initialSession?.startedAt && !initialSession?.isSubmitted) {
       const elapsed = Math.floor((Date.now() - new Date(initialSession.startedAt).getTime()) / 1000);
-      return Math.max(0, totalDurationSeconds - elapsed);
+      const remaining = totalDurationSeconds - elapsed;
+      if (remaining > 30) {
+        return remaining;
+      }
     }
     return totalDurationSeconds;
   });
@@ -67,9 +93,59 @@ export default function CbtStudentExamRoom({
     initialSession?.isSubmitted ? initialSession : null
   );
 
-  // Realtime CBT Package Status Sync (Active / Draft / Paused by Panitia)
+  // Realtime CBT Package Status & Schedule Sync (Active / Window Schedule / Emergency Paused)
   const [currentPackage, setCurrentPackage] = useState<CbtExamPackage>(exam);
-  const isExamPaused = currentPackage.status === 'draft';
+  const [scheduleNow, setScheduleNow] = useState<Date>(new Date());
+
+  useEffect(() => {
+    // Tick every 5 seconds to catch schedule opening/closing precisely
+    const clockTimer = setInterval(() => setScheduleNow(new Date()), 5000);
+    return () => clearInterval(clockTimer);
+  }, []);
+
+  const scheduleEval = useMemo(() => {
+    return evaluateCbtPackageSchedule(currentPackage, scheduleNow);
+  }, [currentPackage, scheduleNow]);
+
+  const isExamPaused = currentPackage.status === 'draft' || scheduleEval.scheduleState === 'emergency_paused';
+
+  // Real-time listener: jika Pengawas membuka kunci dari meja pengawas/panitia secara remote
+  const handleRemoteUnlock = useCallback(() => {
+    try {
+      const sessions = getStoredStudentCbtSessions();
+      const key = `${exam.id}_${student.id}`;
+      let current: CbtStudentAnswerState | undefined = sessions[key];
+      if (!current) {
+        current = Object.values(sessions).find(s => 
+          (s.studentId === student.id || (student.nisn && (s.studentNisn === student.nisn || s.studentId === student.nisn))) &&
+          (!s.examId || s.examId === exam.id)
+        );
+      }
+      if (current) {
+        if (!current.violationCount || current.violationCount === 0) {
+          lastViolationTimeRef.current = Date.now() + 4000;
+          setIsLockedByViolation(false);
+          setViolationCount(0);
+          setUnlockError(null);
+          enterFullscreen();
+        } else {
+          setViolationCount(current.violationCount);
+          setIsLockedByViolation(true);
+        }
+      } else {
+        // Jika sesi telah di-reset/dihapus oleh pengawas dari Meja Pengawas:
+        setIsExamCompleted(false);
+        setCompletedResult(null);
+        setIsLockedByViolation(false);
+        setViolationCount(0);
+        setUnlockError(null);
+        setAnswers({});
+        setDoubtfuls({});
+      }
+    } catch (e) {
+      console.error('Remote unlock sync error', e);
+    }
+  }, [exam.id, student.id, student.nisn]);
 
   useEffect(() => {
     const handlePkgsUpdate = () => {
@@ -79,16 +155,35 @@ export default function CbtStudentExamRoom({
         setCurrentPackage(updated);
       }
     };
+
+    // Sinkronkan langsung saat komponen dibuka
+    handleRemoteUnlock();
+
     window.addEventListener('cbtPackagesUpdated', handlePkgsUpdate);
-    return () => window.removeEventListener('cbtPackagesUpdated', handlePkgsUpdate);
-  }, [exam.id]);
+    window.addEventListener('cbtSessionsUpdated', handleRemoteUnlock);
+    window.addEventListener('storage', handleRemoteUnlock);
+
+    return () => {
+      window.removeEventListener('cbtPackagesUpdated', handlePkgsUpdate);
+      window.removeEventListener('cbtSessionsUpdated', handleRemoteUnlock);
+      window.removeEventListener('storage', handleRemoteUnlock);
+    };
+  }, [exam.id, handleRemoteUnlock]);
 
   // Audio playing ref
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isPlayingAudio, setIsPlayingAudio] = useState<boolean>(false);
 
   const startedAtRef = useRef<string>(
-    initialSession?.startedAt || new Date().toISOString()
+    (() => {
+      if (initialSession?.startedAt && !initialSession?.isSubmitted) {
+        const elapsed = Math.floor((Date.now() - new Date(initialSession.startedAt).getTime()) / 1000);
+        if (totalDurationSeconds - elapsed > 30) {
+          return initialSession.startedAt;
+        }
+      }
+      return new Date().toISOString();
+    })()
   );
 
   // 1. Timer countdown (Automatically frozen when exam is paused)
@@ -109,29 +204,209 @@ export default function CbtStudentExamRoom({
     return () => clearInterval(timer);
   }, [isExamCompleted, isExamPaused]);
 
-  // 2. Anti-Cheating: Window blur / tab switch detection
+  // Fullscreen helper (Cross-browser mobile & desktop)
+  const enterFullscreen = async () => {
+    try {
+      const docEl = document.documentElement as any;
+      if (docEl && !document.fullscreenElement && !docEl.webkitFullscreenElement) {
+        if (docEl.requestFullscreen) {
+          await docEl.requestFullscreen();
+        } else if (docEl.webkitRequestFullscreen) {
+          await docEl.webkitRequestFullscreen();
+        }
+        setIsFullscreen(true);
+      }
+    } catch {
+      // Browser might require direct user gesture
+    }
+  };
+
+  const lastViolationTimeRef = useRef<number>(Date.now() + 3000);
+
+  // Helper: Trigger Violation with ZERO-TOLERANCE (Sekali Keluar Langsung Terkunci Mati!)
+  const triggerViolation = (reasonText: string) => {
+    if (isExamCompleted || isExamPaused) return;
+
+    const now = Date.now();
+    // Abaikan jika masih dalam masa tenggang awal (grace period 3 detik)
+    if (now < lastViolationTimeRef.current) {
+      return;
+    }
+    // Minimal jeda 1 detik antar pelanggaran agar tidak dobel hitungan
+    if (now - lastViolationTimeRef.current < 1000) {
+      return;
+    }
+    lastViolationTimeRef.current = now;
+
+    setViolationCount(prev => {
+      const nextCount = prev + 1;
+      persistSession(answers, doubtfuls, nextCount);
+
+      // ZERO-TOLERANCE: Sekali saja siswa keluar (buka Google/WA/aplikasi lain), ujian LANGSUNG TERKUNCI!
+      setIsLockedByViolation(true);
+      setWarningMessage(null);
+      return nextCount;
+    });
+  };
+
+  // Helper: Supervisor Unlock Logic (RAHASIA: Siswa TIDAK TAHU PIN Ini!)
+  const handleUnlockExam = () => {
+    const cleanInput = unlockTokenInput.trim().toUpperCase();
+    // PIN Rahasia Pengawas Ruangan / Panitia (Bukan Token Ujian yang ada di papan tulis!)
+    const validSupervisorPins = [
+      'SPENTIC99',
+      '999999',
+      'GURU2026',
+      'PENGAWAS2026',
+      'PANITIA2026'
+    ];
+
+    if (!cleanInput) {
+      setUnlockError('Harap masukkan PIN Rahasia Pengawas!');
+      return;
+    }
+
+    // Jika siswa mencoba memasukkan token ujian papan tulis
+    if (cleanInput === exam.token.toUpperCase().trim()) {
+      setUnlockError('❌ Token Ujian papan tulis TIDAK BISA digunakan untuk membuka pelanggaran! Panggil Pengawas Ruangan Anda.');
+      return;
+    }
+
+    if (validSupervisorPins.includes(cleanInput)) {
+      setUnlockError(null);
+      setUnlockSuccess('Kunci ujian berhasil dibuka oleh Pengawas!');
+      setTimeout(() => {
+        setIsLockedByViolation(false);
+        setViolationCount(0);
+        setUnlockTokenInput('');
+        setUnlockSuccess(null);
+        persistSession(answers, doubtfuls, 0);
+        enterFullscreen();
+      }, 700);
+    } else {
+      setUnlockError('❌ PIN Pengawas salah! Hanya Guru Pengawas yang berhak membuka lembar ujian ini.');
+    }
+  };
+
+  // 2. Anti-Cheating: Window blur (Alt+Tab) / tab switch / fullscreen & key detection
   useEffect(() => {
     if (isExamCompleted) return;
 
+    // 1. Deteksi saat jendela browser kehilangan fokus (Alt+Tab, klik Word, klik WA, klik aplikasi lain)
+    const handleWindowBlur = () => {
+      if (isExamCompleted || isExamPaused) return;
+      if (Date.now() < lastViolationTimeRef.current) return;
+      triggerViolation('Anda terdeteksi berpindah ke aplikasi lain atau melakukan Alt+Tab!');
+    };
+
+    // 2. Deteksi saat tab browser disembunyikan / berganti tab
     const handleVisibilityChange = () => {
+      if (isExamCompleted || isExamPaused) return;
+      if (Date.now() < lastViolationTimeRef.current) return;
       if (document.hidden) {
-        setViolationCount(prev => {
-          const nextCount = prev + 1;
-          setWarningMessage(
-            `⚠️ PERINGATAN INTEGRITAS UJIAN!\nAnda terdeteksi berpindah tab/layar (${nextCount}/3). Harap tetap berada di lembar ujian CBT.`
-          );
-          // Persist violation
-          persistSession(answers, doubtfuls, nextCount);
-          return nextCount;
-        });
+        triggerViolation('Anda terdeteksi berpindah tab browser atau meminimalkan layar ujian.');
       }
     };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    // 3. Deteksi aktif berkala (Heartbeat Monitor): Menangkap jika user membuka Word, WA, atau aplikasi desktop lain di depan browser
+    const focusHeartbeat = setInterval(() => {
+      if (isExamCompleted || isExamPaused) return;
+      if (Date.now() < lastViolationTimeRef.current) return;
+
+      // Jika document tidak memiliki fokus atau tab sedang tersembunyi
+      if (!document.hasFocus() || document.hidden) {
+        triggerViolation('Terdeteksi keluar dari layar ujian CBT (membuka aplikasi lain di komputer/HP)!');
+      }
+    }, 700);
+
+    const handleFullscreenChange = () => {
+      const active = Boolean(
+        document.fullscreenElement || 
+        (document as any).webkitFullscreenElement ||
+        (document as any).mozFullScreenElement ||
+        (document as any).msFullscreenElement
+      );
+      setIsFullscreen(active);
+      if (Date.now() < lastViolationTimeRef.current) return;
+      if (!active && !isExamCompleted && !isExamPaused) {
+        triggerViolation('Anda keluar dari Mode Layar Penuh (Fullscreen)!');
+      }
     };
-  }, [isExamCompleted, answers, doubtfuls]);
+
+    // Deteksi Layar Belah (Split Screen / Multi-Window di HP Android / iOS)
+    const handleResizeOrSplitScreen = () => {
+      if (isExamCompleted || isExamPaused) return;
+      if (typeof window !== 'undefined' && window.screen) {
+        const screenH = window.screen.availHeight || window.screen.height;
+        const screenW = window.screen.availWidth || window.screen.width;
+        // Jika layar belah diaktifkan, tinggi atau lebar browser terpotong drastis (< 55% dari layar)
+        // Abaikan jika sedang mengetik (ada input/textarea yang sedang fokus)
+        const isTyping = ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName || '');
+        if (!isTyping && screenH > 500 && window.innerHeight < screenH * 0.52) {
+          triggerViolation('Terdeteksi menggunakan Layar Belah (Split Screen / Multi-Window)!');
+        }
+      }
+    };
+
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'F12') {
+        e.preventDefault();
+      }
+      if (e.ctrlKey && e.shiftKey && ['i', 'j', 'c'].includes(e.key.toLowerCase())) {
+        e.preventDefault();
+      }
+      if (e.ctrlKey && ['u', 'p', 's'].includes(e.key.toLowerCase())) {
+        e.preventDefault();
+      }
+    };
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+
+    // Anti-Copy, Anti-Cut, Anti-Paste & Anti-Drag (Anti Google Lens / Cheating)
+    const handleBlockClipboard = (e: Event) => {
+      e.preventDefault();
+    };
+
+    window.addEventListener('blur', handleWindowBlur);
+    window.addEventListener('pagehide', handleVisibilityChange);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    window.addEventListener('resize', handleResizeOrSplitScreen);
+    window.addEventListener('contextmenu', handleContextMenu);
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('copy', handleBlockClipboard);
+    window.addEventListener('cut', handleBlockClipboard);
+    window.addEventListener('paste', handleBlockClipboard);
+    window.addEventListener('selectstart', handleBlockClipboard);
+    window.addEventListener('dragstart', handleBlockClipboard);
+
+    return () => {
+      clearInterval(focusHeartbeat);
+      window.removeEventListener('blur', handleWindowBlur);
+      window.removeEventListener('pagehide', handleVisibilityChange);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      window.removeEventListener('resize', handleResizeOrSplitScreen);
+      window.removeEventListener('contextmenu', handleContextMenu);
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('copy', handleBlockClipboard);
+      window.removeEventListener('cut', handleBlockClipboard);
+      window.removeEventListener('paste', handleBlockClipboard);
+      window.removeEventListener('selectstart', handleBlockClipboard);
+      window.removeEventListener('dragstart', handleBlockClipboard);
+    };
+  }, [isExamCompleted, isExamPaused, answers, doubtfuls]);
 
   // 3. Format timer: HH:MM:SS
   const formattedTime = useMemo(() => {
@@ -170,6 +445,7 @@ export default function CbtStudentExamRoom({
 
   // Answer handler for PG (Single)
   const handleSelectPgOption = (optionIdx: number) => {
+    if (isLockedByViolation) return;
     const newAnswers = { ...answers, [currentQuestion.id]: optionIdx };
     setAnswers(newAnswers);
     persistSession(newAnswers, doubtfuls);
@@ -177,6 +453,7 @@ export default function CbtStudentExamRoom({
 
   // Answer handler for PG Kompleks (Multi Checkbox)
   const handleTogglePgKompleks = (optionIdx: number) => {
+    if (isLockedByViolation) return;
     const currentList: number[] = Array.isArray(answers[currentQuestion.id])
       ? answers[currentQuestion.id]
       : [];
@@ -193,6 +470,7 @@ export default function CbtStudentExamRoom({
 
   // Answer handler for Benar / Salah
   const handleSelectBenarSalah = (statementId: string, value: boolean) => {
+    if (isLockedByViolation) return;
     const currentObj = answers[currentQuestion.id] || {};
     const updatedObj = { ...currentObj, [statementId]: value };
     const newAnswers = { ...answers, [currentQuestion.id]: updatedObj };
@@ -202,6 +480,7 @@ export default function CbtStudentExamRoom({
 
   // Answer handler for Menjodohkan
   const handleSelectMenjodohkan = (matchingId: string, rightValue: string) => {
+    if (isLockedByViolation) return;
     const currentObj = answers[currentQuestion.id] || {};
     const updatedObj = { ...currentObj, [matchingId]: rightValue };
     const newAnswers = { ...answers, [currentQuestion.id]: updatedObj };
@@ -211,6 +490,7 @@ export default function CbtStudentExamRoom({
 
   // Toggle Ragu-Ragu
   const handleToggleDoubtful = () => {
+    if (isLockedByViolation) return;
     const isCurrentlyDoubtful = Boolean(doubtfuls[currentQuestion.id]);
     const newDoubtfuls = { ...doubtfuls, [currentQuestion.id]: !isCurrentlyDoubtful };
     setDoubtfuls(newDoubtfuls);
@@ -296,6 +576,15 @@ export default function CbtStudentExamRoom({
     handleConfirmSubmit();
   };
 
+  // Otomatis kumpulkan jawaban saat batas akhir jam sesi resmi ujian (endTime) telah tercapai
+  useEffect(() => {
+    if (!isExamCompleted && scheduleEval.scheduleState === 'expired') {
+      handleForceAutoSubmit(
+        `Batas waktu sesi resmi ujian telah berakhir (${currentPackage.endTime || 'Jadwal ditutup'})!`
+      );
+    }
+  }, [scheduleEval.scheduleState, isExamCompleted, currentPackage.endTime]);
+
   // -------------------------------------------------------------
   // JIKA SISWA SUDAH SELESAI MENGERJAKAN (TAMPILAN SELESAI)
   // -------------------------------------------------------------
@@ -349,13 +638,49 @@ export default function CbtStudentExamRoom({
             Jawaban Anda telah tersimpan aman di server sekolah. Terima kasih telah mengikuti ujian dengan tertib dan jujur.
           </div>
 
-          <button
-            type="button"
-            onClick={onExitRoom}
-            className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-lg shadow-emerald-600/30 cursor-pointer"
-          >
-            Kembali ke Beranda E-Learning
-          </button>
+          <div className="flex flex-col gap-2.5 pt-2">
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof document !== 'undefined' && document.fullscreenElement) {
+                  document.exitFullscreen().catch(() => {});
+                }
+                onExitRoom();
+              }}
+              className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-lg shadow-emerald-600/30 cursor-pointer active:scale-98"
+            >
+              Kembali ke Beranda E-Learning
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                const sessions = getStoredStudentCbtSessions();
+                const key = `${exam.id}_${student.id}`;
+                const current = sessions[key] || Object.values(sessions).find(s => 
+                  (s.studentId === student.id || (student.nisn && (s.studentNisn === student.nisn || s.studentId === student.nisn))) &&
+                  (!s.examId || s.examId === exam.id)
+                );
+                if (!current || !current.isSubmitted) {
+                  alert('✅ Sesi ujian telah di-reset oleh Pengawas Ruangan! Membuka kembali lembar ujian dari awal...');
+                  setIsExamCompleted(false);
+                  setCompletedResult(null);
+                  setAnswers({});
+                  setDoubtfuls({});
+                  setViolationCount(0);
+                  setIsLockedByViolation(false);
+                  setSecondsRemaining(currentPackage.durationMinutes * 60);
+                  startedAtRef.current = new Date().toISOString();
+                } else {
+                  alert('ℹ️ Sesi ujian ini masih berstatus "Telah Dikumpulkan" di server sekolah.\n\nJika pengawas ruangan baru saja mereset, pastikan pengawas mengklik tombol "Reset" pada baris nama Anda di Meja Pengawas.');
+                }
+              }}
+              className="w-full py-2.5 px-3 rounded-xl bg-slate-700/70 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold transition border border-slate-600 flex items-center justify-center gap-1.5 cursor-pointer active:scale-98"
+            >
+              <span>🔄</span>
+              <span>Cek Status Reset Pengawas / Kerjakan Ulang</span>
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -365,7 +690,7 @@ export default function CbtStudentExamRoom({
   // TAMPILAN RUANG UJIAN CBT AKTIF (FOCUS MODE)
   // -------------------------------------------------------------
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col font-sans select-none">
+    <div className="min-h-screen bg-slate-100 flex flex-col font-sans select-none" style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}>
       
       {/* 1. TOP BAR CBT (STATUS & TIMER) */}
       <header className="bg-slate-900 text-white border-b border-slate-800 px-4 sm:px-6 py-3 sticky top-0 z-40 shadow-md">
@@ -438,6 +763,40 @@ export default function CbtStudentExamRoom({
               </button>
             </div>
 
+            {/* FULLSCREEN BUTTON */}
+            {!isFullscreen && !isExamCompleted && (
+              <button
+                type="button"
+                onClick={enterFullscreen}
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 font-bold text-xs transition cursor-pointer"
+                title="Buka Layar Penuh"
+              >
+                <span>⛶</span>
+                <span>Layar Penuh</span>
+              </button>
+            )}
+
+            {/* VIOLATION COUNTER BADGE */}
+            {violationCount > 0 && (
+              <div className="px-2.5 py-1.5 rounded-xl border flex items-center gap-1.5 text-xs font-bold bg-rose-950 border-rose-500 text-rose-300 animate-pulse">
+                <span>🔒</span>
+                <span>Terkunci ({violationCount}x Keluar)</span>
+              </div>
+            )}
+
+            {/* SESSION SCHEDULE BADGE */}
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-800 border border-slate-700 text-xs">
+              <span className="text-sm text-amber-400">🕒</span>
+              <div>
+                <div className="text-[9px] uppercase tracking-wider text-slate-400 font-sans leading-none">
+                  Sesi Ujian
+                </div>
+                <div className="text-xs font-bold text-slate-200 font-mono leading-none mt-0.5">
+                  {currentPackage.startTime || '06:00'} - {currentPackage.endTime || '23:59'} WIB
+                </div>
+              </div>
+            </div>
+
             {/* COUNTDOWN TIMER BADGE */}
             <div className={`px-3.5 py-1.5 rounded-xl border flex items-center gap-2 font-mono font-bold text-xs shadow-inner ${
               isLowTime 
@@ -463,7 +822,21 @@ export default function CbtStudentExamRoom({
         
         {/* KOLOM KIRI (3/4): LEMBAR SOAL */}
         <section className="lg:col-span-3 space-y-4">
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm space-y-5">
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm space-y-5 relative overflow-hidden select-none">
+            
+            {/* DYNAMIC WATERMARK (ANTI-SCREENSHOT & ANTI-BOCOR SOAL) */}
+            <div 
+              className="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden flex flex-wrap items-center justify-around gap-y-16 gap-x-12 p-4 opacity-[0.055] sm:opacity-[0.065] rotate-[-18deg] scale-110"
+              aria-hidden="true"
+            >
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="text-center font-black tracking-widest text-slate-900 text-xs sm:text-sm uppercase leading-tight font-mono select-none">
+                  <div>SMP NEGERI 3 CIHAMPELAS</div>
+                  <div className="text-rose-900 font-extrabold">{student.name} • NISN: {student.nisn}</div>
+                  <div>KELAS {student.classId} • {roomName}</div>
+                </div>
+              ))}
+            </div>
             
             {/* Header Soal (Nomor & Tipe Soal) */}
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
@@ -926,26 +1299,130 @@ export default function CbtStudentExamRoom({
         </div>
       )}
 
-      {/* MODAL PERINGATAN CURANG / PINDAH TAB */}
-      {warningMessage && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm">
-          <div className="bg-white border-2 border-rose-500 rounded-3xl p-6 max-w-md w-full text-center space-y-4 shadow-2xl">
-            <div className="w-14 h-14 rounded-full bg-rose-100 text-rose-600 mx-auto flex items-center justify-center text-2xl font-black">
+      {/* MODAL PERINGATAN CURANG / PINDAH TAB (TOLERANSI 1 & 2) */}
+      {warningMessage && !isLockedByViolation && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/85 backdrop-blur-md">
+          <div className="bg-white border-2 border-amber-500 rounded-3xl p-6 sm:p-7 max-w-md w-full text-center space-y-4 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 rounded-full bg-amber-100 text-amber-600 border border-amber-200 mx-auto flex items-center justify-center text-3xl font-black">
               ⚠️
             </div>
-            <h3 className="text-base font-bold text-slate-900">
-              Peringatan Integritas Ujian!
-            </h3>
-            <p className="text-xs text-slate-600 whitespace-pre-line leading-relaxed">
-              {warningMessage}
-            </p>
+            <div className="space-y-1">
+              <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-800 text-[11px] font-black uppercase tracking-wider">
+                Peringatan Integritas ({violationCount}/3)
+              </span>
+              <h3 className="text-base sm:text-lg font-bold text-slate-900 pt-1">
+                Terdeteksi Meninggalkan Ujian
+              </h3>
+            </div>
+            <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-900 leading-relaxed text-left space-y-1.5">
+              <p className="font-semibold whitespace-pre-line">{warningMessage}</p>
+              <p className="text-[11px] text-amber-800 border-t border-amber-200/80 pt-1.5">
+                Aktivitas ini dicatat di monitor Panitia & Pengawas Ruangan. Sisa kesempatan: <strong>{Math.max(0, 3 - violationCount)}x</strong> sebelum sistem <strong>MENGUNCI TOTAL</strong> lembar ujian Anda.
+              </p>
+            </div>
             <button
               type="button"
-              onClick={() => setWarningMessage(null)}
-              className="w-full py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs transition cursor-pointer"
+              onClick={() => {
+                setWarningMessage(null);
+                enterFullscreen();
+              }}
+              className="w-full py-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs transition shadow-lg shadow-amber-600/30 cursor-pointer active:scale-95 flex items-center justify-center gap-2"
             >
-              Saya Mengerti & Lanjutkan Ujian
+              <span>Saya Mengerti & Lanjutkan Ujian</span>
+              <span>→</span>
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL LOCKDOWN RESMI CBT (REMOTE UNLOCK ONLY - RINGKAS & RAPIH) */}
+      {isLockedByViolation && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/95 backdrop-blur-md select-none">
+          <div className="bg-slate-900 border border-rose-500/80 rounded-2xl sm:rounded-3xl p-5 sm:p-6 max-w-sm sm:max-w-md w-full text-center space-y-3.5 shadow-2xl shadow-rose-950/80 max-h-[92vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
+            
+            {/* Icon & Badge */}
+            <div className="flex flex-col items-center gap-2">
+              <div className="w-12 h-12 rounded-2xl bg-rose-500/20 text-rose-500 border border-rose-500/40 flex items-center justify-center text-2xl shadow-inner animate-pulse">
+                🔒
+              </div>
+              <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-rose-500 text-white text-[10px] font-black uppercase tracking-wider">
+                <span>●</span>
+                <span>UJIAN TERKUNCI</span>
+              </div>
+            </div>
+
+            {/* Title & Short Reason */}
+            <div className="space-y-0.5">
+              <h2 className="text-base sm:text-lg font-black text-white">
+                Akses Ujian Dibekukan
+              </h2>
+              <p className="text-xs text-rose-300">
+                Terdeteksi meninggalkan lembar ujian ({violationCount}x keluar).
+              </p>
+            </div>
+
+            {/* Compact Student Identity */}
+            <div className="bg-slate-800/80 border border-slate-700/80 rounded-xl p-3 text-xs text-slate-300 grid grid-cols-2 gap-2 text-left">
+              <div>
+                <span className="text-[10px] text-slate-400 block uppercase font-semibold tracking-wider">Peserta</span>
+                <span className="font-bold text-white truncate block">{student.name}</span>
+                <span className="text-[11px] text-slate-400 font-mono">{student.classId} • {student.nisn}</span>
+              </div>
+              <div className="border-l border-slate-700/60 pl-2">
+                <span className="text-[10px] text-slate-400 block uppercase font-semibold tracking-wider">Ruangan</span>
+                <span className="font-semibold text-slate-200 block truncate">{roomName}</span>
+                <span className="text-[10px] text-rose-400 font-semibold block mt-0.5">🚨 Status: Terkunci</span>
+              </div>
+            </div>
+
+            {/* Concise Instruction */}
+            <div className="p-3 rounded-xl bg-rose-950/40 border border-rose-500/30 text-xs text-rose-200 text-center leading-relaxed">
+              ✋ <strong>Angkat tangan</strong> dan lapor ke <strong>Pengawas Ruangan</strong> untuk membuka kunci ujian dari Meja Pengawas.
+            </div>
+
+            {/* Real-time Status & Sync */}
+            {violationCount === 0 ? (
+              <div className="space-y-2">
+                <div className="py-2.5 px-3 rounded-xl bg-emerald-950/70 border border-emerald-500/50 flex items-center justify-center gap-2 text-emerald-400 font-bold text-xs">
+                  <span>✅</span>
+                  <span>Kunci Telah Dibuka Pengawas!</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    lastViolationTimeRef.current = Date.now() + 4000;
+                    setIsLockedByViolation(false);
+                    enterFullscreen();
+                  }}
+                  className="w-full py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-black text-xs shadow-lg shadow-emerald-950 transition flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <span>🚀 Lanjutkan Ujian Sekarang</span>
+                  <span>➔</span>
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="py-2 px-3 rounded-xl bg-slate-950/70 border border-slate-800 flex items-center justify-center gap-2 text-amber-400 font-semibold text-xs">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                  </span>
+                  <span>Menunggu Buka Kunci Pengawas...</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleRemoteUnlock();
+                  }}
+                  className="w-full py-1.5 px-3 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white text-[11px] font-semibold transition border border-slate-700 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                  title="Klik untuk sinkronisasi manual jika pengawas sudah membuka kunci"
+                >
+                  <span>🔄</span>
+                  <span>Cek Status Buka Kunci Pengawas</span>
+                </button>
+              </div>
+            )}
+
           </div>
         </div>
       )}
@@ -1009,26 +1486,31 @@ export default function CbtStudentExamRoom({
         </div>
       )}
 
-      {/* OVERLAY UJIAN DIJEDA OLEH PANITIA PUSAT */}
+      {/* OVERLAY UJIAN DIJEDA OLEH PANITIA PUSAT (JEDA DARURAT / MANUAL PAUSE) */}
       {isExamPaused && !isExamCompleted && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-fade-in">
           <div className="bg-slate-900 border border-amber-500/30 rounded-3xl p-6 sm:p-8 max-w-md w-full text-center space-y-4 shadow-2xl">
             <div className="w-16 h-16 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-3xl mx-auto animate-pulse">
               ⏸️
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400/20 text-amber-300 border border-amber-400/30">
-                Instruksi Posko Panitia CBT
+                {currentPackage.emergencyPaused ? '⚠️ JEDA DARURAT POSKO CBT' : 'Instruksi Panitia CBT'}
               </span>
               <h3 className="text-lg font-black text-white">
                 Sesi Ujian Sedang Dijeda
               </h3>
+              {currentPackage.emergencyPauseReason && (
+                <div className="p-2.5 rounded-xl bg-amber-950/50 border border-amber-500/40 text-amber-200 text-xs font-semibold leading-relaxed">
+                  📢 Catatan Panitia: {currentPackage.emergencyPauseReason}
+                </div>
+              )}
               <p className="text-xs text-slate-300 leading-relaxed">
-                Panitia CBT pusat sedang menjeda sesi ujian ini. Waktu pengerjaan Anda otomatis dibekukan (tidak berkurang) dan seluruh jawaban Anda telah tersimpan dengan aman di server sekolah.
+                Panitia CBT pusat sedang menjeda sesi ujian ini. Waktu pengerjaan Anda otomatis dibekukan (tidak berkurang) dan seluruh jawaban yang telah Anda pilih tersimpan aman di server sekolah.
               </p>
             </div>
             <div className="p-3 rounded-xl bg-slate-800/80 border border-slate-700 text-[11px] text-slate-400">
-              💡 Harap tetap berada di halaman ini. Layar pengerjaan akan otomatis terbuka kembali begitu panitia mengaktifkan sesi ujian.
+              💡 Harap tetap berada di halaman ini dan tidak menutup aplikasi. Layar ujian akan otomatis kembali aktif begitu panitia melanjutkan sesi ujian.
             </div>
           </div>
         </div>

@@ -5382,6 +5382,19 @@ export function getStoredAssignments(): Assignment[] {
       }
     });
 
+    // Normalisasi mapel ganda (misal 'PABP & Bahasa Sunda' dipecah ke mapel yang sesuai: PABP atau B. Sunda)
+    list.forEach(asg => {
+      if (asg.subject && (asg.subject.includes('&') || asg.subject.includes(' dan '))) {
+        const titleLower = (asg.title || '').toLowerCase();
+        if (titleLower.includes('sunda') || titleLower.includes('paguneman') || titleLower.includes('pupuh') || titleLower.includes('aksara')) {
+          asg.subject = 'Bahasa Sunda';
+        } else {
+          asg.subject = 'Pendidikan Agama Islam (PABP)';
+        }
+        hasChanges = true;
+      }
+    });
+
     if (hasChanges) {
       localStorage.setItem(ASSIGNMENTS_STORAGE_KEY, JSON.stringify(list));
     }

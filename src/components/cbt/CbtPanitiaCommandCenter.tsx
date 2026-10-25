@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useDeferredValue, useRef, startTransition } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useDeferredValue, useRef, startTransition } from 'react';
 import {
   CbtExamPackage,
   CbtExamRoomConfig,
@@ -12,16 +12,29 @@ import {
   getStoredCbtPackages,
   saveStoredCbtPackages,
   getStoredStudentCbtSessions,
+  saveStoredStudentCbtSession,
   resetStoredStudentCbtSession,
   getStoredCbtRoomAttendances,
   getStudentsForRoom,
   updateRoomMetadata,
   splitTwoClassesAcrossTwoRooms,
   getDefaultSchoolRooms,
-  registerEmergencyStudentToCbt
+  registerEmergencyStudentToCbt,
+  evaluateCbtPackageSchedule,
+  updateCbtPackageSchedule,
+  toggleCbtEmergencyPause,
+  CbtSupervisorScheduleEntry,
+  CbtSupervisorSchedule,
+  getDefaultSupervisorSchedule,
+  getStoredSupervisorSchedule,
+  saveStoredSupervisorSchedule,
+  CbtScheduleSessionSlot,
+  DEFAULT_SCHEDULE_SESSIONS,
+  getSupervisorForSlot,
+  generateSessionsFromExamPackages
 } from '@/lib/cbtData';
-import { Student, SCHOOL_CLASSES } from '@/lib/elearningData';
-import { exportCbtSchoolRekapBapToExcel, exportCbtRoomBapToExcel } from '@/lib/elearningExport';
+import { Student, SCHOOL_CLASSES, DEMO_TEACHERS } from '@/lib/elearningData';
+import { exportCbtSchoolRekapBapToExcel, exportCbtRoomBapToExcel, exportCbtSusulanListToExcel } from '@/lib/elearningExport';
 
 interface FastSearchInputProps {
   value: string;
@@ -107,8 +120,22 @@ export default function CbtPanitiaCommandCenter({
   const [studentSessions, setStudentSessions] = useState(() => getStoredStudentCbtSessions());
   const [roomAttendances, setRoomAttendances] = useState(() => getStoredCbtRoomAttendances());
 
-  // Active Tab: 'monitoring' | 'arrangement' | 'search' | 'bap'
-  const [activeTab, setActiveTab] = useState<'monitoring' | 'arrangement' | 'search' | 'bap'>('monitoring');
+  // Active Tab: 'monitoring' | 'schedule' | 'arrangement' | 'search' | 'susulan' | 'bap'
+  const [activeTab, setActiveTab] = useState<'monitoring' | 'schedule' | 'arrangement' | 'search' | 'susulan' | 'bap'>('monitoring');
+
+  // Supervisor Schedule State (Jadwal Pengawas Jam 1 & Jam 2 untuk 17 Ruangan)
+  const [supervisorSchedule, setSupervisorSchedule] = useState<CbtSupervisorSchedule>(() => getStoredSupervisorSchedule());
+  const [scheduleSearchQuery, setScheduleSearchQuery] = useState<string>('');
+  const [scheduleSavedToast, setScheduleSavedToast] = useState<boolean>(false);
+  const [lastScheduleSaveTime, setLastScheduleSaveTime] = useState<string>('');
+
+  const triggerScheduleSaveToast = () => {
+    const now = new Date();
+    const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')} WIB`;
+    setLastScheduleSaveTime(timeStr);
+    setScheduleSavedToast(true);
+    setTimeout(() => setScheduleSavedToast(false), 2500);
+  };
 
   // Room Custom Edit Modal State (Edit Pengawas, Nama, Kapasitas & Kelas manual)
   const [editingRoom, setEditingRoom] = useState<CbtExamRoomConfig | null>(null);
@@ -135,6 +162,16 @@ export default function CbtPanitiaCommandCenter({
   const [previewMonitoringRoom, setPreviewMonitoringRoom] = useState<CbtExamRoomConfig | null>(null);
   const [previewBapRoom, setPreviewBapRoom] = useState<CbtExamRoomConfig | null>(null);
   const [showRekapPrintModal, setShowRekapPrintModal] = useState<boolean>(false);
+  const [susulanFilterStatus, setSusulanFilterStatus] = useState<'all' | 'S' | 'I'>('all');
+  const [susulanFilterQuery, setSusulanFilterQuery] = useState<string>('');
+
+  // Modal Atur Jam & Tanggal Jadwal Sesi CBT
+  const [showScheduleModal, setShowScheduleModal] = useState<boolean>(false);
+  const [selectedSchedPackageId, setSelectedSchedPackageId] = useState<string>('all');
+  const [schedDate, setSchedDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
+  const [schedStartTime, setSchedStartTime] = useState<string>('07:30');
+  const [schedEndTime, setSchedEndTime] = useState<string>('09:00');
+  const [schedDuration, setSchedDuration] = useState<number>(60);
 
   // ==========================================
   // ROOM ARRANGEMENT STATE (Penyusunan Ruangan)
@@ -178,11 +215,13 @@ export default function CbtPanitiaCommandCenter({
     setConfig(getStoredCbtPanitiaConfig());
     setStudentSessions(getStoredStudentCbtSessions());
     setRoomAttendances(getStoredCbtRoomAttendances());
+    setSupervisorSchedule(getStoredSupervisorSchedule());
 
     const handlePkgs = () => setPackages(getStoredCbtPackages());
     const handleSessions = () => setStudentSessions(getStoredStudentCbtSessions());
     const handleConfig = () => setConfig(getStoredCbtPanitiaConfig());
     const handleAttendances = () => setRoomAttendances(getStoredCbtRoomAttendances());
+    const handleSchedule = () => setSupervisorSchedule(getStoredSupervisorSchedule());
 
     const handleStorage = (e: StorageEvent) => {
       if (!e.key || e.key.includes('cbt')) {
@@ -190,6 +229,7 @@ export default function CbtPanitiaCommandCenter({
         handleSessions();
         handleConfig();
         handleAttendances();
+        handleSchedule();
       }
     };
 
@@ -198,6 +238,7 @@ export default function CbtPanitiaCommandCenter({
     window.addEventListener('cbtPanitiaConfigUpdated', handleConfig);
     window.addEventListener('cbtRoomAttendancesUpdated', handleAttendances);
     window.addEventListener('cbtAttendanceUpdated', handleAttendances);
+    window.addEventListener('cbtSupervisorScheduleUpdated', handleSchedule);
     window.addEventListener('storage', handleStorage);
 
     return () => {
@@ -206,6 +247,7 @@ export default function CbtPanitiaCommandCenter({
       window.removeEventListener('cbtPanitiaConfigUpdated', handleConfig);
       window.removeEventListener('cbtRoomAttendancesUpdated', handleAttendances);
       window.removeEventListener('cbtAttendanceUpdated', handleAttendances);
+      window.removeEventListener('cbtSupervisorScheduleUpdated', handleSchedule);
       window.removeEventListener('storage', handleStorage);
     };
   }, []);
@@ -354,7 +396,11 @@ export default function CbtPanitiaCommandCenter({
     setEditRoomName(room.name);
     setEditRoomCapacity(room.capacity || 36);
     setEditRoomClasses([...room.classes]);
-    setEditRoomSupervisor(room.supervisorName || 'Guru Pengawas');
+    const latestAtt = attendancesByRoomMap.get(room.name)?.[0];
+    const initialSup = (latestAtt?.supervisorName && latestAtt.supervisorName !== 'Guru Pengawas Ruang' && latestAtt.supervisorName.trim() !== '')
+      ? latestAtt.supervisorName
+      : (room.supervisorName || 'Guru Pengawas');
+    setEditRoomSupervisor(initialSup);
   };
 
   // Save Room Custom Edit
@@ -378,7 +424,6 @@ export default function CbtPanitiaCommandCenter({
           name: trimmedName,
           capacity: capacityVal,
           classes: editRoomClasses,
-          supervisorName: editRoomSupervisor.trim() || 'Guru Pengawas',
           label: `${trimmedName} (${labelSuffix})`
         };
       }
@@ -392,20 +437,49 @@ export default function CbtPanitiaCommandCenter({
 
     saveStoredCbtPanitiaConfig(updatedConfig);
     setConfig(updatedConfig);
+
     setEditingRoom(null);
     showAlert(`Pengaturan ${trimmedName} berhasil diperbarui!`);
   };
 
-  // Toggle All Exam Packages Status (Master Start / Pause)
-  const handleToggleAllPackages = (newStatus: 'active' | 'draft') => {
-    const updated = packages.map(p => ({ ...p, status: newStatus }));
-    saveStoredCbtPackages(updated);
+  // Simpan Jadwal Waktu Sesi Ujian (Tanggal, Jam Mulai, Jam Selesai, Durasi) - Bisa Per Mapel atau Serentak
+  const handleSaveSchedule = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (schedStartTime >= schedEndTime) {
+      alert('Jam mulai harus lebih awal daripada jam selesai.');
+      return;
+    }
+    const isAll = selectedSchedPackageId === 'all';
+    const updated = updateCbtPackageSchedule({
+      packageId: isAll ? undefined : selectedSchedPackageId,
+      examDate: schedDate,
+      startTime: schedStartTime,
+      endTime: schedEndTime,
+      durationMinutes: Number(schedDuration) || 60
+    });
     setPackages(updated);
-    showAlert(
-      newStatus === 'active'
-        ? '▶️ Seluruh paket ujian CBT berhasil DIAKTIFKAN serentak!'
-        : '⏸️ Seluruh paket ujian CBT berhasil DIJEDA (Draft) serentak!'
-    );
+    setShowScheduleModal(false);
+    const targetPkg = packages.find(p => p.id === selectedSchedPackageId);
+    const targetLabel = isAll ? 'Semua Mata Pelajaran' : `Mata Pelajaran ${targetPkg?.subject || 'Terpilih'}`;
+    showAlert(`✓ Jadwal Asesmen Berhasil Diperbarui!\n\nTarget: ${targetLabel}\nTanggal: ${schedDate}\nJam Sesi: ${schedStartTime} - ${schedEndTime} WIB\nDurasi: ${schedDuration} Menit\nSistem otomatis mengaktifkan ujian saat jam tiba!`);
+  };
+
+  // Toggle Jeda Darurat Manual (Emergency Pause)
+  const handleEmergencyPauseToggle = () => {
+    const isAnyPaused = packages.some(p => p.emergencyPaused || p.status === 'draft');
+    if (!isAnyPaused) {
+      const reason = prompt('Masukkan alasan jeda darurat (misal: Listrik padam sementara / kendala teknis jaringan):', 'Kendala teknis / listrik padam sementara');
+      if (reason === null) return;
+      const updated = toggleCbtEmergencyPause(true, reason);
+      setPackages(updated);
+      showAlert('⏸️ JEDA DARURAT DIAKTIFKAN!\n\nSeluruh paket soal ujian telah dibekukan sementara. Pengerjaan siswa dihentikan dan sisa waktu pengerjaan siswa aman tidak berkurang.');
+    } else {
+      if (confirm('Cabut Jeda Darurat dan lanjutkan jadwal asesmen normal? Siswa akan dapat melanjutkan pengerjaan kembali.')) {
+        const updated = toggleCbtEmergencyPause(false);
+        setPackages(updated);
+        showAlert('▶️ Jeda darurat dicabut! Ujian kembali berjalan otomatis mengikuti jam jadwal.');
+      }
+    }
   };
 
   // ==========================================
@@ -542,23 +616,83 @@ export default function CbtPanitiaCommandCenter({
     return new Map<string, CbtExamPackage>(packages.map(p => [p.id, p]));
   }, [packages]);
 
-  // Pre-indexed attendances by roomName (O(1) instant lookup)
+  // Helper to extract canonical room identifiers: e.g. "Ruang 01", "Ruang 1", "ruang-01"
+  const getRoomLookupKeys = useCallback((str: string): string[] => {
+    if (!str) return [];
+    const keys = new Set<string>();
+    const trimmed = str.trim();
+    keys.add(trimmed);
+    keys.add(trimmed.toLowerCase());
+
+    // Extract "Ruang XX" from strings like "Ruang 01 (Kelas 7-A)"
+    const match = trimmed.match(/Ruang\s*0?(\d+)/i);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      const padded = String(num).padStart(2, '0');
+      keys.add(`Ruang ${padded}`);
+      keys.add(`Ruang ${num}`);
+      keys.add(`ruang-${padded}`);
+      keys.add(`ruang-${num}`);
+      keys.add(`ruang ${padded}`);
+      keys.add(`ruang ${num}`);
+    }
+
+    // Clean alphanumeric
+    const alphaNum = trimmed.toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (alphaNum) keys.add(alphaNum);
+
+    return Array.from(keys);
+  }, []);
+
+  // Pre-indexed attendances by roomName and its aliases (O(1) instant lookup)
   const attendancesByRoomMap = useMemo(() => {
     const map = new Map<string, CbtRoomAttendance[]>();
     const list = Object.values(roomAttendances);
     for (let i = 0; i < list.length; i++) {
       const a = list[i];
       if (a.roomName) {
-        let arr = map.get(a.roomName);
-        if (!arr) {
-          arr = [];
-          map.set(a.roomName, arr);
+        const keys = getRoomLookupKeys(a.roomName);
+        for (const k of keys) {
+          let arr = map.get(k);
+          if (!arr) {
+            arr = [];
+            map.set(k, arr);
+          }
+          if (!arr.includes(a)) {
+            arr.push(a);
+          }
         }
-        arr.push(a);
       }
     }
     return map;
-  }, [roomAttendances]);
+  }, [roomAttendances, getRoomLookupKeys]);
+
+  // Reliable attendance resolver for any room configuration object
+  const getRoomAttendances = useCallback((room: CbtExamRoomConfig): CbtRoomAttendance[] => {
+    const candidateKeys = [
+      room.name,
+      room.label,
+      room.id,
+      ...getRoomLookupKeys(room.name),
+      ...(room.label ? getRoomLookupKeys(room.label) : [])
+    ];
+
+    for (const key of candidateKeys) {
+      if (!key) continue;
+      const found = attendancesByRoomMap.get(key);
+      if (found && found.length > 0) return found;
+    }
+
+    // Fallback search across all entries
+    for (const [k, v] of attendancesByRoomMap.entries()) {
+      if (k.toLowerCase().includes(room.name.toLowerCase()) || 
+          (room.label && k.toLowerCase().includes(room.label.toLowerCase()))) {
+        return v;
+      }
+    }
+
+    return [];
+  }, [attendancesByRoomMap, getRoomLookupKeys]);
 
   // Pre-computed room unique classes and mixed status (O(1) instant lookup)
   const roomUniqueClassesMap = useMemo(() => {
@@ -581,8 +715,32 @@ export default function CbtPanitiaCommandCenter({
     return new Set(selectedStudentIdsToRemove);
   }, [selectedStudentIdsToRemove]);
 
+  // Guaranteed Unique Rooms (Strictly deduplicated by ID & lowercase Name to eliminate ANY duplicate rows)
+  const uniqueSchoolRooms = useMemo(() => {
+    const seenIds = new Set<string>();
+    const seenNames = new Set<string>();
+    return config.rooms.filter(r => {
+      const idKey = r.id?.toLowerCase().trim();
+      const nameKey = r.name?.toLowerCase().trim();
+      if (!idKey || seenIds.has(idKey) || (nameKey && seenNames.has(nameKey))) return false;
+      seenIds.add(idKey);
+      if (nameKey) seenNames.add(nameKey);
+      return true;
+    });
+  }, [config.rooms]);
+
+  // Total BAP Submitted Count (reactive across tabs)
+  const totalBapSubmittedCount = useMemo(() => {
+    let count = 0;
+    for (let i = 0; i < uniqueSchoolRooms.length; i++) {
+      const atts = getRoomAttendances(uniqueSchoolRooms[i]);
+      if (atts.some((a: CbtRoomAttendance) => a.isBapSubmitted)) count++;
+    }
+    return count;
+  }, [uniqueSchoolRooms, getRoomAttendances]);
+
   // Batched Filter & Tab Handlers (prevents cascading re-renders)
-  const handleTabSwitch = (tab: 'monitoring' | 'arrangement' | 'search' | 'bap') => {
+  const handleTabSwitch = (tab: 'monitoring' | 'schedule' | 'arrangement' | 'search' | 'susulan' | 'bap') => {
     startTransition(() => {
       setActiveTab(tab);
     });
@@ -616,12 +774,258 @@ export default function CbtPanitiaCommandCenter({
     setSearchPage(1);
   };
 
+  // -------------------------------------------------------------
+  // JADWAL PENGAWAS RUANG CBT (FLEKSIBEL N-SESI DENGAN SINKRONISASI PAKET MAPEL)
+  // -------------------------------------------------------------
+  const activeScheduleSessions = useMemo(() => {
+    return (supervisorSchedule.sessions && supervisorSchedule.sessions.length > 0)
+      ? supervisorSchedule.sessions
+      : DEFAULT_SCHEDULE_SESSIONS;
+  }, [supervisorSchedule.sessions]);
+
+  // Paket ujian guru untuk tanggal jadwal aktif
+  const scheduledDateExamPackages = useMemo(() => {
+    const targetDate = supervisorSchedule.examDate || new Date().toISOString().split('T')[0];
+    return packages.filter(p => !p.examDate || p.examDate === targetDate);
+  }, [packages, supervisorSchedule.examDate]);
+
+  const scheduleRows = useMemo(() => {
+    return uniqueSchoolRooms.map((room, idx) => {
+      const match = supervisorSchedule.entries.find(e => e.roomId === room.id || e.roomName === room.name);
+      const sups: Record<string, string> = { ...(match?.supervisors || {}) };
+      activeScheduleSessions.forEach((slot, sIdx) => {
+        if (!sups[slot.id]) {
+          if (slot.id === 's1' && match?.session1Supervisor) {
+            sups[slot.id] = match.session1Supervisor;
+          } else if (slot.id === 's2' && match?.session2Supervisor) {
+            sups[slot.id] = match.session2Supervisor;
+          } else {
+            const tIdx = (idx + sIdx * 4) % DEMO_TEACHERS.length;
+            sups[slot.id] = DEMO_TEACHERS[tIdx]?.name || 'Guru Pengawas';
+          }
+        }
+      });
+
+      return {
+        room,
+        roomId: room.id,
+        roomName: room.name,
+        roomLabel: room.label || `${room.name} (${room.classes.join(', ')})`,
+        supervisors: sups
+      };
+    });
+  }, [uniqueSchoolRooms, supervisorSchedule.entries, activeScheduleSessions]);
+
+  // Deteksi bentrok (guru yang sama mengawas di >1 ruangan pada jam/sesi yang sama)
+  const scheduleCollisions = useMemo(() => {
+    const slotCounts = new Map<string, Map<string, number>>();
+    activeScheduleSessions.forEach(slot => {
+      slotCounts.set(slot.id, new Map<string, number>());
+    });
+
+    scheduleRows.forEach(row => {
+      activeScheduleSessions.forEach(slot => {
+        const teacher = row.supervisors[slot.id];
+        if (teacher && teacher !== 'Guru Pengawas') {
+          const countMap = slotCounts.get(slot.id)!;
+          countMap.set(teacher, (countMap.get(teacher) || 0) + 1);
+        }
+      });
+    });
+
+    return slotCounts;
+  }, [scheduleRows, activeScheduleSessions]);
+
+  const filteredScheduleRows = useMemo(() => {
+    const q = scheduleSearchQuery.trim().toLowerCase();
+    if (!q) return scheduleRows;
+    return scheduleRows.filter(r => {
+      const matchRoom = r.roomName.toLowerCase().includes(q) || r.roomLabel.toLowerCase().includes(q);
+      const matchTeacher = Object.values(r.supervisors).some(t => t.toLowerCase().includes(q));
+      return matchRoom || matchTeacher;
+    });
+  }, [scheduleRows, scheduleSearchQuery]);
+
+  const handleUpdateScheduleSupervisor = (roomId: string, slotId: string, teacherName: string) => {
+    const updatedEntries = scheduleRows.map(r => {
+      const sups = { ...r.supervisors };
+      if (r.roomId === roomId) {
+        sups[slotId] = teacherName;
+      }
+      return {
+        roomId: r.roomId,
+        roomName: r.roomName,
+        roomLabel: r.roomLabel,
+        session1Supervisor: sups['s1'],
+        session2Supervisor: sups['s2'],
+        supervisors: sups
+      };
+    });
+
+    const newSchedule: CbtSupervisorSchedule = {
+      examDate: supervisorSchedule.examDate || new Date().toISOString().split('T')[0],
+      sessions: activeScheduleSessions,
+      entries: updatedEntries
+    };
+
+    setSupervisorSchedule(newSchedule);
+    saveStoredSupervisorSchedule(newSchedule);
+    triggerScheduleSaveToast();
+  };
+
+  const handleAutoRotateSchedule = () => {
+    const teacherNames = DEMO_TEACHERS.map(t => t.name);
+    const newEntries: CbtSupervisorScheduleEntry[] = uniqueSchoolRooms.map((r, idx) => {
+      const sups: Record<string, string> = {};
+      activeScheduleSessions.forEach((slot, sIdx) => {
+        sups[slot.id] = teacherNames[(idx + sIdx * 4) % teacherNames.length];
+      });
+      return {
+        roomId: r.id,
+        roomName: r.name,
+        roomLabel: r.label || r.name,
+        session1Supervisor: sups['s1'],
+        session2Supervisor: sups['s2'],
+        supervisors: sups
+      };
+    });
+
+    const newSchedule: CbtSupervisorSchedule = {
+      examDate: supervisorSchedule.examDate || new Date().toISOString().split('T')[0],
+      sessions: activeScheduleSessions,
+      entries: newEntries
+    };
+
+    setSupervisorSchedule(newSchedule);
+    saveStoredSupervisorSchedule(newSchedule);
+    triggerScheduleSaveToast();
+    showAlert(`🔄 Jadwal pengawas 17 ruangan berhasil dirotasi otomatis untuk seluruh ${activeScheduleSessions.length} sesi!`);
+  };
+
+  // Sinkronisasi Sesi otomatis dari Paket Soal yang diterbitkan guru
+  const handleSyncFromTeacherPackages = () => {
+    const newSessions = generateSessionsFromExamPackages(packages, supervisorSchedule.examDate);
+    const teacherNames = DEMO_TEACHERS.map(t => t.name);
+
+    const newEntries: CbtSupervisorScheduleEntry[] = uniqueSchoolRooms.map((r, idx) => {
+      const sups: Record<string, string> = {};
+      newSessions.forEach((slot, sIdx) => {
+        sups[slot.id] = teacherNames[(idx + sIdx * 4) % teacherNames.length];
+      });
+      return {
+        roomId: r.id,
+        roomName: r.name,
+        roomLabel: r.label || r.name,
+        session1Supervisor: sups['s1'],
+        session2Supervisor: sups['s2'],
+        supervisors: sups
+      };
+    });
+
+    const newSchedule: CbtSupervisorSchedule = {
+      examDate: supervisorSchedule.examDate || new Date().toISOString().split('T')[0],
+      sessions: newSessions,
+      entries: newEntries
+    };
+
+    setSupervisorSchedule(newSchedule);
+    saveStoredSupervisorSchedule(newSchedule);
+    triggerScheduleSaveToast();
+    showAlert(`⚡ Berhasil menyinkronkan ${newSessions.length} sesi jam ujian dari paket soal guru!\n\n${newSessions.map(s => `• ${s.name} (${s.startTime} - ${s.endTime} WIB): ${s.subject}`).join('\n')}`);
+  };
+
+  // Tambah Jam / Sesi Baru (Jam 3, Jam 4, Jam 5 dst.)
+  const handleAddSessionSlot = () => {
+    const nextNum = activeScheduleSessions.length + 1;
+    const newSlotId = `s${nextNum}`;
+    const startH = 7 + (nextNum - 1) * 2;
+    const startTimeStr = `${String(Math.min(18, startH)).padStart(2, '0')}:30`;
+    const endTimeStr = `${String(Math.min(19, startH + 1)).padStart(2, '0')}:30`;
+
+    const newSlot: CbtScheduleSessionSlot = {
+      id: newSlotId,
+      name: `Jam Ke-${nextNum}`,
+      startTime: startTimeStr,
+      endTime: endTimeStr,
+      subject: `Mapel Sesi ${nextNum}`
+    };
+
+    const updatedSessions = [...activeScheduleSessions, newSlot];
+    const teacherNames = DEMO_TEACHERS.map(t => t.name);
+
+    const updatedEntries = scheduleRows.map((r, idx) => {
+      const sups = { ...r.supervisors };
+      sups[newSlotId] = teacherNames[(idx + (nextNum - 1) * 4) % teacherNames.length];
+      return {
+        roomId: r.roomId,
+        roomName: r.roomName,
+        roomLabel: r.roomLabel,
+        session1Supervisor: sups['s1'],
+        session2Supervisor: sups['s2'],
+        supervisors: sups
+      };
+    });
+
+    const newSchedule: CbtSupervisorSchedule = {
+      examDate: supervisorSchedule.examDate || new Date().toISOString().split('T')[0],
+      sessions: updatedSessions,
+      entries: updatedEntries
+    };
+
+    setSupervisorSchedule(newSchedule);
+    saveStoredSupervisorSchedule(newSchedule);
+    triggerScheduleSaveToast();
+    showAlert(`➕ Sesi "${newSlot.name}" berhasil ditambahkan! Total sekarang ada ${updatedSessions.length} sesi.`);
+  };
+
+  // Hapus Sesi Tertentu
+  const handleRemoveSessionSlot = (slotId: string) => {
+    if (activeScheduleSessions.length <= 1) {
+      alert('Minimal harus ada 1 sesi ujian.');
+      return;
+    }
+    const targetSlot = activeScheduleSessions.find(s => s.id === slotId);
+    if (!confirm(`Hapus ${targetSlot?.name || 'sesi ini'} dari jadwal?`)) return;
+
+    const updatedSessions = activeScheduleSessions.filter(s => s.id !== slotId);
+    const updatedEntries = scheduleRows.map(r => {
+      const sups = { ...r.supervisors };
+      delete sups[slotId];
+      return {
+        roomId: r.roomId,
+        roomName: r.roomName,
+        roomLabel: r.roomLabel,
+        session1Supervisor: sups['s1'],
+        session2Supervisor: sups['s2'],
+        supervisors: sups
+      };
+    });
+
+    const newSchedule: CbtSupervisorSchedule = {
+      examDate: supervisorSchedule.examDate || new Date().toISOString().split('T')[0],
+      sessions: updatedSessions,
+      entries: updatedEntries
+    };
+
+    setSupervisorSchedule(newSchedule);
+    saveStoredSupervisorSchedule(newSchedule);
+    triggerScheduleSaveToast();
+    showAlert(`🗑️ Sesi ${targetSlot?.name} berhasil dihapus.`);
+  };
+
+  // Simpan Manual Jadwal Pengawas (Konfirmasi Explicit)
+  const handleManualSaveSchedule = () => {
+    saveStoredSupervisorSchedule(supervisorSchedule);
+    triggerScheduleSaveToast();
+    showAlert('💾 JADWAL BERHASIL DISIMPAN & DISINKRONKAN!\n\nSeluruh penugasan pengawas ruangan telah tersimpan di sistem dan langsung aktif ke aplikasi guru pengawas di masing-masing ruangan.');
+  };
+
   const handleExportSchoolBapExcel = () => {
     const todayStr = new Date().toISOString().split('T')[0];
-    const roomRows = config.rooms.map((room, idx) => {
-      const attendances = attendancesByRoomMap.get(room.name) || [];
+    const roomRows = uniqueSchoolRooms.map((room, idx) => {
+      const attendances = getRoomAttendances(room);
       const latestAttendance = attendances[0];
-      const isSubmitted = attendances.some(a => a.isBapSubmitted);
+      const isSubmitted = attendances.some((a: CbtRoomAttendance) => a.isBapSubmitted);
       const roomStudents = roomStudentsMap.get(room.id) || [];
       const uniqueClasses = Array.from(new Set(roomStudents.map(s => s.classId))).sort();
 
@@ -630,22 +1034,21 @@ export default function CbtPanitiaCommandCenter({
       let permitCount = 0;
       let absentCount = 0;
 
-      if (latestAttendance && latestAttendance.records) {
-        Object.values(latestAttendance.records).forEach(status => {
-          if (status === 'H') presentCount++;
-          else if (status === 'S') sickCount++;
-          else if (status === 'I') permitCount++;
-          else if (status === 'A') absentCount++;
-        });
-      } else {
-        presentCount = roomStudents.length;
-      }
+      roomStudents.forEach(st => {
+        const status = latestAttendance?.records?.[st.id] || 'H';
+        if (status === 'H') presentCount++;
+        else if (status === 'S') sickCount++;
+        else if (status === 'I') permitCount++;
+        else if (status === 'A') absentCount++;
+      });
 
       return {
         no: idx + 1,
         roomName: room.name,
         classes: uniqueClasses.length > 0 ? uniqueClasses.join(', ') : room.classes.join(', '),
-        supervisor: room.supervisorName || 'Guru Pengawas',
+        supervisor: (latestAttendance?.supervisorName && latestAttendance.supervisorName !== 'Guru Pengawas Ruang')
+          ? latestAttendance.supervisorName
+          : (room.supervisorName || 'Guru Pengawas'),
         total: roomStudents.length,
         present: presentCount,
         sick: sickCount,
@@ -665,7 +1068,7 @@ export default function CbtPanitiaCommandCenter({
   };
 
   const handleExportSingleRoomBap = (targetRoom: CbtExamRoomConfig) => {
-    const attendances = attendancesByRoomMap.get(targetRoom.name) || [];
+    const attendances = getRoomAttendances(targetRoom);
     const latestAttendance = attendances[0];
     const roomStudents = roomStudentsMap.get(targetRoom.id) || [];
     const todayStr = new Date().toISOString().split('T')[0];
@@ -675,12 +1078,15 @@ export default function CbtPanitiaCommandCenter({
       subject: 'Asesmen Berbasis Komputer (CBT)',
       token: 'SPENTIC'
     };
+    const effectiveSupervisor = (latestAttendance?.supervisorName && latestAttendance.supervisorName !== 'Guru Pengawas Ruang')
+      ? latestAttendance.supervisorName
+      : (targetRoom.supervisorName || 'Guru Pengawas Ruang');
 
     exportCbtRoomBapToExcel({
       examTitle: latestAttendance?.examTitle || activeExam.title,
       subject: activeExam.subject || 'Asesmen CBT',
       roomName: targetRoom.name,
-      supervisorName: targetRoom.supervisorName || 'Guru Pengawas Ruang',
+      supervisorName: effectiveSupervisor,
       token: latestAttendance?.token || activeExam.token || 'SPENTIC',
       date: latestAttendance?.date || todayStr,
       notes: latestAttendance?.notes,
@@ -720,6 +1126,64 @@ export default function CbtPanitiaCommandCenter({
       noSession: Math.max(0, total - hasSession)
     };
   }, [activeStudents, sessionsByStudentId]);
+
+  // Seluruh Siswa yang Berhak Ujian Susulan (Status S / I di presensi ruangan)
+  const susulanStudentsList = useMemo(() => {
+    const list: Array<{
+      student: Student;
+      status: 'S' | 'I';
+      roomName: string;
+      examTitle: string;
+      notes: string;
+      date: string;
+    }> = [];
+
+    const seen = new Set<string>();
+
+    Object.values(roomAttendances).forEach((att: CbtRoomAttendance) => {
+      if (!att || !att.records) return;
+      Object.entries(att.records).forEach(([stId, stStatus]) => {
+        if (stStatus === 'S' || stStatus === 'I') {
+          const key = `${stId}_${att.examId || 'cbt'}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            const st = activeStudents.find(s => s.id === stId);
+            if (st) {
+              list.push({
+                student: st,
+                status: stStatus,
+                roomName: att.roomName || 'Ruang Ujian',
+                examTitle: att.examTitle || 'Ujian CBT',
+                notes: att.notes || '-',
+                date: att.date || new Date().toISOString().split('T')[0]
+              });
+            }
+          }
+        }
+      });
+    });
+
+    return list.sort((a, b) => a.student.classId.localeCompare(b.student.classId) || a.student.name.localeCompare(b.student.name));
+  }, [roomAttendances, activeStudents]);
+
+  const handleExportSusulanExcel = () => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    exportCbtSusulanListToExcel({
+      academicYear: '2026/2027',
+      semester: 'PTS / STS Ganjil',
+      date: todayStr,
+      students: susulanStudentsList.map((item, idx) => ({
+        no: idx + 1,
+        nisn: item.student.nisn,
+        name: item.student.name,
+        classId: item.student.classId,
+        roomName: item.roomName,
+        subject: item.examTitle,
+        status: item.status,
+        notes: item.notes
+      }))
+    });
+  };
 
   // Filtered Students for Emergency Reset Search (Only computed when activeTab === 'search')
   const filteredStudents = useMemo(() => {
@@ -1053,191 +1517,597 @@ export default function CbtPanitiaCommandCenter({
       )}
 
       {/* 1. HEADER PUSAT KOMANDO PANITIA */}
-      <div className="bg-gradient-to-r from-amber-950 via-slate-900 to-indigo-950 rounded-3xl p-6 sm:p-8 text-white shadow-xl border border-amber-500/30 relative overflow-hidden space-y-6">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
+      <div className="bg-gradient-to-r from-amber-950 via-slate-900 to-indigo-950 rounded-3xl p-5 sm:p-6 text-white shadow-xl border border-amber-500/30 relative overflow-hidden space-y-4">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 relative z-10">
           <div>
-            <div className="flex items-center gap-2.5 mb-2">
-              <span className="w-10 h-10 rounded-2xl bg-amber-400 text-slate-950 font-black flex items-center justify-center text-xl shadow-lg shadow-amber-400/20">
+            <div className="flex items-center gap-2.5 mb-1.5">
+              <span className="w-9 h-9 rounded-xl bg-amber-400 text-slate-950 font-black flex items-center justify-center text-lg shadow-md shadow-amber-400/20">
                 🏛️
               </span>
               <div>
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400/20 text-amber-300 border border-amber-400/30">
-                  POSKO PUSAT CBT • {config.academicYear} • {config.semester}
+                <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-400/20 text-amber-300 border border-amber-400/30">
+                  POSKO ASESMEN CBT • {config.academicYear} • {config.semester}
                 </span>
-                <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-                  Pusat Komando Panitia Ujian CBT
+                <h1 className="text-lg sm:text-xl font-black text-white tracking-tight">
+                  Pusat Komando Asesmen CBT
                 </h1>
               </div>
             </div>
-            <p className="text-xs text-slate-300 max-w-2xl">
-              SMP Negeri 3 Cihampelas • Panel Pengendali Asesmen Sekolah. Monitoring Live Ruangan, Penyusunan Fleksibel Siswa & Pembagian Silang 50:50, Reset Sesi Peserta, dan Rekapitulasi BAP Resmi.
+            <p className="text-xs text-slate-300">
+              SMP Negeri 3 Cihampelas • Panel Pengendali &amp; Monitoring Ujian Sekolah Real-Time
             </p>
           </div>
 
-          {/* Quick Master Controls */}
-          <div className="flex flex-wrap items-center gap-2.5 self-start lg:self-auto bg-white/5 backdrop-blur-md p-3 rounded-2xl border border-white/10">
-            <div className="text-right pr-2 border-r border-white/10 hidden sm:block">
-              <span className="block text-[10px] text-slate-400">Status Master CBT:</span>
-              <span className="text-xs font-bold text-amber-300">
-                {macroStats.activePackagesCount} / {macroStats.totalPackages} Paket Aktif
-              </span>
+          {/* Quick Master Controls: Smart Auto-Schedule & Emergency Override */}
+          <div className="flex flex-wrap items-center gap-2 self-start lg:self-auto bg-white/5 backdrop-blur-md p-2 rounded-2xl border border-white/10">
+            {/* Live Auto-Schedule Status */}
+            <div className="text-left sm:text-right pr-2.5 border-r border-white/10">
+              <span className="block text-[10px] text-indigo-300 font-medium">Sesi Asesmen Hari Ini:</span>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                <span className="text-xs font-black text-amber-300">
+                  {packages[0]?.startTime || '07:30'} - {packages[0]?.endTime || '09:00'} WIB
+                </span>
+              </div>
             </div>
+
+            {/* Tombol Atur Jam & Jadwal Sesi */}
             <button
               type="button"
-              onClick={() => handleToggleAllPackages('active')}
-              className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-black text-xs transition shadow-md shadow-emerald-500/20 flex items-center gap-1.5 cursor-pointer active:scale-95"
-              title="Aktifkan seluruh paket soal ujian serentak"
+              onClick={() => {
+                if (packages.length > 0) {
+                  setSchedDate(packages[0].examDate || new Date().toISOString().split('T')[0]);
+                  setSchedStartTime(packages[0].startTime || '07:30');
+                  setSchedEndTime(packages[0].endTime || '09:00');
+                  setSchedDuration(packages[0].durationMinutes || 60);
+                }
+                setShowScheduleModal(true);
+              }}
+              className="px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition shadow-md shadow-amber-400/20 flex items-center gap-1.5 cursor-pointer active:scale-95"
+              title="Atur Tanggal, Jam Mulai, Jam Selesai, dan Durasi Ujian"
             >
-              <span>▶️</span>
-              <span>Aktifkan Semua</span>
+              <span>⚙️</span>
+              <span>Atur Jam &amp; Jadwal</span>
             </button>
-            <button
-              type="button"
-              onClick={() => handleToggleAllPackages('draft')}
-              className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-rose-600 text-white font-bold text-xs transition border border-white/15 flex items-center gap-1.5 cursor-pointer active:scale-95"
-              title="Jeda seluruh ujian serentak"
-            >
-              <span>⏸️</span>
-              <span>Jeda Semua</span>
-            </button>
+
+            {/* Tombol Jeda Darurat (Emergency Override) */}
+            {packages.some(p => p.emergencyPaused || p.status === 'draft') ? (
+              <button
+                type="button"
+                onClick={handleEmergencyPauseToggle}
+                className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 text-white font-black text-xs transition shadow-lg shadow-emerald-500/25 flex items-center gap-1.5 cursor-pointer active:scale-95 animate-pulse"
+                title="Cabut jeda darurat dan lanjutkan jadwal normal"
+              >
+                <span>▶️</span>
+                <span>Lanjutkan Ujian</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleEmergencyPauseToggle}
+                className="px-3 py-1.5 rounded-xl bg-rose-500/20 hover:bg-rose-600 text-rose-200 hover:text-white font-bold text-xs transition border border-rose-500/40 flex items-center gap-1.5 cursor-pointer active:scale-95"
+                title="Gunakan tombol ini HANYA jika darurat (misal mati lampu / kendala server)"
+              >
+                <span>⏸️</span>
+                <span>Jeda Darurat</span>
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Macro Scoreboard Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 relative z-10 pt-2 border-t border-white/10">
-          <div className="p-3 rounded-2xl bg-white/5 border border-white/10">
-            <span className="text-slate-400 block text-[10px] font-semibold">Total Siswa Terdaftar</span>
-            <span className="text-xl font-black text-white">{macroStats.totalStudents}</span>
-            <span className="text-[10px] text-slate-400 block">535 Siswa (17 Rombel)</span>
+        {/* Macro Scoreboard Cards (Compact & Elegant with micro-icons) */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 relative z-10 pt-2 border-t border-white/10">
+          <div className="p-2.5 rounded-2xl bg-white/5 border border-white/10 flex items-center gap-2.5">
+            <span className="w-8 h-8 rounded-xl bg-blue-500/20 text-blue-300 flex items-center justify-center text-base shrink-0">👥</span>
+            <div className="min-w-0">
+              <span className="text-slate-400 block text-[10px] font-semibold uppercase tracking-wider truncate">Total Siswa</span>
+              <div className="flex items-baseline gap-1">
+                <span className="text-base font-black text-white">{macroStats.totalStudents}</span>
+                <span className="text-[10px] text-slate-400">/ 17 Rombel</span>
+              </div>
+            </div>
           </div>
-          <div className="p-3 rounded-2xl bg-white/5 border border-white/10">
-            <span className="text-slate-400 block text-[10px] font-semibold">Sedang Mengerjakan</span>
-            <span className="text-xl font-black text-amber-300">{macroStats.inProgressCount}</span>
-            <span className="text-[10px] text-amber-200/80 block">Live di Ruang Ujian</span>
+
+          <div className="p-2.5 rounded-2xl bg-white/5 border border-white/10 flex items-center gap-2.5">
+            <span className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-300 flex items-center justify-center text-base shrink-0">⏳</span>
+            <div className="min-w-0">
+              <span className="text-slate-400 block text-[10px] font-semibold uppercase tracking-wider truncate">Mengerjakan</span>
+              <div className="flex items-baseline gap-1">
+                <span className="text-base font-black text-amber-300">{macroStats.inProgressCount}</span>
+                <span className="text-[10px] text-amber-200/70">Live</span>
+              </div>
+            </div>
           </div>
-          <div className="p-3 rounded-2xl bg-white/5 border border-white/10">
-            <span className="text-slate-400 block text-[10px] font-semibold">Sudah Mengumpulkan</span>
-            <span className="text-xl font-black text-emerald-300">{macroStats.submittedCount}</span>
-            <span className="text-[10px] text-emerald-200/80 block">Selesai Dinilai</span>
+
+          <div className="p-2.5 rounded-2xl bg-white/5 border border-white/10 flex items-center gap-2.5">
+            <span className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-300 flex items-center justify-center text-base shrink-0">✅</span>
+            <div className="min-w-0">
+              <span className="text-slate-400 block text-[10px] font-semibold uppercase tracking-wider truncate">Terkumpul</span>
+              <div className="flex items-baseline gap-1">
+                <span className="text-base font-black text-emerald-300">{macroStats.submittedCount}</span>
+                <span className="text-[10px] text-emerald-200/70">Selesai</span>
+              </div>
+            </div>
           </div>
-          <div className="p-3 rounded-2xl bg-white/5 border border-white/10">
-            <span className="text-slate-400 block text-[10px] font-semibold">Status Penempatan Siswa</span>
-            <span className="text-sm font-black text-white">
-              {unassignedStudentsCount === 0 ? '✓ 100% Terdistribusi' : `${unassignedStudentsCount} Belum Ada Ruang`}
-            </span>
-            <span className="text-[10px] text-indigo-300 block">{config.rooms.length} Ruang Ujian Siap</span>
+
+          <div className="p-2.5 rounded-2xl bg-white/5 border border-white/10 flex items-center gap-2.5">
+            <span className="w-8 h-8 rounded-xl bg-purple-500/20 text-purple-300 flex items-center justify-center text-base shrink-0">🚪</span>
+            <div className="min-w-0">
+              <span className="text-slate-400 block text-[10px] font-semibold uppercase tracking-wider truncate">Distribusi Ruang</span>
+              <div className="flex items-baseline gap-1">
+                <span className="text-xs font-black text-white truncate">
+                  {unassignedStudentsCount === 0 ? '✓ 100% Siap' : `${unassignedStudentsCount} Belum Diplot`}
+                </span>
+                <span className="text-[10px] text-indigo-300 font-medium">(17 Ruang)</span>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Sub-Tabs Switcher */}
+        {/* Sub-Tabs Switcher - Ringkas, Rapi, Pas dalam 1 Baris */}
         <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-white/10 relative z-10 text-xs">
           <button
             type="button"
-            onClick={() => handleTabSwitch('monitoring')}
-            className={`px-4 py-2 rounded-xl font-bold transition flex items-center gap-1.5 cursor-pointer ${
-              activeTab === 'monitoring'
-                ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20'
-                : 'bg-white/10 text-white hover:bg-white/15'
-            }`}
-          >
-            <span>📺</span>
-            <span>Monitoring Ruang Ujian</span>
-          </button>
-          <button
-            type="button"
             onClick={() => handleTabSwitch('arrangement')}
-            className={`px-4 py-2 rounded-xl font-bold transition flex items-center gap-1.5 cursor-pointer ${
+            className={`px-3 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
               activeTab === 'arrangement'
-                ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20'
+                ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20 font-black'
                 : 'bg-white/10 text-white hover:bg-white/15'
             }`}
           >
             <span>🗂️</span>
-            <span>Penyusunan Ruangan & Siswa</span>
-            <span className="ml-1 px-1.5 py-0.2 rounded-full bg-emerald-500 text-white text-[9px] font-black">
-              Baru
-            </span>
+            <span>1. Susun Ruang</span>
           </button>
+
+          <button
+            type="button"
+            onClick={() => handleTabSwitch('schedule')}
+            className={`px-3 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+              activeTab === 'schedule'
+                ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20 font-black'
+                : 'bg-white/10 text-white hover:bg-white/15'
+            }`}
+          >
+            <span>🗓️</span>
+            <span>2. Jadwal Pengawas</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleTabSwitch('monitoring')}
+            className={`px-3 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+              activeTab === 'monitoring'
+                ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20 font-black'
+                : 'bg-white/10 text-white hover:bg-white/15'
+            }`}
+          >
+            <span>📺</span>
+            <span>3. Live Monitoring</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+          </button>
+
           <button
             type="button"
             onClick={() => handleTabSwitch('search')}
-            className={`px-4 py-2 rounded-xl font-bold transition flex items-center gap-1.5 cursor-pointer ${
+            className={`px-3 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
               activeTab === 'search'
-                ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20'
+                ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20 font-black'
                 : 'bg-white/10 text-white hover:bg-white/15'
             }`}
           >
             <span>🛠️</span>
-            <span>Pencarian Siswa & Reset Sesi</span>
+            <span>4. Bantuan &amp; Reset</span>
           </button>
+
+          <button
+            type="button"
+            onClick={() => handleTabSwitch('susulan')}
+            className={`px-3 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+              activeTab === 'susulan'
+                ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20 font-black'
+                : 'bg-white/10 text-white hover:bg-white/15'
+            }`}
+          >
+            <span>🏥</span>
+            <span>5. Ujian Susulan</span>
+            {susulanStudentsList.length > 0 && (
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                activeTab === 'susulan' ? 'bg-slate-900 text-amber-300' : 'bg-amber-500 text-white'
+              }`}>
+                {susulanStudentsList.length}
+              </span>
+            )}
+          </button>
+
           <button
             type="button"
             onClick={() => handleTabSwitch('bap')}
-            className={`px-4 py-2 rounded-xl font-bold transition flex items-center gap-1.5 cursor-pointer ${
+            className={`px-3 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
               activeTab === 'bap'
-                ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20'
+                ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20 font-black'
                 : 'bg-white/10 text-white hover:bg-white/15'
             }`}
           >
             <span>📋</span>
-            <span>Rekapitulasi BAP Sekolah</span>
+            <span>6. Rekap BAP</span>
+            {totalBapSubmittedCount > 0 && (
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                activeTab === 'bap' ? 'bg-slate-900 text-amber-300' : 'bg-emerald-500 text-white'
+              }`}>
+                {totalBapSubmittedCount}/{uniqueSchoolRooms.length}
+              </span>
+            )}
           </button>
         </div>
       </div>
 
-      {/* 2. TAB CONTENT: PENYUSUNAN RUANGAN & SISWA (FITUR BARU FLEKSIBEL & SPLIT 50:50) */}
-      {activeTab === 'arrangement' && (
-        <div className="space-y-6">
-          {/* Header & Quick Action Toolbar */}
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* TAB CONTENT: JADWAL PENGAWAS RUANG CBT (FLEKSIBEL N-SESI DENGAN SINKRONISASI MAPEL) */}
+      {activeTab === 'schedule' && (
+        <div className="space-y-4">
+          {/* Header Card with Date Picker & Actions */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div>
-              <div className="flex items-center gap-2">
-                <span className="w-8 h-8 rounded-xl bg-amber-100 text-amber-800 font-bold flex items-center justify-center text-sm">
-                  🗂️
-                </span>
-                <h2 className="text-lg font-bold text-slate-900 tracking-tight">
-                  Penyusunan & Pengaturan Ruang Ujian Bebas
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-base font-black text-slate-900 tracking-tight flex items-center gap-2">
+                  <span>🗓️</span>
+                  <span>Jadwal &amp; Rotasi Pengawas Ruangan</span>
                 </h2>
+                {scheduleSavedToast && (
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black border border-emerald-300">
+                    ✓ Tersimpan Otomatis!
+                  </span>
+                )}
               </div>
-              <p className="text-xs text-slate-500 mt-1 max-w-2xl">
-                Atur penempatan peserta per ruangan secara custom: bisa membagi 2 kelas bersilang 50% - 50% (contoh: 50% 7-A + 50% 8-A di Ruang 1, sisanya di Ruang 2), atau bebas memilih siswa spesifik per ruangan.
-              </p>
+
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                  <span>📅</span>
+                  <span>Tanggal:</span>
+                </span>
+                <input
+                  type="date"
+                  value={supervisorSchedule.examDate || new Date().toISOString().split('T')[0]}
+                  onChange={(e) => {
+                    const newDate = e.target.value;
+                    if (!newDate) return;
+                    const schedForDate = getStoredSupervisorSchedule(newDate);
+                    setSupervisorSchedule(schedForDate);
+                  }}
+                  className="px-2.5 py-1 rounded-xl border border-slate-300 text-xs font-bold text-slate-800 bg-slate-50 focus:outline-none focus:border-indigo-500 cursor-pointer shadow-2xs"
+                />
+                <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-md">
+                  {new Date((supervisorSchedule.examDate || new Date().toISOString().split('T')[0]) + 'T00:00:00').toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                </span>
+                <span className="text-xs text-slate-400">•</span>
+                <span className="text-xs font-semibold text-slate-600">
+                  {activeScheduleSessions.length} Sesi Aktif
+                </span>
+              </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                onClick={handleOpenAddRoomModal}
-                className="px-4 py-2.5 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition shadow-md shadow-amber-400/20 flex items-center gap-1.5 cursor-pointer active:scale-95"
+                onClick={handleSyncFromTeacherPackages}
+                className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95"
+                title="Deteksi seluruh paket soal yang diterbitkan guru hari ini dan sesuaikan jam serta mapelnya otomatis"
               >
-                <span>➕</span>
-                <span>Tambah Ruangan</span>
+                <span>⚡</span>
+                <span>Sinkronkan dari Guru</span>
               </button>
               <button
                 type="button"
+                onClick={handleAddSessionSlot}
+                className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 text-slate-800 font-bold text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95"
+                title="Tambah sesi baru (Jam Ke-3, Jam Ke-4, Jam Ke-5 dst.)"
+              >
+                <span>➕</span>
+                <span>Tambah Sesi</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleAutoRotateSchedule}
+                className="px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95"
+                title="Otomatis rotasi pengawas 17 ruangan untuk seluruh sesi agar tidak mengawas di ruangan yang sama"
+              >
+                <span>🔄</span>
+                <span>Rotasi Otomatis</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Combined Session Chips, Published Packages & Search Bar */}
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 shadow-2xs space-y-2.5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              {/* Active Session Chips */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-xs font-bold text-slate-700 flex items-center gap-1 mr-1">
+                  <span>⏱️</span>
+                  <span>Sesi:</span>
+                </span>
+                {activeScheduleSessions.map((slot, sIdx) => {
+                  const colors = [
+                    'bg-amber-50 text-amber-900 border-amber-200',
+                    'bg-indigo-50 text-indigo-900 border-indigo-200',
+                    'bg-emerald-50 text-emerald-900 border-emerald-200',
+                    'bg-purple-50 text-purple-900 border-purple-200',
+                    'bg-cyan-50 text-cyan-900 border-cyan-200'
+                  ];
+                  const colorCls = colors[sIdx % colors.length];
+                  return (
+                    <div key={slot.id} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-xs font-bold ${colorCls}`}>
+                      <span>{slot.name} ({slot.startTime} - {slot.endTime})</span>
+                      {slot.subject && <span className="text-[10px] opacity-80">• {slot.subject}</span>}
+                      {activeScheduleSessions.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveSessionSlot(slot.id)}
+                          className="ml-1 text-slate-400 hover:text-rose-600 font-black cursor-pointer text-xs"
+                          title={`Hapus ${slot.name}`}
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+                <button
+                  type="button"
+                  onClick={handleAddSessionSlot}
+                  className="text-xs font-bold text-indigo-600 hover:text-indigo-800 hover:underline cursor-pointer px-1 py-0.5"
+                >
+                  + Tambah Sesi
+                </button>
+              </div>
+
+              {/* Published Packages Badge Summary */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-[11px] text-slate-500 font-medium">Paket Guru:</span>
+                {scheduledDateExamPackages.length === 0 ? (
+                  <span className="text-[11px] text-slate-400 italic">Belum ada paket terbit</span>
+                ) : (
+                  scheduledDateExamPackages.slice(0, 3).map(pkg => (
+                    <span key={pkg.id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-white border border-indigo-200 text-[10px] font-bold text-indigo-900 shadow-2xs">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                      <span>{pkg.subject}</span>
+                      <span className="text-slate-400 font-normal">({pkg.startTime || '07:30'})</span>
+                    </span>
+                  ))
+                )}
+                {scheduledDateExamPackages.length > 3 && (
+                  <span className="text-[10px] font-bold text-indigo-600">+{scheduledDateExamPackages.length - 3} lainnya</span>
+                )}
+              </div>
+            </div>
+
+            {/* Quick Search in Schedule */}
+            <div className="pt-2 border-t border-slate-200/70 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
+              <div className="w-full sm:w-80">
+                <FastSearchInput
+                  value={scheduleSearchQuery}
+                  onSearchChange={setScheduleSearchQuery}
+                  placeholder="Cari ruangan atau guru pengawas..."
+                  className="w-full pl-8 pr-7 py-1.5 rounded-xl bg-white border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-indigo-500 font-medium shadow-2xs"
+                />
+              </div>
+              <div className="flex items-center gap-2 text-xs text-slate-500 w-full sm:w-auto justify-end">
+                <span>Menampilkan: <strong className="text-slate-900">{filteredScheduleRows.length}</strong> dari {scheduleRows.length} ruangan</span>
+                {scheduleSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setScheduleSearchQuery('')}
+                    className="text-xs text-indigo-600 hover:underline font-bold cursor-pointer"
+                  >
+                    Reset Filter
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Dynamic Matrix Schedule Table */}
+          <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-xs">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-black text-slate-600 uppercase tracking-wider">
+                    <th className="py-3.5 px-4 text-center w-14">No</th>
+                    <th className="py-3.5 px-4 min-w-[200px]">Ruang Ujian &amp; Rombel</th>
+                    {activeScheduleSessions.map((slot, sIdx) => {
+                      const dotColors = ['bg-amber-500', 'bg-indigo-500', 'bg-emerald-500', 'bg-purple-500', 'bg-cyan-500'];
+                      const dotColor = dotColors[sIdx % dotColors.length];
+                      return (
+                        <th key={slot.id} className="py-3.5 px-4 min-w-[280px]">
+                          <div className="flex items-center gap-1.5">
+                            <span className={`w-2 h-2 rounded-full ${dotColor}`}></span>
+                            <span>{slot.name} ({slot.startTime} - {slot.endTime} WIB)</span>
+                          </div>
+                          {slot.subject && (
+                            <span className="text-[10px] text-slate-500 font-semibold block mt-0.5 normal-case">
+                              📖 Mapel: <strong className="text-slate-800">{slot.subject}</strong>
+                            </span>
+                          )}
+                        </th>
+                      );
+                    })}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-xs">
+                  {filteredScheduleRows.map((row, idx) => {
+                    return (
+                      <tr key={row.roomId} className="hover:bg-slate-50/70 transition">
+                        <td className="py-3 px-4 text-center font-bold text-slate-400">
+                          {idx + 1}
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="flex items-center gap-2">
+                            <span className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-900 border border-indigo-200 font-black text-xs">
+                              {row.roomName}
+                            </span>
+                            <span className="text-slate-600 font-semibold truncate max-w-[160px]" title={row.roomLabel}>
+                              {row.room.classes.join(', ') || 'Custom'}
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-slate-400 block mt-0.5">
+                            Kapasitas: {row.room.capacity || 36} siswa
+                          </span>
+                        </td>
+                        {activeScheduleSessions.map((slot) => {
+                          const supervisor = row.supervisors[slot.id] || 'Guru Pengawas';
+                          const isCollision = (scheduleCollisions.get(slot.id)?.get(supervisor) || 0) > 1;
+
+                          return (
+                            <td key={slot.id} className="py-3 px-4">
+                              <div className="space-y-1">
+                                <select
+                                  value={supervisor}
+                                  onChange={(e) => handleUpdateScheduleSupervisor(row.roomId, slot.id, e.target.value)}
+                                  className={`w-full px-3 py-2 rounded-xl border text-xs font-semibold focus:outline-none focus:border-indigo-500 cursor-pointer ${
+                                    isCollision
+                                      ? 'bg-rose-50 border-rose-300 text-rose-900 font-bold ring-2 ring-rose-200'
+                                      : 'bg-white border-slate-200 text-slate-800'
+                                  }`}
+                                >
+                                  {DEMO_TEACHERS.map(t => (
+                                    <option key={t.nip || t.name} value={t.name}>
+                                      {t.name} ({t.subject})
+                                    </option>
+                                  ))}
+                                </select>
+                                {isCollision && (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">
+                                    ⚠️ Bentrok di {slot.name}!
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Table Footer Bar with Status & Action Buttons */}
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <span className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-bold text-slate-800">
+                      Sistem Penyimpanan: 100% Otomatis (Real-Time Auto-Save)
+                    </span>
+                    {scheduleSavedToast && (
+                      <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[10px] font-black border border-emerald-300">
+                        ✓ Baru Saja Disimpan!
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Setiap pergantian nama pengawas langsung aktif ke layar guru detik itu juga tanpa resiko hilang.{lastScheduleSaveTime ? ` Terakhir diperbarui: ${lastScheduleSaveTime}` : ''}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={handleAutoRotateSchedule}
+                  className="px-3.5 py-2.5 rounded-xl bg-white hover:bg-slate-100 border border-slate-300 text-slate-800 font-bold text-xs transition shadow-2xs flex items-center gap-1.5 cursor-pointer active:scale-95"
+                  title="Acak dan putar ulang pengawas 17 ruangan"
+                >
+                  <span>🔄</span>
+                  <span>Rotasi Otomatis</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleManualSaveSchedule}
+                  className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-md shadow-emerald-600/20 flex items-center gap-1.5 cursor-pointer active:scale-95"
+                  title="Klik untuk memastikan jadwal tersimpan dan tersinkronkan"
+                >
+                  <span>💾</span>
+                  <span>Simpan &amp; Sinkronkan</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Floating Toast Notification on changes */}
+          {scheduleSavedToast && (
+            <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-2xl shadow-2xl border border-slate-700 flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
+              <div>
+                <div className="text-xs font-bold text-emerald-300">💾 Tersimpan Otomatis Real-Time!</div>
+                <div className="text-[10px] text-slate-400">
+                  Sinkron live ke 17 ruangan • {lastScheduleSaveTime || 'Baru saja'}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 1. TAB CONTENT: PENYUSUNAN RUANGAN & SISWA */}
+      {activeTab === 'arrangement' && (
+        <div className="space-y-4">
+          {/* Header & Quick Action Command Bar */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center text-base shadow-xs shrink-0">
+                🗂️
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight">
+                    Penyusunan Ruangan &amp; Penempatan Peserta
+                  </h2>
+                  <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 font-bold text-[11px] border border-amber-200/60">
+                    {config.rooms.length} Ruang • {activeStudents.length} Siswa
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Bagi silang 50:50 antar tingkat kelas atau atur penempatan peserta custom per ruangan.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+              <button
+                type="button"
                 onClick={() => setShowSplitModal(true)}
-                className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs transition shadow-md shadow-amber-500/20 flex items-center gap-1.5 cursor-pointer active:scale-95"
+                className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95"
+                title="Bagi 2 kelas secara silang 50% - 50% ke dua ruangan ujian"
               >
                 <span>⚡</span>
-                <span>Bagi Silang 2 Kelas (50:50)</span>
+                <span>Bagi Silang (50:50)</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleOpenAddRoomModal}
+                className="px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold text-xs border border-amber-200/80 transition flex items-center gap-1 cursor-pointer active:scale-95"
+              >
+                <span>➕</span>
+                <span>Tambah Ruang</span>
               </button>
               <button
                 type="button"
                 onClick={() => setShowEmergencyModal(true)}
-                className="px-4 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-md shadow-indigo-600/20 flex items-center gap-1.5 cursor-pointer active:scale-95"
+                className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition flex items-center gap-1 cursor-pointer active:scale-95 shadow-xs"
                 title="Daftarkan siswa baru/darurat yang belum terdaftar di CBT"
               >
                 <span>👤➕</span>
-                <span>Daftarkan Siswa Darurat</span>
+                <span>Siswa Darurat</span>
               </button>
               <button
                 type="button"
                 onClick={handleResetToDefaultPureRooms}
-                className="px-4 py-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition border border-slate-200 flex items-center gap-1.5 cursor-pointer active:scale-95"
+                className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition border border-slate-200 flex items-center gap-1 cursor-pointer active:scale-95"
                 title="Kembalikan semua ruangan ke 1 rombel utuh (7A s.d 9E)"
               >
                 <span>🔄</span>
-                <span>Reset ke Kelas Murni</span>
+                <span>Reset Rombel Murni</span>
               </button>
             </div>
           </div>
@@ -1283,49 +2153,44 @@ export default function CbtPanitiaCommandCenter({
                         setSelectedStudentIdsToRemove([]);
                         setRoomStudentSearch('');
                       }}
-                      className={`w-full text-left p-3.5 rounded-2xl transition border cursor-pointer relative ${
+                      className={`w-full text-left p-3 rounded-2xl transition border cursor-pointer relative ${
                         isSelected
-                          ? 'bg-amber-50/80 border-amber-500 shadow-md ring-2 ring-amber-400/20'
+                          ? 'bg-amber-50/90 border-amber-500 shadow-sm ring-2 ring-amber-400/20'
                           : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50'
                       }`}
                     >
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-black text-slate-900 text-sm">
-                              {room.name}
-                            </span>
-                            {isMixed ? (
-                              <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-purple-100 text-purple-800 border border-purple-200">
-                                🔀 Campur {uniqueClasses.join(' & ')}
-                              </span>
-                            ) : uniqueClasses.length === 1 ? (
-                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
-                                Kelas {uniqueClasses[0]}
-                              </span>
-                            ) : (
-                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-500">
-                                Kosong
-                              </span>
-                            )}
-                          </div>
-                          <span className="text-[11px] text-slate-500 block mt-0.5">
-                            👤 {room.supervisorName || 'Guru Pengawas'}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="font-black text-slate-900 text-sm whitespace-nowrap">
+                            {room.name}
                           </span>
+                          {isMixed ? (
+                            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-black bg-purple-100 text-purple-800 border border-purple-200 truncate">
+                              🔀 {uniqueClasses.join(' & ')}
+                            </span>
+                          ) : uniqueClasses.length === 1 ? (
+                            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 truncate">
+                              Kelas {uniqueClasses[0]}
+                            </span>
+                          ) : (
+                            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-500">
+                              Kosong
+                            </span>
+                          )}
                         </div>
 
-                        <div className="text-right">
+                        <div className="shrink-0 flex items-center gap-1">
                           <span className={`text-xs font-black ${
-                            isFull ? 'text-amber-600' : students.length === 0 ? 'text-slate-400' : 'text-emerald-700'
+                            isFull ? 'text-amber-700' : students.length === 0 ? 'text-slate-400' : 'text-emerald-700'
                           }`}>
-                            {students.length} / {room.capacity}
+                            {students.length}/{room.capacity}
                           </span>
-                          <span className="text-[10px] text-slate-400 block">Kursi</span>
+                          <span className="text-[10px] text-slate-400">kursi</span>
                         </div>
                       </div>
 
-                      {/* Mini Capacity Bar */}
-                      <div className="mt-2.5 h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                      {/* Mini Slim Capacity Bar */}
+                      <div className="mt-2 h-1 w-full bg-slate-100 rounded-full overflow-hidden">
                         <div
                           style={{ width: `${percent}%` }}
                           className={`h-full transition-all duration-300 ${
@@ -1340,42 +2205,50 @@ export default function CbtPanitiaCommandCenter({
             </div>
 
             {/* RIGHT COLUMN: ROOM EDITOR & STUDENT PICKER (8 Cols) */}
-            <div className="lg:col-span-8 space-y-6">
+            <div className="lg:col-span-8 space-y-4">
               {/* Card 1: Selected Room Active Banner */}
-              <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-xs space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="px-3 py-1 rounded-xl bg-amber-400 text-slate-950 font-black text-xs uppercase tracking-wider">
+              <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-2xs space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3.5 border-b border-slate-100">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="px-2.5 py-1 rounded-xl bg-amber-400 text-slate-950 font-black text-xs uppercase tracking-wider">
                         {currentArrangementRoom?.name}
                       </span>
-                      <span className="text-xs font-bold text-slate-600">
+                      <span className="text-xs font-bold text-slate-800">
                         {currentArrangementRoom?.label}
                       </span>
                     </div>
-                    <div className="flex items-center gap-3 mt-1.5 text-xs text-slate-500">
-                      <span>Kapasitas: <strong className="text-slate-900">{currentArrangementRoom?.capacity} Siswa</strong></span>
-                      <span>•</span>
-                      <span>Terisi: <strong className="text-emerald-600">{currentRoomStudents.length} Siswa</strong></span>
-                      <span>•</span>
-                      <span>Pengawas: <strong className="text-slate-900">{currentArrangementRoom?.supervisorName || 'Guru Pengawas'}</strong></span>
+                    <div className="flex items-center gap-2 flex-wrap text-xs text-slate-500">
+                      <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-medium text-[11px]">
+                        Kapasitas: <strong className="text-slate-900">{currentArrangementRoom?.capacity}</strong>
+                      </span>
+                      <span className={`px-2 py-0.5 rounded-md font-bold text-[11px] ${
+                        currentRoomStudents.length >= (currentArrangementRoom?.capacity || 0)
+                          ? 'bg-amber-100 text-amber-900'
+                          : 'bg-emerald-50 text-emerald-800'
+                      }`}>
+                        Terisi: <strong>{currentRoomStudents.length} Siswa</strong>
+                      </span>
+                      <span className="text-[11px] text-slate-400">
+                        • Pengawas diatur di tab Jadwal Pengawas
+                      </span>
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex items-center gap-1.5 shrink-0 self-start sm:self-center">
                     <button
                       type="button"
                       onClick={() => handleOpenEditRoom(currentArrangementRoom)}
-                      className="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 font-bold text-xs transition cursor-pointer flex items-center gap-1 active:scale-95"
-                      title="Edit nama, kapasitas, dan pengawas ruangan ini"
+                      className="px-2.5 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 font-bold text-xs transition cursor-pointer flex items-center gap-1 active:scale-95"
+                      title="Edit nama, kapasitas, dan rombel ruangan ini"
                     >
                       <span>✏️</span>
-                      <span>Edit Ruang</span>
+                      <span>Edit</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => handleClearRoom(currentArrangementRoom.id)}
-                      className="px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 font-bold text-xs transition cursor-pointer flex items-center gap-1 active:scale-95"
+                      className="px-2.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 font-bold text-xs transition cursor-pointer flex items-center gap-1 active:scale-95"
                       title="Keluarkan seluruh siswa dari ruangan ini"
                     >
                       <span>🗑️</span>
@@ -1384,11 +2257,11 @@ export default function CbtPanitiaCommandCenter({
                     <button
                       type="button"
                       onClick={() => handleDeleteRoom(currentArrangementRoom.id)}
-                      className="px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold text-xs transition cursor-pointer flex items-center gap-1 active:scale-95"
+                      className="px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold text-xs transition cursor-pointer flex items-center gap-1 active:scale-95"
                       title="Hapus ruangan ini dari sistem CBT"
                     >
                       <span>✕</span>
-                      <span>Hapus Ruang</span>
+                      <span>Hapus</span>
                     </button>
                   </div>
                 </div>
@@ -1473,17 +2346,25 @@ export default function CbtPanitiaCommandCenter({
                                     className="rounded text-rose-600 cursor-pointer"
                                   />
                                 </td>
-                                <td className="py-2 px-3 font-mono font-bold text-slate-500">
-                                  {String(idx + 1).padStart(2, '0')}
+                                <td className="py-2 px-3">
+                                  <span className="w-6 h-6 rounded-md bg-slate-100 text-slate-600 font-mono font-bold text-[11px] inline-flex items-center justify-center">
+                                    {String(idx + 1).padStart(2, '0')}
+                                  </span>
                                 </td>
                                 <td className="py-2 px-3 font-bold text-slate-900">
                                   {st.name}
                                 </td>
-                                <td className="py-2 px-3 font-mono text-slate-600">
+                                <td className="py-2 px-3 font-mono text-slate-600 text-xs">
                                   {st.nisn}
                                 </td>
                                 <td className="py-2 px-3">
-                                  <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700">
+                                  <span className={`px-2 py-0.5 rounded-md text-[10px] font-black border ${
+                                    st.classId.startsWith('7')
+                                      ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                      : st.classId.startsWith('8')
+                                      ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                      : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                  }`}>
                                     {st.classId}
                                   </span>
                                 </td>
@@ -1491,8 +2372,8 @@ export default function CbtPanitiaCommandCenter({
                                   <button
                                     type="button"
                                     onClick={() => handleRemoveStudentsFromRoom([st.id])}
-                                    className="text-slate-400 hover:text-rose-600 font-bold text-xs p-1 cursor-pointer"
-                                    title="Keluarkan siswa ini"
+                                    className="w-6 h-6 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition inline-flex items-center justify-center font-bold text-xs cursor-pointer"
+                                    title="Keluarkan siswa ini dari ruangan"
                                   >
                                     ✕
                                   </button>
@@ -1508,7 +2389,7 @@ export default function CbtPanitiaCommandCenter({
               </div>
 
               {/* Card 2: Tambah Siswa ke Ruangan Ini (Student Picker) */}
-              <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-xs space-y-4">
+              <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-2xs space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
                     <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
@@ -1705,7 +2586,13 @@ export default function CbtPanitiaCommandCenter({
                                 {st.nisn}
                               </td>
                               <td className="py-2 px-3">
-                                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700">
+                                <span className={`px-2 py-0.5 rounded-md text-[10px] font-black border ${
+                                  st.classId.startsWith('7')
+                                    ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                    : st.classId.startsWith('8')
+                                    ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                    : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                }`}>
                                   {st.classId}
                                 </span>
                               </td>
@@ -1739,40 +2626,75 @@ export default function CbtPanitiaCommandCenter({
 
       {/* 3. TAB CONTENT: MONITORING 17 RUANGAN LIVE GRID */}
       {activeTab === 'monitoring' && (
-        <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="space-y-4">
+          {/* Consolidated Sleek Monitoring Header */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div>
-              <h2 className="text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
-                <span>📺</span>
-                <span>Monitoring Live Ruang Ujian</span>
-              </h2>
-              <p className="text-xs text-slate-500">
-                Data sinkron realtime dengan presensi dan pengerjaan siswa di seluruh ruangan ujian.
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-black text-slate-900 tracking-tight flex items-center gap-2">
+                  <span>📺</span>
+                  <span>Monitoring Live {config.rooms.length} Ruang Ujian</span>
+                </h2>
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
+                  Live Sync
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Pantauan real-time presensi pengawas, pengerjaan {activeStudents.length} peserta, dan penyerahan BAP.
               </p>
             </div>
-            <div className="flex items-center gap-2">
+
+            <div className="flex items-center gap-2 flex-wrap">
+              {(() => {
+                let activeSupCount = 0;
+                let bapDoneCount = 0;
+                let emptySupCount = 0;
+                config.rooms.forEach(r => {
+                  const att = getRoomAttendances(r)[0];
+                  const sup = (att?.supervisorName && att.supervisorName !== 'Guru Pengawas Ruang')
+                    ? att.supervisorName
+                    : (r.supervisorName || 'Guru Pengawas');
+                  if (att?.isBapSubmitted) bapDoneCount++;
+                  else if (sup && sup !== 'Guru Pengawas' && sup !== 'Guru Pengawas Ruang') activeSupCount++;
+                  else emptySupCount++;
+                });
+
+                return (
+                  <>
+                    <span className="px-2.5 py-1.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold flex items-center gap-1.5 shadow-2xs">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                      {activeSupCount} Pengawas Hadir
+                    </span>
+                    <span className="px-2.5 py-1.5 rounded-xl bg-indigo-50 text-indigo-800 border border-indigo-200 text-xs font-bold flex items-center gap-1 shadow-2xs">
+                      <span>✓</span> {bapDoneCount} BAP Terkirim
+                    </span>
+                    {emptySupCount > 0 && (
+                      <span className="px-2.5 py-1.5 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 text-xs font-bold flex items-center gap-1 shadow-2xs">
+                        <span>⚠️</span> {emptySupCount} Belum Check-in
+                      </span>
+                    )}
+                  </>
+                );
+              })()}
+
               <button
                 type="button"
                 onClick={() => {
                   setActiveTab('arrangement');
                   handleOpenAddRoomModal();
                 }}
-                className="px-3 py-1.5 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
+                className="px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95 ml-1"
+                title="Tambah ruangan ujian baru"
               >
                 <span>➕</span>
-                <span>Tambah Ruangan</span>
+                <span>Tambah Ruang</span>
               </button>
-              <span className="text-xs font-semibold px-3 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
-                {config.rooms.length} Ruangan Ujian • {activeStudents.length} Peserta Terdaftar
-              </span>
             </div>
           </div>
 
-          {/* Grid Seluruh Ruang Ujian */}
           <div>
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 flex items-center gap-2">
-              <span>🏫 Daftar Ruang Ujian ({config.rooms.length} Ruangan)</span>
-            </h3>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {config.rooms.map(room => {
                 const studentsInRoom = roomStudentsMap.get(room.id) || [];
@@ -1780,6 +2702,18 @@ export default function CbtPanitiaCommandCenter({
                 const roomSubmitted = stats.submitted;
                 const roomInProgress = stats.inProgress;
                 const roomNotStarted = stats.notStarted;
+
+                const roomAtts = getRoomAttendances(room);
+                const latestRoomAtt = roomAtts[0];
+                const displaySupervisor = (latestRoomAtt?.supervisorName && latestRoomAtt.supervisorName !== 'Guru Pengawas Ruang')
+                  ? latestRoomAtt.supervisorName
+                  : (room.supervisorName || 'Guru Pengawas');
+                const isBapDone = Boolean(latestRoomAtt?.isBapSubmitted);
+                const hasActiveSupervisor = Boolean(
+                  displaySupervisor &&
+                  displaySupervisor !== 'Guru Pengawas' &&
+                  displaySupervisor !== 'Guru Pengawas Ruang'
+                );
 
                 const total = studentsInRoom.length;
                 const percent = total > 0 ? Math.round((roomSubmitted / total) * 100) : 0;
@@ -1794,10 +2728,26 @@ export default function CbtPanitiaCommandCenter({
                     <div className="space-y-3">
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-slate-100 text-slate-700">
                               {room.name}
                             </span>
+                            {isBapDone ? (
+                              <span className="px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                ✓ BAP Diserahkan
+                              </span>
+                            ) : hasActiveSupervisor ? (
+                              <span className="px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                Standby
+                              </span>
+                            ) : (
+                              <span className="px-1.5 py-0.5 rounded-md text-[9px] font-semibold bg-slate-100 text-slate-400">
+                                Belum Check-in
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5 mt-1">
                             {isMixed ? (
                               <span className="px-2 py-0.5 rounded-md font-bold text-[10px] bg-purple-50 text-purple-700 border border-purple-200">
                                 🔀 Campur {uniqueClasses.join(' & ')}
@@ -1816,7 +2766,7 @@ export default function CbtPanitiaCommandCenter({
                             {total} Siswa Terdaftar
                           </h3>
                         </div>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
                           percent === 100
                             ? 'bg-emerald-100 text-emerald-800'
                             : percent > 0
@@ -1847,19 +2797,16 @@ export default function CbtPanitiaCommandCenter({
                       </div>
                     </div>
 
-                    <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-1 truncate max-w-[130px]">
-                        <span className="text-[11px] text-slate-600 truncate" title={room.supervisorName || 'Pengawas Ruang'}>
-                          👤 {room.supervisorName || 'Guru Pengawas'}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => handleOpenEditRoom(room)}
-                          className="text-slate-400 hover:text-indigo-600 cursor-pointer ml-1"
-                          title="Ubah Pengawas"
+                    <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs gap-2">
+                      <div className="flex items-center gap-1 truncate max-w-[170px]">
+                        <span
+                          className={`text-[11px] truncate ${
+                            hasActiveSupervisor ? 'text-slate-900 font-bold' : 'text-slate-400 italic'
+                          }`}
+                          title={hasActiveSupervisor ? `Pengawas: ${displaySupervisor}` : 'Belum aktif / belum ada pengawas'}
                         >
-                          ✏️
-                        </button>
+                          👤 {hasActiveSupervisor ? displaySupervisor : 'Belum Aktif'}
+                        </span>
                       </div>
                       <button
                         type="button"
@@ -1867,7 +2814,7 @@ export default function CbtPanitiaCommandCenter({
                           if (onOpenRoomView) onOpenRoomView(room.label || room.name);
                           setPreviewMonitoringRoom(room);
                         }}
-                        className="px-2.5 py-1 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs cursor-pointer transition flex items-center gap-1 active:scale-95 shadow-2xs"
+                        className="px-2.5 py-1 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs cursor-pointer transition flex items-center gap-1 active:scale-95 shadow-2xs shrink-0"
                         title={`Pantau langsung peserta di ${room.name}`}
                       >
                         <span>Pantau Ruang</span>
@@ -1884,17 +2831,21 @@ export default function CbtPanitiaCommandCenter({
 
       {/* 4. TAB CONTENT: PENCARIAN SISWA & RESET SESI MANDIRI */}
       {activeTab === 'search' && (
-        <div className="bg-white border border-slate-200 rounded-3xl p-4 sm:p-6 space-y-4 shadow-sm">
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 space-y-4 shadow-2xs">
           {/* Header & Quick Horizontal KPI Strip */}
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-slate-100">
-            <div>
-              <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
-                <span>🛠️</span>
-                <span>Pencarian Peserta & Reset Sesi Mandiri (Posko Pusat)</span>
-              </h2>
-              <p className="text-[11px] text-slate-500 mt-0.5">
-                Buka kunci sesi pengerjaan siswa yang mengalami kendala teknis (HP restart, browser crash) secara instan.
-              </p>
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center text-base shadow-xs shrink-0">
+                🛠️
+              </div>
+              <div>
+                <h2 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight">
+                  Pencarian Peserta &amp; Reset Sesi Mandiri
+                </h2>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Buka kunci sesi ujian siswa yang kendala teknis (HP restart, browser tertutup) secara instan.
+                </p>
+              </div>
             </div>
 
             {/* Compact Horizontal KPI Filter Badges */}
@@ -2338,34 +3289,38 @@ export default function CbtPanitiaCommandCenter({
       {/* 5. TAB CONTENT: REKAPITULASI BAP SEKOLAH */}
       {activeTab === 'bap' && (() => {
         let bapSubmittedCount = 0;
-        config.rooms.forEach(room => {
-          const attendances = Object.values(roomAttendances).filter(a => a.roomName?.includes(room.name));
+        uniqueSchoolRooms.forEach(room => {
+          const attendances = attendancesByRoomMap.get(room.name) || [];
           if (attendances.some(a => a.isBapSubmitted)) bapSubmittedCount++;
         });
 
         return (
-          <div className="bg-white border border-slate-200 rounded-3xl p-5 sm:p-7 space-y-5 shadow-sm">
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 space-y-4 shadow-2xs">
             {/* Header & KPI Summary */}
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-slate-100">
-              <div>
-                <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
-                  <span>📋</span>
-                  <span>Rekapitulasi Berita Acara Pelaksanaan (BAP) Seluruh Ruangan</span>
-                </h2>
-                <p className="text-[11px] text-slate-500 mt-0.5">
-                  Pantau kelengkapan Berita Acara Pelaksanaan ujian dari seluruh ruangan pengawas untuk keperluan arsip administrasi panitia asesmen.
-                </p>
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center text-base shadow-xs shrink-0">
+                  📋
+                </div>
+                <div>
+                  <h2 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight">
+                    Rekapitulasi Berita Acara Pelaksanaan (BAP)
+                  </h2>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Pantau kelengkapan BAP dan catatan kejadian khusus seluruh ruangan pengawas.
+                  </p>
+                </div>
               </div>
 
-              <div className="flex items-center gap-2 flex-wrap shrink-0">
-                <span className="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs border border-slate-200">
-                  🏢 Total {config.rooms.length} Ruangan
+              <div className="flex items-center gap-1.5 flex-wrap shrink-0">
+                <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 font-bold text-xs border border-slate-200">
+                  🏢 {uniqueSchoolRooms.length} Ruang
                 </span>
-                <span className="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-800 font-bold text-xs border border-emerald-200">
-                  ✓ {bapSubmittedCount} BAP Terkirim
+                <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 font-bold text-xs border border-emerald-200">
+                  ✓ {bapSubmittedCount} Terkirim
                 </span>
-                <span className="px-3 py-1.5 rounded-xl bg-amber-50 text-amber-800 font-bold text-xs border border-amber-200">
-                  ⏳ {Math.max(0, config.rooms.length - bapSubmittedCount)} Menunggu BAP
+                <span className="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-800 font-bold text-xs border border-amber-200">
+                  ⏳ {Math.max(0, uniqueSchoolRooms.length - bapSubmittedCount)} Menunggu
                 </span>
                 <button
                   type="button"
@@ -2374,7 +3329,7 @@ export default function CbtPanitiaCommandCenter({
                   title="Unduh seluruh rekapitulasi BAP sekolah ke Excel (.xlsx)"
                 >
                   <span>📥</span>
-                  <span>Export Excel (.xlsx)</span>
+                  <span>Export Excel</span>
                 </button>
                 <button
                   type="button"
@@ -2383,7 +3338,7 @@ export default function CbtPanitiaCommandCenter({
                   title="Cetak seluruh rekapitulasi BAP sekolah"
                 >
                   <span>🖨️</span>
-                  <span>Cetak Rekapitulasi</span>
+                  <span>Cetak Rekap</span>
                 </button>
               </div>
             </div>
@@ -2402,8 +3357,8 @@ export default function CbtPanitiaCommandCenter({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {config.rooms.map(room => {
-                    const attendances = Object.values(roomAttendances).filter(a => a.roomName?.includes(room.name));
+                  {uniqueSchoolRooms.map(room => {
+                    const attendances = attendancesByRoomMap.get(room.name) || [];
                     const latestAttendance = attendances[0];
                     const isSubmitted = attendances.some(a => a.isBapSubmitted);
                     const latestNote = latestAttendance?.notes || '-';
@@ -2437,8 +3392,23 @@ export default function CbtPanitiaCommandCenter({
                             {uniqueClasses.length > 0 ? uniqueClasses.join(', ') : room.classes.join(', ')}
                           </span>
                         </td>
-                        <td className="py-3 px-4 text-slate-700">
-                          {room.supervisorName || 'Guru Pengawas'}
+                        <td className="py-3 px-4">
+                          {isSubmitted ? (
+                            <div className="flex items-center gap-1.5">
+                              <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-[10px] font-bold shrink-0">
+                                ✓
+                              </span>
+                              <span className="font-bold text-slate-900">
+                                {(latestAttendance?.supervisorName && latestAttendance.supervisorName !== 'Guru Pengawas Ruang')
+                                  ? latestAttendance.supervisorName
+                                  : (room.supervisorName || 'Guru Pengawas')}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-slate-500 font-medium">
+                              {room.supervisorName || 'Guru Pengawas'}
+                            </span>
+                          )}
                         </td>
                         <td className="py-3 px-4">
                           {isSubmitted ? (
@@ -2506,6 +3476,240 @@ export default function CbtPanitiaCommandCenter({
         );
       })()}
 
+      {/* 5B. TAB CONTENT: REKAPITULASI UJIAN SUSULAN (SAKIT / IZIN) */}
+      {activeTab === 'susulan' && (() => {
+        const query = susulanFilterQuery.trim().toLowerCase();
+        const filteredList = susulanStudentsList.filter(item => {
+          if (susulanFilterStatus !== 'all' && item.status !== susulanFilterStatus) return false;
+          if (query) {
+            return (
+              item.student.name.toLowerCase().includes(query) ||
+              item.student.nisn.includes(query) ||
+              item.student.classId.toLowerCase().includes(query) ||
+              item.roomName.toLowerCase().includes(query) ||
+              item.examTitle.toLowerCase().includes(query)
+            );
+          }
+          return true;
+        });
+
+        const sickCount = susulanStudentsList.filter(s => s.status === 'S').length;
+        const permitCount = susulanStudentsList.filter(s => s.status === 'I').length;
+        const affectedClassesCount = new Set(susulanStudentsList.map(s => s.student.classId)).size;
+
+        return (
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 space-y-4 shadow-2xs">
+            {/* Header & Main Export */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-rose-600 text-white flex items-center justify-center text-base shadow-xs shrink-0">
+                  🏥
+                </div>
+                <div>
+                  <h2 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight">
+                    Rekapitulasi Peserta Ujian Susulan (Sakit / Izin)
+                  </h2>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Data otomatis terhimpun dari Berita Acara &amp; Presensi seluruh ruangan untuk jadwal susulan resmi.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleExportSusulanExcel}
+                  disabled={susulanStudentsList.length === 0}
+                  className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95"
+                  title="Unduh Rekap Peserta Ujian Susulan Format Excel"
+                >
+                  <span>📥</span>
+                  <span>Export Excel (.xlsx)</span>
+                </button>
+              </div>
+            </div>
+
+            {/* KPI Scoreboard Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              <div className="p-3 rounded-xl bg-amber-50/70 border border-amber-200/80 space-y-0.5">
+                <div className="text-[10px] font-bold text-amber-800 uppercase tracking-wider flex items-center gap-1">
+                  <span>📋</span>
+                  <span>Total Susulan</span>
+                </div>
+                <div className="text-xl font-black text-amber-950">
+                  {susulanStudentsList.length} <span className="text-xs font-semibold text-amber-800">Siswa</span>
+                </div>
+                <div className="text-[10px] text-amber-700">Perlu susulan</div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-blue-50/70 border border-blue-200/80 space-y-0.5">
+                <div className="text-[10px] font-bold text-blue-800 uppercase tracking-wider flex items-center gap-1">
+                  <span>🤒</span>
+                  <span>Sakit (S)</span>
+                </div>
+                <div className="text-xl font-black text-blue-950">
+                  {sickCount} <span className="text-xs font-semibold text-blue-800">Siswa</span>
+                </div>
+                <div className="text-[10px] text-blue-700">Surat dokter / ket. ortu</div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-purple-50/70 border border-purple-200/80 space-y-0.5">
+                <div className="text-[10px] font-bold text-purple-800 uppercase tracking-wider flex items-center gap-1">
+                  <span>✉️</span>
+                  <span>Izin Resmi (I)</span>
+                </div>
+                <div className="text-xl font-black text-purple-950">
+                  {permitCount} <span className="text-xs font-semibold text-purple-800">Siswa</span>
+                </div>
+                <div className="text-[10px] text-purple-700">Izin keluarga / duka</div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 space-y-0.5">
+                <div className="text-[10px] font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1">
+                  <span>🏫</span>
+                  <span>Kelas Terdampak</span>
+                </div>
+                <div className="text-xl font-black text-slate-800">
+                  {affectedClassesCount} <span className="text-xs font-semibold text-slate-500">Rombel</span>
+                </div>
+                <div className="text-[10px] text-slate-500">Dari total 17 rombel</div>
+              </div>
+            </div>
+
+            {/* Filter & Search Bar */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 p-2.5 bg-slate-50/90 border border-slate-200 rounded-xl">
+              <div className="flex items-center gap-1.5 overflow-x-auto text-xs">
+                <span className="text-[11px] font-bold text-slate-400 px-1">Kategori:</span>
+                <button
+                  type="button"
+                  onClick={() => setSusulanFilterStatus('all')}
+                  className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer text-xs ${
+                    susulanFilterStatus === 'all'
+                      ? 'bg-amber-500 text-slate-950 font-black shadow-xs'
+                      : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  Semua ({susulanStudentsList.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSusulanFilterStatus('S')}
+                  className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer text-xs flex items-center gap-1 ${
+                    susulanFilterStatus === 'S'
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  <span>🤒 Sakit ({sickCount})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSusulanFilterStatus('I')}
+                  className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer text-xs flex items-center gap-1 ${
+                    susulanFilterStatus === 'I'
+                      ? 'bg-purple-600 text-white shadow-xs'
+                      : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  <span>✉️ Izin ({permitCount})</span>
+                </button>
+              </div>
+
+              <div className="w-full sm:w-64">
+                <FastSearchInput
+                  value={susulanFilterQuery}
+                  onSearchChange={(q) => setSusulanFilterQuery(q)}
+                  placeholder="Cari nama, NISN, kelas, atau ruang..."
+                  className="w-full pl-8 pr-7 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-semibold focus:outline-none focus:border-amber-500 shadow-2xs"
+                />
+              </div>
+            </div>
+
+            {/* Susulan Table */}
+            {filteredList.length === 0 ? (
+              <div className="p-10 text-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 space-y-2">
+                <span className="text-3xl">🎉</span>
+                <h3 className="text-sm font-bold text-slate-700">
+                  {susulanStudentsList.length === 0
+                    ? 'Tidak Ada Peserta Ujian Susulan'
+                    : 'Tidak ada data yang sesuai filter'}
+                </h3>
+                <p className="text-xs text-slate-500 max-w-md mx-auto">
+                  {susulanStudentsList.length === 0
+                    ? 'Alhamdulillah, seluruh peserta tercatat Hadir di seluruh ruangan ujian. Belum ada siswa yang ditandai Sakit (S) atau Izin (I) oleh para guru pengawas.'
+                    : 'Coba ubah kata kunci pencarian atau bersihkan filter kategori di atas.'}
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-2xl border border-slate-200">
+                <table className="w-full text-xs text-left border-collapse">
+                  <thead className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
+                    <tr>
+                      <th className="px-3.5 py-3 w-12 text-center">No</th>
+                      <th className="px-3.5 py-3 w-28 font-mono">NISN</th>
+                      <th className="px-3.5 py-3">Nama Lengkap Peserta</th>
+                      <th className="px-3.5 py-3 w-24 text-center">Rombel</th>
+                      <th className="px-3.5 py-3 w-32">Ruang Asal</th>
+                      <th className="px-3.5 py-3">Mata Pelajaran</th>
+                      <th className="px-3.5 py-3 w-32 text-center">Status Alasan</th>
+                      <th className="px-3.5 py-3">Catatan Pengawas</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredList.map((item, idx) => (
+                      <tr key={`${item.student.id}_${idx}`} className="hover:bg-slate-50 transition">
+                        <td className="px-3.5 py-3 text-center font-mono text-slate-500">
+                          {idx + 1}
+                        </td>
+                        <td className="px-3.5 py-3 font-mono font-medium text-slate-600">
+                          {item.student.nisn}
+                        </td>
+                        <td className="px-3.5 py-3 font-bold text-slate-900">
+                          {item.student.name}
+                        </td>
+                        <td className="px-3.5 py-3 text-center">
+                          <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
+                            item.student.classId.startsWith('7')
+                              ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                              : item.student.classId.startsWith('8')
+                              ? 'bg-purple-50 text-purple-700 border border-purple-200'
+                              : 'bg-teal-50 text-teal-700 border border-teal-200'
+                          }`}>
+                            {item.student.classId}
+                          </span>
+                        </td>
+                        <td className="px-3.5 py-3 font-semibold text-slate-700">
+                          {item.roomName}
+                        </td>
+                        <td className="px-3.5 py-3 text-slate-700 font-medium">
+                          {item.examTitle}
+                        </td>
+                        <td className="px-3.5 py-3 text-center">
+                          {item.status === 'S' ? (
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-blue-100 text-blue-800 border border-blue-200 flex items-center justify-center gap-1">
+                              <span>🏥</span>
+                              <span>Sakit (S)</span>
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-purple-100 text-purple-800 border border-purple-200 flex items-center justify-center gap-1">
+                              <span>📩</span>
+                              <span>Izin (I)</span>
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3.5 py-3 text-slate-500 text-[11px] italic">
+                          {item.notes || '-'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {/* 6. MODAL EDIT PENGATURAN RUANGAN / PENGAWAS */}
       {editingRoom && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
@@ -2555,17 +3759,14 @@ export default function CbtPanitiaCommandCenter({
                 </div>
               </div>
 
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">
-                  Nama Guru Pengawas:
-                </label>
-                <input
-                  type="text"
-                  value={editRoomSupervisor}
-                  onChange={(e) => setEditRoomSupervisor(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-indigo-500"
-                  placeholder="Contoh: Dani Ramdani, S.Pd."
-                />
+              <div className="p-3.5 rounded-2xl bg-amber-50/80 border border-amber-200/80 text-xs text-amber-900 flex items-start gap-2.5">
+                <span className="text-base leading-none mt-0.5">🗓️</span>
+                <div>
+                  <span className="font-bold block">Jadwal Pengawas Ruangan</span>
+                  <p className="text-[11px] text-amber-800/90 mt-0.5 leading-relaxed">
+                    Pengawas untuk Jam Ke-1 dan Jam Ke-2 diatur terpusat di tab <strong>&quot;Jadwal Pengawas (Jam 1 &amp; 2)&quot;</strong> agar dapat dirotasi otomatis dan bebas bentrok.
+                  </p>
+                </div>
               </div>
 
               <div>
@@ -2704,10 +3905,11 @@ export default function CbtPanitiaCommandCenter({
                   </label>
                   <input
                     type="text"
+                    list="panitia-teachers-list"
                     value={newRoomSupervisor}
                     onChange={(e) => setNewRoomSupervisor(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-amber-500"
-                    placeholder="Nama Pengawas"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-amber-500 font-semibold"
+                    placeholder="Pilih atau ketik pengawas"
                   />
                 </div>
               </div>
@@ -2987,9 +4189,9 @@ export default function CbtPanitiaCommandCenter({
                             >
                               {sess.isSubmitted ? '✓ Selesai' : '⏳ Mengerjakan'}
                             </span>
-                            {sess.violationCount && sess.violationCount > 0 ? (
-                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-100 text-rose-800">
-                                ⚠️ {sess.violationCount}x Pindah Tab
+                            {sess.violationCount && sess.violationCount >= 1 ? (
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-rose-600 text-white animate-pulse">
+                                🔒 TERKUNCI ({sess.violationCount}x Keluar)
                               </span>
                             ) : null}
                           </div>
@@ -3010,22 +4212,42 @@ export default function CbtPanitiaCommandCenter({
                           </div>
                         </div>
 
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (confirm(`Yakin ingin mereset sesi ujian "${examTitle}" untuk siswa "${st.name}"?\n\nSiswa akan dapat mengerjakan kembali mata pelajaran ini dari awal.`)) {
-                              resetStoredStudentCbtSession(sess.examId, st.id);
-                              showAlert(`Sesi ${subjectName} untuk ${st.name} berhasil di-reset!`);
-                              if (currentSessions.length <= 1) {
-                                setResetModalStudent(null);
+                        <div className="flex items-center gap-2">
+                          {sess.violationCount && sess.violationCount >= 1 ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                saveStoredStudentCbtSession({
+                                  ...sess,
+                                  violationCount: 0
+                                });
+                                showAlert(`Kunci ujian untuk ${st.name} berhasil dibuka (pelanggaran di-reset ke 0)!`);
+                              }}
+                              className="shrink-0 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-800 font-bold text-xs transition cursor-pointer active:scale-95 flex items-center gap-1 shadow-2xs"
+                              title="Buka kunci ujian siswa tanpa menghapus jawaban yang sudah dikerjakan"
+                            >
+                              <span>🔓</span>
+                              <span>Buka Kunci Pelanggaran</span>
+                            </button>
+                          ) : null}
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (confirm(`Yakin ingin mereset sesi ujian "${examTitle}" untuk siswa "${st.name}"?\n\nSiswa akan dapat mengerjakan kembali mata pelajaran ini dari awal.`)) {
+                                resetStoredStudentCbtSession(sess.examId, st.id);
+                                showAlert(`Sesi ${subjectName} untuk ${st.name} berhasil di-reset!`);
+                                if (currentSessions.length <= 1) {
+                                  setResetModalStudent(null);
+                                }
                               }
-                            }
-                          }}
-                          className="shrink-0 px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold text-xs transition cursor-pointer active:scale-95 flex items-center gap-1 shadow-2xs"
-                        >
-                          <span>🔄</span>
-                          <span>Reset Sesi Ini</span>
-                        </button>
+                            }}
+                            className="shrink-0 px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold text-xs transition cursor-pointer active:scale-95 flex items-center gap-1 shadow-2xs"
+                          >
+                            <span>🔄</span>
+                            <span>Reset Sesi Ini</span>
+                          </button>
+                        </div>
                       </div>
                     );
                   })
@@ -3093,7 +4315,11 @@ export default function CbtPanitiaCommandCenter({
                     </h3>
                   </div>
                   <div className="flex items-center gap-3 mt-1.5 text-xs text-slate-500">
-                    <span>Pengawas: <strong className="text-slate-800">{room.supervisorName || 'Guru Pengawas'}</strong></span>
+                    <span>Pengawas: <strong className="text-slate-800">
+                      {(attendancesByRoomMap.get(room.name)?.[0]?.supervisorName && attendancesByRoomMap.get(room.name)?.[0]?.supervisorName !== 'Guru Pengawas Ruang')
+                        ? attendancesByRoomMap.get(room.name)?.[0]?.supervisorName
+                        : (room.supervisorName || 'Guru Pengawas')}
+                    </strong></span>
                     <span>•</span>
                     <span>Kapasitas: <strong className="text-slate-800">{room.capacity} Kursi</strong></span>
                     <span>•</span>
@@ -3322,7 +4548,11 @@ export default function CbtPanitiaCommandCenter({
                     </tr>
                     <tr className="border-b border-slate-200">
                       <td className="py-1.5 px-3 bg-slate-50 font-bold">Guru Pengawas Ruang</td>
-                      <td className="py-1.5 px-3 font-semibold">{room.supervisorName || 'Guru Pengawas'}</td>
+                      <td className="py-1.5 px-3 font-semibold">
+                        {(latestAttendance?.supervisorName && latestAttendance.supervisorName !== 'Guru Pengawas Ruang')
+                          ? latestAttendance.supervisorName
+                          : (room.supervisorName || 'Guru Pengawas')}
+                      </td>
                     </tr>
                     <tr className="border-b border-slate-200">
                       <td className="py-1.5 px-3 bg-slate-50 font-bold">Jumlah Peserta Terdaftar</td>
@@ -3357,7 +4587,12 @@ export default function CbtPanitiaCommandCenter({
                   </div>
                   <div className="space-y-12">
                     <p>Cihampelas, {new Date().toLocaleDateString('id-ID')}<br />Guru Pengawas Ruang</p>
-                    <p className="font-bold underline">{room.supervisorName || 'Guru Pengawas'}<br /><span className="font-normal text-[10px] text-slate-500">Guru Pengawas CBT</span></p>
+                    <p className="font-bold underline">
+                      {(latestAttendance?.supervisorName && latestAttendance.supervisorName !== 'Guru Pengawas Ruang')
+                        ? latestAttendance.supervisorName
+                        : (room.supervisorName || 'Guru Pengawas')}
+                      <br /><span className="font-normal text-[10px] text-slate-500">Guru Pengawas CBT</span>
+                    </p>
                   </div>
                 </div>
               </div>
@@ -3367,31 +4602,13 @@ export default function CbtPanitiaCommandCenter({
                 <span className="text-[11px] text-slate-400">
                   Dokumen resmi Berita Acara Pelaksanaan (BAP) SMP Negeri 3 Cihampelas
                 </span>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleExportSingleRoomBap(room)}
-                    className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition cursor-pointer flex items-center gap-1 shadow-xs active:scale-95"
-                  >
-                    <span>📥</span>
-                    <span>Download Excel</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => window.print()}
-                    className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition cursor-pointer flex items-center gap-1 shadow-xs active:scale-95"
-                  >
-                    <span>🖨️</span>
-                    <span>Cetak Lembar BAP</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPreviewBapRoom(null)}
-                    className="px-4 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition cursor-pointer"
-                  >
-                    Tutup
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setPreviewBapRoom(null)}
+                  className="px-4 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition cursor-pointer"
+                >
+                  Tutup
+                </button>
               </div>
             </div>
           </div>
@@ -3407,7 +4624,7 @@ export default function CbtPanitiaCommandCenter({
         let totalAbsentAll = 0;
         let totalBapSubmitted = 0;
 
-        const roomRows = config.rooms.map((room, idx) => {
+        const roomRows = uniqueSchoolRooms.map((room, idx) => {
           const attendances = attendancesByRoomMap.get(room.name) || [];
           const latestAttendance = attendances[0];
           const isSubmitted = attendances.some(a => a.isBapSubmitted);
@@ -3439,7 +4656,9 @@ export default function CbtPanitiaCommandCenter({
             no: idx + 1,
             roomName: room.name,
             classes: uniqueClasses.length > 0 ? uniqueClasses.join(', ') : room.classes.join(', '),
-            supervisor: room.supervisorName || 'Guru Pengawas',
+            supervisor: (latestAttendance?.supervisorName && latestAttendance.supervisorName !== 'Guru Pengawas Ruang')
+              ? latestAttendance.supervisorName
+              : (room.supervisorName || 'Guru Pengawas'),
             total: roomStudents.length,
             present: presentCount,
             sick: sickCount,
@@ -3618,32 +4837,13 @@ export default function CbtPanitiaCommandCenter({
                 <span className="text-[11px] text-slate-400">
                   Dokumen resmi Rekapitulasi Berita Acara Pelaksanaan (BAP) SMP Negeri 3 Cihampelas
                 </span>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handleExportSchoolBapExcel}
-                    className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition cursor-pointer flex items-center gap-1 shadow-xs active:scale-95"
-                    title="Unduh format spreadsheet Excel (.xlsx)"
-                  >
-                    <span>📥</span>
-                    <span>Download Excel (.xlsx)</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => window.print()}
-                    className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition cursor-pointer flex items-center gap-1 shadow-xs active:scale-95"
-                  >
-                    <span>🖨️</span>
-                    <span>Cetak Lembar Rekapitulasi</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowRekapPrintModal(false)}
-                    className="px-4 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition cursor-pointer"
-                  >
-                    Tutup
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowRekapPrintModal(false)}
+                  className="px-4 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition cursor-pointer"
+                >
+                  Tutup
+                </button>
               </div>
             </div>
           </div>
@@ -3797,6 +4997,169 @@ export default function CbtPanitiaCommandCenter({
                   className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-md shadow-indigo-600/20 cursor-pointer active:scale-95"
                 >
                   Simpan & Daftarkan Siswa ✓
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 6C. MODAL ATUR JAM & PENJADWALAN SESI ASESMEN (AUTO-SCHEDULE) */}
+      {showScheduleModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-lg w-full space-y-4 shadow-2xl border border-amber-200">
+            <div className="flex items-start justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <span className="p-2.5 rounded-2xl bg-amber-100 text-amber-900 text-xl font-bold">
+                  ⏰
+                </span>
+                <div>
+                  <h3 className="text-base sm:text-lg font-black text-slate-900">
+                    Atur Jadwal Waktu Sesi CBT
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Tentukan tanggal, jam buka, jam tutup, dan durasi pengerjaan. Ujian otomatis aktif saat jam tiba.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowScheduleModal(false)}
+                className="text-slate-400 hover:text-slate-600 font-bold cursor-pointer text-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveSchedule} className="space-y-4 text-xs">
+              {/* TARGET MATA PELAJARAN / PAKET ASESMEN */}
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">
+                  🎯 Target Mata Pelajaran / Paket Ujian:
+                </label>
+                <select
+                  value={selectedSchedPackageId}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSelectedSchedPackageId(val);
+                    if (val !== 'all') {
+                      const target = packages.find(p => p.id === val);
+                      if (target) {
+                        if (target.examDate) setSchedDate(target.examDate);
+                        if (target.startTime) setSchedStartTime(target.startTime);
+                        if (target.endTime) setSchedEndTime(target.endTime);
+                        if (target.durationMinutes) setSchedDuration(target.durationMinutes);
+                      }
+                    }
+                  }}
+                  className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-bold focus:outline-none focus:border-amber-500 text-xs cursor-pointer shadow-xs"
+                >
+                  <option value="all">🌐 Semua Mata Pelajaran (Serentak)</option>
+                  <optgroup label="Pilih Mata Pelajaran Spesifik:">
+                    {packages.map(pkg => (
+                      <option key={pkg.id} value={pkg.id}>
+                        [{pkg.subject}] {pkg.title} ({pkg.startTime || '07:30'} - {pkg.endTime || '09:00'} WIB)
+                      </option>
+                    ))}
+                  </optgroup>
+                </select>
+                <p className="text-[10px] text-slate-400 mt-1">
+                  {selectedSchedPackageId === 'all'
+                    ? '💡 Pengaturan jam di bawah akan diterapkan serentak ke semua mata pelajaran.'
+                    : `💡 Pengaturan jam di bawah khusus berlaku untuk mata pelajaran ${packages.find(p => p.id === selectedSchedPackageId)?.subject}.`}
+                </p>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">
+                  📅 Tanggal Pelaksanaan Ujian:
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={schedDate}
+                  onChange={(e) => setSchedDate(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-bold focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">
+                    🟢 Jam Mulai (Buka Soal):
+                  </label>
+                  <input
+                    type="time"
+                    required
+                    value={schedStartTime}
+                    onChange={(e) => setSchedStartTime(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-black text-sm focus:outline-none focus:border-emerald-500"
+                  />
+                  <span className="text-[10px] text-slate-400 mt-0.5 block">
+                    Sistem otomatis membuka ujian
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">
+                    🔴 Jam Selesai (Auto-Submit):
+                  </label>
+                  <input
+                    type="time"
+                    required
+                    value={schedEndTime}
+                    onChange={(e) => setSchedEndTime(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-black text-sm focus:outline-none focus:border-rose-500"
+                  />
+                  <span className="text-[10px] text-slate-400 mt-0.5 block">
+                    Batas akhir pengumpulan
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">
+                  ⏱️ Durasi Pengerjaan Peserta (Menit):
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="10"
+                    max="180"
+                    required
+                    value={schedDuration}
+                    onChange={(e) => setSchedDuration(Math.max(10, parseInt(e.target.value) || 60))}
+                    className="w-32 px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-black text-sm focus:outline-none focus:border-amber-500"
+                  />
+                  <span className="text-xs text-slate-600 font-semibold">Menit hitung mundur personal</span>
+                </div>
+              </div>
+
+              <div className="p-3 bg-indigo-50/70 rounded-2xl border border-indigo-200 text-[11px] text-indigo-900 space-y-1">
+                <div className="font-bold flex items-center gap-1.5">
+                  <span>💡</span>
+                  <span>Otomatisasi Penuh:</span>
+                </div>
+                <p className="text-indigo-800 leading-relaxed">
+                  Panitia tidak perlu menekan tombol Pause/Active setiap sesi. Tepat pukul <strong>{schedStartTime} WIB</strong> tombol ujian otomatis terbuka di portal siswa, dan pukul <strong>{schedEndTime} WIB</strong> seluruh lembar jawaban yang belum dikumpulkan otomatis tersimpan permanen.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowScheduleModal(false)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition shadow-md shadow-amber-400/20 cursor-pointer active:scale-95"
+                >
+                  {selectedSchedPackageId === 'all'
+                    ? 'Simpan & Terapkan Jadwal Serentak ✓'
+                    : `Simpan Jadwal ${packages.find(p => p.id === selectedSchedPackageId)?.subject || 'Mapel Ini'} ✓`}
                 </button>
               </div>
             </form>
