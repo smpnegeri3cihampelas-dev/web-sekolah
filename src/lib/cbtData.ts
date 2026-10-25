@@ -262,27 +262,40 @@ function normalizeSupervisorSchedule(parsed: any, targetDate: string): CbtSuperv
   };
 }
 
+export const REAL_SCHOOL_TEACHERS = [
+  'Ichsanul Arifin, S.Kom.',
+  'Dedeh Komalasari, S.Pd.',
+  'E. Hamdani, S.Pd., M.M.Pd.',
+  'Rohidin, S.Pd.',
+  'Dian Nuryati, SP., MM',
+  'Rachmi Fatwalia, S.Pd.',
+  'H. Osad, M.Pd.I',
+  'Nunik Wahyuni, S.Pd.',
+  'N. Euis Kurnia, S.Pd.',
+  'Rifayanti Maulani, S.Pd.',
+  'Yulia M. Ahmad, S.Pd.',
+  'Yepy Agus R, S.IP., M.Pd.',
+  'Dudi Yusup, S.Pd.',
+  'Gugun Gunawan, S.Pd.',
+  'Nursifa Fauziah, S.Pd.',
+  'Krisna Lestari, S.Pd.',
+  'Wiwin S, S.Pd.I., M.Pd.',
+  'Cincin Cintawati, S.Pd.',
+  'Budiyanto, S.Pd.',
+  'Muhammad Ahiq T, S.Pd.',
+  'Riski Ismawarni M, S.Pd.',
+  'Siti Nurjanah, S.Pd.',
+  'Tina A. Rosdiana, S.Pd.I',
+  'Sonia Winjuni L, S.Pd.',
+  "Elis Siti Sa'adah, S.Pd.",
+  'Nira Destriyani, S.Pd.',
+  'Dani Ramdani, S.Pd.',
+  'H. Rustandi, S.Pd., M.Pd.'
+];
+
 export function getDefaultSupervisorSchedule(targetDate?: string): CbtSupervisorSchedule {
   const rooms = getDefaultSchoolRooms();
-  const defaultTeachers = [
-    'Ichsanul Arifin, S.Kom.',
-    'Cucu Rohaeti, S.Pd.',
-    'Dani Ramdani, S.Pd.',
-    'Dra. Hj. Siti Rohmah, M.Pd.',
-    'Yudi, S.Pd.',
-    'Siti Nurhaliza, S.Pd.',
-    'Ahmad Fauzi, S.Pd.I.',
-    'Budi Santoso, S.Pd.',
-    'Rina Marlina, S.Pd.',
-    'Eka Prasetya, S.Pd.',
-    'Dewi Sartika, S.Pd.',
-    'Agus Setiawan, S.Pd.',
-    'Fitri Handayani, S.Pd.',
-    'Hendri Gunawan, S.Pd.',
-    'Novi Andriani, S.Pd.',
-    'Rahmat Hidayat, S.Pd.',
-    'Wawan Kuswandi, S.Pd.'
-  ];
+  const defaultTeachers = REAL_SCHOOL_TEACHERS;
 
   const dateToUse = targetDate || new Date().toISOString().split('T')[0];
   const sessions: CbtScheduleSessionSlot[] = [
@@ -344,25 +357,7 @@ export function getStoredSupervisorSchedule(targetDate?: string): CbtSupervisorS
     if (pkgsOnDate.length > 0) {
       const autoSessions = generateSessionsFromExamPackages(pkgs, dateToUse);
       const rooms = getDefaultSchoolRooms();
-      const defaultTeachers = [
-        'Ichsanul Arifin, S.Kom.',
-        'Cucu Rohaeti, S.Pd.',
-        'Dani Ramdani, S.Pd.',
-        'Dra. Hj. Siti Rohmah, M.Pd.',
-        'Yudi, S.Pd.',
-        'Siti Nurhaliza, S.Pd.',
-        'Ahmad Fauzi, S.Pd.I.',
-        'Budi Santoso, S.Pd.',
-        'Rina Marlina, S.Pd.',
-        'Eka Prasetya, S.Pd.',
-        'Dewi Sartika, S.Pd.',
-        'Agus Setiawan, S.Pd.',
-        'Fitri Handayani, S.Pd.',
-        'Hendri Gunawan, S.Pd.',
-        'Novi Andriani, S.Pd.',
-        'Rahmat Hidayat, S.Pd.',
-        'Wawan Kuswandi, S.Pd.'
-      ];
+      const defaultTeachers = REAL_SCHOOL_TEACHERS;
       const entries: CbtSupervisorScheduleEntry[] = rooms.map((r, idx) => {
         const sups: Record<string, string> = {};
         autoSessions.forEach((slot, sIdx) => {
@@ -694,7 +689,21 @@ export function getStoredCbtPackages(): CbtExamPackage[] {
     }
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) {
-      return parsed.map((p: CbtExamPackage) => ({
+      // Clean up legacy mock exams (Cucu Rohaeti, Erma Rismayanti, old demo tests)
+      const cleaned = parsed.filter((p: any) => {
+        const tName = p.teacherName || '';
+        return (
+          !tName.includes('Cucu Rohaeti') &&
+          !tName.includes('Erma Rismayanti') &&
+          p.id !== 'cbt-ipa-7-pts' &&
+          p.id !== 'cbt-bing-8-pts' &&
+          p.title !== 'jnn'
+        );
+      });
+      if (cleaned.length !== parsed.length) {
+        localStorage.setItem(CBT_PACKAGES_KEY, JSON.stringify(cleaned));
+      }
+      return cleaned.map((p: CbtExamPackage) => ({
         ...p,
         examDate: p.examDate || new Date().toISOString().split('T')[0],
         startTime: (p.startTime === '07:30' && p.endTime === '09:00') ? '06:00' : (p.startTime || '06:00'),
