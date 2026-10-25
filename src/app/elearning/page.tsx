@@ -1337,6 +1337,10 @@ export default function ELearningPage() {
   // Teacher Account Settings Modal State
   const [isTeacherSettingsOpen, setIsTeacherSettingsOpen] = useState<boolean>(false);
 
+  // Student CBT Token Entry Modal State (Enables true instantaneous Fullscreen without prompt() blockage)
+  const [cbtTokenModalExam, setCbtTokenModalExam] = useState<CbtExamPackage | null>(null);
+  const [cbtTokenInputValue, setCbtTokenInputValue] = useState<string>('');
+
   // Fullscreen Detection State
   const [isBrowserFullscreen, setIsBrowserFullscreen] = useState<boolean>(false);
   useEffect(() => {
@@ -5120,33 +5124,28 @@ export default function ELearningPage() {
                                     <span>{sched.scheduleState === 'emergency_paused' ? '⏸️ Ujian Dijeda' : sched.scheduleState === 'upcoming' ? `⏳ Dibuka ${exam.startTime || '07:30'} WIB` : '🏁 Waktu Berakhir'}</span>
                                   </button>
                                 ) : (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const inputToken = prompt(`Masukkan Token Sesi Ujian untuk ${exam.title} (lihat di papan tulis):`);
-                                      if (!inputToken) return;
-                                      if (inputToken.trim().toUpperCase() !== exam.token.toUpperCase().trim()) {
-                                        alert(`⚠️ Token Ujian Salah!\n\nToken "${inputToken.toUpperCase().trim()}" tidak valid.`);
-                                        return;
-                                      }
-                                      markStudentCbtAttendancePresent({
-                                        roomName: targetRoomName,
-                                        examId: exam.id,
-                                        studentId: currentStudent.id,
-                                        examTitle: exam.title,
-                                        token: exam.token
-                                      });
-                                      setActiveCbtExamSession({
-                                        exam,
-                                        student: currentStudent,
-                                        roomName: targetRoomName
-                                      });
-                                    }}
-                                    className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs transition shadow-md shadow-amber-500/20 flex items-center justify-center gap-2 cursor-pointer active:scale-95"
-                                  >
-                                    <span>🚀 Masuk Ruang Ujian CBT</span>
-                                    <span>➔</span>
-                                  </button>
+                                  (() => {
+                                    const hasOngoing = Boolean(
+                                      cbtStudentSessions[`${exam.id}_${currentStudent.id}`] ||
+                                      Object.values(cbtStudentSessions).find(s => 
+                                        (s.studentId === currentStudent.id || s.studentNisn === currentStudent.nisn) &&
+                                        s.examId === exam.id && !s.isSubmitted
+                                      )
+                                    );
+                                    return (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setCbtTokenModalExam(exam);
+                                          setCbtTokenInputValue(hasOngoing ? exam.token : '');
+                                        }}
+                                        className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs transition shadow-md shadow-amber-500/20 flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                                      >
+                                        <span>{hasOngoing ? '⏩ Lanjutkan Ujian CBT' : '🚀 Masuk Ruang Ujian CBT'}</span>
+                                        <span>➔</span>
+                                      </button>
+                                    );
+                                  })()
                                 )}
                               </div>
                             </div>
@@ -5746,6 +5745,125 @@ export default function ELearningPage() {
               showToast(`Nilai (${updated.grade}/100) dan umpan balik berhasil disimpan!`, 'success');
             }}
           />
+        )}
+
+        {/* MODAL VERIFIKASI TOKEN CBT & AUTO FULLSCREEN */}
+        {cbtTokenModalExam && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+            <div className="bg-slate-900 border border-slate-700/80 rounded-3xl p-6 sm:p-7 max-w-sm w-full text-white shadow-2xl space-y-4">
+              <div className="text-center space-y-1.5">
+                <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/30 text-amber-400 text-2xl mx-auto flex items-center justify-center">
+                  💻
+                </div>
+                <h3 className="text-base font-bold text-white line-clamp-1">{cbtTokenModalExam.title}</h3>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Masukkan Token Sesi Ujian dari papan tulis untuk masuk ke mode ujian layar penuh.
+                </p>
+              </div>
+
+              {(() => {
+                const handleStartExamDirect = () => {
+                  const cleanInput = cbtTokenInputValue.trim().toUpperCase();
+                  if (!cleanInput) {
+                    alert('Harap masukkan token ujian!');
+                    return;
+                  }
+                  if (cleanInput !== cbtTokenModalExam.token.trim().toUpperCase()) {
+                    alert(`⚠️ Token Ujian Salah!\n\nToken "${cleanInput}" tidak valid.`);
+                    return;
+                  }
+
+                  // 1. AKTIFKAN FULLSCREEN LANGSUNG DI GESTURE ASLI (100% DIDUKUNG BROWSER)
+                  try {
+                    const docEl = document.documentElement as any;
+                    if (docEl.requestFullscreen) {
+                      docEl.requestFullscreen().catch(() => {});
+                    } else if (docEl.webkitRequestFullscreen) {
+                      docEl.webkitRequestFullscreen().catch(() => {});
+                    } else if (docEl.mozRequestFullScreen) {
+                      docEl.mozRequestFullScreen().catch(() => {});
+                    } else if (docEl.msRequestFullscreen) {
+                      docEl.msRequestFullscreen().catch(() => {});
+                    }
+                  } catch (e) {
+                    console.error('Fullscreen request error', e);
+                  }
+
+                  // 2. Tandai kehadiran
+                  const currentStudentObj = activeStudents.find(s => s.nisn === currentUser?.nipOrNisn) ||
+                    activeStudents.find(s => s.name.toLowerCase() === currentUser?.name?.toLowerCase()) ||
+                    activeStudents[0];
+
+                  const assignedRoom = getRoomForStudent(currentStudentObj, getStoredCbtPanitiaConfig().rooms);
+                  const targetRoom = assignedRoom?.name || `Ruang ${currentUser?.classId || '7-A'}`;
+
+                  markStudentCbtAttendancePresent({
+                    roomName: targetRoom,
+                    examId: cbtTokenModalExam.id,
+                    studentId: currentStudentObj.id,
+                    examTitle: cbtTokenModalExam.title,
+                    token: cbtTokenModalExam.token
+                  });
+
+                  // 3. Masuk ruang ujian
+                  setActiveCbtExamSession({
+                    exam: cbtTokenModalExam,
+                    student: currentStudentObj,
+                    roomName: targetRoom
+                  });
+
+                  setCbtTokenModalExam(null);
+                  setCbtTokenInputValue('');
+                };
+
+                return (
+                  <>
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        placeholder="TOKEN UJIAN (cth: INF7SM)"
+                        value={cbtTokenInputValue}
+                        onChange={e => setCbtTokenInputValue(e.target.value.toUpperCase())}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') {
+                            handleStartExamDirect();
+                          }
+                        }}
+                        className="w-full text-center tracking-widest font-mono font-black text-lg py-3 px-4 rounded-xl bg-slate-800 border border-slate-700 text-amber-300 placeholder-slate-600 focus:outline-hidden focus:border-amber-400 uppercase shadow-inner"
+                        autoFocus
+                      />
+                      <div className="text-[11px] text-slate-400 text-center flex items-center justify-center gap-1.5 font-medium">
+                        <span>🛡️</span>
+                        <span>Layar akan otomatis terkunci ke Mode Penuh</span>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCbtTokenModalExam(null);
+                          setCbtTokenInputValue('');
+                        }}
+                        className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition cursor-pointer"
+                      >
+                        Batal
+                      </button>
+                      <button
+                        id="btn-submit-cbt-token"
+                        type="button"
+                        onClick={handleStartExamDirect}
+                        className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-md shadow-amber-500/30 flex items-center justify-center gap-1.5 transition cursor-pointer active:scale-95"
+                      >
+                        <span>⛶</span>
+                        <span>Mulai Ujian</span>
+                      </button>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+          </div>
         )}
 
         {/* MODAL: PENGATURAN AKUN GURU & GANTI KATA SANDI MANDIRI */}

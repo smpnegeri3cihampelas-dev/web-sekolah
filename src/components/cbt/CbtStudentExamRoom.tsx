@@ -66,7 +66,15 @@ export default function CbtStudentExamRoom({
   const [unlockTokenInput, setUnlockTokenInput] = useState<string>('');
   const [unlockError, setUnlockError] = useState<string | null>(null);
   const [unlockSuccess, setUnlockSuccess] = useState<string | null>(null);
-  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(() => {
+    if (typeof document === 'undefined') return false;
+    return Boolean(
+      document.fullscreenElement ||
+      (document as any).webkitFullscreenElement ||
+      (document as any).mozFullScreenElement ||
+      (document as any).msFullscreenElement
+    );
+  });
 
   // Time remaining in seconds
   const totalDurationSeconds = Math.max(60, (exam.durationMinutes || 60) * 60);
@@ -213,11 +221,15 @@ export default function CbtStudentExamRoom({
           await docEl.requestFullscreen();
         } else if (docEl.webkitRequestFullscreen) {
           await docEl.webkitRequestFullscreen();
+        } else if (docEl.mozRequestFullScreen) {
+          await docEl.mozRequestFullScreen();
+        } else if (docEl.msRequestFullscreen) {
+          await docEl.msRequestFullscreen();
         }
         setIsFullscreen(true);
       }
-    } catch {
-      // Browser might require direct user gesture
+    } catch (err) {
+      console.warn('Fullscreen entry pending or requires direct user gesture', err);
     }
   };
 
@@ -690,7 +702,15 @@ export default function CbtStudentExamRoom({
   // TAMPILAN RUANG UJIAN CBT AKTIF (FOCUS MODE)
   // -------------------------------------------------------------
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col font-sans select-none" style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}>
+    <div 
+      className="min-h-screen bg-slate-100 flex flex-col font-sans select-none" 
+      style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
+      onClick={() => {
+        if (typeof document !== 'undefined' && !document.fullscreenElement && !isExamCompleted && !isExamPaused && roomName !== 'Ruang Pratinjau Guru') {
+          enterFullscreen();
+        }
+      }}
+    >
       
       {/* 1. TOP BAR CBT (STATUS & TIMER) */}
       <header className="bg-slate-900 text-white border-b border-slate-800 px-4 sm:px-6 py-3 sticky top-0 z-40 shadow-md">
@@ -1423,6 +1443,61 @@ export default function CbtStudentExamRoom({
               </div>
             )}
 
+          </div>
+        </div>
+      )}
+
+      {/* MODAL / OVERLAY: WAJIB LAYAR PENUH (FULLSCREEN ENFORCER) */}
+      {!isFullscreen && !isExamCompleted && !isExamPaused && roomName !== 'Ruang Pratinjau Guru' && !isLockedByViolation && (
+        <div 
+          className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md flex flex-col items-center justify-center p-4 text-center animate-fade-in select-none"
+          onClick={enterFullscreen}
+        >
+          <div 
+            className="max-w-md w-full bg-slate-900 border border-amber-500/40 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-5"
+            onClick={(e) => {
+              e.stopPropagation();
+              enterFullscreen();
+            }}
+          >
+            <div className="w-16 h-16 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30 mx-auto flex items-center justify-center text-3xl animate-bounce">
+              ⛶
+            </div>
+            <div className="space-y-2">
+              <span className="px-3 py-1 rounded-full text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 uppercase tracking-wider">
+                Mode Ujian Terproteksi
+              </span>
+              <h2 className="text-lg sm:text-xl font-black text-white">
+                Wajib Masuk Layar Penuh
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                Ujian <strong>{exam.title}</strong> wajib dikerjakan dalam mode <strong>Layar Penuh (Fullscreen)</strong> demi ketertiban dan pencegahan kecurangan.
+              </p>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-slate-800/80 border border-slate-700/80 text-[11px] text-slate-400 text-left space-y-1.5">
+              <div className="flex items-start gap-2">
+                <span className="text-amber-400">✓</span>
+                <span>Tab browser lain & navigasi Windows otomatis disembunyikan.</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-rose-400">⚠️</span>
+                <span>Dilarang menekan tombol Esc, Alt+Tab, atau membuka aplikasi lain.</span>
+              </div>
+            </div>
+
+            <button
+              id="btn-activate-fullscreen"
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                enterFullscreen();
+              }}
+              className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-sm transition shadow-lg shadow-amber-500/30 flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+            >
+              <span>⛶</span>
+              <span>Klik Di Sini Untuk Masuk Layar Penuh</span>
+            </button>
           </div>
         </div>
       )}
