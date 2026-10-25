@@ -1559,6 +1559,18 @@ export default function ELearningPage() {
     } catch (e) {
       console.error(e);
     }
+    // Record login in database activity_logs
+    try {
+      fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: user.nipOrNisn || user.name,
+          password: 'spentic2026',
+          role: user.role
+        })
+      }).catch(() => {});
+    } catch {}
     showToast(`Selamat datang di SIAP SPENTIC, ${user.name}!`, 'success');
   };
 

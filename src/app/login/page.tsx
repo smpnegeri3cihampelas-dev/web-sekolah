@@ -46,6 +46,14 @@ export default function LoginPage() {
       if (!validPasswords.includes(password)) {
         setErrorMessage('Password salah! Periksa kembali kata sandi Anda.');
       } else {
+        // Record login in database
+        try {
+          fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password, role: 'admin' })
+          }).catch(() => {});
+        } catch {}
         router.push('/dashboard');
       }
     }, 600);
