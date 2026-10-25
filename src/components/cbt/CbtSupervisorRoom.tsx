@@ -718,11 +718,15 @@ export default function CbtSupervisorRoom({
               onChange={(e) => setSelectedExamId(e.target.value)}
               className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-semibold focus:outline-none focus:border-indigo-500 cursor-pointer"
             >
-              {packages.map(pkg => (
-                <option key={pkg.id} value={pkg.id}>
-                  {pkg.status === 'active' ? '🟢 [AKTIF]' : '⏸️ [DIJEDA]'} {pkg.title} ({pkg.subject})
-                </option>
-              ))}
+              {packages.length === 0 ? (
+                <option value="">-- Belum ada paket ujian aktif (Buat di Bank Soal) --</option>
+              ) : (
+                packages.map(pkg => (
+                  <option key={pkg.id}>
+                    {pkg.status === 'active' ? '🟢 [AKTIF]' : '⏸️ [DIJEDA]'} {pkg.title} ({pkg.subject})
+                  </option>
+                ))
+              )}
             </select>
           </div>
         </div>

@@ -673,357 +673,9 @@ export const CBT_EXAM_ROOMS: string[] = [
 ];
 
 // -------------------------------------------------------------
-// PAKET UJIAN DEMO LENGKAP & KAYA MULTIMEDIA
+// PAKET UJIAN CBT RESMI (DIBUAT LANGSUNG OLEH GURU & PANITIA)
 // -------------------------------------------------------------
-export const INITIAL_CBT_PACKAGES: CbtExamPackage[] = [
-  {
-    id: 'cbt-infor-7-pts',
-    title: 'Asesmen Sumatif Tengah Semester (STS/PTS) - Informatika',
-    subject: 'Informatika',
-    gradeLevel: '7',
-    targetClasses: ['7-A', '7-B', '7-C', '7-D', '7-E', '7-F'],
-    semester: 'Ganjil (PTS/STS)',
-    academicYear: '2026/2027',
-    durationMinutes: 60,
-    token: 'INF7SM',
-    passingGrade: 75,
-    totalQuestions: 5,
-    status: 'active',
-    examDate: '2026-10-25',
-    startTime: '06:00',
-    endTime: '23:59',
-    emergencyPaused: false,
-    teacherName: 'Ichsanul Arifin, S.Kom.',
-    instructions: 'Bacalah setiap soal dengan cermat dan teliti. Soal mencakup Perangkat Keras Komputer, Jaringan Internet, dan Berpikir Komputasional.',
-    createdAt: '2026-10-23',
-    questions: [
-      {
-        id: 'q-inf-1',
-        number: 1,
-        type: 'pg',
-        question: 'Komponen perangkat keras komputer (hardware) yang berfungsi sebagai "otak utama" untuk memproses data dan mengeksekusi instruksi program adalah...',
-        scoreWeight: 20,
-        mediaType: 'none',
-        options: [
-          'Central Processing Unit (CPU)',
-          'Random Access Memory (RAM)',
-          'Hard Disk Drive (HDD)',
-          'Power Supply Unit (PSU)'
-        ],
-        correctOptionIndex: 0
-      },
-      {
-        id: 'q-inf-2',
-        number: 2,
-        type: 'pg_kompleks',
-        question: 'Manakah dari pilihan di bawah ini yang tergolong sebagai Perangkat Masukan (Input Device) pada komputer? (Pilih dua atau lebih jawaban yang benar!)',
-        scoreWeight: 20,
-        mediaType: 'none',
-        options: [
-          'Keyboard mekanik/membran',
-          'Mouse optik / Touchpad',
-          'Monitor LED / LCD',
-          'Scanner dokumen'
-        ],
-        correctOptionIndices: [0, 1, 3]
-      },
-      {
-        id: 'q-inf-3',
-        number: 3,
-        type: 'benar_salah',
-        question: 'Tentukan apakah setiap pernyataan mengenai konsep Berpikir Komputasional berikut ini BENAR atau SALAH:',
-        scoreWeight: 20,
-        mediaType: 'none',
-        statements: [
-          {
-            id: 'st-inf-1',
-            statement: 'Dekomposisi adalah teknik memecah masalah besar atau kompleks menjadi bagian-bagian yang lebih kecil dan mudah dikelola.',
-            correctAnswer: true
-          },
-          {
-            id: 'st-inf-2',
-            statement: 'Algoritma hanya dapat dieksekusi oleh mesin komputer dan tidak bisa ditulis dalam bentuk langkah bahasa manusia.',
-            correctAnswer: false
-          },
-          {
-            id: 'st-inf-3',
-            statement: 'Abstraksi bertujuan untuk menyaring informasi yang relevan dan mengabaikan detail-detail yang tidak penting.',
-            correctAnswer: true
-          }
-        ]
-      },
-      {
-        id: 'q-inf-4',
-        number: 4,
-        type: 'menjodohkan',
-        question: 'Pasangkanlah istilah teknologi jaringan & internet di sebelah kiri dengan fungsi utamanya yang tepat di sebelah kanan:',
-        scoreWeight: 20,
-        mediaType: 'none',
-        matchingPairs: [
-          {
-            id: 'm-inf-1',
-            leftPrompt: 'Web Browser (Contoh: Google Chrome)',
-            rightMatch: 'Perangkat lunak untuk mengakses dan menjelajahi halaman situs internet'
-          },
-          {
-            id: 'm-inf-2',
-            leftPrompt: 'Wi-Fi (Wireless Fidelity)',
-            rightMatch: 'Teknologi komunikasi nirkabel untuk menghubungkan perangkat ke jaringan lokal'
-          },
-          {
-            id: 'm-inf-3',
-            leftPrompt: 'IP Address',
-            rightMatch: 'Identitas alamat numerik unik perangkat dalam jaringan komputer'
-          }
-        ]
-      },
-      {
-        id: 'q-inf-5',
-        number: 5,
-        type: 'pg',
-        question: 'Media transmisi kabel jaringan berkecepatan tinggi yang mentransmisikan data menggunakan gelombang cahaya melalui serat kaca tipis dinamakan...',
-        scoreWeight: 20,
-        mediaType: 'none',
-        options: [
-          'Fiber Optic (Serat Optik)',
-          'Kabel UTP (Unshielded Twisted Pair)',
-          'Kabel Koaksial (Coaxial Cable)',
-          'Kabel Telepon Tembaga'
-        ],
-        correctOptionIndex: 0
-      }
-    ]
-  },
-  {
-    id: 'cbt-ipa-7-pts',
-    title: 'Asesmen Sumatif Tengah Semester (STS/PTS) - IPA Terpadu',
-    subject: 'Ilmu Pengetahuan Alam (IPA)',
-    gradeLevel: '7',
-    targetClasses: ['7-A', '7-B', '7-C', '7-D', '7-E', '7-F'],
-    semester: 'Ganjil (PTS/STS)',
-    academicYear: '2026/2027',
-    durationMinutes: 60,
-    token: 'IPA7SM',
-    passingGrade: 75,
-    totalQuestions: 5,
-    status: 'active',
-    examDate: '2026-10-20',
-    startTime: '06:00',
-    endTime: '23:59',
-    emergencyPaused: false,
-    teacherName: 'Cucu Rohaeti, S.Pd.',
-    instructions: 'Bacalah petunjuk pengerjaan soal dengan teliti. Gunakan headset/earphone jika terdapat soal listening/video. Dilarang membuka tab lain.',
-    createdAt: '2026-10-01',
-    questions: [
-      {
-        id: 'q-ipa-1',
-        number: 1,
-        type: 'pg',
-        question: 'Perhatikan gambar mikroskop cahaya dan bagian yang ditunjuk dengan tanda panah merah berikut. Bagian tersebut berfungsi untuk memfokuskan bayangan objek secara cepat dan kasar, yaitu dinamakan...',
-        scoreWeight: 20,
-        mediaType: 'image',
-        mediaUrl: 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=800&q=80',
-        mediaCaption: 'Gambar 1. Bagian-Bagian Mikroskop Cahaya Laboratorium IPA',
-        options: [
-          'Makrometer (Pemutar Kasar)',
-          'Mikrometer (Pemutar Halus)',
-          'Revolver Lensa Obyektif',
-          'Diafragma Pengatur Cahaya'
-        ],
-        correctOptionIndex: 0
-      },
-      {
-        id: 'q-ipa-2',
-        number: 2,
-        type: 'pg_kompleks',
-        question: 'Manakah dari pernyataan berikut yang merupakan ciri-ciri khas sel tumbuhan yang MEMBEDAKANNYA dari sel hewan? (Pilihlah DUA atau LEBIH jawaban yang benar!)',
-        scoreWeight: 20,
-        mediaType: 'none',
-        options: [
-          'Memiliki dinding sel yang tersusun dari selulosa sehingga bentuknya kaku dan tetap',
-          'Memiliki kloroplas yang mengandung klorofil untuk fotosintesis',
-          'Tidak memiliki membran inti sel (prokariotik)',
-          'Memiliki vakuola berukuran besar di bagian tengah sitoplasma'
-        ],
-        correctOptionIndices: [0, 1, 3]
-      },
-      {
-        id: 'q-ipa-3',
-        number: 3,
-        type: 'benar_salah',
-        question: 'Tentukan apakah setiap pernyataan mengenai wujud zat dan perubahannya berikut ini BENAR atau SALAH berdasarkan konsep sains:',
-        scoreWeight: 20,
-        mediaType: 'none',
-        statements: [
-          {
-            id: 'st-ipa-1',
-            statement: 'Partikel-partikel pada zat padat memiliki susunan yang sangat rapat dan gaya tarik-menarik antarpartikel yang sangat kuat.',
-            correctAnswer: true
-          },
-          {
-            id: 'st-ipa-2',
-            statement: 'Proses perubahan wujud dari gas langsung menjadi padat disebut dengan menguap.',
-            correctAnswer: false
-          },
-          {
-            id: 'st-ipa-3',
-            statement: 'Zat cair memiliki volume yang tetap namun bentuknya selalu mengikuti wadah tempatnya berada.',
-            correctAnswer: true
-          }
-        ]
-      },
-      {
-        id: 'q-ipa-4',
-        number: 4,
-        type: 'menjodohkan',
-        question: 'Pasangkanlah organ sistem pencernaan manusia di sebelah kiri dengan fungsi utamanya yang tepat di sebelah kanan:',
-        scoreWeight: 20,
-        mediaType: 'none',
-        matchingPairs: [
-          {
-            id: 'm-ipa-1',
-            leftPrompt: 'Lambung (Ventrikulus)',
-            rightMatch: 'Menghasilkan asam lambung (HCl) dan enzim pepsin untuk mencerna protein'
-          },
-          {
-            id: 'm-ipa-2',
-            leftPrompt: 'Usus Halus (Intestinum)',
-            rightMatch: 'Tempat penyerapan utama sari-sari makanan ke dalam pembuluh darah'
-          },
-          {
-            id: 'm-ipa-3',
-            leftPrompt: 'Usus Besar (Kolon)',
-            rightMatch: 'Penyerapan kembali air dan pembusukan sisa makanan oleh bakteri E. coli'
-          }
-        ]
-      },
-      {
-        id: 'q-ipa-5',
-        number: 5,
-        type: 'pg',
-        question: 'Simaklah rekaman audio penjelasan praktikum uji asam-basa menggunakan indikator lakmus berikut ini. Berdasarkan rekaman tersebut, warna kertas lakmus merah jika dicelupkan ke dalam larutan sabun akan berubah menjadi...',
-        scoreWeight: 20,
-        mediaType: 'audio',
-        mediaUrl: 'https://cdn.freesound.org/previews/274/274178_5121236-lq.mp3',
-        mediaCaption: '🎧 Audio Stimulus: Penjelasan Praktikum Larutan Asam & Basa (Sains Kelas 7)',
-        audioMaxPlays: 3,
-        options: [
-          'Berubah menjadi warna Biru (karena sabun bersifat Basa)',
-          'Tetap berwarna Merah (karena sabun bersifat Netral)',
-          'Berubah menjadi warna Kuning keemasan',
-          'Berubah menjadi Transparan'
-        ],
-        correctOptionIndex: 0
-      }
-    ]
-  },
-  {
-    id: 'cbt-eng-7-pas',
-    title: 'Asesmen Sumatif Akhir Semester (SAS/PAS) - Bahasa Inggris',
-    subject: 'Bahasa Inggris',
-    gradeLevel: '7',
-    targetClasses: ['7-A', '7-B', '7-C', '7-D', '7-E', '7-F'],
-    semester: 'Ganjil (PAS/SAS)',
-    academicYear: '2026/2027',
-    durationMinutes: 90,
-    token: 'ENG7SM',
-    passingGrade: 75,
-    totalQuestions: 4,
-    status: 'active',
-    examDate: '2026-10-20',
-    startTime: '06:00',
-    endTime: '23:59',
-    emergencyPaused: false,
-    teacherName: 'Erma Rismayanti, S.Pd.',
-    instructions: 'Put on your headphones for the listening section. Choose the most appropriate answer for each question.',
-    createdAt: '2026-10-05',
-    questions: [
-      {
-        id: 'q-eng-1',
-        number: 1,
-        type: 'pg',
-        question: 'Listen carefully to the audio conversation between Edo and Dayu at the school library. What time does the school library close today?',
-        scoreWeight: 25,
-        mediaType: 'audio',
-        mediaUrl: 'https://cdn.freesound.org/previews/274/274178_5121236-lq.mp3',
-        mediaCaption: '🎧 Audio Section 1: Daily Conversation at Spentic Library',
-        audioMaxPlays: 3,
-        options: [
-          'At 02.00 PM in the afternoon',
-          'At 03.30 PM in the afternoon',
-          'At 11.45 AM in the morning',
-          'At 05.00 PM in the evening'
-        ],
-        correctOptionIndex: 1
-      },
-      {
-        id: 'q-eng-2',
-        number: 2,
-        type: 'pg_kompleks',
-        question: 'Read the short introduction text below. Which sentences are grammatically CORRECT in using Subject Pronouns and to be? (Select TWO or MORE correct sentences!)',
-        scoreWeight: 25,
-        mediaType: 'none',
-        options: [
-          'Rina and I are seventh-grade students at SMP Negeri 3 Cihampelas.',
-          'They is very excited to join the English Club competition.',
-          'Mr. Hendra is our dedicated science teacher in school.',
-          'She am always polite and friendly to everyone.'
-        ],
-        correctOptionIndices: [0, 2]
-      },
-      {
-        id: 'q-eng-3',
-        number: 3,
-        type: 'benar_salah',
-        question: 'Determine whether each statement below is TRUE or FALSE based on the classroom greeting rules:',
-        scoreWeight: 25,
-        mediaType: 'none',
-        statements: [
-          {
-            id: 'st-eng-1',
-            statement: 'We say "Good Morning" when meeting our teachers between 06.00 AM and 11.59 AM.',
-            correctAnswer: true
-          },
-          {
-            id: 'st-eng-2',
-            statement: '"Good Night" is used when greeting someone in the afternoon at school.',
-            correctAnswer: false
-          },
-          {
-            id: 'st-eng-3',
-            statement: 'When leaving a friend after school, we can say "Goodbye" or "See you tomorrow".',
-            correctAnswer: true
-          }
-        ]
-      },
-      {
-        id: 'q-eng-4',
-        number: 4,
-        type: 'menjodohkan',
-        question: 'Match the English vocabulary on the left with its correct Indonesian translation on the right:',
-        scoreWeight: 25,
-        mediaType: 'none',
-        matchingPairs: [
-          {
-            id: 'm-eng-1',
-            leftPrompt: 'Timetable / Schedule',
-            rightMatch: 'Jadwal Pelajaran'
-          },
-          {
-            id: 'm-eng-2',
-            leftPrompt: 'Headmaster / Principal',
-            rightMatch: 'Kepala Sekolah'
-          },
-          {
-            id: 'm-eng-3',
-            leftPrompt: 'Laboratory Equipment',
-            rightMatch: 'Peralatan Laboratorium'
-          }
-        ]
-      }
-    ]
-  }
-];
+export const INITIAL_CBT_PACKAGES: CbtExamPackage[] = [];
 
 // -------------------------------------------------------------
 // STORAGE KEYS & LOCAL PERSISTENCE
@@ -1036,24 +688,13 @@ export function getStoredCbtPackages(): CbtExamPackage[] {
   if (typeof window === 'undefined') return INITIAL_CBT_PACKAGES;
   try {
     const raw = localStorage.getItem(CBT_PACKAGES_KEY);
-    if (!raw) {
+    if (raw === null) {
       localStorage.setItem(CBT_PACKAGES_KEY, JSON.stringify(INITIAL_CBT_PACKAGES));
       return INITIAL_CBT_PACKAGES;
     }
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length > 0) {
-      // Clean up temporary test package 'jnn'
-      let cleaned = parsed.filter((p: any) => p.title !== 'jnn');
-      
-      // Ensure missing initial packages (such as cbt-infor-7-pts) exist in storage
-      const existingIds = new Set(cleaned.map((p: any) => p.id));
-      const missingInitials = INITIAL_CBT_PACKAGES.filter(p => !existingIds.has(p.id));
-      if (missingInitials.length > 0 || cleaned.length !== parsed.length) {
-        cleaned = [...missingInitials, ...cleaned];
-        localStorage.setItem(CBT_PACKAGES_KEY, JSON.stringify(cleaned));
-      }
-
-      return cleaned.map((p: CbtExamPackage) => ({
+    if (Array.isArray(parsed)) {
+      return parsed.map((p: CbtExamPackage) => ({
         ...p,
         examDate: p.examDate || new Date().toISOString().split('T')[0],
         startTime: (p.startTime === '07:30' && p.endTime === '09:00') ? '06:00' : (p.startTime || '06:00'),
@@ -1061,9 +702,23 @@ export function getStoredCbtPackages(): CbtExamPackage[] {
         emergencyPaused: Boolean(p.emergencyPaused)
       }));
     }
-    return INITIAL_CBT_PACKAGES;
+    return [];
   } catch {
-    return INITIAL_CBT_PACKAGES;
+    return [];
+  }
+}
+
+export function deleteStoredCbtPackage(id: string) {
+  if (typeof window === 'undefined') return;
+  try {
+    const list = getStoredCbtPackages().filter(p => p.id !== id);
+    localStorage.setItem(CBT_PACKAGES_KEY, JSON.stringify(list));
+    window.dispatchEvent(new Event('cbtPackagesUpdated'));
+    try {
+      import('./cloudSync').then(m => m.deleteCbtPackageFromCloud(id)).catch(() => {});
+    } catch {}
+  } catch (e) {
+    console.error('Failed deleting CBT package', e);
   }
 }
 

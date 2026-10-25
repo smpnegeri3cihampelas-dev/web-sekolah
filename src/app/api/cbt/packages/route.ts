@@ -127,3 +127,21 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
+
+export async function DELETE(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json({ success: false, message: 'ID paket ujian wajib disertakan!' }, { status: 400 });
+    }
+
+    await query('DELETE FROM cbt_exam_packages WHERE id = ?', [id]);
+    return NextResponse.json({ success: true, message: `Paket ujian ${id} berhasil dihapus dari database!` });
+  } catch (error: any) {
+    console.error('Error deleting CBT package:', error);
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}
+

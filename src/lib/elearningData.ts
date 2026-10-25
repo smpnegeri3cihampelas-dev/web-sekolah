@@ -5436,6 +5436,9 @@ export function deleteStoredAssignment(id: string) {
     const list = getStoredAssignments().filter(a => a.id !== id);
     localStorage.setItem(ASSIGNMENTS_STORAGE_KEY, JSON.stringify(list));
     window.dispatchEvent(new Event('elearningAssignmentsUpdated'));
+    try {
+      import('./cloudSync').then(m => m.deleteAssignmentFromCloud(id)).catch(() => {});
+    } catch {}
   } catch (e) {
     console.error('Failed deleting assignment from localStorage', e);
   }

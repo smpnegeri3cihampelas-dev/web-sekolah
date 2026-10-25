@@ -7,6 +7,7 @@ import {
   CbtQuestionType,
   getStoredCbtPackages,
   saveStoredCbtPackages,
+  deleteStoredCbtPackage,
   getStoredStudentCbtSessions,
   resetStoredStudentCbtSession,
   evaluateCbtPackageSchedule
@@ -225,8 +226,8 @@ export default function CbtTeacherManagement({
   // Delete package
   const handleDeletePackage = (pkgId: string) => {
     if (confirm('Yakin ingin menghapus paket ujian ini beserta seluruh butir soalnya?')) {
+      deleteStoredCbtPackage(pkgId);
       const updated = packages.filter(p => p.id !== pkgId);
-      saveStoredCbtPackages(updated);
       setPackages(updated);
       if (selectedPackageForEdit?.id === pkgId) setSelectedPackageForEdit(null);
       if (selectedPackageForScores?.id === pkgId) setSelectedPackageForScores(null);

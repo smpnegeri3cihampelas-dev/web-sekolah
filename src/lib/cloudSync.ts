@@ -107,14 +107,8 @@ export async function syncCbtWithCloud(): Promise<void> {
     const pkgRes = await fetch('/api/cbt/packages', { cache: 'no-store' });
     if (pkgRes.ok) {
       const { data } = await pkgRes.json();
-      if (Array.isArray(data) && data.length > 0) {
-        const local = getStoredCbtPackages();
-        const localMap = new Map(local.map(p => [p.id, p]));
-        data.forEach((cloudPkg: CbtExamPackage) => {
-          localMap.set(cloudPkg.id, cloudPkg);
-        });
-        const merged = Array.from(localMap.values());
-        localStorage.setItem(CBT_PACKAGES_KEY, JSON.stringify(merged));
+      if (Array.isArray(data)) {
+        localStorage.setItem(CBT_PACKAGES_KEY, JSON.stringify(data));
         window.dispatchEvent(new Event('cbtPackagesUpdated'));
       }
     }
@@ -214,4 +208,18 @@ export function pushCbtRoomsToCloud(rooms: CbtExamRoomConfig[]): void {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ rooms })
   }).catch(err => console.warn('Background CBT rooms upload queued:', err));
+}
+
+export function deleteCbtPackageFromCloud(id: string): void {
+  if (typeof window === 'undefined') return;
+  fetch(`/api/cbt/packages?id=${encodeURIComponent(id)}`, {
+    method: 'DELETE'
+  }).catch(err => console.warn('Background CBT package delete queued:', err));
+}
+
+export function deleteAssignmentFromCloud(id: string): void {
+  if (typeof window === 'undefined') return;
+  fetch(`/api/elearning/assignments?id=${encodeURIComponent(id)}`, {
+    method: 'DELETE'
+  }).catch(err => console.warn('Background assignment delete queued:', err));
 }
