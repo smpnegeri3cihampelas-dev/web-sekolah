@@ -14,7 +14,8 @@ const STATUS_LABELS: Record<AttendanceStatus, string> = {
   S: 'SAKIT',
   I: 'IZIN',
   A: 'ALPA',
-  T: 'TERLAMBAT'
+  T: 'TERLAMBAT',
+  K: 'KELUAR'
 };
 
 /**
@@ -88,17 +89,19 @@ export function exportMapelAttendanceToExcel(params: {
   let countI = 0;
   let countA = 0;
   let countT = 0;
+  let countK = 0;
 
   // 2. Add Student Rows
   students.forEach((student, index) => {
-    const status: AttendanceStatus = records[student.id] || 'H';
-    const note = notes[student.id] || '-';
+    const status: AttendanceStatus = records[student.id] || (student.status === 'Keluar' ? 'K' : 'H');
+    const note = notes[student.id] || (student.status === 'Keluar' ? `Keluar/Pindah: ${student.exitReason || '-'}` : '-');
 
     if (status === 'H') countH++;
     else if (status === 'S') countS++;
     else if (status === 'I') countI++;
     else if (status === 'A') countA++;
     else if (status === 'T') countT++;
+    else if (status === 'K') countK++;
 
     rows.push([
       index + 1,
@@ -112,16 +115,20 @@ export function exportMapelAttendanceToExcel(params: {
 
   // 3. Summary Rows
   const total = students.length;
-  const pctHadir = total > 0 ? ((countH / total) * 100).toFixed(1) : '0';
+  const activeTotal = total - countK;
+  const pctHadir = activeTotal > 0 ? ((countH / activeTotal) * 100).toFixed(1) : '0';
 
   rows.push([]);
   rows.push(['RINGKASAN KEHADIRAN:']);
-  rows.push(['Hadir (H)', countH, `${pctHadir}%`]);
+  rows.push(['Hadir (H)', countH, `${pctHadir}% (dari ${activeTotal} siswa aktif)`]);
   rows.push(['Sakit (S)', countS]);
   rows.push(['Izin (I)', countI]);
   rows.push(['Alpa (A)', countA]);
   rows.push(['Terlambat (T)', countT]);
-  rows.push(['Total Siswa', total]);
+  if (countK > 0) {
+    rows.push(['Keluar / Pindah (K)', countK]);
+  }
+  rows.push(['Total Terdaftar', total]);
   rows.push([]);
   rows.push([]);
 

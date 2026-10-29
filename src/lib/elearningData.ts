@@ -8,9 +8,13 @@ export interface Student {
   name: string;
   gender?: string;
   classId: string;
+  status?: string; // 'Aktif' | 'Keluar' | 'Pindah Sekolah'
+  exitReason?: string;
+  exitDate?: string;
+  exitMarkedBy?: string;
 }
 
-export type AttendanceStatus = 'H' | 'S' | 'I' | 'A' | 'T'; // Hadir, Sakit, Izin, Alpa, Terlambat
+export type AttendanceStatus = 'H' | 'S' | 'I' | 'A' | 'T' | 'K'; // Hadir, Sakit, Izin, Alpa, Terlambat, Keluar (Tidak bersekolah lagi)
 
 export interface AttendanceRecord {
   studentId: string;
@@ -4926,6 +4930,64 @@ export function saveStoredStudents(students: Student[]) {
   } catch (e) {
     console.error('Failed saving students to localStorage', e);
   }
+}
+
+export async function updateStudentExitStatus(params: {
+  studentId: string;
+  nisn: string;
+  status: 'Aktif' | 'Keluar';
+  exitReason?: string;
+  exitDate?: string;
+  exitMarkedBy?: string;
+}): Promise<Student[]> {
+  const currentList = getStoredStudents();
+  const updatedList = currentList.map(st => {
+    if (st.id === params.studentId || st.nisn === params.nisn) {
+      if (params.status === 'Aktif') {
+        const { exitReason, exitDate, exitMarkedBy, ...rest } = st;
+        return { ...rest, status: 'Aktif' };
+      } else {
+        return {
+          ...st,
+          status: 'Keluar',
+          exitReason: params.exitReason || 'Pindah / Keluar Sekolah',
+          exitDate: params.exitDate || new Date().toISOString().split('T')[0],
+          exitMarkedBy: params.exitMarkedBy || 'Guru / Meja Piket'
+        };
+      }
+    }
+    return st;
+  });
+
+  saveStoredStudents(updatedList);
+
+  // Background sync with database API
+  try {
+    fetch('/api/students', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params)
+    }).catch(err => console.warn('Background sync student status failed:', err));
+  } catch {}
+
+  return updatedList;
+}
+
+export async function syncStudentsWithCloud(): Promise<Student[]> {
+  if (typeof window === 'undefined') return INITIAL_STUDENTS;
+  try {
+    const res = await fetch('/api/students');
+    if (!res.ok) return getStoredStudents();
+    const json = await res.json();
+    if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+      const cloudStudents: Student[] = json.data;
+      saveStoredStudents(cloudStudents);
+      return cloudStudents;
+    }
+  } catch (e) {
+    console.warn('Could not sync students from cloud API:', e);
+  }
+  return getStoredStudents();
 }
 
 import { safeSaveSubmissions } from './elearningStorage';

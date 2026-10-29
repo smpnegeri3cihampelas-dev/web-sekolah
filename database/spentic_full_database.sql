@@ -108,10 +108,14 @@ CREATE TABLE IF NOT EXISTS `students` (
   `class_id` VARCHAR(50) NOT NULL,
   `gender` VARCHAR(10) DEFAULT '-',
   `password` VARCHAR(255) DEFAULT '123456',
-  `status` VARCHAR(50) DEFAULT 'Aktif',
+  `status` VARCHAR(50) DEFAULT 'Aktif' COMMENT 'Aktif, Keluar, Pindah Sekolah',
+  `exit_reason` VARCHAR(255) DEFAULT NULL COMMENT 'Alasan keluar / pindah sekolah',
+  `exit_date` VARCHAR(50) DEFAULT NULL COMMENT 'Tanggal siswa keluar',
+  `exit_marked_by` VARCHAR(255) DEFAULT NULL COMMENT 'Guru atau Meja Piket yang menandai',
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX `idx_student_class` (`class_id`),
-  INDEX `idx_student_nisn` (`nisn`)
+  INDEX `idx_student_nisn` (`nisn`),
+  INDEX `idx_student_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ----------------------------------------------------------------------------
