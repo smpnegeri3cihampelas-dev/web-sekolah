@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Student, SCHOOL_CLASSES } from '@/lib/elearningData';
+import { Student, SCHOOL_CLASSES, updateStudentExitStatus } from '@/lib/elearningData';
 import { downloadStudentTemplateExcel } from '@/lib/elearningExport';
 import { AddStudentModal, EditStudentModal } from './StudentModals';
 
@@ -28,34 +28,97 @@ export function TabSiswa({
 }: TabSiswaProps) {
   const [studentSearch, setStudentSearch] = useState('');
   const [studentClassFilter, setStudentClassFilter] = useState('ALL');
+  const [studentStatusFilter, setStudentStatusFilter] = useState<'ALL' | 'AKTIF' | 'KELUAR'>('ALL');
   const [studentPage, setStudentPage] = useState(1);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Modal Tandai Keluar / Mutasi oleh Admin
+  const [exitModalStudent, setExitModalStudent] = useState<Student | null>(null);
+  const [exitReasonType, setExitReasonType] = useState<string>('Pindah / Mutasi ke Sekolah Lain');
+  const [exitCustomReason, setExitCustomReason] = useState<string>('');
+  const [exitDateInput, setExitDateInput] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [isSubmittingExit, setIsSubmittingExit] = useState<boolean>(false);
+
+  // Modal Konfirmasi Pulihkan Status Aktif oleh Admin
+  const [restoreModalStudent, setRestoreModalStudent] = useState<Student | null>(null);
+
   // Reset page when filter/search changes
   useEffect(() => {
     setStudentPage(1);
-  }, [studentSearch, studentClassFilter]);
+  }, [studentSearch, studentClassFilter, studentStatusFilter]);
+
+  const aktifCount = useMemo(() => studentsList.filter(s => s.status !== 'Keluar').length, [studentsList]);
+  const keluarCount = useMemo(() => studentsList.filter(s => s.status === 'Keluar').length, [studentsList]);
 
   // Memoized filter for 535+ students
   const filteredStudents = useMemo(() => {
     const q = studentSearch.toLowerCase().trim();
     return studentsList.filter(s => {
       const matchClass = studentClassFilter === 'ALL' || s.classId === studentClassFilter;
+      const matchStatus = 
+        studentStatusFilter === 'ALL' ||
+        (studentStatusFilter === 'AKTIF' && s.status !== 'Keluar') ||
+        (studentStatusFilter === 'KELUAR' && s.status === 'Keluar');
       const matchSearch = !q || 
         s.name.toLowerCase().includes(q) || 
         s.nisn.includes(q) || 
         (s.nis && s.nis.includes(q));
-      return matchClass && matchSearch;
+      return matchClass && matchStatus && matchSearch;
     });
-  }, [studentsList, studentClassFilter, studentSearch]);
+  }, [studentsList, studentClassFilter, studentStatusFilter, studentSearch]);
 
   const totalPages = Math.max(1, Math.ceil(filteredStudents.length / STUDENTS_PER_PAGE));
   const paginatedStudents = useMemo(() => {
     const start = (studentPage - 1) * STUDENTS_PER_PAGE;
     return filteredStudents.slice(start, start + STUDENTS_PER_PAGE);
   }, [filteredStudents, studentPage]);
+
+  // Handle Admin Mark Exit Student
+  const handleConfirmAdminMarkExit = async () => {
+    if (!exitModalStudent) return;
+    const finalReason = exitReasonType === 'Lainnya' 
+      ? (exitCustomReason.trim() || 'Lainnya')
+      : (exitCustomReason.trim() ? `${exitReasonType} (${exitCustomReason.trim()})` : exitReasonType);
+    
+    setIsSubmittingExit(true);
+    try {
+      await updateStudentExitStatus({
+        studentId: exitModalStudent.id,
+        nisn: exitModalStudent.nisn,
+        status: 'Keluar',
+        exitReason: finalReason,
+        exitDate: exitDateInput,
+        exitMarkedBy: 'Administrator Sekolah'
+      });
+      showToast(`🚪 Siswa "${exitModalStudent.name}" berhasil ditandai KELUAR SEKOLAH! Data tersinkron ke Guru & Piket.`);
+      setExitModalStudent(null);
+    } catch (e) {
+      showToast('❌ Gagal mengubah status siswa.');
+    } finally {
+      setIsSubmittingExit(false);
+    }
+  };
+
+  // Handle Admin Restore Student
+  const handleConfirmAdminRestore = async () => {
+    if (!restoreModalStudent) return;
+    setIsSubmittingExit(true);
+    try {
+      await updateStudentExitStatus({
+        studentId: restoreModalStudent.id,
+        nisn: restoreModalStudent.nisn,
+        status: 'Aktif'
+      });
+      showToast(`✅ Siswa "${restoreModalStudent.name}" berhasil dipulihkan menjadi SISWA AKTIF!`);
+      setRestoreModalStudent(null);
+    } catch (e) {
+      showToast('❌ Gagal memulihkan status siswa.');
+    } finally {
+      setIsSubmittingExit(false);
+    }
+  };
 
   // Handle Excel upload
   const handleExcelFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -172,7 +235,7 @@ export function TabSiswa({
             Data Siswa & Rombongan Belajar <span className="font-extrabold text-indigo-700">(2026/2027)</span>
           </h2>
           <p className="text-xs text-slate-700 font-semibold mt-0.5">
-            Kelola daftar resmi peserta didik. Seluruh data di sini otomatis tersinkronisasi ke modul Presensi & E-Learning kelas.
+            Kelola daftar resmi peserta didik. Seluruh data di sini otomatis tersinkronisasi ke modul Presensi Guru, Meja Piket & Database Cloud.
           </p>
         </div>
 
@@ -230,7 +293,11 @@ export function TabSiswa({
         <div className="p-5 rounded-2xl bg-white border-2 border-slate-200 shadow-sm">
           <div className="text-xs font-black text-slate-700 uppercase tracking-wider">Total Siswa Terdaftar</div>
           <div className="text-3xl font-black text-slate-950 mt-1">{studentsList.length}</div>
-          <div className="text-xs text-slate-600 mt-1 font-semibold">Siswa Aktif Dapodik & Presensi</div>
+          <div className="text-xs text-slate-600 mt-1 font-semibold flex items-center gap-2">
+            <span className="text-emerald-700 font-bold">✅ {aktifCount} Siswa Aktif</span>
+            <span className="text-slate-300">•</span>
+            <span className="text-rose-700 font-bold">🚪 {keluarCount} Keluar / Mutasi</span>
+          </div>
         </div>
 
         <div className="p-5 rounded-2xl bg-white border-2 border-slate-200 shadow-sm">
@@ -241,30 +308,48 @@ export function TabSiswa({
 
         <div className="p-5 rounded-2xl bg-white border-2 border-slate-200 shadow-sm">
           <div className="text-xs font-black text-slate-700 uppercase tracking-wider">Status Sinkronisasi</div>
-          <div className="text-3xl font-black text-emerald-700 mt-1">Live Aktif</div>
-          <div className="text-xs text-emerald-800 mt-1 font-bold">Terhubung ke Portal Presensi E-Learning</div>
+          <div className="text-3xl font-black text-emerald-700 mt-1">Live MariaDB</div>
+          <div className="text-xs text-emerald-800 mt-1 font-bold">Tersinkron Guru, Piket & Database Cloud</div>
         </div>
       </div>
 
       {/* Filter & Search Bar */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-4 rounded-2xl bg-white border-2 border-slate-200 shadow-xs">
-        {/* Select Class Filter */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0">
-          <span className="text-xs font-black text-slate-800 uppercase tracking-wider mr-1 whitespace-nowrap">
-            Pilih Kelas:
-          </span>
-          <select
-            value={studentClassFilter}
-            onChange={(e) => setStudentClassFilter(e.target.value)}
-            className="px-3.5 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-slate-950 text-xs font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 cursor-pointer shadow-xs"
-          >
-            <option value="ALL">Semua Kelas ({studentsList.length} Siswa)</option>
-            {SCHOOL_CLASSES.map(cls => (
-              <option key={cls.id} value={cls.id}>
-                {cls.name} ({studentsList.filter(s => s.classId === cls.id).length} Siswa)
-              </option>
-            ))}
-          </select>
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Select Class Filter */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-black text-slate-800 uppercase tracking-wider mr-1 whitespace-nowrap">
+              Kelas:
+            </span>
+            <select
+              value={studentClassFilter}
+              onChange={(e) => setStudentClassFilter(e.target.value)}
+              className="px-3.5 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-slate-950 text-xs font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 cursor-pointer shadow-xs"
+            >
+              <option value="ALL">Semua Kelas ({studentsList.length} Siswa)</option>
+              {SCHOOL_CLASSES.map(cls => (
+                <option key={cls.id} value={cls.id}>
+                  {cls.name} ({studentsList.filter(s => s.classId === cls.id).length} Siswa)
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Select Status Filter */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-black text-slate-800 uppercase tracking-wider mr-1 whitespace-nowrap">
+              Status:
+            </span>
+            <select
+              value={studentStatusFilter}
+              onChange={(e) => setStudentStatusFilter(e.target.value as any)}
+              className="px-3.5 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-slate-950 text-xs font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 cursor-pointer shadow-xs"
+            >
+              <option value="ALL">Semua Status ({studentsList.length})</option>
+              <option value="AKTIF">Hanya Siswa Aktif ({aktifCount})</option>
+              <option value="KELUAR">Hanya Siswa Keluar / Mutasi ({keluarCount})</option>
+            </select>
+          </div>
         </div>
 
         {/* Search Input */}
@@ -284,15 +369,26 @@ export function TabSiswa({
 
       {/* Students Table */}
       <div className="rounded-2xl bg-white border-2 border-slate-200 overflow-hidden shadow-sm">
-        <div className="p-3.5 bg-slate-100 border-b-2 border-slate-200 flex items-center justify-between text-xs text-slate-800 font-bold">
+        <div className="p-3.5 bg-slate-100 border-b-2 border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-800 font-bold">
           <span>
             Menampilkan <span className="font-black text-slate-950">{filteredStudents.length}</span> dari {studentsList.length} siswa
           </span>
-          {studentClassFilter !== 'ALL' && (
-            <span className="px-2.5 py-0.5 rounded font-mono font-black text-xs bg-indigo-100 text-indigo-900 border border-indigo-300">
-              Filter: Kelas {studentClassFilter}
-            </span>
-          )}
+          <div className="flex items-center gap-2">
+            {studentClassFilter !== 'ALL' && (
+              <span className="px-2.5 py-0.5 rounded font-mono font-black text-xs bg-indigo-100 text-indigo-900 border border-indigo-300">
+                Kelas: {studentClassFilter}
+              </span>
+            )}
+            {studentStatusFilter !== 'ALL' && (
+              <span className={`px-2.5 py-0.5 rounded font-mono font-black text-xs border ${
+                studentStatusFilter === 'KELUAR' 
+                  ? 'bg-rose-100 text-rose-900 border-rose-300' 
+                  : 'bg-emerald-100 text-emerald-900 border-emerald-300'
+              }`}>
+                Status: {studentStatusFilter}
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="overflow-x-auto max-h-[600px] overflow-y-auto [scrollbar-width:thin]">
@@ -303,23 +399,50 @@ export function TabSiswa({
                 <th className="py-3.5 px-4 w-32">NISN</th>
                 <th className="py-3.5 px-4 w-28">NIS</th>
                 <th className="py-3.5 px-4">Nama Lengkap Siswa</th>
-                <th className="py-3.5 px-4 w-24">Kelas</th>
-                <th className="py-3.5 px-4 w-28 text-center">Aksi</th>
+                <th className="py-3.5 px-4 w-20">Kelas</th>
+                <th className="py-3.5 px-4 w-48">Status Siswa</th>
+                <th className="py-3.5 px-4 w-32 text-center">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
               {paginatedStudents.map((st, idx) => {
                 const absoluteIndex = (studentPage - 1) * STUDENTS_PER_PAGE + idx + 1;
+                const isExit = st.status === 'Keluar';
                 return (
-                  <tr key={st.id} className="hover:bg-slate-50 transition-colors">
+                  <tr key={st.id} className={`hover:bg-slate-50 transition-colors ${isExit ? 'bg-rose-50/30' : ''}`}>
                     <td className="py-3 px-4 text-center font-mono text-slate-700 font-bold">{absoluteIndex}</td>
                     <td className="py-3 px-4 font-mono font-black text-indigo-700">{st.nisn}</td>
                     <td className="py-3 px-4 font-mono font-bold text-slate-800">{st.nis || '-'}</td>
-                    <td className="py-3 px-4 font-black text-slate-950 text-sm">{st.name}</td>
+                    <td className="py-3 px-4">
+                      <div className={`font-black text-sm ${isExit ? 'line-through text-slate-500' : 'text-slate-950'}`}>
+                        {st.name}
+                      </div>
+                      {isExit && (
+                        <div className="text-[10px] text-rose-700 font-semibold mt-0.5">
+                          {st.exitReason ? `Alasan: ${st.exitReason}` : 'Sudah Keluar / Mutasi Sekolah'}
+                        </div>
+                      )}
+                    </td>
                     <td className="py-3 px-4">
                       <span className="px-2.5 py-1 rounded text-xs font-black bg-indigo-100 border border-indigo-300 text-indigo-900 font-mono">
                         {st.classId}
                       </span>
+                    </td>
+                    <td className="py-3 px-4">
+                      {isExit ? (
+                        <div className="space-y-0.5">
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-rose-100 text-rose-800 border border-rose-300 inline-flex items-center gap-1">
+                            <span>🚪</span> Keluar Sekolah
+                          </span>
+                          <div className="text-[9px] text-slate-500 font-medium leading-tight">
+                            {st.exitDate ? `Tgl: ${st.exitDate}` : ''} {st.exitMarkedBy ? `• Oleh: ${st.exitMarkedBy}` : ''}
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 inline-flex items-center gap-1">
+                          <span>✅</span> Siswa Aktif
+                        </span>
+                      )}
                     </td>
                     <td className="py-3 px-4 text-center">
                       <div className="flex items-center justify-center gap-1.5">
@@ -327,10 +450,37 @@ export function TabSiswa({
                           type="button"
                           onClick={() => setEditingStudent(st)}
                           className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 transition cursor-pointer"
-                          title="Edit siswa"
+                          title="Edit data siswa"
                         >
                           ✏️
                         </button>
+
+                        {isExit ? (
+                          <button
+                            type="button"
+                            onClick={() => setRestoreModalStudent(st)}
+                            className="px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 font-black text-[11px] transition cursor-pointer shadow-xs flex items-center gap-1"
+                            title="Pulihkan status siswa aktif"
+                          >
+                            <span>🔄</span>
+                            <span>Pulihkan</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setExitModalStudent(st);
+                              setExitReasonType('Pindah / Mutasi ke Sekolah Lain');
+                              setExitCustomReason('');
+                              setExitDateInput(new Date().toISOString().split('T')[0]);
+                            }}
+                            className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 transition cursor-pointer"
+                            title="Tandai siswa keluar / mutasi sekolah"
+                          >
+                            🚪
+                          </button>
+                        )}
+
                         <button
                           type="button"
                           onClick={() => onDeleteStudent(st.id, st.name)}
@@ -401,6 +551,185 @@ export function TabSiswa({
         onDelete={onDeleteStudent}
         showToast={showToast}
       />
+
+      {/* MODAL TANDAI SISWA KELUAR SEKOLAH (ADMIN DASHBOARD) */}
+      {exitModalStudent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm animate-fade-in select-text">
+          <div 
+            className="bg-white border-2 border-rose-300 rounded-3xl p-6 sm:p-7 max-w-lg w-full shadow-2xl space-y-4"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 pb-3 border-b border-rose-100">
+              <div className="w-10 h-10 rounded-2xl bg-rose-50 text-rose-600 border border-rose-200 flex items-center justify-center text-xl flex-shrink-0">
+                🚪
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Tandai Siswa Keluar / Mutasi Sekolah</h3>
+                <p className="text-xs text-slate-500">Tersinkronisasi ke seluruh Guru Mapel, Meja Piket & Database</p>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 flex items-center justify-between">
+              <div>
+                <div className="font-black text-slate-900 text-sm">{exitModalStudent.name}</div>
+                <div className="text-xs text-slate-500 font-mono mt-0.5">
+                  NISN: {exitModalStudent.nisn || '-'} • Kelas {exitModalStudent.classId}
+                </div>
+              </div>
+              <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                {exitModalStudent.gender === 'L' ? 'Laki-laki' : 'Perempuan'}
+              </span>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-900 space-y-1">
+              <div className="font-bold flex items-center gap-1.5 text-amber-800">
+                <span>🛡️ Jaminan Keamanan Data Sekolah:</span>
+              </div>
+              <p className="leading-relaxed text-[11px] text-amber-800/90">
+                Nama siswa <strong>TIDAK akan dihapus</strong> dari database sekolah. Siswa akan ditandai dengan status <strong>Keluar (K)</strong> agar seluruh riwayat kehadiran lama, tugas, dan nilai ujian tetap utuh tersimpan di sistem.
+              </p>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">
+                  Alasan Keluar Sekolah:
+                </label>
+                <select
+                  value={exitReasonType}
+                  onChange={e => setExitReasonType(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-300 font-medium text-slate-900 focus:outline-none focus:border-rose-500 focus:bg-white transition"
+                >
+                  <option value="Pindah / Mutasi ke Sekolah Lain">Pindah / Mutasi ke Sekolah Lain</option>
+                  <option value="Mengikuti Orang Tua / Pindah Domisili">Mengikuti Orang Tua / Pindah Domisili</option>
+                  <option value="Berhenti / Mengundurkan Diri (Drop Out)">Berhenti / Mengundurkan Diri (Drop Out)</option>
+                  <option value="Dikeluarkan karena Pelanggaran Berat">Dikeluarkan karena Pelanggaran Berat</option>
+                  <option value="Lainnya">Lainnya (Tuliskan Keterangan)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">
+                  Sekolah Tujuan / Catatan Tambahan:
+                </label>
+                <input
+                  type="text"
+                  value={exitCustomReason}
+                  onChange={e => setExitCustomReason(e.target.value)}
+                  placeholder="Contoh: Pindah ke SMPN 1 Cililin / Surat Mutasi No. 421/..."
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-300 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-rose-500 focus:bg-white transition"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">
+                  Tanggal Efektif Keluar:
+                </label>
+                <input
+                  type="date"
+                  value={exitDateInput}
+                  onChange={e => setExitDateInput(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-300 font-mono text-slate-900 focus:outline-none focus:border-rose-500 focus:bg-white transition"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setExitModalStudent(null)}
+                disabled={isSubmittingExit}
+                className="px-4 py-2.5 rounded-xl text-slate-600 hover:bg-slate-100 font-bold text-xs transition cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmAdminMarkExit}
+                disabled={isSubmittingExit}
+                className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs transition shadow-md shadow-rose-600/20 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                {isSubmittingExit ? (
+                  <>
+                    <span className="animate-spin">⏳</span>
+                    <span>Menyimpan ke Cloud...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>🚪</span>
+                    <span>Konfirmasi Siswa Keluar</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL PULIHKAN STATUS SISWA AKTIF (ADMIN DASHBOARD) */}
+      {restoreModalStudent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm animate-fade-in select-text">
+          <div 
+            className="bg-white border-2 border-emerald-300 rounded-3xl p-6 sm:p-7 max-w-md w-full shadow-2xl space-y-4"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 pb-3 border-b border-emerald-100">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center text-xl flex-shrink-0">
+                🔄
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Pulihkan Status Siswa Aktif</h3>
+                <p className="text-xs text-slate-500">Aktifkan kembali siswa ke daftar presensi kelas</p>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 space-y-1.5 text-xs">
+              <div className="font-black text-slate-900 text-sm">{restoreModalStudent.name}</div>
+              <div className="text-slate-500 font-mono">
+                NISN: {restoreModalStudent.nisn || '-'} • Kelas {restoreModalStudent.classId}
+              </div>
+              {restoreModalStudent.exitReason && (
+                <div className="text-rose-700 font-medium pt-1 border-t border-slate-200">
+                  Alasan keluar sebelumnya: <strong>{restoreModalStudent.exitReason}</strong>
+                </div>
+              )}
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 leading-relaxed">
+              Apakah Anda yakin ingin memulihkan status siswa ini kembali menjadi <strong>Siswa Aktif</strong>? Siswa akan otomatis muncul di presensi guru mapel dan meja piket untuk diabsen seperti biasa.
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setRestoreModalStudent(null)}
+                disabled={isSubmittingExit}
+                className="px-4 py-2.5 rounded-xl text-slate-600 hover:bg-slate-100 font-bold text-xs transition cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmAdminRestore}
+                disabled={isSubmittingExit}
+                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-md shadow-emerald-600/20 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                {isSubmittingExit ? (
+                  <>
+                    <span className="animate-spin">⏳</span>
+                    <span>Memulihkan...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>✓</span>
+                    <span>Ya, Pulihkan Siswa</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

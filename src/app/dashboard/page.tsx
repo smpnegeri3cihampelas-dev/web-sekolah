@@ -11,7 +11,8 @@ import {
   Student, 
   INITIAL_STUDENTS, 
   getStoredStudents, 
-  saveStoredStudents 
+  saveStoredStudents,
+  syncStudentsWithCloud 
 } from '@/lib/elearningData';
 
 // Tab Subcomponents (Semua terisolasi agar render super ringan dan 100% anti-lag)
@@ -63,6 +64,13 @@ export default function DashboardPage() {
     const handleUpdate = () => setStudentsList(getStoredStudents());
     window.addEventListener('elearningStudentsUpdated', handleUpdate);
     window.addEventListener('storage', handleUpdate);
+    // Sync live student exit statuses from Hostinger Cloud Database
+    syncStudentsWithCloud().then(cloudStudents => {
+      if (cloudStudents && cloudStudents.length > 0) {
+        setStudentsList(cloudStudents);
+      }
+    }).catch(() => {});
+
     // Trigger background Hostinger Cloud Synchronization
     try {
       import('@/lib/cloudSync').then(m => {

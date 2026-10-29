@@ -26,6 +26,8 @@ export function TabOverview({
   onNavigateTab
 }: TabOverviewProps) {
   const totalStudents = studentsList.length || 535;
+  const activeCount = studentsList.filter(s => s.status !== 'Keluar').length;
+  const keluarCount = studentsList.filter(s => s.status === 'Keluar').length;
 
   return (
     <div className="space-y-6 animate-[fadeIn_0.3s_ease-out]">
@@ -34,8 +36,8 @@ export function TabOverview({
         {[
           {
             label: 'Siswa Aktif',
-            value: `${totalStudents}`,
-            desc: '17 Rombel Terdaftar',
+            value: `${activeCount}`,
+            desc: `${totalStudents} Total ${keluarCount > 0 ? `· ${keluarCount} Keluar` : '· 17 Rombel'}`,
             icon: '🎒',
             onClick: () => onNavigateTab('siswa')
           },
