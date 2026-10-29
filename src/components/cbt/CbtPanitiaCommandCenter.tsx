@@ -1502,31 +1502,6 @@ export default function CbtPanitiaCommandCenter({
 
   return (
     <div className="space-y-6">
-      {/* Quick Exit Banner back to Teacher/Student E-Learning */}
-      <div className="bg-amber-500/10 border-2 border-amber-300 rounded-2xl p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-        <div className="flex items-center gap-2.5 font-bold text-amber-950">
-          <span className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-700 flex items-center justify-center text-base shrink-0">🏛️</span>
-          <div>
-            <div className="text-sm font-black text-amber-950">Pusat Komando Panitia Ujian CBT</div>
-            <div className="text-[11px] text-amber-800 font-medium">Khusus Posko Panitia Pelaksana CBT. Untuk presensi KBM harian &amp; jurnal, silakan kembali ke Portal Guru.</div>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={() => {
-            try {
-              localStorage.removeItem('spentic_elearning_session_v2');
-              sessionStorage.removeItem('spentic_cbt_panitia_session');
-            } catch {}
-            window.location.href = '/elearning';
-          }}
-          className="px-4 py-2 rounded-xl bg-white hover:bg-rose-50 border-2 border-amber-300 hover:border-rose-400 text-rose-700 font-extrabold transition shadow-xs cursor-pointer flex items-center justify-center gap-2 shrink-0 active:scale-95"
-        >
-          <span>🚪</span>
-          <span>Keluar ke Portal Guru &amp; Siswa</span>
-        </button>
-      </div>
-
       {/* Toast Alert */}
       {alertMsg && (
         <div className={`p-4 rounded-2xl text-xs font-bold shadow-lg flex items-center justify-between animate-fade-in ${

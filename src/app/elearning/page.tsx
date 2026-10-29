@@ -3043,19 +3043,6 @@ export default function ELearningPage() {
                 <ELearningClock />
               </div>
 
-              {/* Quick Exit to Teacher/Student Portal if in Panitia role */}
-              {currentUser.role === 'panitia' && (
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                  className="px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-rose-50 border border-amber-300 hover:border-rose-300 text-amber-900 hover:text-rose-700 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs active:scale-95 shrink-0"
-                  title="Keluar dari mode Panitia CBT dan kembali ke Portal Guru/Presensi"
-                >
-                  <span>🚪</span>
-                  <span>Keluar ke Portal Guru</span>
-                </button>
-              )}
-
               {/* Teacher Account Settings & Change Password */}
               {(currentUser.role === 'guru_mapel' || currentUser.role === 'guru_piket') && (
                 <button
