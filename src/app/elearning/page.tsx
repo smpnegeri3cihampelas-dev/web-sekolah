@@ -3136,7 +3136,7 @@ export default function ELearningPage() {
                 </p>
               </div>
 
-              {/* 4-Role Clean Switcher */}
+              {/* 4-Role Clean Switcher: Diurutkan berdasarkan frekuensi pemakaian harian (Guru, Piket, Siswa, lalu Panitia) */}
               <div className="grid grid-cols-4 gap-1 p-1 bg-slate-100 rounded-xl mb-5 text-xs font-medium">
                 <button 
                   type="button"
@@ -3164,18 +3164,6 @@ export default function ELearningPage() {
 
                 <button 
                   type="button"
-                  onClick={() => switchLoginTab('panitia')}
-                  className={`py-2 rounded-lg transition cursor-pointer text-center ${
-                    loginRole === 'panitia'
-                      ? 'bg-white text-amber-600 font-bold shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  Panitia
-                </button>
-
-                <button 
-                  type="button"
                   onClick={() => switchLoginTab('siswa')}
                   className={`py-2 rounded-lg transition cursor-pointer text-center ${
                     loginRole === 'siswa'
@@ -3184,6 +3172,18 @@ export default function ELearningPage() {
                   }`}
                 >
                   Siswa
+                </button>
+
+                <button 
+                  type="button"
+                  onClick={() => switchLoginTab('panitia')}
+                  className={`py-2 rounded-lg transition cursor-pointer text-center ${
+                    loginRole === 'panitia'
+                      ? 'bg-white text-amber-600 font-bold shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Panitia
                 </button>
               </div>
 
@@ -3287,7 +3287,7 @@ export default function ELearningPage() {
                       type="submit"
                       className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm transition shadow-md shadow-emerald-600/20 flex items-center justify-center gap-1.5 cursor-pointer mt-2 active:scale-[0.99]"
                     >
-                      Masuk
+                      Masuk sebagai Guru Piket ➔
                     </button>
                   </>
                 )}
@@ -3400,7 +3400,7 @@ export default function ELearningPage() {
                       type="submit"
                       className="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-sm transition shadow-md shadow-purple-600/20 flex items-center justify-center gap-1.5 cursor-pointer mt-2 active:scale-[0.99]"
                     >
-                      Masuk
+                      Masuk sebagai Siswa ➔
                     </button>
 
                     {/* Tombol Uji Coba Akun Siswa Cepat (1 Siswa Saja) */}
