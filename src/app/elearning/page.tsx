@@ -1242,17 +1242,33 @@ export default function ELearningPage() {
       const saved = localStorage.getItem('spentic_elearning_session_v2');
       if (saved) {
         const parsed: AuthUserSession = JSON.parse(saved);
-        if (parsed && parsed.role) {
+        // CRITICAL FIX: NEVER auto-open into panitia! Always clear stale panitia sessions on mount
+        if (parsed && parsed.role && parsed.role !== 'panitia') {
           setCurrentUser(parsed);
           if (parsed.classId) {
             setSelectedClassId(parsed.classId);
           }
+        } else if (parsed && parsed.role === 'panitia') {
+          localStorage.removeItem('spentic_elearning_session_v2');
+          setCurrentUser(null);
         }
+      } else {
+        // Only allow panitia if explicitly logged in in the current active tab
+        try {
+          const panitiaSession = sessionStorage.getItem('spentic_cbt_panitia_session');
+          if (panitiaSession) {
+            const parsed = JSON.parse(panitiaSession);
+            if (parsed && parsed.role === 'panitia') {
+              setCurrentUser(parsed);
+            }
+          }
+        } catch {}
       }
     } catch (e) {
       console.error('Failed reading session', e);
     } finally {
       setIsAuthLoading(false);
+      setLoginRole('guru'); // Default form tab ALWAYS to 'guru'
       // Trigger background Hostinger Cloud Synchronization
       try {
         import('@/lib/cloudSync').then(m => {
@@ -1575,10 +1591,21 @@ export default function ELearningPage() {
     if (user.classId) {
       setSelectedClassId(user.classId);
     }
-    try {
-      localStorage.setItem('spentic_elearning_session_v2', JSON.stringify(user));
-    } catch (e) {
-      console.error(e);
+    // Panitia CBT is session-only so opening elearning anew never auto-enters Panitia
+    if (user.role === 'panitia') {
+      try {
+        sessionStorage.setItem('spentic_cbt_panitia_session', JSON.stringify(user));
+        localStorage.removeItem('spentic_elearning_session_v2');
+      } catch (e) {
+        console.error(e);
+      }
+    } else {
+      try {
+        localStorage.setItem('spentic_elearning_session_v2', JSON.stringify(user));
+        sessionStorage.removeItem('spentic_cbt_panitia_session');
+      } catch (e) {
+        console.error(e);
+      }
     }
     // Record login in database activity_logs
     try {
@@ -1597,11 +1624,13 @@ export default function ELearningPage() {
 
   const handleLogout = () => {
     setCurrentUser(null);
+    setLoginRole('guru'); // ALWAYS reset tab back to 'guru'
     setLoginIdentifier('');
     setLoginPassword('');
     setShowPassword(false);
     try {
       localStorage.removeItem('spentic_elearning_session_v2');
+      sessionStorage.removeItem('spentic_cbt_panitia_session');
     } catch (e) {
       console.error(e);
     }
@@ -3014,6 +3043,19 @@ export default function ELearningPage() {
                 <ELearningClock />
               </div>
 
+              {/* Quick Exit to Teacher/Student Portal if in Panitia role */}
+              {currentUser.role === 'panitia' && (
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-rose-50 border border-amber-300 hover:border-rose-300 text-amber-900 hover:text-rose-700 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs active:scale-95 shrink-0"
+                  title="Keluar dari mode Panitia CBT dan kembali ke Portal Guru/Presensi"
+                >
+                  <span>🚪</span>
+                  <span>Keluar ke Portal Guru</span>
+                </button>
+              )}
+
               {/* Teacher Account Settings & Change Password */}
               {(currentUser.role === 'guru_mapel' || currentUser.role === 'guru_piket') && (
                 <button
@@ -3207,7 +3249,7 @@ export default function ELearningPage() {
                       type="submit"
                       className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm transition shadow-md shadow-indigo-600/20 flex items-center justify-center gap-1.5 cursor-pointer mt-2 active:scale-[0.99]"
                     >
-                      Masuk
+                      Masuk sebagai Guru Mapel ➔
                     </button>
                   </>
                 )}
