@@ -1547,39 +1547,64 @@ export default function ELearningPage() {
     };
   }, []);
 
+  // Track previous class and teacher so unsaved attendance edits aren't wiped when marking a student as keluar
+  const prevSelectedClassForWorkingRef = useRef<string>('');
+  const prevTeacherKeyForWorkingRef = useRef<string>('');
+
   // Sync working records when selected class or current teacher changes (Isolated per Teacher & Subject)
   useEffect(() => {
+    if (!selectedClassId || !currentTeacher) return;
     const todayStr = new Date().toISOString().split('T')[0];
     const studentsInClass = activeStudents.filter(s => s.classId === selectedClassId);
     
     // Look up this specific teacher's session for this class today
     const teacherNipClean = (currentTeacher?.nip || '').replace(/\s+/g, '');
+    const teacherKey = `${currentTeacher.nip}_${currentTeacher.subject}`;
     const mySession = sessions.find(s => 
       s.date === todayStr && 
       s.classId === selectedClassId && 
       (s.teacherNip.replace(/\s+/g, '') === teacherNipClean || s.subject.toLowerCase() === (currentTeacher?.subject || '').toLowerCase())
     );
 
-    const records: Record<string, AttendanceStatus> = {};
-    const notes: Record<string, string> = {};
+    const isClassOrTeacherChanged =
+      prevSelectedClassForWorkingRef.current !== selectedClassId ||
+      prevTeacherKeyForWorkingRef.current !== teacherKey;
 
-    studentsInClass.forEach(student => {
-      if (student.status === 'Keluar') {
-        records[student.id] = 'K';
-        notes[student.id] = student.exitReason ? `Keluar/Pindah: ${student.exitReason}` : 'Sudah Keluar Sekolah';
-      } else if (mySession && mySession.records?.[student.id]) {
-        records[student.id] = mySession.records[student.id];
-        if (mySession.notes?.[student.id]) {
-          notes[student.id] = mySession.notes[student.id];
+    setWorkingRecords(prev => {
+      const records: Record<string, AttendanceStatus> = {};
+      studentsInClass.forEach(student => {
+        if (student.status === 'Keluar') {
+          records[student.id] = 'K';
+        } else if (!isClassOrTeacherChanged && prev[student.id] !== undefined) {
+          // Tetap pertahankan status presensi yang baru saja dipilih guru (misal Sakit, Izin, Alpa, Terlambat)
+          records[student.id] = prev[student.id];
+        } else if (mySession && mySession.records?.[student.id]) {
+          records[student.id] = mySession.records[student.id];
+        } else {
+          records[student.id] = 'H'; // Default setiap sesi baru: otomatis HADIR
         }
-      } else {
-        records[student.id] = 'H'; // Default setiap sesi baru: otomatis HADIR
-      }
+      });
+      return records;
     });
 
-    setWorkingRecords(records);
-    setWorkingNotes(notes);
-    workingNotesRef.current = { ...notes };
+    setWorkingNotes(prev => {
+      const notes: Record<string, string> = {};
+      studentsInClass.forEach(student => {
+        if (student.status === 'Keluar') {
+          notes[student.id] = student.exitReason ? `Keluar/Pindah: ${student.exitReason}` : 'Sudah Keluar Sekolah';
+        } else if (!isClassOrTeacherChanged && prev[student.id] !== undefined) {
+          // Tetap pertahankan catatan yang sedang diketik guru
+          notes[student.id] = prev[student.id];
+        } else if (mySession && mySession.notes?.[student.id]) {
+          notes[student.id] = mySession.notes[student.id];
+        }
+      });
+      workingNotesRef.current = { ...notes };
+      return notes;
+    });
+
+    prevSelectedClassForWorkingRef.current = selectedClassId;
+    prevTeacherKeyForWorkingRef.current = teacherKey;
   }, [selectedClassId, currentTeacher?.nip, currentTeacher?.subject, sessions, activeStudents]);
 
   // Authentication & Session Management
