@@ -227,281 +227,6 @@ export default function CreateAssignmentModal({
   const [isQuizActive, setIsQuizActive] = useState(false);
   const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([]);
 
-  const handleAutoFillSubjectQuiz = () => {
-    const sLower = (currentTeacher.subject || '').toLowerCase();
-    let sampleQuestions: QuizQuestion[] = [];
-
-    if (sLower.includes('inggris') || sLower.includes('english')) {
-      sampleQuestions = [
-        {
-          id: `q-${Date.now()}-1`,
-          question: 'Complete the sentence: "She always ___ up at 05.00 AM every morning."',
-          options: ['A. wake', 'B. wakes', 'C. waking', 'D. waked'],
-          correctOptionIndex: 1,
-          explanation: 'Third-person singular subject takes verb + s/es in Simple Present.'
-        },
-        {
-          id: `q-${Date.now()}-2`,
-          question: '"They ___ badminton in the yard on Sundays."',
-          options: ['A. plays', 'B. play', 'C. played', 'D. playing'],
-          correctOptionIndex: 1,
-          explanation: 'Subject "They" uses bare verb "play".'
-        },
-        {
-          id: `q-${Date.now()}-3`,
-          question: 'Which of the following words is an adverb of frequency?',
-          options: ['A. Quickly', 'B. Usually', 'C. Tomorrow', 'D. Beautiful'],
-          correctOptionIndex: 1,
-          explanation: '"Usually" indicates frequency of action.'
-        }
-      ];
-    } else if (sLower.includes('agama') || sLower.includes('pai') || sLower.includes('pabp')) {
-      sampleQuestions = [
-        {
-          id: `q-${Date.now()}-1`,
-          question: 'Sikap terpuji yang mencerminkan keselarasan antara perkataan dan perbuatan yang benar disebut...',
-          options: ['A. Amanah', 'B. Shiddiq (Jujur)', 'C. Fathanah', 'D. Tabligh'],
-          correctOptionIndex: 1,
-          explanation: 'Shiddiq berarti jujur dan benar dalam perkataan maupun perbuatan.'
-        },
-        {
-          id: `q-${Date.now()}-2`,
-          question: 'Tujuan utama membaca doa sebelum belajar adalah...',
-          options: ['A. Cepat selesai', 'B. Memohon kemudahan dan keberkahan pemahaman ilmu', 'C. Mendapat pujian', 'D. Bebas ulangan'],
-          correctOptionIndex: 1,
-          explanation: 'Mengharap rida Allah agar ilmu mudah dipahami dan membawa manfaat.'
-        },
-        {
-          id: `q-${Date.now()}-3`,
-          question: 'Salah satu wujud adab birrul walidain kepada orang tua di rumah adalah...',
-          options: ['A. Membantah', 'B. Berbicara santun dan menaati nasihat kebaikan', 'C. Acuh tak acuh', 'D. Menunda shalat'],
-          correctOptionIndex: 1,
-          explanation: 'Berbicara sopan, lembut, dan tawadhu adalah wujud bakti kepada kedua orang tua.'
-        }
-      ];
-    } else if (sLower.includes('sunda')) {
-      sampleQuestions = [
-        {
-          id: `q-${Date.now()}-1`,
-          question: 'Ragam basa Sunda anu luyu digunakeun ka saluhureun (sepuh/guru) nyaeta...',
-          options: ['A. Basa loma', 'B. Basa lemes / hormat', 'C. Basa garihal', 'D. Basa wewengkon'],
-          correctOptionIndex: 1,
-          explanation: 'Basa lemes hormat ka batur dianggo pikeun ngajenan jalma anu saluhureun.'
-        },
-        {
-          id: `q-${Date.now()}-2`,
-          question: 'Kecap lemes keur diri sorangan tina kecap "dahar" nyaeta...',
-          options: ['A. Neda', 'B. Tuang', 'C. Nyatu', 'D. Lebok'],
-          correctOptionIndex: 0,
-          explanation: 'Keur diri sorangan nganggo "neda".'
-        },
-        {
-          id: `q-${Date.now()}-3`,
-          question: 'Dina istilah pancakaki Sunda, sebutan pikeun anakna anak urang nyaeta...',
-          options: ['A. Buyut', 'B. Incu', 'C. Bao', 'D. Alo'],
-          correctOptionIndex: 1,
-          explanation: 'Anakna anak urang nyaeta incu.'
-        }
-      ];
-    } else if (sLower.includes('matematika') || sLower.includes('mtk')) {
-      sampleQuestions = [
-        {
-          id: `q-${Date.now()}-1`,
-          question: 'Bentuk sederhana dari 3x + 5y - x + 2y adalah...',
-          options: ['A. 2x + 7y', 'B. 4x + 7y', 'C. 2x + 3y', 'D. 3x + 7y'],
-          correctOptionIndex: 0,
-          explanation: '(3x - x) + (5y + 2y) = 2x + 7y.'
-        },
-        {
-          id: `q-${Date.now()}-2`,
-          question: 'Koefisien dari variabel x pada bentuk aljabar 5x² - 7x + 9 adalah...',
-          options: ['A. 5', 'B. -7', 'C. 7', 'D. 9'],
-          correctOptionIndex: 1,
-          explanation: 'Koefisien di depan variabel x berpangkat satu adalah -7.'
-        },
-        {
-          id: `q-${Date.now()}-3`,
-          question: 'Jika x = 3 dan y = 2, maka nilai dari 2x + 3y adalah...',
-          options: ['A. 10', 'B. 12', 'C. 15', 'D. 18'],
-          correctOptionIndex: 1,
-          explanation: '2(3) + 3(2) = 6 + 6 = 12.'
-        }
-      ];
-    } else if (sLower.includes('ipa') || sLower.includes('sains') || sLower.includes('alam')) {
-      sampleQuestions = [
-        {
-          id: `q-${Date.now()}-1`,
-          question: 'Unit terkecil struktural dan fungsional penyusun tubuh makhluk hidup disebut...',
-          options: ['A. Jaringan', 'B. Sel', 'C. Organ', 'D. Sistem Organ'],
-          correctOptionIndex: 1,
-          explanation: 'Sel adalah satuan terkecil kehidupan yang menyusun setiap organisme.'
-        },
-        {
-          id: `q-${Date.now()}-2`,
-          question: 'Organel sel yang berperan sebagai tempat berlangsungnya proses fotosintesis pada tumbuhan adalah...',
-          options: ['A. Mitokondria', 'B. Kloroplas', 'C. Ribosom', 'D. Vakuola'],
-          correctOptionIndex: 1,
-          explanation: 'Kloroplas mengandung pigmen klorofil yang menangkap energi cahaya matahari.'
-        },
-        {
-          id: `q-${Date.now()}-3`,
-          question: 'Bagian mikroskop yang berfungsi untuk memfokuskan bayangan preparat secara cepat dan kasar adalah...',
-          options: ['A. Makrometer (Pemutar Kasar)', 'B. Mikrometer (Pemutar Halus)', 'C. Diafragma', 'D. Kondensor'],
-          correctOptionIndex: 0,
-          explanation: 'Makrometer menaikkan atau menurunkan tabung mikroskop secara cepat untuk mencari fokus bayangan awal.'
-        }
-      ];
-    } else if (sLower.includes('indonesia')) {
-      sampleQuestions = [
-        {
-          id: `q-${Date.now()}-1`,
-          question: 'Teks yang menggambarkan suatu objek secara rinci sehingga pembaca seolah melihat atau merasakan sendiri objek tersebut disebut teks...',
-          options: ['A. Narasi', 'B. Deskripsi', 'C. Prosedur', 'D. Eksplanasi'],
-          correctOptionIndex: 1,
-          explanation: 'Teks deskripsi memaparkan ciri fisik dan suasana suatu objek secara rinci dan pancaindra.'
-        },
-        {
-          id: `q-${Date.now()}-2`,
-          question: 'Gagasan utama yang menjadi dasar pengembangan sebuah paragraf disebut...',
-          options: ['A. Ide pokok (Kalimat utama)', 'B. Kalimat penjelas', 'C. Ringkasan', 'D. Kesimpulan'],
-          correctOptionIndex: 0,
-          explanation: 'Ide pokok merupakan inti permasalahan yang dibahas dalam paragraf.'
-        },
-        {
-          id: `q-${Date.now()}-3`,
-          question: 'Penulisan huruf kapital yang tepat di bawah ini adalah...',
-          options: ['A. sungai Citarum', 'B. Sungai Citarum', 'C. sungai citarum', 'D. Sungai citarum'],
-          correctOptionIndex: 1,
-          explanation: 'Nama unsur geografi yang diikuti nama diri ditulis dengan huruf awal kapital (Sungai Citarum).'
-        }
-      ];
-    } else if (sLower.includes('ips') || sLower.includes('sosial')) {
-      sampleQuestions = [
-        {
-          id: `q-${Date.now()}-1`,
-          question: 'Letak suatu wilayah berdasarkan garis lintang dan garis bujur pada peta disebut letak...',
-          options: ['A. Geografis', 'B. Astronomis', 'C. Geologis', 'D. Geomorfologis'],
-          correctOptionIndex: 1,
-          explanation: 'Letak astronomis ditentukan oleh koordinat garis lintang dan garis bujur bumi.'
-        },
-        {
-          id: `q-${Date.now()}-2`,
-          question: 'Kegiatan menyalurkan barang atau jasa dari produsen ke konsumen disebut...',
-          options: ['A. Produksi', 'B. Distribusi', 'C. Konsumsi', 'D. Investasi'],
-          correctOptionIndex: 1,
-          explanation: 'Distribusi adalah mata rantai penyalur barang/jasa kepada pihak pemakai.'
-        },
-        {
-          id: `q-${Date.now()}-3`,
-          question: 'Interaksi timbal balik antara individu dengan individu, atau individu dengan kelompok disebut...',
-          options: ['A. Status sosial', 'B. Interaksi sosial', 'C. Norma sosial', 'D. Peran sosial'],
-          correctOptionIndex: 1,
-          explanation: 'Interaksi sosial adalah hubungan timbal balik dinamis antarmanusia.'
-        }
-      ];
-    } else if (sLower.includes('pkn') || sLower.includes('pancasila')) {
-      sampleQuestions = [
-        {
-          id: `q-${Date.now()}-1`,
-          question: 'Pancasila berkedudukan sebagai pedoman tingkah laku dan cita-cita luhur bangsa Indonesia, fungsi ini disebut sebagai...',
-          options: ['A. Pandangan hidup bangsa', 'B. Dasar negara hukum', 'C. Perjanjian luhur', 'D. Sumber hukum semata'],
-          correctOptionIndex: 0,
-          explanation: 'Pandangan hidup (way of life) membimbing sikap dan perilaku seluruh warga negara.'
-        },
-        {
-          id: `q-${Date.now()}-2`,
-          question: 'Sikap menghargai perbedaan keyakinan dan saling tolong menolong antarumat beragama mencerminkan pengamalan sila...',
-          options: ['A. Pertama (Ketuhanan Yang Maha Esa)', 'B. Kedua', 'C. Ketiga', 'D. Kelima'],
-          correctOptionIndex: 0,
-          explanation: 'Toleransi dan kerukunan beragama merupakan perwujudan Sila ke-1.'
-        },
-        {
-          id: `q-${Date.now()}-3`,
-          question: 'Musyawarah untuk mufakat dalam mengambil keputusan bersama merupakan perwujudan dari sila...',
-          options: ['A. Kedua', 'B. Ketiga', 'C. Keempat (Kerakyatan yang dipimpin oleh hikmat kebijaksanaan)', 'D. Kelima'],
-          correctOptionIndex: 2,
-          explanation: 'Musyawarah mufakat adalah ciri khas demokrasi Pancasila pada sila ke-4.'
-        }
-      ];
-    } else if (sLower.includes('penjas') || sLower.includes('pjok') || sLower.includes('olahraga')) {
-      sampleQuestions = [
-        {
-          id: `q-${Date.now()}-1`,
-          question: 'Gerakan menggiring bola dalam permainan sepak bola bertujuan untuk...',
-          options: ['A. Mengulur waktu', 'B. Melewati lawan dan mendekati gawang', 'C. Menendang sekuat tenaga', 'D. Melakukan lemparan ke dalam'],
-          correctOptionIndex: 1,
-          explanation: 'Dribbling dilakukan untuk mengontrol dan membawa bola mendekati area pertahanan lawan.'
-        },
-        {
-          id: `q-${Date.now()}-2`,
-          question: 'Berapa jumlah pemain dalam satu regu pada permainan bola voli resmi?',
-          options: ['A. 5 pemain', 'B. 6 pemain', 'C. 7 pemain', 'D. 11 pemain'],
-          correctOptionIndex: 1,
-          explanation: 'Setiap regu bola voli terdiri dari 6 pemain di dalam lapangan.'
-        },
-        {
-          id: `q-${Date.now()}-3`,
-          question: 'Latihan push-up secara teratur bermanfaat utama untuk melatih kekuatan otot...',
-          options: ['A. Lengan dan dada', 'B. Kaki dan betis', 'C. Leher', 'D. Jari-jari kaki'],
-          correctOptionIndex: 0,
-          explanation: 'Push-up melatih otot pectoralis (dada) dan triceps (lengan atas).'
-        }
-      ];
-    } else if (sLower.includes('informatika')) {
-      sampleQuestions = [
-        {
-          id: `q-${Date.now()}-1`,
-          question: 'Komponen perangkat keras yang berfungsi sebagai otak pemroses utama komputer adalah...',
-          options: ['A. RAM', 'B. CPU', 'C. Hard Disk', 'D. PSU'],
-          correctOptionIndex: 1,
-          explanation: 'CPU (Central Processing Unit) mengeksekusi instruksi komputasi.'
-        },
-        {
-          id: `q-${Date.now()}-2`,
-          question: 'Memori komputer yang bersifat sementara saat dialiri listrik adalah...',
-          options: ['A. ROM', 'B. RAM', 'C. SSD', 'D. Flashdisk'],
-          correctOptionIndex: 1,
-          explanation: 'RAM menyimpan data sementara untuk aplikasi yang sedang aktif.'
-        },
-        {
-          id: `q-${Date.now()}-3`,
-          question: 'Manakah dari perangkat berikut yang termasuk perangkat masukan (input)?',
-          options: ['A. Monitor', 'B. Keyboard & Mouse', 'C. Speaker', 'D. Printer'],
-          correctOptionIndex: 1,
-          explanation: 'Keyboard dan mouse memasukkan input ke komputer.'
-        }
-      ];
-    } else {
-      sampleQuestions = [
-        {
-          id: `q-${Date.now()}-1`,
-          question: `Apa konsep pokok yang paling mendasari materi ${currentTeacher.subject || 'pelajaran'} bab ini?`,
-          options: ['A. Pemahaman fakta dasar', 'B. Analisis dan aplikasi konsep', 'C. Penghafalan istilah', 'D. Teori umum'],
-          correctOptionIndex: 1,
-          explanation: 'Penerapan konsep kontekstual menjadi fokus pembelajaran kurikulum merdeka.'
-        },
-        {
-          id: `q-${Date.now()}-2`,
-          question: 'Manakah langkah awal yang paling tepat dalam menyelesaikan soal latihan ini?',
-          options: ['A. Menuliskan kesimpulan langsung', 'B. Membaca petunjuk dan mencatat poin penting', 'C. Menebak jawaban', 'D. Mengabaikan data'],
-          correctOptionIndex: 1,
-          explanation: 'Memahami petunjuk dan merangkum informasi esensial adalah langkah pertama.'
-        },
-        {
-          id: `q-${Date.now()}-3`,
-          question: 'Bagaimana penerapan nilai materi ini dalam kehidupan sehari-hari?',
-          options: ['A. Hanya untuk ujian', 'B. Diterapkan secara kritis dan bertanggung jawab', 'C. Tidak relevan', 'D. Bersifat teoritis semata'],
-          correctOptionIndex: 1,
-          explanation: 'Pembelajaran bermakna diaplikasikan dalam kehidupan nyata sehari-hari.'
-        }
-      ];
-    }
-
-    setQuizQuestions(sampleQuestions);
-    setIsQuizActive(true);
-    showToast(`3 Soal Kuis untuk ${currentTeacher.subject} berhasil disiapkan!`, 'info');
-  };
-
   type TeacherTab = 'info' | 'kuis' | 'lampiran';
   const [activeTab, setActiveTab] = useState<TeacherTab>('info');
 
@@ -692,6 +417,8 @@ export default function CreateAssignmentModal({
               setIsQuizActive(val);
               if (val && quizQuestions.length === 0) {
                 addManualQuestion();
+              } else if (!val) {
+                setQuizQuestions([]);
               }
             }}
             className="w-5 h-5 text-purple-600 rounded focus:ring-purple-500 cursor-pointer mt-0.5"
@@ -716,17 +443,10 @@ export default function CreateAssignmentModal({
           <button
             type="button"
             onClick={addManualQuestion}
-            className="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md shadow-purple-600/20 cursor-pointer flex items-center gap-1.5 transition active:scale-95"
+            className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md shadow-purple-600/20 cursor-pointer flex items-center gap-1.5 transition active:scale-95"
           >
             <span>+</span>
             <span>Tambah Soal</span>
-          </button>
-          <button
-            type="button"
-            onClick={handleAutoFillSubjectQuiz}
-            className="px-3 py-2 rounded-xl bg-white hover:bg-purple-100 text-purple-800 border border-purple-300 font-bold text-xs shadow-xs cursor-pointer flex items-center gap-1.5 transition active:scale-95"
-          >
-            <span>⚡ Contoh Soal ({currentTeacher.subject})</span>
           </button>
           {quizQuestions.length > 0 && (
             <button
@@ -736,7 +456,7 @@ export default function CreateAssignmentModal({
                   setQuizQuestions([]);
                 }
               }}
-              className="px-2.5 py-2 rounded-xl text-rose-600 hover:bg-rose-50 text-xs font-semibold cursor-pointer"
+              className="px-3 py-2 rounded-xl text-rose-600 hover:bg-rose-50 border border-rose-200 text-xs font-semibold cursor-pointer transition"
             >
               Hapus Semua
             </button>
@@ -752,26 +472,16 @@ export default function CreateAssignmentModal({
           <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
             Tugas ini akan berlaku sebagai tugas penugasan berkas (upload file atau ketik rangkuman). Centang kotak di atas atau klik tombol di bawah untuk mengaktifkan soal kuis.
           </p>
-          <div className="flex flex-wrap items-center justify-center gap-2.5 pt-2">
+          <div className="pt-2">
             <button
               type="button"
               onClick={() => {
                 setIsQuizActive(true);
                 if (quizQuestions.length === 0) addManualQuestion();
               }}
-              className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md shadow-purple-600/20 cursor-pointer transition inline-flex items-center gap-2 active:scale-95"
+              className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md shadow-purple-600/20 cursor-pointer transition inline-flex items-center gap-2 active:scale-95"
             >
-              <span>+ Buat Soal Pertama</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setIsQuizActive(true);
-                handleAutoFillSubjectQuiz();
-              }}
-              className="px-4 py-2.5 rounded-xl bg-white hover:bg-purple-50 text-purple-700 border border-purple-300 font-bold text-xs shadow-xs cursor-pointer transition inline-flex items-center gap-2 active:scale-95"
-            >
-              <span>⚡ Contoh Soal ({currentTeacher.subject})</span>
+              <span>+ Aktifkan Kuis &amp; Tambah Soal</span>
             </button>
           </div>
         </div>
@@ -782,20 +492,13 @@ export default function CreateAssignmentModal({
           <p className="text-xs text-purple-700/80 max-w-md mx-auto">
             Klik tombol &quot;+ Tambah Soal&quot; untuk membuat soal baru secara manual, atau gunakan tombol &quot;⚡ Contoh Soal&quot; untuk template cepat sesuai mata pelajaran.
           </p>
-          <div className="flex justify-center gap-2 pt-2">
+          <div className="pt-2 flex justify-center">
             <button
               type="button"
               onClick={addManualQuestion}
-              className="px-4 py-2 rounded-xl bg-purple-600 text-white font-bold text-xs shadow-sm cursor-pointer"
+              className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md shadow-purple-600/20 cursor-pointer transition inline-flex items-center gap-2 active:scale-95"
             >
-              + Tambah Soal Manual
-            </button>
-            <button
-              type="button"
-              onClick={handleAutoFillSubjectQuiz}
-              className="px-4 py-2 rounded-xl bg-white border border-purple-300 text-purple-700 font-bold text-xs cursor-pointer"
-            >
-              ⚡ Isi Otomatis
+              <span>+ Tambah Soal Pertama</span>
             </button>
           </div>
         </div>
