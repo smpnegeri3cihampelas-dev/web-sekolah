@@ -539,7 +539,7 @@ export default function CreateAssignmentModal({
       data-lenis-prevent-touch="true"
       className="fixed inset-0 z-[80] bg-slate-900/80 backdrop-blur-xs p-2 sm:p-4 md:p-6 flex items-center justify-center animate-in fade-in duration-150 font-elearning"
     >
-      <div className="bg-white rounded-3xl max-w-5xl w-full shadow-2xl h-[92vh] max-h-[92vh] flex flex-col overflow-hidden border border-slate-100">
+      <div className="bg-white rounded-3xl max-w-5xl w-full shadow-2xl max-h-[90vh] flex flex-col overflow-hidden border border-slate-100">
         {/* HEADER MODAL (CLEAN & RINGKAS) */}
         <div className="px-6 py-4 flex items-center justify-between gap-3 border-b border-slate-100 bg-white flex-shrink-0">
           <div>
@@ -558,9 +558,9 @@ export default function CreateAssignmentModal({
           </button>
         </div>
 
-        {/* TAB NAVIGATION (3 PILL BERSIH) */}
-        <div className="px-6 border-b border-slate-200 flex-shrink-0 bg-white">
-          <div className="flex gap-2 overflow-x-auto" role="tablist">
+        {/* TAB NAVIGATION (3 PILL BERSIH - TANPA SCROLLBAR) */}
+        <div className="px-6 border-b border-slate-200 flex-shrink-0 bg-white overflow-hidden">
+          <div className="flex items-center gap-2 overflow-hidden" role="tablist">
             {tabs.map(t => {
               const isActive = t.id === activeTab;
               return (
