@@ -690,7 +690,9 @@ export default function CreateAssignmentModal({
             onChange={(e) => {
               const val = e.target.checked;
               setIsQuizActive(val);
-              if (val && quizQuestions.length === 0) handleAutoFillSubjectQuiz();
+              if (val && quizQuestions.length === 0) {
+                addManualQuestion();
+              }
             }}
             className="w-5 h-5 text-purple-600 rounded focus:ring-purple-500 cursor-pointer mt-0.5"
           />
@@ -750,16 +752,28 @@ export default function CreateAssignmentModal({
           <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
             Tugas ini akan berlaku sebagai tugas penugasan berkas (upload file atau ketik rangkuman). Centang kotak di atas atau klik tombol di bawah untuk mengaktifkan soal kuis.
           </p>
-          <button
-            type="button"
-            onClick={() => {
-              setIsQuizActive(true);
-              if (quizQuestions.length === 0) handleAutoFillSubjectQuiz();
-            }}
-            className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-sm cursor-pointer transition inline-flex items-center gap-2"
-          >
-            <span>Aktifkan Kuis Sekarang</span>
-          </button>
+          <div className="flex flex-wrap items-center justify-center gap-2.5 pt-2">
+            <button
+              type="button"
+              onClick={() => {
+                setIsQuizActive(true);
+                if (quizQuestions.length === 0) addManualQuestion();
+              }}
+              className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md shadow-purple-600/20 cursor-pointer transition inline-flex items-center gap-2 active:scale-95"
+            >
+              <span>+ Buat Soal Pertama</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setIsQuizActive(true);
+                handleAutoFillSubjectQuiz();
+              }}
+              className="px-4 py-2.5 rounded-xl bg-white hover:bg-purple-50 text-purple-700 border border-purple-300 font-bold text-xs shadow-xs cursor-pointer transition inline-flex items-center gap-2 active:scale-95"
+            >
+              <span>⚡ Contoh Soal ({currentTeacher.subject})</span>
+            </button>
+          </div>
         </div>
       ) : quizQuestions.length === 0 ? (
         <div className="text-center py-12 px-4 rounded-3xl bg-purple-50/50 border-2 border-dashed border-purple-200 space-y-3">
