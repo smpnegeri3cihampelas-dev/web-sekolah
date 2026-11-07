@@ -617,35 +617,26 @@ export default function CbtSupervisorRoom({
     <div className="space-y-6">
 
       {/* 1. HEADER PENGAWAS RUANG */}
-      <div className="bg-white border border-indigo-100 rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
+      <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-xs space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <span className="w-8 h-8 rounded-xl bg-purple-50 border border-purple-200 text-purple-700 font-bold flex items-center justify-center text-sm">
-                📋
-              </span>
-              <h2 className="text-lg font-bold text-slate-900 tracking-tight">
-                Mode Pengawas Ruang Ujian CBT
+              <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+                Pengawasan Ruang Ujian
               </h2>
-            </div>
-            <div className="flex items-center gap-2 flex-wrap text-xs text-slate-500 mt-1">
-              <span>Pengawas: <strong className="text-slate-800">{currentTeacherName}</strong></span>
-              <span>•</span>
               <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                Tersinkron Live ke Posko Panitia
+                Live Panitia
               </span>
-              {isAssignedByPanitia && (
-                <span className="text-[10px] bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-md font-bold">
-                  Sesuai Plotting Panitia
-                </span>
-              )}
+            </div>
+            <div className="text-xs text-slate-500 mt-0.5">
+              Pengawas: <strong className="text-slate-800">{currentTeacherName}</strong>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
             {/* Dynamic Session Switcher Pills (Jam 1, Jam 2, Jam 3, dst.) */}
-            <div className="flex flex-wrap items-center gap-1 p-1 bg-slate-100 rounded-xl">
+            <div className="flex flex-wrap items-center gap-1 p-1 bg-slate-100/90 rounded-xl border border-slate-200/80 text-xs">
               {scheduleSessions.map((slot, idx) => {
                 const isSelected = slot.id === currentSlot.id;
                 return (
@@ -658,8 +649,8 @@ export default function CbtSupervisorRoom({
                     }}
                     className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
                       isSelected
-                        ? 'bg-amber-400 text-slate-950 shadow-xs font-black'
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                        ? 'bg-white text-indigo-700 shadow-xs border border-indigo-100/60 font-black'
+                        : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
                     <span>{idx % 2 === 0 ? '☀️' : '⛅'}</span>
@@ -675,19 +666,19 @@ export default function CbtSupervisorRoom({
             <button
               type="button"
               onClick={() => setShowEmergencyModal(true)}
-              className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs transition shadow-md shadow-amber-500/20 flex items-center gap-1.5 cursor-pointer"
+              className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-sm flex items-center gap-1.5 cursor-pointer"
             >
-              <span>➕ Daftarkan Siswa</span>
+              <span>+ Daftarkan Siswa</span>
             </button>
           </div>
         </div>
 
-        {/* Ruangan Tugas Resmi & Pemilih Paket Ujian */}
+        {/* Ruangan Tugas & Pemilih Paket Ujian */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t border-slate-100">
           <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 flex flex-col justify-between">
             <div className="flex items-center justify-between mb-1">
               <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                1. Ruangan Tugas Pengawas:
+                Ruangan Tugas Pengawas:
               </span>
               <span className="px-2 py-0.5 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 text-[10px] font-bold">
                 {currentSlot.name} ({currentSlot.startTime} - {currentSlot.endTime} WIB){currentSlot.subject ? ` • ${currentSlot.subject}` : ''}
@@ -711,7 +702,7 @@ export default function CbtSupervisorRoom({
 
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">
-              2. Paket Ujian:
+              Paket Ujian:
             </label>
             <select
               value={selectedExamId}
@@ -722,7 +713,7 @@ export default function CbtSupervisorRoom({
                 <option value="">-- Belum ada paket ujian aktif (Buat di Bank Soal) --</option>
               ) : (
                 packages.map(pkg => (
-                  <option key={pkg.id}>
+                  <option key={pkg.id} value={pkg.id}>
                     {pkg.status === 'active' ? '🟢 [AKTIF]' : '⏸️ [DIJEDA]'} {pkg.title} ({pkg.subject})
                   </option>
                 ))

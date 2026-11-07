@@ -352,69 +352,51 @@ export default function CbtTeacherManagement({
     <div className="space-y-6">
 
       {/* 1. HEADER MODUL CBT GURU */}
-      <div className="bg-white border border-indigo-100 rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold flex items-center justify-center text-sm">
-                💻
-              </span>
-              <h2 className="text-lg font-bold text-slate-900 tracking-tight">
-                Pusat Bank Soal & Asesmen CBT (PTS / PAS)
-              </h2>
-            </div>
-            <p className="text-xs text-slate-500 mt-1">
-              SMP Negeri 3 Cihampelas • Dukungan Soal PG, PG Kompleks, Benar/Salah, Menjodohkan, Audio Listening, dan Gambar.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setShowCreatePackageModal(true)}
-              className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-md shadow-indigo-600/20 flex items-center gap-2 cursor-pointer"
-            >
-              <span>+ Buat Paket Ujian Baru</span>
-            </button>
-          </div>
-        </div>
-
+      <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         {/* Tab Switcher: Daftar Paket vs Rekap Nilai */}
-        <div className="flex items-center gap-1 border-t border-slate-100 pt-3">
+        <div className="inline-flex items-center gap-1 bg-slate-100/90 p-1 rounded-xl border border-slate-200/80 text-xs">
           <button
             type="button"
             onClick={() => { setActiveTab('packages'); setSelectedPackageForEdit(null); }}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-2 ${
+            className={`px-3 py-1.5 rounded-lg font-bold transition cursor-pointer ${
               activeTab === 'packages' && !selectedPackageForEdit
-                ? 'bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-2xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                ? 'bg-white text-indigo-700 shadow-xs border border-indigo-100/60'
+                : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <span>📋 Daftar Paket Ujian ({myPackages.length})</span>
+            Paket Ujian ({myPackages.length})
           </button>
           <button
             type="button"
             onClick={() => { setActiveTab('scores'); setSelectedPackageForEdit(null); }}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-2 ${
+            className={`px-3 py-1.5 rounded-lg font-bold transition cursor-pointer ${
               activeTab === 'scores'
-                ? 'bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-2xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                ? 'bg-white text-indigo-700 shadow-xs border border-indigo-100/60'
+                : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <span>📊 Rekapitulasi Nilai & Leger (.xlsx)</span>
+            Rekapitulasi Nilai (.xlsx)
           </button>
         </div>
+
+        <button
+          type="button"
+          onClick={() => setShowCreatePackageModal(true)}
+          className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-sm flex items-center gap-1.5 cursor-pointer self-start sm:self-auto"
+        >
+          <span>+ Buat Paket Ujian</span>
+        </button>
       </div>
 
       {/* 2. TAB CONTENT: DAFTAR PAKET UJIAN */}
       {activeTab === 'packages' && !selectedPackageForEdit && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {myPackages.length === 0 ? (
-            <div className="col-span-full p-8 rounded-2xl bg-white border border-slate-200 text-center space-y-3">
-              <div className="text-4xl">📝</div>
-              <h3 className="font-bold text-slate-800 text-sm">Belum Ada Paket Ujian {teacherSubject || 'Informatika'}</h3>
+            <div className="col-span-full p-8 rounded-2xl bg-white border border-slate-200/80 text-center space-y-3">
+              <div className="text-3xl">📝</div>
+              <h3 className="font-bold text-slate-800 text-sm">Belum Ada Paket Ujian {teacherSubject || ''}</h3>
               <p className="text-xs text-slate-500 max-w-md mx-auto">
-                Silakan klik tombol <strong>"+ Buat Paket Ujian Baru"</strong> di atas untuk membuat asesmen bagi siswa Anda.
+                Klik tombol <strong>"+ Buat Paket Ujian"</strong> untuk membuat soal asesmen CBT.
               </p>
             </div>
           ) : (

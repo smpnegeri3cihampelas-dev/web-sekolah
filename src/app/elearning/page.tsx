@@ -3474,49 +3474,35 @@ export default function ELearningPage() {
         {currentUser?.role === 'guru_mapel' && (
           <div className="space-y-4">
             
-            {/* Top Bar: Title & Sub-tabs */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-indigo-100">
+            {/* Top Bar: Title & Clean Sub-tabs */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-indigo-100/80">
               <div>
                 <h1 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
                   <span>
                     {activeMenu === 'presensi' && 'Presensi KBM'}
                     {activeMenu === 'laporan' && 'Rekap Kehadiran'}
-                    {activeMenu === 'tugas' && 'Materi & Tugas Siswa'}
-                    {activeMenu === 'cbt' && 'Bank Soal & Asesmen CBT'}
-                    {activeMenu === 'pengawas' && 'Mode Pengawas Ruang'}
+                    {activeMenu === 'tugas' && 'Materi & Tugas'}
+                    {activeMenu === 'cbt' && 'Bank Soal CBT'}
+                    {activeMenu === 'pengawas' && 'Mode Pengawas'}
                   </span>
                   <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
                     {currentTeacher.subject}
                   </span>
                 </h1>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  {activeMenu === 'presensi' && (
-                    <>Pengampu: <span className="text-slate-800 font-semibold">{currentTeacher.name}</span> (NIP: {currentTeacher.nip}) • SMP Negeri 3 Cihampelas</>
-                  )}
-                  {activeMenu === 'laporan' && (
-                    <>Rekapitulasi presensi harian, bulanan, dan semester mata pelajaran <span className="text-indigo-700 font-semibold">{currentTeacher.subject}</span></>
-                  )}
-                  {activeMenu === 'tugas' && (
-                    <>Pusat modul ajar, materi pembelajaran, dan penugasan mata pelajaran <span className="text-indigo-700 font-semibold">{currentTeacher.subject}</span></>
-                  )}
-                  {activeMenu === 'cbt' && (
-                    <>Bank soal evaluasi dan simulasi ujian komputer (CBT) mata pelajaran <span className="text-indigo-700 font-semibold">{currentTeacher.subject}</span></>
-                  )}
-                  {activeMenu === 'pengawas' && (
-                    <>Pengawasan ruang ujian CBT, presensi peserta ruangan, dan berita acara pelaksanaan (BAP)</>
-                  )}
+                  {currentTeacher.name} • {currentTeacher.subject}
                 </p>
               </div>
 
-              {/* Sub-tabs: Presensi / Laporan / Materi & Tugas / CBT / Pengawas */}
-              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs overflow-x-auto max-w-full">
+              {/* Clean Sub-tabs: Presensi / Laporan / Materi & Tugas / CBT / Pengawas */}
+              <div className="inline-flex items-center gap-1 bg-slate-100/90 p-1 rounded-xl border border-slate-200/80 text-xs overflow-x-auto no-scrollbar max-w-full">
                 <button
                   type="button"
                   onClick={() => setActiveMenu('presensi')}
-                  className={`px-3 py-1.5 rounded-lg font-medium transition cursor-pointer whitespace-nowrap ${
+                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
                     activeMenu === 'presensi' 
-                      ? 'bg-indigo-600 text-white font-bold shadow-sm' 
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-white'
+                      ? 'bg-white text-indigo-700 font-bold shadow-xs border border-indigo-100/60' 
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/60 font-medium'
                   }`}
                 >
                   Presensi KBM
@@ -3524,10 +3510,10 @@ export default function ELearningPage() {
                 <button
                   type="button"
                   onClick={() => setActiveMenu('laporan')}
-                  className={`px-3 py-1.5 rounded-lg font-medium transition cursor-pointer whitespace-nowrap ${
+                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
                     activeMenu === 'laporan' 
-                      ? 'bg-indigo-600 text-white font-bold shadow-sm' 
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-white'
+                      ? 'bg-white text-indigo-700 font-bold shadow-xs border border-indigo-100/60' 
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/60 font-medium'
                   }`}
                 >
                   Rekap Kehadiran
@@ -3535,10 +3521,10 @@ export default function ELearningPage() {
                 <button
                   type="button"
                   onClick={() => setActiveMenu('tugas')}
-                  className={`px-3 py-1.5 rounded-lg font-medium transition cursor-pointer whitespace-nowrap ${
+                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
                     activeMenu === 'tugas' 
-                      ? 'bg-indigo-600 text-white font-bold shadow-sm' 
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-white'
+                      ? 'bg-white text-indigo-700 font-bold shadow-xs border border-indigo-100/60' 
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/60 font-medium'
                   }`}
                 >
                   Materi & Tugas
@@ -3546,21 +3532,21 @@ export default function ELearningPage() {
                 <button
                   type="button"
                   onClick={() => setActiveMenu('cbt')}
-                  className={`px-3 py-1.5 rounded-lg font-medium transition cursor-pointer whitespace-nowrap ${
+                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
                     activeMenu === 'cbt' 
-                      ? 'bg-indigo-600 text-white font-bold shadow-sm' 
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-white'
+                      ? 'bg-white text-indigo-700 font-bold shadow-xs border border-indigo-100/60' 
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/60 font-medium'
                   }`}
                 >
-                  Bank Soal & CBT
+                  Bank Soal CBT
                 </button>
                 <button
                   type="button"
                   onClick={() => setActiveMenu('pengawas')}
-                  className={`px-3 py-1.5 rounded-lg font-medium transition cursor-pointer whitespace-nowrap ${
+                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
                     activeMenu === 'pengawas' 
-                      ? 'bg-indigo-600 text-white font-bold shadow-sm' 
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-white'
+                      ? 'bg-white text-indigo-700 font-bold shadow-xs border border-indigo-100/60' 
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/60 font-medium'
                   }`}
                 >
                   Mode Pengawas
@@ -3573,40 +3559,32 @@ export default function ELearningPage() {
               <div className="space-y-4">
                 
                 {/* Clean Toolbar: Class Selector & Quick Action */}
-                <div className="bg-white border border-indigo-100 rounded-2xl p-3 sm:p-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-slate-500 font-medium">Pilih Rombel / Kelas:</span>
-                      <select
-                        value={selectedClassId}
-                        onChange={(e) => setSelectedClassId(e.target.value)}
-                        className="px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-indigo-700 text-xs font-bold focus:outline-none focus:border-indigo-500 cursor-pointer shadow-sm"
-                      >
-                        {SCHOOL_CLASSES.map(cls => (
-                          <option key={cls.id} value={cls.id} className="bg-white text-slate-900">
-                            {cls.name} ({cls.totalStudents} Siswa)
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-indigo-50 border border-indigo-100 text-xs">
-                      <span className="text-indigo-700 font-semibold">Pengampu:</span>
-                      <span className="text-slate-900 font-semibold">{currentTeacher.name}</span>
-                      <span className="text-slate-500">({currentTeacher.subject})</span>
-                    </div>
+                <div className="bg-white border border-slate-200/80 rounded-2xl p-3 sm:p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-xs text-slate-500 font-medium">Kelas / Rombel:</span>
+                    <select
+                      value={selectedClassId}
+                      onChange={(e) => setSelectedClassId(e.target.value)}
+                      className="px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-bold focus:outline-none focus:border-indigo-500 cursor-pointer shadow-xs"
+                    >
+                      {SCHOOL_CLASSES.map(cls => (
+                        <option key={cls.id} value={cls.id} className="bg-white text-slate-900">
+                          {cls.name} ({cls.totalStudents} Siswa)
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
-                  <div className="flex items-center gap-2.5">
+                  <div className="flex items-center gap-2">
                     {currentClassSession?.isSubmitted ? (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                         Tersimpan ({currentClassSession.submittedAt})
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-xs font-medium">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold">
                         <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                        Belum Diabsen (Jam {currentTeacher.subject})
+                        Belum Diabsen
                       </span>
                     )}
 
@@ -3623,14 +3601,14 @@ export default function ELearningPage() {
 
                 {/* Info Sesi Mapel Lain yang Sudah Masuk Hari Ini di Kelas Ini */}
                 {otherClassSessions.length > 0 && (
-                  <div className="bg-indigo-50/70 border border-indigo-100 rounded-xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 text-xs">
-                    <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse" />
-                      <span className="font-bold text-slate-800">Riwayat Mapel Lain di {selectedClassId} Hari Ini:</span>
+                  <div className="bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <div className="flex items-center gap-1.5 text-slate-600 font-medium">
+                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                      <span>Mapel lain di {selectedClassId} hari ini:</span>
                     </div>
                     <div className="flex flex-wrap items-center gap-1.5">
                       {otherClassSessions.map((os: SubjectSession) => (
-                        <span key={os.id} className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-slate-700 font-medium text-[11px] shadow-xs flex items-center gap-1">
+                        <span key={os.id} className="px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-700 font-medium text-[11px] shadow-2xs flex items-center gap-1">
                           <span className="font-semibold text-indigo-700">{os.subject}</span>
                           <span className="text-slate-400">•</span>
                           <span>{os.teacherName.split(',')[0]}</span>
@@ -3821,26 +3799,17 @@ export default function ELearningPage() {
                     })}
                   </div>
 
-                  {/* BOTTOM ACTION BAR (BERSIH & FOKUS SIMPAN PRESENSI) */}
-                  <div className="p-3.5 sm:p-4 bg-slate-50 border-t border-indigo-100 flex flex-col sm:flex-row items-center justify-between gap-3">
-                    <div className="text-xs text-slate-500 flex flex-wrap items-center gap-1.5 text-center sm:text-left">
-                      <span className="text-emerald-700 font-semibold flex items-center gap-1">
-                        <span>✅</span> Presensi otomatis tersimpan ke Jurnal KBM.
-                      </span>
-                      <span className="text-slate-400">•</span>
-                      <button
-                        type="button"
-                        onClick={() => setActiveMenu('laporan')}
-                        className="text-indigo-600 hover:text-indigo-800 font-bold hover:underline transition cursor-pointer"
-                      >
-                        Buka Tab Laporan Rekap untuk Unduh Excel (Harian, Bulanan & Semester) →
-                      </button>
+                  {/* BOTTOM ACTION BAR */}
+                  <div className="p-3.5 sm:p-4 bg-slate-50/80 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <div className="text-xs text-slate-500 flex items-center gap-1.5 text-center sm:text-left">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                      <span>Presensi tersimpan otomatis ke Jurnal KBM</span>
                     </div>
 
                     <button
                       type="button"
                       onClick={handleSaveAttendance}
-                      className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs sm:text-sm transition shadow-lg shadow-indigo-600/25 flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                      className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs sm:text-sm transition shadow-md shadow-indigo-600/20 flex items-center justify-center gap-2 cursor-pointer active:scale-95"
                     >
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
@@ -3854,26 +3823,21 @@ export default function ELearningPage() {
               </div>
             )}
 
-            {/* TAB: LAPORAN REKAP PRESENSI (BULANAN MATRIKS 1-31 & SEMESTER P1-P16) */}
+            {/* TAB: LAPORAN REKAP PRESENSI */}
             {activeMenu === 'laporan' && (
               <div className="space-y-4">
                 
-                {/* Top Notice: Isolation Confirmation */}
-                <div className="bg-gradient-to-r from-indigo-50 via-white to-purple-50 border border-indigo-200 rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+                {/* Top Action Bar */}
+                <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div>
-                    <div className="flex flex-wrap items-center gap-2 mb-1">
-                      <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold border border-emerald-300">
-                        🔒 Presensi Terisolasi Mandiri
+                    <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                      <span>Rekapitulasi Presensi</span>
+                      <span className="text-xs px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 font-semibold">
+                        {currentTeacher.subject}
                       </span>
-                      <span className="text-xs px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-800 font-bold border border-indigo-300">
-                        Mapel: {currentTeacher.subject}
-                      </span>
-                    </div>
-                    <h2 className="text-lg font-bold text-slate-900 tracking-tight">
-                      Laporan Rekapitulasi Presensi Peserta Didik
                     </h2>
-                    <p className="text-xs text-slate-600 mt-1">
-                      Menampilkan rekapan presensi khusus mata pelajaran <strong className="text-indigo-700">{currentTeacher.subject}</strong> yang diampu oleh <strong className="text-slate-800">{currentTeacher.name}</strong>. Sesi guru mapel lain tidak tercampur dalam laporan ini.
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Laporan presensi harian, bulanan, dan semester kelas.
                     </p>
                   </div>
 
@@ -3889,21 +3853,21 @@ export default function ELearningPage() {
                           handleExportSemesterExcel(reportClassId);
                         }
                       }}
-                      className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-md shadow-emerald-600/25 flex items-center gap-2 cursor-pointer"
-                      title="Unduh laporan ke format Excel resmi (.xlsx)"
+                      className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-sm flex items-center gap-2 cursor-pointer"
+                      title="Unduh laporan ke format Excel (.xlsx)"
                     >
                       <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/>
                       </svg>
                       <span>
-                        {reportMode === 'harian' ? 'Export Jurnal Harian (.xlsx)' : reportMode === 'bulanan' ? 'Export Matriks Bulanan (.xlsx)' : 'Export Rekap Semester (.xlsx)'}
+                        {reportMode === 'harian' ? 'Export Jurnal (.xlsx)' : reportMode === 'bulanan' ? 'Export Matriks (.xlsx)' : 'Export Semester (.xlsx)'}
                       </span>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => window.print()}
-                      className="px-3.5 py-2.5 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 font-semibold text-xs transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+                      className="px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-semibold text-xs transition flex items-center gap-1.5 cursor-pointer shadow-xs"
                       title="Cetak laporan presensi"
                     >
                       <span>🖨️ Cetak</span>
@@ -3911,47 +3875,47 @@ export default function ELearningPage() {
                   </div>
                 </div>
 
-                {/* Filter Card (Pilihan Mode: Harian, Bulanan, Semester) */}
-                <div className="bg-white border border-indigo-100 rounded-2xl p-4 sm:p-5 shadow-sm space-y-4">
+                {/* Filter Card */}
+                <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs space-y-3">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
-                    <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-                      <span>🔍 Filter Laporan Presensi</span>
+                    <span className="text-xs font-bold text-slate-700">
+                      Filter Presensi
                     </span>
 
                     {/* Mode Toggle: Harian vs Bulanan vs Semester */}
-                    <div className="flex flex-wrap items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs">
+                    <div className="inline-flex items-center gap-1 bg-slate-100/90 p-1 rounded-xl border border-slate-200/80 text-xs">
                       <button
                         type="button"
                         onClick={() => setReportMode('harian')}
-                        className={`px-3 py-1.5 rounded-lg font-bold transition-colors duration-75 select-none active:scale-[0.98] cursor-pointer ${
+                        className={`px-3 py-1.5 rounded-lg font-bold transition cursor-pointer ${
                           reportMode === 'harian'
-                            ? 'bg-indigo-600 text-white shadow-sm'
+                            ? 'bg-white text-indigo-700 shadow-xs border border-indigo-100/60'
                             : 'text-slate-600 hover:text-slate-900'
                         }`}
                       >
-                        📄 Harian (Per Tanggal)
+                        Harian
                       </button>
                       <button
                         type="button"
                         onClick={() => setReportMode('bulanan')}
-                        className={`px-3 py-1.5 rounded-lg font-bold transition-colors duration-75 select-none active:scale-[0.98] cursor-pointer ${
+                        className={`px-3 py-1.5 rounded-lg font-bold transition cursor-pointer ${
                           reportMode === 'bulanan'
-                            ? 'bg-indigo-600 text-white shadow-sm'
+                            ? 'bg-white text-indigo-700 shadow-xs border border-indigo-100/60'
                             : 'text-slate-600 hover:text-slate-900'
                         }`}
                       >
-                        📅 Bulanan (Tgl 1 - 31)
+                        Bulanan
                       </button>
                       <button
                         type="button"
                         onClick={() => setReportMode('semester')}
-                        className={`px-3 py-1.5 rounded-lg font-bold transition-colors duration-75 select-none active:scale-[0.98] cursor-pointer ${
+                        className={`px-3 py-1.5 rounded-lg font-bold transition cursor-pointer ${
                           reportMode === 'semester'
-                            ? 'bg-indigo-600 text-white shadow-sm'
+                            ? 'bg-white text-indigo-700 shadow-xs border border-indigo-100/60'
                             : 'text-slate-600 hover:text-slate-900'
                         }`}
                       >
-                        📚 Semester (P1 - P16)
+                        Semester
                       </button>
                     </div>
                   </div>
@@ -3959,7 +3923,7 @@ export default function ELearningPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
                       <label className="block text-xs font-bold text-slate-700 mb-1">
-                        1. Pilih Kelas / Rombel:
+                        Kelas / Rombel:
                       </label>
                       <select
                         value={reportClassId}
@@ -3976,7 +3940,7 @@ export default function ELearningPage() {
 
                     <div className={reportMode === 'harian' ? 'block sm:col-span-2' : 'hidden'}>
                       <label className="block text-xs font-bold text-slate-700 mb-1">
-                        2. Pilih Tanggal Presensi:
+                        Tanggal Presensi:
                       </label>
                       <input
                         type="date"
@@ -3988,7 +3952,7 @@ export default function ELearningPage() {
 
                     <div className={reportMode === 'bulanan' ? 'block' : 'hidden'}>
                       <label className="block text-xs font-bold text-slate-700 mb-1">
-                        2. Pilih Bulan:
+                        Bulan:
                       </label>
                       <select
                         value={reportMonth}
@@ -4005,7 +3969,7 @@ export default function ELearningPage() {
 
                     <div className={reportMode === 'bulanan' ? 'block' : 'hidden'}>
                       <label className="block text-xs font-bold text-slate-700 mb-1">
-                        3. Pilih Tahun:
+                        Tahun:
                       </label>
                       <select
                         value={reportYear}
@@ -4020,7 +3984,7 @@ export default function ELearningPage() {
 
                     <div className={reportMode === 'semester' ? 'block' : 'hidden'}>
                       <label className="block text-xs font-bold text-slate-700 mb-1">
-                        2. Pilih Semester:
+                        Semester:
                       </label>
                       <select
                         value={reportSemester}
@@ -4034,7 +3998,7 @@ export default function ELearningPage() {
 
                     <div className={reportMode === 'semester' ? 'block' : 'hidden'}>
                       <label className="block text-xs font-bold text-slate-700 mb-1">
-                        3. Tahun Ajaran:
+                        Tahun Ajaran:
                       </label>
                       <select
                         value={reportAcademicYear}
@@ -4189,10 +4153,6 @@ export default function ELearningPage() {
                       <span>Tidak ada jam KBM {currentTeacher.subject}</span>
                     </span>
                   </div>
-
-                  <div className="text-[11px] text-slate-500 italic">
-                    Format laporan memenuhi standar Dapodik & Kurikulum Merdeka SMPN 3 Cihampelas
-                  </div>
                 </div>
 
               </div>
@@ -4200,73 +4160,48 @@ export default function ELearningPage() {
 
             {/* TAB: MATERI & PENUGASAN SISWA */}
             {activeMenu === 'tugas' && (
-              <div className="space-y-6">
-                {/* Header Banner */}
-                <div className="bg-white border border-indigo-100 rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div>
-                    <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                      <span>Materi Pembelajaran & Penugasan Siswa</span>
-                      <span className="text-xs px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 font-semibold">
-                        {currentTeacher.subject}
-                      </span>
-                    </h2>
-                    <p className="text-xs text-slate-500 mt-1">
-                      Kelola modul ajar, penugasan mata pelajaran {currentTeacher.subject}, dan periksa hasil pengerjaan siswa per rombel.
-                    </p>
+              <div className="space-y-4">
+                {/* Header & Filter Bar */}
+                <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-500 font-medium">Kelas / Rombel:</span>
+                      <select
+                        value={selectedClassId}
+                        onChange={(e) => setSelectedClassId(e.target.value)}
+                        className="px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-bold focus:outline-none focus:border-indigo-500 cursor-pointer shadow-xs"
+                      >
+                        <option value="ALL">Semua Kelas</option>
+                        {SCHOOL_CLASSES.map(cls => (
+                          <option key={cls.id} value={cls.id}>
+                            Kelas {cls.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {(() => {
+                      const myTasks = assignments.filter(a => {
+                        if (!isTeacherAssignment(a)) return false;
+                        if (selectedClassId === 'ALL') return true;
+                        return a.targetClass === selectedClassId;
+                      });
+
+                      return (
+                        <span className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 font-bold text-xs border border-indigo-100">
+                          {myTasks.length} Tugas
+                        </span>
+                      );
+                    })()}
                   </div>
 
                   <button
                     type="button"
                     onClick={() => setIsCreateAsgModalOpen(true)}
-                    className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-md shadow-indigo-600/20 flex items-center gap-2 cursor-pointer self-start md:self-auto"
+                    className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-sm flex items-center gap-1.5 cursor-pointer self-start sm:self-auto"
                   >
-                    <span>+ Buat Tugas / Materi</span>
+                    <span>+ Buat Tugas Baru</span>
                   </button>
-                </div>
-
-                {/* Sub-filter bar: Pilihan Rombel Kelas (Semua Kelas Sekolah 7-A s.d 9-E) */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs bg-slate-50/90 p-3.5 rounded-2xl border border-slate-200 shadow-xs">
-                  <div className="flex flex-wrap items-center gap-2.5">
-                    <span className="font-bold text-slate-700 flex items-center gap-1.5">
-                      <span>👥 Pilih Rombel:</span>
-                    </span>
-
-                    <select
-                      value={selectedClassId}
-                      onChange={(e) => {
-                        setSelectedClassId(e.target.value);
-                      }}
-                      className="px-3.5 py-2 rounded-xl bg-white border border-slate-300 text-slate-800 text-xs font-bold focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 cursor-pointer shadow-xs min-w-[240px]"
-                    >
-                      <option value="ALL">🌐 Semua Kelas</option>
-                      {SCHOOL_CLASSES.map(cls => (
-                        <option key={cls.id} value={cls.id}>
-                          Kelas {cls.name} ({cls.totalStudents} Siswa)
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {(() => {
-                    const myTasks = assignments.filter(a => {
-                      if (!isTeacherAssignment(a)) return false;
-                      if (selectedClassId === 'ALL') return true;
-                      return a.targetClass === selectedClassId;
-                    });
-
-                    return (
-                      <div className="flex items-center gap-1.5 text-xs self-start sm:self-auto">
-                        <span className="text-slate-500">Menampilkan</span>
-                        <span className="px-2 py-0.5 rounded-lg bg-indigo-100 text-indigo-800 font-extrabold text-[11px]">
-                          {myTasks.length} Tugas
-                        </span>
-                        <span className="text-slate-500">untuk</span>
-                        <span className="font-bold text-slate-800">
-                          {selectedClassId === 'ALL' ? 'Semua Kelas' : `Kelas ${selectedClassId}`}
-                        </span>
-                      </div>
-                    );
-                  })()}
                 </div>
 
                 {/* My Assignments List */}
@@ -4279,20 +4214,20 @@ export default function ELearningPage() {
 
                   if (myTasks.length === 0) {
                     return (
-                      <div className="bg-white border border-indigo-100 rounded-2xl p-8 text-center space-y-3">
-                        <div className="text-4xl">📝</div>
+                      <div className="bg-white border border-slate-200/80 rounded-2xl p-8 text-center space-y-3">
+                        <div className="text-3xl">📝</div>
                         <h3 className="text-sm font-bold text-slate-800">
-                          Belum Ada Tugas {currentTeacher.subject} untuk {selectedClassId === 'ALL' ? 'Kelas Mana Pun' : `Kelas ${selectedClassId}`}
+                          Belum ada tugas atau modul
                         </h3>
                         <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                          Bapak/Ibu guru dapat membuat tugas mandiri, PR, atau proyek untuk peserta didik {selectedClassId === 'ALL' ? 'sekolah' : `Kelas ${selectedClassId}`}.
+                          Buat tugas atau materi pembelajaran baru untuk siswa {selectedClassId === 'ALL' ? '' : `Kelas ${selectedClassId}`}.
                         </p>
                         <button
                           type="button"
                           onClick={() => setIsCreateAsgModalOpen(true)}
                           className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition shadow-sm cursor-pointer"
                         >
-                          + Terbitkan Tugas {selectedClassId === 'ALL' ? '' : `untuk Kelas ${selectedClassId}`}
+                          + Buat Tugas Baru
                         </button>
                       </div>
                     );
