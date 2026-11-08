@@ -2174,27 +2174,35 @@ export default function CbtPanitiaCommandCenter({
       {activeTab === 'arrangement' && (
         <div className="space-y-4">
           {/* Header & Quick Action Command Bar */}
-          <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs flex flex-col xl:flex-row xl:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-amber-500 text-slate-950 flex items-center justify-center text-xl shadow-xs font-black shrink-0">
-                🗂️
-              </div>
-              <div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
-                    Penyusunan Ruangan &amp; Pembagian Peserta Ujian
-                  </h2>
-                  <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 font-extrabold text-xs border border-amber-200/80">
-                    {config.rooms.length} Ruang • {activeStudents.length} Siswa Terdaftar
-                  </span>
+          <div className="bg-white border border-slate-200 rounded-3xl p-5 sm:p-6 shadow-xs space-y-4">
+            {/* Row 1: Judul dan Keterangan Lengkap (Full Width) */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-amber-500 text-slate-950 flex items-center justify-center text-xl shadow-xs font-black shrink-0">
+                  🗂️
                 </div>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Bagi silang (50:50 antar tingkat kelas) atau rombel murni. Semua perubahan otomatis tersimpan &amp; tersinkron real-time ke database Hostinger.
-                </p>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+                      Penyusunan Ruangan &amp; Pembagian Peserta Ujian
+                    </h2>
+                    <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 font-extrabold text-xs border border-amber-200/80">
+                      {config.rooms.length} Ruang • {activeStudents.length} Siswa Terdaftar
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Atur pembagian silang (50:50 antar tingkat kelas) atau rombel murni. Semua perubahan tersimpan &amp; tersinkron real-time ke database Hostinger.
+                  </p>
+                </div>
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {/* Row 2: Toolbar Tombol Aksi Cepat */}
+            <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center gap-2">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1 hidden sm:inline">
+                Aksi Cepat:
+              </span>
+
               {/* ⚡ ONE-CLICK AUTO-SILANG 7 & 8 */}
               <button
                 type="button"
@@ -2332,12 +2340,12 @@ export default function CbtPanitiaCommandCenter({
 
                 {/* Banner Panduan jika semua ruangan masih bersih (0 Siswa) */}
                 {totalAssigned === 0 && (
-                  <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-amber-500/10 via-amber-50/50 to-orange-50 border border-amber-300 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="flex items-start gap-3">
+                  <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-amber-500/10 via-amber-50/50 to-orange-50 border border-amber-300 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                    <div className="flex items-start gap-3 min-w-0 flex-1">
                       <div className="w-10 h-10 rounded-2xl bg-amber-500 text-slate-950 flex items-center justify-center text-xl shrink-0 font-bold shadow-xs">
                         💡
                       </div>
-                      <div>
+                      <div className="min-w-0 flex-1">
                         <h4 className="font-black text-slate-900 text-sm">
                           Semua Ruangan Masih Bersih (0 Siswa / Siap Disusun)
                         </h4>
