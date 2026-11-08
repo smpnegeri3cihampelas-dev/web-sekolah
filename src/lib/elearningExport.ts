@@ -446,16 +446,39 @@ export function exportSchoolSemesterAttendanceToExcel(params: {
   classes: SchoolClass[];
   students: Student[];
   piketOfficer: string;
+  sessions?: SubjectSession[];
+  semester?: 'ganjil' | 'genap';
+  academicYear?: string;
 }) {
   const {
     semesterName = 'Semester Ganjil TP. 2026/2027',
     classes,
     students,
-    piketOfficer
+    piketOfficer,
+    sessions = [],
+    semester = 'ganjil',
+    academicYear = '2026/2027'
   } = params;
 
   const workbook = XLSX.utils.book_new();
-  const TOTAL_MEETINGS = 16;
+
+  // Filter sesi sesuai tahun ajaran dan semester yang dipilih
+  const [startYearStr, endYearStr] = academicYear.split('/');
+  const startYear = parseInt(startYearStr, 10) || 2026;
+  const endYear = parseInt(endYearStr, 10) || (startYear + 1);
+
+  const semesterSessions = sessions.filter(s => {
+    if (!s.date) return false;
+    const parts = s.date.split('-');
+    if (parts.length < 3) return false;
+    const y = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10);
+    if (semester === 'genap') {
+      return y === endYear && m >= 1 && m <= 6;
+    } else {
+      return y === startYear && m >= 7 && m <= 12;
+    }
+  });
 
   // -------------------------------------------------------------
   // SHEET 1: REKAPITULASI 17 ROMBEL TINGKAT SEKOLAH
@@ -463,7 +486,7 @@ export function exportSchoolSemesterAttendanceToExcel(params: {
   const summaryRows: (string | number)[][] = [
     ['SMP NEGERI 3 CIHAMPELAS'],
     ['LAPORAN REKAPITULASI PRESENSI TINGKAT SEKOLAH 1 SEMESTER'],
-    ['Tahun Ajaran 2026/2027 (' + semesterName + ')'],
+    ['Tahun Ajaran ' + academicYear + ' (' + semesterName + ')'],
     [],
     ['Petugas Rekap Piket', ':', piketOfficer],
     ['Tanggal Cetak', ':', formatIndonesianDate(new Date().toISOString().split('T')[0])],
@@ -491,25 +514,113 @@ export function exportSchoolSemesterAttendanceToExcel(params: {
   let schoolTotalI = 0;
   let schoolTotalA = 0;
   let schoolTotalT = 0;
+  let schoolTotalSlots = 0;
+
+  // Pre-calculate statistics per class and student
+  interface StudentSemesterStat {
+    h: number;
+    s: number;
+    i: number;
+    a: number;
+    t: number;
+    k: number;
+    totalDays: number;
+    pctNum: number | null;
+    pctStr: string;
+    statusKet: string;
+    isKeluar: boolean;
+  }
+
+  const studentStatsMap = new Map<string, StudentSemesterStat>();
 
   classes.forEach((cls, idx) => {
     const clsStudents = students.filter(s => s.classId === cls.id);
+    const clsSessions = semesterSessions.filter(s => s.classId === cls.id);
+    const classDates = Array.from(new Set(clsSessions.map(s => s.date))).sort();
+    const numDays = classDates.length;
+
     let classH = 0, classS = 0, classI = 0, classA = 0, classT = 0;
+    const activeInClass = clsStudents.filter(s => s.status !== 'Keluar').length;
 
     clsStudents.forEach(st => {
-      for (let m = 1; m <= TOTAL_MEETINGS; m++) {
-        const pseudoHash = (st.id.charCodeAt(st.id.length - 1) * 7 + m * 13) % 100;
-        if (pseudoHash === 1) classS++;
-        else if (pseudoHash === 2) classI++;
-        else if (pseudoHash === 3 && pseudoHash % 2 === 0) classA++;
-        else classH++;
+      let stH = 0, stS = 0, stI = 0, stA = 0, stT = 0, stK = 0;
+      const isKeluar = st.status === 'Keluar';
+
+      if (numDays > 0) {
+        classDates.forEach(dateStr => {
+          const daySessions = clsSessions.filter(s => s.date === dateStr);
+          let hasA = false, hasS = false, hasI = false, hasT = false, hasK = false;
+          let hasRecord = false;
+
+          for (const sess of daySessions) {
+            const rec = sess.records?.[st.id];
+            if (rec) {
+              hasRecord = true;
+              if (rec === 'A') hasA = true;
+              else if (rec === 'S') hasS = true;
+              else if (rec === 'I') hasI = true;
+              else if (rec === 'T') hasT = true;
+              else if (rec === 'K') hasK = true;
+            }
+          }
+
+          if (isKeluar || hasK) {
+            stK++;
+          } else if (hasA) {
+            stA++;
+          } else if (hasS) {
+            stS++;
+          } else if (hasI) {
+            stI++;
+          } else if (hasT) {
+            stT++;
+          } else if (hasRecord || daySessions.length > 0) {
+            stH++;
+          }
+        });
+      }
+
+      const pctNum = numDays > 0 && !isKeluar ? ((stH + stT) / numDays) * 100 : null;
+      const pctStr = isKeluar
+        ? 'Keluar'
+        : (pctNum !== null ? `${pctNum.toFixed(1)}%` : '-');
+      const statusKet = isKeluar
+        ? (st.exitReason ? `Keluar (${st.exitReason})` : 'Keluar Sekolah')
+        : (pctNum === null
+          ? 'Belum Ada Sesi'
+          : (pctNum >= 95 ? 'Sangat Baik' : pctNum >= 85 ? 'Baik' : 'Perlu Pembinaan BK'));
+
+      studentStatsMap.set(st.id, {
+        h: stH,
+        s: stS,
+        i: stI,
+        a: stA,
+        t: stT,
+        k: stK,
+        totalDays: numDays,
+        pctNum,
+        pctStr,
+        statusKet,
+        isKeluar
+      });
+
+      if (!isKeluar) {
+        classH += stH;
+        classS += stS;
+        classI += stI;
+        classA += stA;
+        classT += stT;
       }
     });
 
-    const totalAttendanceSlots = clsStudents.length * TOTAL_MEETINGS;
-    const classPct = totalAttendanceSlots > 0 
-      ? ((classH / totalAttendanceSlots) * 100).toFixed(1) + '%' 
-      : '0%';
+    const classSlots = activeInClass * numDays;
+    const classPct = classSlots > 0 
+      ? (((classH + classT) / classSlots) * 100).toFixed(1) + '%' 
+      : (numDays === 0 ? '-' : '0%');
+
+    const kategori = numDays === 0
+      ? 'Belum Ada Sesi'
+      : (parseFloat(classPct) >= 95 ? 'Sangat Baik' : parseFloat(classPct) >= 88 ? 'Baik' : 'Perlu Pembinaan');
 
     schoolTotalStudents += clsStudents.length;
     schoolTotalH += classH;
@@ -517,8 +628,7 @@ export function exportSchoolSemesterAttendanceToExcel(params: {
     schoolTotalI += classI;
     schoolTotalA += classA;
     schoolTotalT += classT;
-
-    const kategori = parseFloat(classPct) >= 95 ? 'Sangat Baik' : parseFloat(classPct) >= 88 ? 'Baik' : 'Cukup';
+    schoolTotalSlots += classSlots;
 
     summaryRows.push([
       idx + 1,
@@ -535,10 +645,9 @@ export function exportSchoolSemesterAttendanceToExcel(params: {
     ]);
   });
 
-  const totalSlotsSchool = schoolTotalStudents * TOTAL_MEETINGS;
-  const schoolPct = totalSlotsSchool > 0 
-    ? ((schoolTotalH / totalSlotsSchool) * 100).toFixed(1) + '%' 
-    : '0%';
+  const schoolPct = schoolTotalSlots > 0 
+    ? (((schoolTotalH + schoolTotalT) / schoolTotalSlots) * 100).toFixed(1) + '%' 
+    : (schoolTotalSlots === 0 ? '-' : '0%');
 
   summaryRows.push([]);
   summaryRows.push([
@@ -552,7 +661,7 @@ export function exportSchoolSemesterAttendanceToExcel(params: {
     schoolTotalA,
     schoolTotalT,
     schoolPct,
-    'Sangat Baik'
+    schoolTotalSlots > 0 ? (parseFloat(schoolPct) >= 90 ? 'Sangat Baik' : 'Baik') : '-'
   ]);
 
   // Signature Block on Sheet 1
@@ -588,7 +697,7 @@ export function exportSchoolSemesterAttendanceToExcel(params: {
   const studentRows: (string | number)[][] = [
     ['SMP NEGERI 3 CIHAMPELAS'],
     ['DAFTAR PRESENSI SISWA 1 SEMESTER (SELURUH ROMBEL UNTUK e-RAPOR)'],
-    ['Tahun Ajaran 2026/2027 (' + semesterName + ')'],
+    ['Tahun Ajaran ' + academicYear + ' (' + semesterName + ')'],
     [],
     ['No.', 'Kelas', 'NISN', 'NIS', 'Nama Siswa', 'Hadir (H)', 'Sakit (S)', 'Izin (I)', 'Alpa (A)', 'Telat (T)', '% Kehadiran', 'Keterangan e-Rapor']
   ];
@@ -604,18 +713,10 @@ export function exportSchoolSemesterAttendanceToExcel(params: {
   let bkCount = 0;
 
   students.forEach((st, idx) => {
-    let h = 0, s = 0, i = 0, a = 0, t = 0;
-    for (let m = 1; m <= TOTAL_MEETINGS; m++) {
-      const pseudoHash = (st.id.charCodeAt(st.id.length - 1) * 7 + m * 13) % 100;
-      if (pseudoHash === 1) s++;
-      else if (pseudoHash === 2) i++;
-      else if (pseudoHash === 3 && pseudoHash % 2 === 0) a++;
-      else h++;
-    }
-
-    const pctNum = (h / TOTAL_MEETINGS) * 100;
-    const pct = pctNum.toFixed(1) + '%';
-    const statusKet = pctNum >= 95 ? 'Sangat Baik' : pctNum >= 85 ? 'Baik' : 'Perlu Pembinaan BK';
+    const stat = studentStatsMap.get(st.id) || {
+      h: 0, s: 0, i: 0, a: 0, t: 0, k: 0, totalDays: 0,
+      pctNum: null, pctStr: '-', statusKet: 'Belum Ada Sesi', isKeluar: st.status === 'Keluar'
+    };
 
     studentRows.push([
       idx + 1,
@@ -623,26 +724,34 @@ export function exportSchoolSemesterAttendanceToExcel(params: {
       st.nisn,
       st.nis || '-',
       st.name,
-      h,
-      s,
-      i,
-      a,
-      t,
-      pct,
-      statusKet
+      stat.h,
+      stat.s,
+      stat.i,
+      stat.a,
+      stat.t,
+      stat.pctStr,
+      stat.statusKet
     ]);
 
-    if (a >= 1 || pctNum < 90) {
+    if (!stat.isKeluar && (stat.a >= 1 || (stat.pctNum !== null && stat.pctNum < 90) || stat.t >= 3)) {
       bkCount++;
+      const rekomendasi = stat.a >= 3
+        ? 'Panggilan Orang Tua & Konferensi Kasus BK'
+        : stat.a >= 1
+        ? 'Konseling Individual Guru BK & Wali Kelas'
+        : stat.t >= 3
+        ? 'Pembinaan Kedisiplinan & Piket'
+        : 'Bimbingan Wali Kelas & Pemantauan Kehadiran';
+
       bkFollowUpRows.push([
         bkCount,
         st.classId,
         st.nisn,
         st.name,
-        a,
-        t,
-        pct,
-        a >= 2 ? 'Panggilan Orang Tua & Konseling BK' : 'Bimbingan Wali Kelas'
+        stat.a,
+        stat.t,
+        stat.pctStr,
+        rekomendasi
       ]);
     }
   });
@@ -660,7 +769,7 @@ export function exportSchoolSemesterAttendanceToExcel(params: {
     { wch: 10 }, // A
     { wch: 10 }, // T
     { wch: 14 }, // %
-    { wch: 20 }  // Ket
+    { wch: 24 }  // Ket
   ];
   XLSX.utils.book_append_sheet(workbook, wsStudents, 'Rekap 535 Siswa');
 
@@ -668,7 +777,7 @@ export function exportSchoolSemesterAttendanceToExcel(params: {
   // SHEET 3: PANTAUAN BK & KESISWAAN
   // -------------------------------------------------------------
   if (bkCount === 0) {
-    bkFollowUpRows.push(['-', '-', '-', 'Alhamdulillah seluruh siswa memenuhi standar kehadiran (Nihil)', 0, 0, '100%', '-']);
+    bkFollowUpRows.push(['-', '-', '-', 'Alhamdulillah seluruh siswa memenuhi standar kehadiran (Nihil Kasus)', 0, 0, '100%', '-']);
   }
   const wsBK = XLSX.utils.aoa_to_sheet(bkFollowUpRows);
   wsBK['!cols'] = [
@@ -679,11 +788,12 @@ export function exportSchoolSemesterAttendanceToExcel(params: {
     { wch: 10 },
     { wch: 10 },
     { wch: 14 },
-    { wch: 34 }
+    { wch: 38 }
   ];
   XLSX.utils.book_append_sheet(workbook, wsBK, 'Pantauan Khusus BK');
 
-  const fileName = sanitizeFileName(`Rekap_Semester_Tingkat_Sekolah_SMPN3Cihampelas_2026-2027.xlsx`);
+  const cleanYear = (academicYear || '2026-2027').replace(/\//g, '-');
+  const fileName = sanitizeFileName(`Rekap_Semester_Tingkat_Sekolah_SMPN3Cihampelas_${cleanYear}_${semester}.xlsx`);
   XLSX.writeFile(workbook, fileName);
 }
 
@@ -764,13 +874,15 @@ export function exportSemesterAttendanceToExcel(params: {
   // For meetings P1..P16:
   // If real sessions exist, use them. If not, fill with '-'
   students.forEach((student, index) => {
+    const isKeluar = student.status === 'Keluar';
     const pStatus: (AttendanceStatus | string)[] = [];
     let h = 0, s = 0, i = 0, a = 0, t = 0;
 
     for (let m = 0; m < displayColsCount; m++) {
       if (hasRealSessions) {
         if (m < sessions.length) {
-          const st = sessions[m].records?.[student.id] || 'H';
+          const raw = sessions[m].records?.[student.id];
+          const st = raw ? raw : (isKeluar ? 'K' : 'H');
           pStatus.push(st);
           if (st === 'H') h++;
           else if (st === 'S') s++;
@@ -778,16 +890,16 @@ export function exportSemesterAttendanceToExcel(params: {
           else if (st === 'A') a++;
           else if (st === 'T') t++;
         } else {
-          pStatus.push('-');
+          pStatus.push(isKeluar ? 'K' : '-');
         }
       } else {
-        pStatus.push('-');
+        pStatus.push(isKeluar ? 'K' : '-');
       }
     }
 
-    const pct = numSessions > 0
-      ? `${Math.round(((h + t) / numSessions) * 100)}%`
-      : '100%';
+    const pct = isKeluar
+      ? (student.exitReason ? `Keluar (${student.exitReason})` : 'Keluar')
+      : (numSessions > 0 ? `${Math.round(((h + t) / numSessions) * 100)}%` : '-');
 
     rows.push([
       index + 1,
@@ -806,7 +918,7 @@ export function exportSemesterAttendanceToExcel(params: {
 
   // Footer: Summary statistics
   rows.push([]);
-  rows.push(['Keterangan Status: H = Hadir, S = Sakit, I = Izin, A = Alpa, T = Terlambat, - = Belum Ada Sesi']);
+  rows.push(['Keterangan Status: H = Hadir, S = Sakit, I = Izin, A = Alpa, T = Terlambat, K = Siswa Keluar / Mutasi, - = Belum Ada Sesi']);
   rows.push([`Total Pertemuan Semester: ${numSessions} Sesi dari Target 16 Pertemuan Efektif`]);
   rows.push([]);
   rows.push([]);

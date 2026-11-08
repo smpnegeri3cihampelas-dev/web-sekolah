@@ -2103,6 +2103,31 @@ export default function ELearningPage() {
     const studentsInClass = activeStudents.filter(s => s.classId === targetClassId);
     const cls = SCHOOL_CLASSES.find(c => c.id === targetClassId);
 
+    // Filter sesi semester langsung dari data sessions agar selalu akurat & singkron
+    const [startYearStr, endYearStr] = reportAcademicYear.split('/');
+    const startYear = parseInt(startYearStr, 10) || 2026;
+    const endYear = parseInt(endYearStr, 10) || (startYear + 1);
+    const tNipClean = (currentTeacher?.nip || '').replace(/\s+/g, '');
+
+    const targetSemesterSessions = sessions.filter(s => {
+      if (s.classId !== targetClassId) return false;
+      const cleanSessionNip = (s.teacherNip || '').replace(/\s+/g, '');
+      const isTeacherMatch = (cleanSessionNip && tNipClean && cleanSessionNip === tNipClean) ||
+        (s.teacherName && currentTeacher?.name && s.teacherName.toLowerCase().trim() === currentTeacher.name.toLowerCase().trim()) ||
+        (s.subject && currentTeacher?.subject && s.subject.toLowerCase().trim() === currentTeacher.subject.toLowerCase().trim());
+      if (!isTeacherMatch) return false;
+
+      const parts = s.date.split('-');
+      if (parts.length < 3) return false;
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10);
+      if (reportSemester === 'ganjil') {
+        return y === startYear && m >= 7 && m <= 12;
+      } else {
+        return y === endYear && m >= 1 && m <= 6;
+      }
+    }).sort((a, b) => a.date.localeCompare(b.date));
+
     exportSemesterAttendanceToExcel({
       classId: targetClassId,
       className: cls?.name || `Kelas ${targetClassId}`,
@@ -2112,7 +2137,7 @@ export default function ELearningPage() {
       semesterName: semesterFullName,
       students: studentsInClass,
       currentRecords: workingRecords,
-      sessions: semesterReportData.semesterSessionsSorted
+      sessions: targetSemesterSessions
     });
 
     showToast(`File Rekap ${semesterFullName} (P1-P16) ${currentTeacher.subject} (${targetClassId}) berhasil diunduh!`, 'success');
@@ -2167,7 +2192,10 @@ export default function ELearningPage() {
       semesterName: semesterFullName,
       classes: SCHOOL_CLASSES,
       students: activeStudents,
-      piketOfficer: `${piketDutyTeacher} (Petugas Piket / Kesiswaan)`
+      piketOfficer: `${piketDutyTeacher} (Petugas Piket / Kesiswaan)`,
+      sessions: sessions,
+      semester: reportSemester,
+      academicYear: reportAcademicYear
     });
 
     showToast(`File Rekapitulasi Presensi ${semesterFullName} Tingkat Sekolah (17 Rombel & 535 Siswa) berhasil diunduh!`, 'success');
