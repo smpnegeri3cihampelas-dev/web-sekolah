@@ -1343,9 +1343,6 @@ export default function ELearningPage() {
   const [gradingScore, setGradingScore] = useState<number>(90);
   const [gradingFeedback, setGradingFeedback] = useState<string>('');
 
-  // Teacher Assignment Scope Filter (Rombel Terpilih vs Semua Rombel)
-  const [teacherAsgScope, setTeacherAsgScope] = useState<'current_class' | 'all_classes'>('current_class');
-
   // Student Assignment Upload, Quiz, & Dashboard Tabs
   const [studentSubmitAsgId, setStudentSubmitAsgId] = useState<string | null>(null);
   const [studentSubjectFilter, setStudentSubjectFilter] = useState<string>('all');
@@ -3513,7 +3510,7 @@ export default function ELearningPage() {
                   </span>
                 </h1>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  {currentTeacher.name} • {currentTeacher.subject}
+                  {currentTeacher.name}{currentTeacher.nip && currentTeacher.nip !== '-' ? ` • NIP. ${currentTeacher.nip}` : ''}
                 </p>
               </div>
 
@@ -4182,81 +4179,67 @@ export default function ELearningPage() {
             )}
 
             {/* TAB: MATERI & PENUGASAN SISWA */}
-            {activeMenu === 'tugas' && (
-              <div className="space-y-4">
-                {/* Header & Filter Bar */}
-                <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-slate-500 font-medium">Kelas / Rombel:</span>
-                      <select
-                        value={selectedClassId}
-                        onChange={(e) => setSelectedClassId(e.target.value)}
-                        className="px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-bold focus:outline-none focus:border-indigo-500 cursor-pointer shadow-xs"
-                      >
-                        <option value="ALL">Semua Kelas</option>
-                        {SCHOOL_CLASSES.map(cls => (
-                          <option key={cls.id} value={cls.id}>
-                            Kelas {cls.name}
-                          </option>
-                        ))}
-                      </select>
+            {activeMenu === 'tugas' && (() => {
+              const myTasks = assignments.filter(a => {
+                if (!isTeacherAssignment(a)) return false;
+                if (selectedClassId === 'ALL') return true;
+                return a.targetClass === selectedClassId;
+              });
+
+              return (
+                <div className="space-y-4">
+                  {/* Header & Filter Bar */}
+                  <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-slate-500 font-medium">Kelas / Rombel:</span>
+                        <select
+                          value={selectedClassId}
+                          onChange={(e) => setSelectedClassId(e.target.value)}
+                          className="px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-bold focus:outline-none focus:border-indigo-500 cursor-pointer shadow-xs"
+                        >
+                          <option value="ALL">Semua Kelas</option>
+                          {SCHOOL_CLASSES.map(cls => (
+                            <option key={cls.id} value={cls.id}>
+                              {cls.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <span className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 font-bold text-xs border border-indigo-100">
+                        {myTasks.length} Tugas
+                      </span>
                     </div>
 
-                    {(() => {
-                      const myTasks = assignments.filter(a => {
-                        if (!isTeacherAssignment(a)) return false;
-                        if (selectedClassId === 'ALL') return true;
-                        return a.targetClass === selectedClassId;
-                      });
-
-                      return (
-                        <span className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 font-bold text-xs border border-indigo-100">
-                          {myTasks.length} Tugas
-                        </span>
-                      );
-                    })()}
+                    <button
+                      type="button"
+                      onClick={() => setIsCreateAsgModalOpen(true)}
+                      className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-sm flex items-center gap-1.5 cursor-pointer self-start sm:self-auto"
+                    >
+                      <span>+ Buat Tugas Baru</span>
+                    </button>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setIsCreateAsgModalOpen(true)}
-                    className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-sm flex items-center gap-1.5 cursor-pointer self-start sm:self-auto"
-                  >
-                    <span>+ Buat Tugas Baru</span>
-                  </button>
-                </div>
-
-                {/* My Assignments List */}
-                {(() => {
-                  const myTasks = assignments.filter(a => {
-                    if (!isTeacherAssignment(a)) return false;
-                    if (selectedClassId === 'ALL') return true;
-                    return a.targetClass === selectedClassId;
-                  });
-
-                  if (myTasks.length === 0) {
-                    return (
-                      <div className="bg-white border border-slate-200/80 rounded-2xl p-8 text-center space-y-3">
-                        <div className="text-3xl">📝</div>
-                        <h3 className="text-sm font-bold text-slate-800">
-                          Belum ada tugas atau modul
-                        </h3>
-                        <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                          Buat tugas atau materi pembelajaran baru untuk siswa {selectedClassId === 'ALL' ? '' : `Kelas ${selectedClassId}`}.
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => setIsCreateAsgModalOpen(true)}
-                          className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition shadow-sm cursor-pointer"
-                        >
-                          + Buat Tugas Baru
-                        </button>
-                      </div>
-                    );
-                  }
-
-                  return (
+                  {/* My Assignments List */}
+                  {myTasks.length === 0 ? (
+                    <div className="bg-white border border-slate-200/80 rounded-2xl p-8 text-center space-y-3">
+                      <div className="text-3xl">📝</div>
+                      <h3 className="text-sm font-bold text-slate-800">
+                        Belum ada tugas atau modul
+                      </h3>
+                      <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                        Buat tugas atau materi pembelajaran baru untuk siswa {selectedClassId === 'ALL' ? 'seluruh kelas' : `Kelas ${selectedClassId}`}.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setIsCreateAsgModalOpen(true)}
+                        className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition shadow-sm cursor-pointer"
+                      >
+                        + Buat Tugas Pertama
+                      </button>
+                    </div>
+                  ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {myTasks.map((asg) => {
                         const asgSubs = submissions.filter(s => s.assignmentId === asg.id);
@@ -4352,10 +4335,10 @@ export default function ELearningPage() {
                         );
                       })}
                     </div>
-                  );
-                })()}
-              </div>
-            )}
+                  )}
+                </div>
+              );
+            })()}
 
             {/* TAB: BANK SOAL & CBT */}
             {activeMenu === 'cbt' && (
