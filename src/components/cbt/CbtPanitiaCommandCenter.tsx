@@ -2561,18 +2561,18 @@ export default function CbtPanitiaCommandCenter({
             );
           })()}
 
-          {/* MODAL: KELOLA & LIHAT PESERTA RUANG (FOCUSED & CLEAN) */}
+          {/* MODAL: KELOLA & LIHAT PESERTA RUANG (FOCUSED & CLEAN - SPACIOUS SINGLE SCROLL) */}
           {managingRoomModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
-              <div className="bg-white rounded-3xl max-w-4xl w-full p-5 sm:p-6 shadow-2xl border border-slate-200 flex flex-col max-h-[90vh] overflow-hidden">
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-950/70 backdrop-blur-md animate-fade-in">
+              <div className="bg-white rounded-3xl max-w-5xl xl:max-w-6xl w-full h-[92vh] max-h-[960px] p-4 sm:p-6 shadow-2xl border border-slate-200 flex flex-col overflow-hidden">
                 {/* Modal Header */}
-                <div className="flex items-start justify-between pb-3 border-b border-slate-100 shrink-0">
+                <div className="flex items-start justify-between pb-3.5 border-b border-slate-100 shrink-0">
                   <div className="space-y-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="px-2.5 py-0.5 rounded-xl bg-amber-400 text-slate-950 font-black text-xs uppercase">
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <span className="px-3 py-1 rounded-xl bg-amber-400 text-slate-950 font-black text-xs uppercase tracking-wider">
                         {managingRoomModal.name}
                       </span>
-                      <h3 className="font-black text-slate-900 text-base sm:text-lg">
+                      <h3 className="font-black text-slate-900 text-base sm:text-xl">
                         {managingRoomModal.label || `${managingRoomModal.name}`}
                       </h3>
                     </div>
@@ -2588,7 +2588,7 @@ export default function CbtPanitiaCommandCenter({
                   <button
                     type="button"
                     onClick={() => setManagingRoomModal(null)}
-                    className="w-8 h-8 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700 font-bold text-base flex items-center justify-center cursor-pointer"
+                    className="w-9 h-9 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700 font-bold text-lg flex items-center justify-center cursor-pointer transition active:scale-95"
                   >
                     ✕
                   </button>
@@ -2599,7 +2599,7 @@ export default function CbtPanitiaCommandCenter({
                   <button
                     type="button"
                     onClick={() => setManagingRoomTab('list')}
-                    className={`pb-2.5 px-3 font-bold text-xs transition border-b-2 cursor-pointer ${
+                    className={`pb-2.5 px-4 font-bold text-xs sm:text-sm transition border-b-2 cursor-pointer ${
                       managingRoomTab === 'list'
                         ? 'border-amber-500 text-slate-950 font-black'
                         : 'border-transparent text-slate-400 hover:text-slate-600'
@@ -2610,7 +2610,7 @@ export default function CbtPanitiaCommandCenter({
                   <button
                     type="button"
                     onClick={() => setManagingRoomTab('add')}
-                    className={`pb-2.5 px-3 font-bold text-xs transition border-b-2 cursor-pointer ${
+                    className={`pb-2.5 px-4 font-bold text-xs sm:text-sm transition border-b-2 cursor-pointer ${
                       managingRoomTab === 'add'
                         ? 'border-amber-500 text-slate-950 font-black'
                         : 'border-transparent text-slate-400 hover:text-slate-600'
@@ -2620,8 +2620,8 @@ export default function CbtPanitiaCommandCenter({
                   </button>
                 </div>
 
-                {/* Modal Tab Body */}
-                <div className="flex-1 overflow-y-auto pt-3 space-y-3">
+                {/* Modal Tab Body: flex-1 min-h-0 flex flex-col pt-3 overflow-hidden (NO OUTER SCROLLBAR) */}
+                <div className="flex-1 min-h-0 flex flex-col pt-3 overflow-hidden">
                   {managingRoomTab === 'list' && (() => {
                     const roomStudents = roomStudentsMap.get(managingRoomModal.id) || [];
                     const q = roomStudentSearch.trim().toLowerCase();
@@ -2634,15 +2634,15 @@ export default function CbtPanitiaCommandCenter({
                         );
 
                     return (
-                      <div className="space-y-3">
+                      <div className="flex-1 min-h-0 flex flex-col space-y-3 overflow-hidden">
                         {/* Control bar inside Tab 1 */}
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-slate-50 p-3 rounded-2xl border border-slate-200">
-                          <div className="w-full sm:w-64">
+                        <div className="shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-slate-50 p-3 rounded-2xl border border-slate-200">
+                          <div className="w-full sm:w-72">
                             <FastSearchInput
                               value={roomStudentSearch}
                               onSearchChange={setRoomStudentSearch}
                               placeholder="Cari siswa di ruangan ini..."
-                              className="w-full pl-8 pr-7 py-1.5 rounded-xl bg-white border border-slate-200 text-xs text-slate-900 focus:outline-none"
+                              className="w-full pl-8 pr-7 py-2 rounded-xl bg-white border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-amber-500"
                             />
                           </div>
 
@@ -2654,7 +2654,7 @@ export default function CbtPanitiaCommandCenter({
                                   <select
                                     value={targetMoveRoomId}
                                     onChange={(e) => setTargetMoveRoomId(e.target.value)}
-                                    className="px-2 py-1.5 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none"
+                                    className="px-2.5 py-1.5 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none"
                                   >
                                     <option value="">-- Pindah ke Ruang --</option>
                                     {config.rooms.filter(r => r.id !== managingRoomModal.id).map(r => (
@@ -2689,7 +2689,7 @@ export default function CbtPanitiaCommandCenter({
                             <button
                               type="button"
                               onClick={() => handleClearRoom(managingRoomModal.id)}
-                              className="px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs border border-rose-200 transition cursor-pointer"
+                              className="px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs border border-rose-200 transition cursor-pointer"
                               title="Kosongkan seluruh siswa dari ruangan ini"
                             >
                               Kosongkan Semua 🗑️
@@ -2699,7 +2699,7 @@ export default function CbtPanitiaCommandCenter({
 
                         {/* Student Table */}
                         {displayed.length === 0 ? (
-                          <div className="p-10 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 space-y-3">
+                          <div className="flex-1 min-h-0 flex flex-col items-center justify-center p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 space-y-3">
                             <div className="text-4xl">🪑</div>
                             <div className="font-bold text-slate-800 text-sm">
                               {roomStudents.length === 0
@@ -2723,11 +2723,11 @@ export default function CbtPanitiaCommandCenter({
                             )}
                           </div>
                         ) : (
-                          <div className="overflow-x-auto rounded-2xl border border-slate-200 max-h-96 overflow-y-auto">
+                          <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-2xs">
                             <table className="w-full text-xs text-left">
-                              <thead className="bg-slate-50 text-slate-700 font-bold border-b border-slate-200 sticky top-0 z-10">
+                              <thead className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 sticky top-0 z-10">
                                 <tr>
-                                  <th className="py-2.5 px-3 w-8">
+                                  <th className="py-2.5 px-3 w-10 text-center">
                                     <input
                                       type="checkbox"
                                       checked={
@@ -2744,11 +2744,11 @@ export default function CbtPanitiaCommandCenter({
                                       className="rounded text-rose-600 cursor-pointer"
                                     />
                                   </th>
-                                  <th className="py-2.5 px-3">No / Meja</th>
-                                  <th className="py-2.5 px-3">Nama Lengkap Siswa</th>
-                                  <th className="py-2.5 px-3">NISN</th>
-                                  <th className="py-2.5 px-3">Kelas Asal</th>
-                                  <th className="py-2.5 px-3 text-right">Aksi</th>
+                                  <th className="py-2.5 px-3 w-20 text-center">No / Meja</th>
+                                  <th className="py-2.5 px-4">Nama Lengkap Siswa</th>
+                                  <th className="py-2.5 px-3 w-36">NISN</th>
+                                  <th className="py-2.5 px-3 w-28 text-center">Kelas Asal</th>
+                                  <th className="py-2.5 px-4 w-20 text-right">Aksi</th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-slate-100">
@@ -2756,7 +2756,7 @@ export default function CbtPanitiaCommandCenter({
                                   const isChecked = selectedStudentIdsToRemoveSet.has(st.id);
                                   return (
                                     <tr key={st.id} className="hover:bg-slate-50 transition">
-                                      <td className="py-2 px-3">
+                                      <td className="py-2.5 px-3 text-center">
                                         <input
                                           type="checkbox"
                                           checked={isChecked}
@@ -2770,19 +2770,19 @@ export default function CbtPanitiaCommandCenter({
                                           className="rounded text-rose-600 cursor-pointer"
                                         />
                                       </td>
-                                      <td className="py-2 px-3">
-                                        <span className="w-6 h-6 rounded-md bg-slate-100 text-slate-600 font-mono font-bold text-[11px] inline-flex items-center justify-center">
+                                      <td className="py-2.5 px-3 text-center">
+                                        <span className="w-7 h-7 rounded-lg bg-slate-100 text-slate-700 font-mono font-black text-xs inline-flex items-center justify-center">
                                           {String(idx + 1).padStart(2, '0')}
                                         </span>
                                       </td>
-                                      <td className="py-2 px-3 font-bold text-slate-900">
+                                      <td className="py-2.5 px-4 font-bold text-slate-900 text-xs sm:text-sm">
                                         {st.name}
                                       </td>
-                                      <td className="py-2 px-3 font-mono text-slate-600">
+                                      <td className="py-2.5 px-3 font-mono text-slate-600 text-xs">
                                         {st.nisn}
                                       </td>
-                                      <td className="py-2 px-3">
-                                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-black border ${
+                                      <td className="py-2.5 px-3 text-center">
+                                        <span className={`px-2.5 py-0.5 rounded-md text-[10px] font-black border ${
                                           st.classId.startsWith('7')
                                             ? 'bg-blue-50 text-blue-700 border-blue-200'
                                             : st.classId.startsWith('8')
@@ -2792,11 +2792,11 @@ export default function CbtPanitiaCommandCenter({
                                           {st.classId}
                                         </span>
                                       </td>
-                                      <td className="py-2 px-3 text-right">
+                                      <td className="py-2.5 px-4 text-right">
                                         <button
                                           type="button"
                                           onClick={() => handleRemoveStudentsFromRoom([st.id])}
-                                          className="w-6 h-6 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition inline-flex items-center justify-center font-bold text-xs cursor-pointer"
+                                          className="w-7 h-7 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition inline-flex items-center justify-center font-bold text-xs cursor-pointer"
                                           title="Keluarkan dari ruangan ini"
                                         >
                                           ✕
@@ -2814,9 +2814,9 @@ export default function CbtPanitiaCommandCenter({
                   })()}
 
                   {managingRoomTab === 'add' && (
-                    <div className="space-y-3">
+                    <div className="flex-1 min-h-0 flex flex-col space-y-2.5 overflow-hidden">
                       {/* Top Action Bar for Add */}
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-slate-50 p-3 rounded-2xl border border-slate-200">
+                      <div className="shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-slate-50 p-3 rounded-2xl border border-slate-200">
                         <div className="text-xs text-slate-600">
                           Pilih siswa di bawah lalu klik tombol di kanan untuk menambahkan ke <strong>{managingRoomModal.name}</strong>.
                         </div>
@@ -2836,7 +2836,7 @@ export default function CbtPanitiaCommandCenter({
                       </div>
 
                       {/* Filters */}
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                      <div className="shrink-0 grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                         <div>
                           <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
                             1. Filter Kelas Asal:
@@ -2885,7 +2885,7 @@ export default function CbtPanitiaCommandCenter({
                       </div>
 
                       {/* Quick Select Buttons */}
-                      <div className="flex flex-wrap items-center gap-1.5 p-2 rounded-xl bg-amber-50/60 border border-amber-200/60 text-xs">
+                      <div className="shrink-0 flex flex-wrap items-center gap-1.5 p-2 rounded-xl bg-amber-50/60 border border-amber-200/60 text-xs">
                         <span className="text-[11px] font-bold text-amber-900 mr-1">
                           ⚡ Pilih Cepat:
                         </span>
@@ -2922,11 +2922,11 @@ export default function CbtPanitiaCommandCenter({
                       </div>
 
                       {/* Candidate Table */}
-                      <div className="overflow-x-auto rounded-2xl border border-slate-200 max-h-80 overflow-y-auto">
+                      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-2xs">
                         <table className="w-full text-xs text-left">
-                          <thead className="bg-slate-50 text-slate-700 font-bold border-b border-slate-200 sticky top-0 z-10">
+                          <thead className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 sticky top-0 z-10">
                             <tr>
-                              <th className="py-2.5 px-3 w-8">
+                              <th className="py-2.5 px-3 w-10 text-center">
                                 <input
                                   type="checkbox"
                                   checked={
@@ -2943,10 +2943,10 @@ export default function CbtPanitiaCommandCenter({
                                   className="rounded text-indigo-600 cursor-pointer"
                                 />
                               </th>
-                              <th className="py-2.5 px-3">Nama Siswa</th>
-                              <th className="py-2.5 px-3">NISN</th>
-                              <th className="py-2.5 px-3">Kelas</th>
-                              <th className="py-2.5 px-3">Status Saat Ini</th>
+                              <th className="py-2.5 px-4">Nama Siswa</th>
+                              <th className="py-2.5 px-3 w-36">NISN</th>
+                              <th className="py-2.5 px-3 w-28 text-center">Kelas</th>
+                              <th className="py-2.5 px-4 w-44">Status Saat Ini</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
@@ -2980,7 +2980,7 @@ export default function CbtPanitiaCommandCenter({
                                         : 'hover:bg-slate-50'
                                     }`}
                                   >
-                                    <td className="py-2 px-3" onClick={(e) => e.stopPropagation()}>
+                                    <td className="py-2.5 px-3 text-center" onClick={(e) => e.stopPropagation()}>
                                       <input
                                         type="checkbox"
                                         checked={isChecked}
@@ -2994,14 +2994,14 @@ export default function CbtPanitiaCommandCenter({
                                         className="rounded text-indigo-600 cursor-pointer"
                                       />
                                     </td>
-                                    <td className="py-2 px-3 font-bold text-slate-900">
+                                    <td className="py-2.5 px-4 font-bold text-slate-900">
                                       {st.name}
                                     </td>
-                                    <td className="py-2 px-3 font-mono text-slate-600">
+                                    <td className="py-2.5 px-3 font-mono text-slate-600">
                                       {st.nisn}
                                     </td>
-                                    <td className="py-2 px-3">
-                                      <span className={`px-2 py-0.5 rounded-md text-[10px] font-black border ${
+                                    <td className="py-2.5 px-3 text-center">
+                                      <span className={`px-2.5 py-0.5 rounded-md text-[10px] font-black border ${
                                         st.classId.startsWith('7')
                                           ? 'bg-blue-50 text-blue-700 border-blue-200'
                                           : st.classId.startsWith('8')
@@ -3011,17 +3011,17 @@ export default function CbtPanitiaCommandCenter({
                                         {st.classId}
                                       </span>
                                     </td>
-                                    <td className="py-2 px-3">
+                                    <td className="py-2.5 px-4">
                                       {isAlreadyInCurrentRoom ? (
-                                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
                                           ✓ Sudah di {managingRoomModal.name}
                                         </span>
                                       ) : assignedRoom ? (
-                                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">
+                                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">
                                           📍 Sedang di {assignedRoom.name}
                                         </span>
                                       ) : (
-                                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
+                                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
                                           ⚪ Belum Ada Ruang
                                         </span>
                                       )}
@@ -3038,14 +3038,15 @@ export default function CbtPanitiaCommandCenter({
                 </div>
 
                 {/* Modal Footer */}
-                <div className="pt-3 border-t border-slate-100 flex items-center justify-between shrink-0">
-                  <span className="text-xs text-slate-400">
-                    Otomatis sinkron ke server saat ditutup.
-                  </span>
+                <div className="pt-3.5 border-t border-slate-100 flex items-center justify-between shrink-0">
+                  <div className="flex items-center gap-2 text-xs text-slate-500">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span>Otomatis tersimpan &amp; tersinkron ke server saat ditutup.</span>
+                  </div>
                   <button
                     type="button"
                     onClick={() => setManagingRoomModal(null)}
-                    className="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black text-xs transition cursor-pointer active:scale-95"
+                    className="px-6 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black text-xs sm:text-sm transition cursor-pointer active:scale-95 shadow-md"
                   >
                     Selesai &amp; Tutup
                   </button>
