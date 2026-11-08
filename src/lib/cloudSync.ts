@@ -14,7 +14,8 @@ import {
   CbtExamRoomConfig, 
   getStoredCbtPackages, 
   getStoredStudentCbtSessions,
-  getStoredCbtPanitiaConfig
+  getStoredCbtPanitiaConfig,
+  toLocalDateString
 } from './cbtData';
 
 // -------------------------------------------------------------
@@ -213,7 +214,7 @@ export async function syncCbtWithCloud(): Promise<void> {
           })
           .map((p: any) => ({
             ...p,
-            examDate: p.examDate ? p.examDate.split('T')[0] : null
+            examDate: toLocalDateString(p.examDate)
           }));
         localStorage.setItem(CBT_PACKAGES_KEY, JSON.stringify(cleaned));
         window.dispatchEvent(new Event('cbtPackagesUpdated'));

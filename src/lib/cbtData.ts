@@ -830,6 +830,40 @@ const CBT_PACKAGES_KEY = 'spentic_cbt_packages_v1';
 const CBT_STUDENT_SESSIONS_KEY = 'spentic_cbt_student_sessions_v1';
 const CBT_ROOM_ATTENDANCE_KEY = 'spentic_cbt_room_attendance_v1';
 
+/**
+ * Konversi tanggal ke format 'YYYY-MM-DD' lokal tanpa tergeser timezone UTC
+ */
+export function toLocalDateString(val: any): string {
+  if (!val) {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+  if (val instanceof Date && !isNaN(val.getTime())) {
+    const y = val.getFullYear();
+    const m = String(val.getMonth() + 1).padStart(2, '0');
+    const day = String(val.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+  if (typeof val === 'string') {
+    if (val.includes('T')) {
+      const d = new Date(val);
+      if (!isNaN(d.getTime())) {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+      }
+    }
+    const match = val.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (match) return match[1];
+    return val.split('T')[0];
+  }
+  return String(val);
+}
+
 export function getStoredCbtPackages(): CbtExamPackage[] {
   if (typeof window === 'undefined') return INITIAL_CBT_PACKAGES;
   try {
@@ -856,7 +890,7 @@ export function getStoredCbtPackages(): CbtExamPackage[] {
       }
       return cleaned.map((p: CbtExamPackage) => ({
         ...p,
-        examDate: p.examDate ? p.examDate.split('T')[0] : new Date().toISOString().split('T')[0],
+        examDate: toLocalDateString(p.examDate),
         startTime: p.startTime || '07:30',
         endTime: p.endTime || '09:00',
         emergencyPaused: Boolean(p.emergencyPaused)
@@ -887,7 +921,7 @@ export function saveStoredCbtPackages(packages: CbtExamPackage[]) {
   try {
     const sanitized = packages.map(p => ({
       ...p,
-      examDate: p.examDate ? p.examDate.split('T')[0] : new Date().toISOString().split('T')[0]
+      examDate: toLocalDateString(p.examDate)
     }));
     localStorage.setItem(CBT_PACKAGES_KEY, JSON.stringify(sanitized));
     window.dispatchEvent(new Event('cbtPackagesUpdated'));
@@ -970,7 +1004,7 @@ export function evaluateCbtPackageSchedule(
   const minutes = String(now.getMinutes()).padStart(2, '0');
   const currentTimeStr = `${hours}:${minutes}`;
 
-  const targetDate = pkg.examDate ? pkg.examDate.split('T')[0] : todayStr;
+  const targetDate = toLocalDateString(pkg.examDate) || todayStr;
   const startTime = pkg.startTime || '00:00';
   const endTime = pkg.endTime || '23:59';
   const scheduleDisplay = `${startTime} - ${endTime} WIB`;

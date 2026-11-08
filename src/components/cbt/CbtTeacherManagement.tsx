@@ -10,7 +10,8 @@ import {
   deleteStoredCbtPackage,
   getStoredStudentCbtSessions,
   resetStoredStudentCbtSession,
-  evaluateCbtPackageSchedule
+  evaluateCbtPackageSchedule,
+  toLocalDateString
 } from '@/lib/cbtData';
 import { Student, SCHOOL_CLASSES } from '@/lib/elearningData';
 import { exportCbtScoreLegerToExcel } from '@/lib/elearningExport';
@@ -25,7 +26,7 @@ interface CbtTeacherManagementProps {
 // Helper format tanggal Indonesia (contoh: "Min, 8 Nov 2026")
 function formatIndonesianExamDate(dateStr?: string): string {
   if (!dateStr) return 'Hari Ini';
-  const clean = dateStr.split('T')[0];
+  const clean = toLocalDateString(dateStr);
   const parts = clean.split('-');
   if (parts.length === 3) {
     const y = Number(parts[0]);
@@ -106,7 +107,7 @@ export default function CbtTeacherManagement({
 
   const openScheduleModal = (pkg: CbtExamPackage) => {
     setScheduleModalPkg(pkg);
-    const rawDate = pkg.examDate ? pkg.examDate.split('T')[0] : new Date().toISOString().split('T')[0];
+    const rawDate = toLocalDateString(pkg.examDate);
     setEditSchedDate(rawDate);
     setEditSchedStartTime(pkg.startTime || '07:30');
     setEditSchedEndTime(pkg.endTime || '09:00');
@@ -122,7 +123,7 @@ export default function CbtTeacherManagement({
       return;
     }
 
-    const cleanDate = editSchedDate ? editSchedDate.split('T')[0] : new Date().toISOString().split('T')[0];
+    const cleanDate = toLocalDateString(editSchedDate);
 
     const updated = packages.map(p => {
       if (p.id === scheduleModalPkg.id) {

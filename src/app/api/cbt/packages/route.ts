@@ -1,6 +1,31 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 
+function toLocalDateString(val: any): string {
+  if (!val) return '';
+  if (val instanceof Date && !isNaN(val.getTime())) {
+    const y = val.getFullYear();
+    const m = String(val.getMonth() + 1).padStart(2, '0');
+    const day = String(val.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+  if (typeof val === 'string') {
+    if (val.includes('T')) {
+      const d = new Date(val);
+      if (!isNaN(d.getTime())) {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+      }
+    }
+    const match = val.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (match) return match[1];
+    return val.split('T')[0];
+  }
+  return String(val);
+}
+
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
@@ -39,11 +64,7 @@ export async function GET(req: Request) {
       status: r.status,
       teacherName: r.teacher_name,
       instructions: r.instructions,
-      examDate: r.exam_date
-        ? (typeof r.exam_date === 'string'
-            ? r.exam_date.split('T')[0]
-            : new Date(r.exam_date).toISOString().split('T')[0])
-        : null,
+      examDate: toLocalDateString(r.exam_date),
       startTime: r.start_time,
       endTime: r.end_time,
       emergencyPaused: Boolean(r.emergency_paused),
@@ -86,9 +107,7 @@ export async function POST(req: Request) {
 
     const pkgId = id || `cbt-${Date.now()}`;
     const totalQuestions = questions ? questions.length : 0;
-    const cleanExamDate = examDate
-      ? (typeof examDate === 'string' ? examDate.split('T')[0] : new Date(examDate).toISOString().split('T')[0])
-      : null;
+    const cleanExamDate = toLocalDateString(examDate) || null;
 
     await query(`
       INSERT INTO cbt_exam_packages (

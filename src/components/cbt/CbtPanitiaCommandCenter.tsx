@@ -26,6 +26,7 @@ import {
   evaluateCbtPackageSchedule,
   updateCbtPackageSchedule,
   toggleCbtEmergencyPause,
+  toLocalDateString,
   CbtSupervisorScheduleEntry,
   CbtSupervisorSchedule,
   getDefaultSupervisorSchedule,
@@ -460,7 +461,7 @@ export default function CbtPanitiaCommandCenter({
     const isAll = selectedSchedPackageId === 'all';
     const updated = updateCbtPackageSchedule({
       packageId: isAll ? undefined : selectedSchedPackageId,
-      examDate: schedDate,
+      examDate: toLocalDateString(schedDate),
       startTime: schedStartTime,
       endTime: schedEndTime,
       durationMinutes: Number(schedDuration) || 60
@@ -1677,7 +1678,7 @@ export default function CbtPanitiaCommandCenter({
               type="button"
               onClick={() => {
                 if (packages.length > 0) {
-                  setSchedDate(packages[0].examDate ? packages[0].examDate.split('T')[0] : new Date().toISOString().split('T')[0]);
+                  setSchedDate(toLocalDateString(packages[0].examDate));
                   setSchedStartTime(packages[0].startTime || '07:30');
                   setSchedEndTime(packages[0].endTime || '09:00');
                   setSchedDuration(packages[0].durationMinutes || 60);
@@ -5489,7 +5490,7 @@ export default function CbtPanitiaCommandCenter({
                     if (val !== 'all') {
                       const target = packages.find(p => p.id === val);
                       if (target) {
-                        if (target.examDate) setSchedDate(target.examDate.split('T')[0]);
+                        if (target.examDate) setSchedDate(toLocalDateString(target.examDate));
                         if (target.startTime) setSchedStartTime(target.startTime);
                         if (target.endTime) setSchedEndTime(target.endTime);
                         if (target.durationMinutes) setSchedDuration(target.durationMinutes);
