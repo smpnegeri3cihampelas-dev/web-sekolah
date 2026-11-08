@@ -19,6 +19,7 @@ import {
   updateRoomMetadata,
   splitTwoClassesAcrossTwoRooms,
   getDefaultSchoolRooms,
+  autoCrossSplitClasses7And8,
   registerEmergencyStudentToCbt,
   evaluateCbtPackageSchedule,
   updateCbtPackageSchedule,
@@ -200,6 +201,11 @@ export default function CbtPanitiaCommandCenter({
   const [selectedStudentIdsToAdd, setSelectedStudentIdsToAdd] = useState<string[]>([]);
   const [selectedStudentIdsToRemove, setSelectedStudentIdsToRemove] = useState<string[]>([]);
   const [roomStudentSearch, setRoomStudentSearch] = useState<string>('');
+  const [managingRoomModal, setManagingRoomModal] = useState<CbtExamRoomConfig | null>(null);
+  const [managingRoomTab, setManagingRoomTab] = useState<'list' | 'add'>('list');
+  const [targetMoveRoomId, setTargetMoveRoomId] = useState<string>('');
+  const [arrangementGradeFilter, setArrangementGradeFilter] = useState<'all' | 'cross' | 'pure' | 'empty'>('all');
+  const [arrangementSearchQuery, setArrangementSearchQuery] = useState<string>('');
 
   // Toast / Notification
   const [alertMsg, setAlertMsg] = useState<{ text: string; type: 'success' | 'info' | 'warning' } | null>(null);
@@ -1251,8 +1257,11 @@ export default function CbtPanitiaCommandCenter({
 
   // Currently selected room in arrangement tab
   const currentArrangementRoom = useMemo(() => {
+    if (managingRoomModal) {
+      return config.rooms.find(r => r.id === managingRoomModal.id) || managingRoomModal;
+    }
     return config.rooms.find(r => r.id === selectedArrangementRoomId) || config.rooms[0];
-  }, [config.rooms, selectedArrangementRoomId]);
+  }, [config.rooms, selectedArrangementRoomId, managingRoomModal]);
 
   // Students currently in selected room (O(1) lookup)
   const currentRoomStudents = useMemo(() => {
@@ -1333,13 +1342,14 @@ export default function CbtPanitiaCommandCenter({
 
   // Add selected students to current room
   const handleAddSelectedStudentsToRoom = () => {
-    if (!currentArrangementRoom || selectedStudentIdsToAdd.length === 0) return;
+    const targetRoom = managingRoomModal || currentArrangementRoom;
+    if (!targetRoom || selectedStudentIdsToAdd.length === 0) return;
 
-    const targetRoomId = currentArrangementRoom.id;
+    const targetRoomId = targetRoom.id;
     const idsToAddSet = new Set(selectedStudentIdsToAdd);
 
     // Current students in target room + new ones
-    const existingInRoom = getStudentsForRoom(currentArrangementRoom, activeStudents);
+    const existingInRoom = getStudentsForRoom(targetRoom, activeStudents);
     const combinedIds = Array.from(new Set([...existingInRoom.map(s => s.id), ...selectedStudentIdsToAdd]));
     const targetStudents = activeStudents.filter(s => combinedIds.includes(s.id));
 
@@ -1374,20 +1384,24 @@ export default function CbtPanitiaCommandCenter({
     saveStoredCbtPanitiaConfig(updatedConfig);
     setConfig(updatedConfig);
     setSelectedStudentIdsToAdd([]);
-    showAlert(`✅ Berhasil menambahkan ${selectedStudentIdsToAdd.length} siswa ke ${currentArrangementRoom.name}!`);
+    if (managingRoomModal) {
+      setManagingRoomModal(updatedRooms.find(r => r.id === managingRoomModal.id) || null);
+    }
+    showAlert(`✅ Berhasil menambahkan ${selectedStudentIdsToAdd.length} siswa ke ${targetRoom.name}!`);
   };
 
   // Remove students from current room
   const handleRemoveStudentsFromRoom = (studentIdsToRemove: string[]) => {
-    if (!currentArrangementRoom || studentIdsToRemove.length === 0) return;
+    const targetRoom = managingRoomModal || currentArrangementRoom;
+    if (!targetRoom || studentIdsToRemove.length === 0) return;
 
     const removeSet = new Set(studentIdsToRemove);
-    const currentInRoom = getStudentsForRoom(currentArrangementRoom, activeStudents);
+    const currentInRoom = getStudentsForRoom(targetRoom, activeStudents);
     const remainingStudents = currentInRoom.filter(s => !removeSet.has(s.id));
     const remainingIds = remainingStudents.map(s => s.id);
 
     const updatedRooms = config.rooms.map(room => {
-      if (room.id === currentArrangementRoom.id) {
+      if (room.id === targetRoom.id) {
         return {
           ...updateRoomMetadata(room, remainingStudents),
           assignedStudentIds: remainingIds
@@ -1404,7 +1418,63 @@ export default function CbtPanitiaCommandCenter({
     saveStoredCbtPanitiaConfig(updatedConfig);
     setConfig(updatedConfig);
     setSelectedStudentIdsToRemove([]);
-    showAlert(`✓ ${studentIdsToRemove.length} siswa dikeluarkan dari ${currentArrangementRoom.name}`);
+    if (managingRoomModal) {
+      setManagingRoomModal(updatedRooms.find(r => r.id === managingRoomModal.id) || null);
+    }
+    showAlert(`✓ ${studentIdsToRemove.length} siswa dikeluarkan dari ${targetRoom.name}`);
+  };
+
+  // Move students to another room
+  const handleMoveSelectedStudentsToRoom = (targetRoomId: string, studentIdsToMove: string[]) => {
+    const fromRoom = managingRoomModal || currentArrangementRoom;
+    if (!fromRoom || !targetRoomId || studentIdsToMove.length === 0) return;
+    if (fromRoom.id === targetRoomId) {
+      alert('Pilih ruangan tujuan yang berbeda.');
+      return;
+    }
+
+    const moveSet = new Set(studentIdsToMove);
+    const targetRoom = config.rooms.find(r => r.id === targetRoomId);
+    if (!targetRoom) return;
+
+    // Remaining in fromRoom
+    const fromStudents = getStudentsForRoom(fromRoom, activeStudents);
+    const remainingStudents = fromStudents.filter(s => !moveSet.has(s.id));
+    const remainingIds = remainingStudents.map(s => s.id);
+
+    // Existing in targetRoom + moved
+    const existingInTarget = getStudentsForRoom(targetRoom, activeStudents);
+    const combinedTargetIds = Array.from(new Set([...existingInTarget.map(s => s.id), ...studentIdsToMove]));
+    const targetStudents = activeStudents.filter(s => combinedTargetIds.includes(s.id));
+
+    const updatedRooms = config.rooms.map(room => {
+      if (room.id === fromRoom.id) {
+        return {
+          ...updateRoomMetadata(room, remainingStudents),
+          assignedStudentIds: remainingIds
+        };
+      }
+      if (room.id === targetRoomId) {
+        return {
+          ...updateRoomMetadata(room, targetStudents),
+          assignedStudentIds: combinedTargetIds
+        };
+      }
+      return room;
+    });
+
+    const updatedConfig: CbtPanitiaConfig = {
+      ...config,
+      rooms: updatedRooms
+    };
+
+    saveStoredCbtPanitiaConfig(updatedConfig);
+    setConfig(updatedConfig);
+    setSelectedStudentIdsToRemove([]);
+    if (managingRoomModal) {
+      setManagingRoomModal(updatedRooms.find(r => r.id === managingRoomModal.id) || null);
+    }
+    showAlert(`🚚 Berhasil memindahkan ${studentIdsToMove.length} siswa ke ${targetRoom.name}!`);
   };
 
   // Clear all students from a room
@@ -1433,6 +1503,9 @@ export default function CbtPanitiaCommandCenter({
 
     saveStoredCbtPanitiaConfig(updatedConfig);
     setConfig(updatedConfig);
+    if (managingRoomModal?.id === roomId) {
+      setManagingRoomModal(updatedRooms.find(r => r.id === roomId) || null);
+    }
     showAlert(`Ruangan ${room.name} telah dikosongkan.`);
   };
 
@@ -1442,7 +1515,7 @@ export default function CbtPanitiaCommandCenter({
       return;
     }
 
-    const defaultRooms = getDefaultSchoolRooms();
+    const defaultRooms = getDefaultSchoolRooms(activeStudents);
     const updatedConfig: CbtPanitiaConfig = {
       ...config,
       rooms: defaultRooms
@@ -1450,7 +1523,30 @@ export default function CbtPanitiaCommandCenter({
 
     saveStoredCbtPanitiaConfig(updatedConfig);
     setConfig(updatedConfig);
+    if (managingRoomModal) {
+      setManagingRoomModal(defaultRooms.find(r => r.id === managingRoomModal.id) || null);
+    }
     showAlert('🔄 Susunan ruangan berhasil dikembalikan ke 17 Ruangan Kelas Murni!');
+  };
+
+  // ⚡ One-Click Auto Cross-Split for Grade 7 & 8 (Ruang 01-12) and Grade 9 Pure (Ruang 13-17)
+  const handleAutoCrossSplitAll = () => {
+    if (!confirm('⚡ Jalankan Pembagian Silang Otomatis (50:50)?\n\n• Ruang 01 s/d 12: Dibagi silang antara Kelas 7 & 8 (rata-rata 34-35 siswa per ruang)\n• Ruang 13 s/d 17: Rombel murni Kelas 9 (9-A s.d 9-E)\n\nSemua peserta akan langsung terdistribusi rapi tanpa kerja sama antarteman sekelas.')) {
+      return;
+    }
+
+    const crossRooms = autoCrossSplitClasses7And8(activeStudents);
+    const updatedConfig: CbtPanitiaConfig = {
+      ...config,
+      rooms: crossRooms
+    };
+
+    saveStoredCbtPanitiaConfig(updatedConfig);
+    setConfig(updatedConfig);
+    if (managingRoomModal) {
+      setManagingRoomModal(crossRooms.find(r => r.id === managingRoomModal.id) || null);
+    }
+    showAlert('⚡ Sukses! Seluruh Kelas 7 & 8 berhasil dibagi silang ke Ruang 01-12, dan Kelas 9 di Ruang 13-17!');
   };
 
   // Quick Half Selector for Picker (Top 50% or Bottom 50%)
@@ -2049,578 +2145,872 @@ export default function CbtPanitiaCommandCenter({
         </div>
       )}
 
-      {/* 1. TAB CONTENT: PENYUSUNAN RUANGAN & SISWA */}
+      {/* 1. TAB CONTENT: PENYUSUNAN RUANGAN & SISWA (OVERHAULED & INTUITIVE) */}
       {activeTab === 'arrangement' && (
         <div className="space-y-4">
           {/* Header & Quick Action Command Bar */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center text-base shadow-xs shrink-0">
+          <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500 text-slate-950 flex items-center justify-center text-xl shadow-xs font-black shrink-0">
                 🗂️
               </div>
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h2 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight">
-                    Penyusunan Ruangan &amp; Penempatan Peserta
+                  <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+                    Penyusunan Ruangan &amp; Pembagian Peserta Ujian
                   </h2>
-                  <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 font-bold text-[11px] border border-amber-200/60">
-                    {config.rooms.length} Ruang • {activeStudents.length} Siswa
+                  <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 font-extrabold text-xs border border-amber-200/80">
+                    {config.rooms.length} Ruang • {activeStudents.length} Siswa Terdaftar
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-500 mt-0.5">
-                  Bagi silang 50:50 antar tingkat kelas atau atur penempatan peserta custom per ruangan.
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Bagi silang (50:50 antar tingkat kelas) atau rombel murni. Semua perubahan otomatis tersimpan &amp; tersinkron real-time ke database Hostinger.
                 </p>
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              {/* ⚡ ONE-CLICK AUTO-SILANG 7 & 8 */}
+              <button
+                type="button"
+                onClick={handleAutoCrossSplitAll}
+                className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs transition shadow-md shadow-amber-500/20 flex items-center gap-1.5 cursor-pointer active:scale-95"
+                title="Bagi silang otomatis Kelas 7 & 8 ke Ruang 01-12 dan Kelas 9 di Ruang 13-17"
+              >
+                <span>⚡</span>
+                <span>Auto-Silang Kelas 7 &amp; 8 (12 Ruang)</span>
+              </button>
+
+              {/* 🔀 MANUAL SPLIT MODAL */}
               <button
                 type="button"
                 onClick={() => setShowSplitModal(true)}
-                className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95"
-                title="Bagi 2 kelas secara silang 50% - 50% ke dua ruangan ujian"
+                className="px-3 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold text-xs border border-amber-200 transition flex items-center gap-1.5 cursor-pointer active:scale-95"
+                title="Bagi silang manual antara 2 kelas ke 2 ruangan"
               >
-                <span>⚡</span>
-                <span>Bagi Silang (50:50)</span>
+                <span>🔀</span>
+                <span>Bagi Silang 2 Kelas</span>
               </button>
+
+              {/* 🔄 RESET TO PURE */}
+              <button
+                type="button"
+                onClick={handleResetToDefaultPureRooms}
+                className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition border border-slate-200 flex items-center gap-1.5 cursor-pointer active:scale-95"
+                title="Kembalikan semua ruangan ke rombel utuh (7-A s.d 9-E)"
+              >
+                <span>🔄</span>
+                <span>Reset Rombel Murni</span>
+              </button>
+
+              {/* ➕ TAMBAH RUANGAN */}
               <button
                 type="button"
                 onClick={handleOpenAddRoomModal}
-                className="px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold text-xs border border-amber-200/80 transition flex items-center gap-1 cursor-pointer active:scale-95"
+                className="px-3 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs border border-emerald-200 transition flex items-center gap-1.5 cursor-pointer active:scale-95"
               >
                 <span>➕</span>
                 <span>Tambah Ruang</span>
               </button>
+
+              {/* 👤➕ SISWA DARURAT */}
               <button
                 type="button"
                 onClick={() => setShowEmergencyModal(true)}
-                className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition flex items-center gap-1 cursor-pointer active:scale-95 shadow-xs"
+                className="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-xs"
                 title="Daftarkan siswa baru/darurat yang belum terdaftar di CBT"
               >
                 <span>👤➕</span>
                 <span>Siswa Darurat</span>
               </button>
-              <button
-                type="button"
-                onClick={handleResetToDefaultPureRooms}
-                className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition border border-slate-200 flex items-center gap-1 cursor-pointer active:scale-95"
-                title="Kembalikan semua ruangan ke 1 rombel utuh (7A s.d 9E)"
-              >
-                <span>🔄</span>
-                <span>Reset Rombel Murni</span>
-              </button>
             </div>
           </div>
 
-          {/* Main 2-Column Arrangement Layout */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            {/* LEFT COLUMN: ROOM SELECTOR CARDS (4 Cols) */}
-            <div className="lg:col-span-4 space-y-3">
-              <div className="flex items-center justify-between px-1">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                  Daftar Ruangan ({config.rooms.length})
-                </span>
-                <button
-                  type="button"
-                  onClick={handleOpenAddRoomModal}
-                  className="px-2.5 py-1 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition flex items-center gap-1 cursor-pointer shadow-xs active:scale-95"
-                  title="Tambah Ruangan Ujian Baru"
-                >
-                  <span>➕</span>
-                  <span>Tambah</span>
-                </button>
+          {/* Metric Overview Bar */}
+          {(() => {
+            let crossCount = 0;
+            let pureCount = 0;
+            let emptyCount = 0;
+            let totalAssigned = 0;
+
+            config.rooms.forEach(room => {
+              const stds = roomStudentsMap.get(room.id) || [];
+              totalAssigned += stds.length;
+              const classInfo = roomUniqueClassesMap.get(room.id);
+              if (stds.length === 0) emptyCount++;
+              else if (classInfo?.isMixed) crossCount++;
+              else pureCount++;
+            });
+
+            const unassignedCount = Math.max(0, activeStudents.length - totalAssigned);
+
+            return (
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-2xs">
+                  <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Ruangan</div>
+                  <div className="text-xl font-black text-slate-900 mt-0.5 flex items-center gap-1.5">
+                    <span>🏢</span>
+                    <span>{config.rooms.length} Ruang</span>
+                  </div>
+                  <div className="text-[11px] text-slate-400 mt-0.5">
+                    {crossCount} Silang • {pureCount} Murni {emptyCount > 0 && `• ${emptyCount} Kosong`}
+                  </div>
+                </div>
+
+                <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-2xs">
+                  <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Peserta Terdistribusi</div>
+                  <div className="text-xl font-black text-emerald-700 mt-0.5 flex items-center gap-1.5">
+                    <span>👥</span>
+                    <span>{totalAssigned} Siswa</span>
+                  </div>
+                  <div className="text-[11px] text-slate-400 mt-0.5">
+                    Dari {activeStudents.length} total siswa
+                  </div>
+                </div>
+
+                <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-2xs">
+                  <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Belum Dapat Ruangan</div>
+                  <div className={`text-xl font-black mt-0.5 flex items-center gap-1.5 ${
+                    unassignedCount > 0 ? 'text-amber-600' : 'text-slate-400'
+                  }`}>
+                    <span>{unassignedCount > 0 ? '⚠️' : '✓'}</span>
+                    <span>{unassignedCount} Siswa</span>
+                  </div>
+                  <div className="text-[11px] text-slate-400 mt-0.5">
+                    {unassignedCount === 0 ? 'Semua peserta sudah terbagi' : 'Perlu dialokasikan ke ruangan'}
+                  </div>
+                </div>
+
+                <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-2xs">
+                  <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Rata-Rata per Ruang</div>
+                  <div className="text-xl font-black text-indigo-700 mt-0.5 flex items-center gap-1.5">
+                    <span>🪑</span>
+                    <span>{config.rooms.length > 0 ? Math.round(totalAssigned / config.rooms.length) : 0} Siswa</span>
+                  </div>
+                  <div className="text-[11px] text-slate-400 mt-0.5">
+                    Standar ~35 kursi per ruangan
+                  </div>
+                </div>
               </div>
+            );
+          })()}
 
-              <div className="space-y-2 max-h-[780px] overflow-y-auto pr-1">
-                {config.rooms.map(room => {
+          {/* Filter & Search Toolbar */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-3 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
+              <button
+                type="button"
+                onClick={() => setArrangementGradeFilter('all')}
+                className={`px-3 py-1.5 rounded-xl font-bold text-xs transition cursor-pointer whitespace-nowrap ${
+                  arrangementGradeFilter === 'all'
+                    ? 'bg-amber-500 text-slate-950 font-black shadow-xs'
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                }`}
+              >
+                Semua Ruangan ({config.rooms.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setArrangementGradeFilter('cross')}
+                className={`px-3 py-1.5 rounded-xl font-bold text-xs transition cursor-pointer whitespace-nowrap ${
+                  arrangementGradeFilter === 'cross'
+                    ? 'bg-purple-600 text-white font-black shadow-xs'
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                }`}
+              >
+                🔀 Ruangan Silang (Kelas 7 &amp; 8)
+              </button>
+              <button
+                type="button"
+                onClick={() => setArrangementGradeFilter('pure')}
+                className={`px-3 py-1.5 rounded-xl font-bold text-xs transition cursor-pointer whitespace-nowrap ${
+                  arrangementGradeFilter === 'pure'
+                    ? 'bg-indigo-600 text-white font-black shadow-xs'
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                }`}
+              >
+                📌 Ruangan Murni (Kelas 9)
+              </button>
+              <button
+                type="button"
+                onClick={() => setArrangementGradeFilter('empty')}
+                className={`px-3 py-1.5 rounded-xl font-bold text-xs transition cursor-pointer whitespace-nowrap ${
+                  arrangementGradeFilter === 'empty'
+                    ? 'bg-rose-600 text-white font-black shadow-xs'
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                }`}
+              >
+                ⚪ Ruang Kosong
+              </button>
+            </div>
+
+            <div className="w-full md:w-64 shrink-0">
+              <FastSearchInput
+                value={arrangementSearchQuery}
+                onSearchChange={setArrangementSearchQuery}
+                placeholder="Cari ruang, kelas, pengawas..."
+                className="w-full pl-8 pr-7 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:bg-white"
+              />
+            </div>
+          </div>
+
+          {/* Responsive 17 Room Cards Grid */}
+          {(() => {
+            const filteredRooms = config.rooms.filter(room => {
+              const students = roomStudentsMap.get(room.id) || [];
+              const classInfo = roomUniqueClassesMap.get(room.id) || { uniqueClasses: [], isMixed: false };
+
+              // Category filter
+              if (arrangementGradeFilter === 'cross' && !classInfo.isMixed) return false;
+              if (arrangementGradeFilter === 'pure' && (classInfo.isMixed || students.length === 0)) return false;
+              if (arrangementGradeFilter === 'empty' && students.length > 0) return false;
+
+              // Search query filter
+              const q = arrangementSearchQuery.trim().toLowerCase();
+              if (!q) return true;
+
+              const matchName = room.name.toLowerCase().includes(q);
+              const matchLabel = (room.label || '').toLowerCase().includes(q);
+              const matchSup = (room.supervisorName || '').toLowerCase().includes(q);
+              const matchClass = classInfo.uniqueClasses.some(c => c.toLowerCase().includes(q));
+              const matchStudent = students.some(s => s.name.toLowerCase().includes(q) || s.nisn.includes(q));
+
+              return matchName || matchLabel || matchSup || matchClass || matchStudent;
+            });
+
+            if (filteredRooms.length === 0) {
+              return (
+                <div className="p-12 text-center bg-white rounded-3xl border border-slate-200 space-y-2">
+                  <div className="text-3xl">🔍</div>
+                  <div className="font-bold text-slate-700 text-sm">Tidak ada ruangan yang sesuai filter</div>
+                  <div className="text-xs text-slate-400">Silakan ubah filter atau kata kunci pencarian Anda.</div>
+                </div>
+              );
+            }
+
+            return (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {filteredRooms.map(room => {
                   const students = roomStudentsMap.get(room.id) || [];
-                  const isSelected = room.id === currentArrangementRoom?.id;
-                  const isFull = students.length >= room.capacity;
-                  const percent = Math.min(100, Math.round((students.length / room.capacity) * 100));
-
-                  // Represented classes via O(1) map
                   const classInfo = roomUniqueClassesMap.get(room.id) || { uniqueClasses: [], isMixed: false };
-                  const uniqueClasses = classInfo.uniqueClasses;
                   const isMixed = classInfo.isMixed;
+                  const uniqueClasses = classInfo.uniqueClasses;
+                  const capacity = room.capacity || 35;
+                  const isFull = students.length >= capacity;
+                  const percent = Math.min(100, Math.round((students.length / capacity) * 100));
+
+                  // Count students per class
+                  const classCountRecord: Record<string, number> = {};
+                  students.forEach(st => {
+                    classCountRecord[st.classId] = (classCountRecord[st.classId] || 0) + 1;
+                  });
 
                   return (
-                    <button
+                    <div
                       key={room.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedArrangementRoomId(room.id);
-                        setSelectedStudentIdsToAdd([]);
-                        setSelectedStudentIdsToRemove([]);
-                        setRoomStudentSearch('');
-                      }}
-                      className={`w-full text-left p-3 rounded-2xl transition border cursor-pointer relative ${
-                        isSelected
-                          ? 'bg-amber-50/90 border-amber-500 shadow-sm ring-2 ring-amber-400/20'
-                          : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50'
-                      }`}
+                      className="bg-white border border-slate-200 hover:border-amber-300 rounded-3xl p-4 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between space-y-3 relative group"
                     >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <span className="font-black text-slate-900 text-sm whitespace-nowrap">
-                            {room.name}
-                          </span>
+                      {/* Top Header */}
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+                            <span className="font-black text-slate-900 text-sm sm:text-base">
+                              {room.name}
+                            </span>
+                          </div>
+
                           {isMixed ? (
-                            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-black bg-purple-100 text-purple-800 border border-purple-200 truncate">
-                              🔀 {uniqueClasses.join(' & ')}
+                            <span className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-purple-100 text-purple-800 border border-purple-200">
+                              🔀 Silang {uniqueClasses.join(' & ')}
                             </span>
                           ) : uniqueClasses.length === 1 ? (
-                            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 truncate">
-                              Kelas {uniqueClasses[0]}
+                            <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                              📌 Kelas {uniqueClasses[0]}
                             </span>
                           ) : (
-                            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-500">
-                              Kosong
+                            <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-500">
+                              ⚪ Kosong
                             </span>
                           )}
                         </div>
 
-                        <div className="shrink-0 flex items-center gap-1">
-                          <span className={`text-xs font-black ${
-                            isFull ? 'text-amber-700' : students.length === 0 ? 'text-slate-400' : 'text-emerald-700'
-                          }`}>
-                            {students.length}/{room.capacity}
+                        {/* Occupancy Bar */}
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="text-slate-500 font-medium">Terisi:</span>
+                            <span className="font-black">
+                              <span className={students.length > capacity ? 'text-rose-600' : isFull ? 'text-amber-700' : 'text-emerald-700'}>
+                                {students.length}
+                              </span>
+                              <span className="text-slate-400"> / {capacity} Kursi</span>
+                            </span>
+                          </div>
+                          <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                            <div
+                              style={{ width: `${percent}%` }}
+                              className={`h-full transition-all duration-300 rounded-full ${
+                                students.length > capacity
+                                  ? 'bg-rose-500'
+                                  : isFull
+                                  ? 'bg-emerald-500'
+                                  : students.length === 0
+                                  ? 'bg-slate-300'
+                                  : 'bg-amber-400'
+                              }`}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Breakdown per Class */}
+                        <div className="pt-2 border-t border-slate-100 space-y-1">
+                          {students.length === 0 ? (
+                            <div className="text-[11px] text-slate-400 italic py-1">
+                              Belum ada siswa ditempatkan
+                            </div>
+                          ) : (
+                            Object.entries(classCountRecord).map(([cls, count]) => (
+                              <div key={cls} className="flex items-center justify-between text-[11px]">
+                                <span className="flex items-center gap-1 font-semibold text-slate-700">
+                                  <span className={`w-2 h-2 rounded-full ${
+                                    cls.startsWith('7') ? 'bg-blue-500' : cls.startsWith('8') ? 'bg-purple-500' : 'bg-emerald-500'
+                                  }`}></span>
+                                  <span>Kelas {cls}</span>
+                                </span>
+                                <span className="font-bold text-slate-900 bg-slate-100 px-1.5 py-0.2 rounded-md text-[10px]">
+                                  {count} Siswa
+                                </span>
+                              </div>
+                            ))
+                          )}
+                        </div>
+
+                        {/* Supervisor info */}
+                        <div className="pt-1.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+                          <span className="truncate">
+                            👨‍🏫 {room.supervisorName || 'Guru Pengawas'}
                           </span>
-                          <span className="text-[10px] text-slate-400">kursi</span>
                         </div>
                       </div>
 
-                      {/* Mini Slim Capacity Bar */}
-                      <div className="mt-2 h-1 w-full bg-slate-100 rounded-full overflow-hidden">
-                        <div
-                          style={{ width: `${percent}%` }}
-                          className={`h-full transition-all duration-300 ${
-                            isFull ? 'bg-amber-500' : 'bg-emerald-500'
-                          }`}
-                        />
+                      {/* Action Buttons Footer */}
+                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setManagingRoomModal(room);
+                            setManagingRoomTab('list');
+                            setSelectedStudentIdsToRemove([]);
+                            setSelectedStudentIdsToAdd([]);
+                            setRoomStudentSearch('');
+                            setTargetMoveRoomId('');
+                          }}
+                          className="flex-1 py-1.5 px-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition shadow-xs cursor-pointer flex items-center justify-center gap-1 active:scale-95"
+                          title="Lihat atau atur peserta di ruangan ini"
+                        >
+                          <span>👥</span>
+                          <span>Kelola ({students.length})</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditRoom(room)}
+                          className="p-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition cursor-pointer"
+                          title="Edit nama atau kapasitas ruangan"
+                        >
+                          ✏️
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleClearRoom(room.id)}
+                          className="p-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs transition cursor-pointer"
+                          title="Kosongkan ruangan ini"
+                        >
+                          🗑️
+                        </button>
                       </div>
-                    </button>
+                    </div>
                   );
                 })}
               </div>
-            </div>
+            );
+          })()}
 
-            {/* RIGHT COLUMN: ROOM EDITOR & STUDENT PICKER (8 Cols) */}
-            <div className="lg:col-span-8 space-y-4">
-              {/* Card 1: Selected Room Active Banner */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-2xs space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3.5 border-b border-slate-100">
+          {/* MODAL: KELOLA & LIHAT PESERTA RUANG (FOCUSED & CLEAN) */}
+          {managingRoomModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+              <div className="bg-white rounded-3xl max-w-4xl w-full p-5 sm:p-6 shadow-2xl border border-slate-200 flex flex-col max-h-[90vh] overflow-hidden">
+                {/* Modal Header */}
+                <div className="flex items-start justify-between pb-3 border-b border-slate-100 shrink-0">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="px-2.5 py-1 rounded-xl bg-amber-400 text-slate-950 font-black text-xs uppercase tracking-wider">
-                        {currentArrangementRoom?.name}
+                      <span className="px-2.5 py-0.5 rounded-xl bg-amber-400 text-slate-950 font-black text-xs uppercase">
+                        {managingRoomModal.name}
                       </span>
-                      <span className="text-xs font-bold text-slate-800">
-                        {currentArrangementRoom?.label}
-                      </span>
+                      <h3 className="font-black text-slate-900 text-base sm:text-lg">
+                        {managingRoomModal.label || `${managingRoomModal.name}`}
+                      </h3>
                     </div>
-                    <div className="flex items-center gap-2 flex-wrap text-xs text-slate-500">
-                      <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-medium text-[11px]">
-                        Kapasitas: <strong className="text-slate-900">{currentArrangementRoom?.capacity}</strong>
-                      </span>
-                      <span className={`px-2 py-0.5 rounded-md font-bold text-[11px] ${
-                        currentRoomStudents.length >= (currentArrangementRoom?.capacity || 0)
-                          ? 'bg-amber-100 text-amber-900'
-                          : 'bg-emerald-50 text-emerald-800'
-                      }`}>
-                        Terisi: <strong>{currentRoomStudents.length} Siswa</strong>
-                      </span>
-                      <span className="text-[11px] text-slate-400">
-                        • Pengawas diatur di tab Jadwal Pengawas
-                      </span>
+                    <div className="flex items-center gap-2 text-xs text-slate-500 flex-wrap">
+                      <span>Kapasitas: <strong className="text-slate-800">{managingRoomModal.capacity || 35} Kursi</strong></span>
+                      <span>•</span>
+                      <span>Terisi: <strong className="text-emerald-700 font-black">{(roomStudentsMap.get(managingRoomModal.id) || []).length} Siswa</strong></span>
+                      <span>•</span>
+                      <span>Pengawas: <strong className="text-slate-800">{managingRoomModal.supervisorName || 'Guru Pengawas'}</strong></span>
                     </div>
-                  </div>
-
-                  <div className="flex items-center gap-1.5 shrink-0 self-start sm:self-center">
-                    <button
-                      type="button"
-                      onClick={() => handleOpenEditRoom(currentArrangementRoom)}
-                      className="px-2.5 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 font-bold text-xs transition cursor-pointer flex items-center gap-1 active:scale-95"
-                      title="Edit nama, kapasitas, dan rombel ruangan ini"
-                    >
-                      <span>✏️</span>
-                      <span>Edit</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleClearRoom(currentArrangementRoom.id)}
-                      className="px-2.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 font-bold text-xs transition cursor-pointer flex items-center gap-1 active:scale-95"
-                      title="Keluarkan seluruh siswa dari ruangan ini"
-                    >
-                      <span>🗑️</span>
-                      <span>Kosongkan</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteRoom(currentArrangementRoom.id)}
-                      className="px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold text-xs transition cursor-pointer flex items-center gap-1 active:scale-95"
-                      title="Hapus ruangan ini dari sistem CBT"
-                    >
-                      <span>✕</span>
-                      <span>Hapus</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Section A: Daftar Siswa Saat Ini di Ruangan Ini */}
-                <div className="space-y-3">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-slate-900 text-sm">
-                        Daftar Peserta di {currentArrangementRoom?.name} ({currentRoomStudents.length} Siswa)
-                      </span>
-                      {selectedStudentIdsToRemove.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveStudentsFromRoom(selectedStudentIdsToRemove)}
-                          className="px-2.5 py-1 rounded-lg bg-rose-600 text-white font-bold text-[11px] transition shadow-xs hover:bg-rose-700 cursor-pointer"
-                        >
-                          Hapus {selectedStudentIdsToRemove.length} Terpilih ✕
-                        </button>
-                      )}
-                    </div>
-
-                    <div className="w-full sm:w-56">
-                      <FastSearchInput
-                        value={roomStudentSearch}
-                        onSearchChange={setRoomStudentSearch}
-                        placeholder="Cari siswa di ruangan ini..."
-                        className="w-full pl-8 pr-7 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:bg-white"
-                      />
-                    </div>
-                  </div>
-
-                  {currentRoomStudents.length === 0 ? (
-                    <div className="p-8 text-center text-xs text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                      Ruangan ini saat ini kosong. Gunakan panel &quot;Tambah Siswa ke Ruangan&quot; di bawah untuk menambahkan siswa.
-                    </div>
-                  ) : (
-                    <div className="overflow-x-auto rounded-2xl border border-slate-200 max-h-72 overflow-y-auto">
-                      <table className="w-full text-xs text-left">
-                        <thead className="bg-slate-50 text-slate-700 font-bold border-b border-slate-200 sticky top-0 z-10">
-                          <tr>
-                            <th className="py-2.5 px-3 w-8">
-                              <input
-                                type="checkbox"
-                                checked={
-                                  filteredCurrentRoomStudents.length > 0 &&
-                                  filteredCurrentRoomStudents.every(s => selectedStudentIdsToRemoveSet.has(s.id))
-                                }
-                                onChange={(e) => {
-                                  if (e.target.checked) {
-                                    setSelectedStudentIdsToRemove(filteredCurrentRoomStudents.map(s => s.id));
-                                  } else {
-                                    setSelectedStudentIdsToRemove([]);
-                                  }
-                                }}
-                                className="rounded text-rose-600 cursor-pointer"
-                              />
-                            </th>
-                            <th className="py-2.5 px-3">No / Meja</th>
-                            <th className="py-2.5 px-3">Nama Siswa</th>
-                            <th className="py-2.5 px-3">NISN</th>
-                            <th className="py-2.5 px-3">Kelas Asal</th>
-                            <th className="py-2.5 px-3 text-right">Aksi</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {filteredCurrentRoomStudents.map((st, idx) => {
-                            const isChecked = selectedStudentIdsToRemoveSet.has(st.id);
-                            return (
-                              <tr key={st.id} className="hover:bg-slate-50 transition">
-                                <td className="py-2 px-3">
-                                  <input
-                                    type="checkbox"
-                                    checked={isChecked}
-                                    onChange={(e) => {
-                                      if (e.target.checked) {
-                                        setSelectedStudentIdsToRemove([...selectedStudentIdsToRemove, st.id]);
-                                      } else {
-                                        setSelectedStudentIdsToRemove(selectedStudentIdsToRemove.filter(id => id !== st.id));
-                                      }
-                                    }}
-                                    className="rounded text-rose-600 cursor-pointer"
-                                  />
-                                </td>
-                                <td className="py-2 px-3">
-                                  <span className="w-6 h-6 rounded-md bg-slate-100 text-slate-600 font-mono font-bold text-[11px] inline-flex items-center justify-center">
-                                    {String(idx + 1).padStart(2, '0')}
-                                  </span>
-                                </td>
-                                <td className="py-2 px-3 font-bold text-slate-900">
-                                  {st.name}
-                                </td>
-                                <td className="py-2 px-3 font-mono text-slate-600 text-xs">
-                                  {st.nisn}
-                                </td>
-                                <td className="py-2 px-3">
-                                  <span className={`px-2 py-0.5 rounded-md text-[10px] font-black border ${
-                                    st.classId.startsWith('7')
-                                      ? 'bg-blue-50 text-blue-700 border-blue-200'
-                                      : st.classId.startsWith('8')
-                                      ? 'bg-purple-50 text-purple-700 border-purple-200'
-                                      : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                  }`}>
-                                    {st.classId}
-                                  </span>
-                                </td>
-                                <td className="py-2 px-3 text-right">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleRemoveStudentsFromRoom([st.id])}
-                                    className="w-6 h-6 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition inline-flex items-center justify-center font-bold text-xs cursor-pointer"
-                                    title="Keluarkan siswa ini dari ruangan"
-                                  >
-                                    ✕
-                                  </button>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Card 2: Tambah Siswa ke Ruangan Ini (Student Picker) */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-2xs space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div>
-                    <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                      <span>➕</span>
-                      <span>Tambah / Pindahkan Siswa ke {currentArrangementRoom?.name}</span>
-                    </h3>
-                    <p className="text-[11px] text-slate-500 mt-0.5">
-                      Pilih siswa dari kelas mana pun untuk dimasukkan ke ruangan ini secara fleksibel.
-                    </p>
                   </div>
 
                   <button
                     type="button"
-                    onClick={handleAddSelectedStudentsToRoom}
-                    disabled={selectedStudentIdsToAdd.length === 0}
-                    className={`px-4 py-2 rounded-xl font-black text-xs transition shadow-md flex items-center gap-1.5 cursor-pointer ${
-                      selectedStudentIdsToAdd.length > 0
-                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20 active:scale-95'
-                        : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                    onClick={() => setManagingRoomModal(null)}
+                    className="w-8 h-8 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700 font-bold text-base flex items-center justify-center cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                {/* Sub-Tabs: Daftar Peserta Saat Ini vs Tambah Siswa */}
+                <div className="flex items-center gap-2 pt-3 border-b border-slate-100 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setManagingRoomTab('list')}
+                    className={`pb-2.5 px-3 font-bold text-xs transition border-b-2 cursor-pointer ${
+                      managingRoomTab === 'list'
+                        ? 'border-amber-500 text-slate-950 font-black'
+                        : 'border-transparent text-slate-400 hover:text-slate-600'
                     }`}
                   >
-                    <span>+ Masukkan {selectedStudentIdsToAdd.length} Siswa Terpilih</span>
-                  </button>
-                </div>
-
-                {/* Filters & Quick Selector Buttons */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2 border-t border-slate-100">
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
-                      1. Pilih Kelas Asal:
-                    </label>
-                    <select
-                      value={pickerClassFilter}
-                      onChange={(e) => {
-                        setPickerClassFilter(e.target.value);
-                        setSelectedStudentIdsToAdd([]);
-                      }}
-                      className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:border-indigo-500 cursor-pointer"
-                    >
-                      <option value="all">Semua Kelas</option>
-                      {SCHOOL_CLASSES.map(c => (
-                        <option key={c.id} value={c.id}>{c.name}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
-                      2. Filter Status Ruangan:
-                    </label>
-                    <select
-                      value={pickerStatusFilter}
-                      onChange={(e) => setPickerStatusFilter(e.target.value as any)}
-                      className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-500 cursor-pointer"
-                    >
-                      <option value="all">Semua Siswa</option>
-                      <option value="unassigned">Hanya yang Belum Dapat Ruangan</option>
-                      <option value="other_room">Dari Ruangan Lain (Pindahkan)</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
-                      3. Cari Nama / NISN:
-                    </label>
-                    <FastSearchInput
-                      value={pickerSearchQuery}
-                      onSearchChange={setPickerSearchQuery}
-                      placeholder="Ketik nama atau NISN..."
-                      className="w-full pl-8 pr-7 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-indigo-500"
-                    />
-                  </div>
-                </div>
-
-                {/* Quick Selection Shortcuts (50% Atas / 50% Bawah) */}
-                <div className="flex flex-wrap items-center gap-1.5 p-2.5 rounded-2xl bg-amber-50/60 border border-amber-200/60 text-xs">
-                  <span className="text-[11px] font-bold text-amber-900 mr-1">
-                    ⚡ Bantuan Pilih Cepat:
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => handleQuickSelectHalf('top')}
-                    className="px-2.5 py-1 rounded-lg bg-white border border-amber-300 hover:bg-amber-100 text-amber-950 font-bold text-[11px] transition cursor-pointer"
-                    title="Pilih setengah pertama siswa dari kelas ini (Absen 1 s.d Tengah)"
-                  >
-                    Pilih 50% Pertama (Atas)
+                    📋 Daftar Peserta Saat Ini ({(roomStudentsMap.get(managingRoomModal.id) || []).length})
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleQuickSelectHalf('bottom')}
-                    className="px-2.5 py-1 rounded-lg bg-white border border-amber-300 hover:bg-amber-100 text-amber-950 font-bold text-[11px] transition cursor-pointer"
-                    title="Pilih setengah sisa siswa dari kelas ini (Tengah s.d Terakhir)"
+                    onClick={() => setManagingRoomTab('add')}
+                    className={`pb-2.5 px-3 font-bold text-xs transition border-b-2 cursor-pointer ${
+                      managingRoomTab === 'add'
+                        ? 'border-amber-500 text-slate-950 font-black'
+                        : 'border-transparent text-slate-400 hover:text-slate-600'
+                    }`}
                   >
-                    Pilih 50% Kedua (Bawah)
+                    ➕ Tambah / Pindahkan Siswa ke Ruangan Ini
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const allIds = pickerCandidates.map(s => s.id);
-                      setSelectedStudentIdsToAdd(allIds);
-                    }}
-                    className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 font-bold text-[11px] transition cursor-pointer"
-                  >
-                    Pilih Semua ({pickerCandidates.length})
-                  </button>
-                  {selectedStudentIdsToAdd.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setSelectedStudentIdsToAdd([])}
-                      className="px-2.5 py-1 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 font-bold text-[11px] transition cursor-pointer ml-auto"
-                    >
-                      Batal Pilih (0)
-                    </button>
-                  )}
                 </div>
 
-                {/* Picker Candidate List Table */}
-                <div className="overflow-x-auto rounded-2xl border border-slate-200 max-h-80 overflow-y-auto">
-                  <table className="w-full text-xs text-left">
-                    <thead className="bg-slate-50 text-slate-700 font-bold border-b border-slate-200 sticky top-0 z-10">
-                      <tr>
-                        <th className="py-2.5 px-3 w-8">
-                          <input
-                            type="checkbox"
-                            checked={
-                              pickerCandidates.length > 0 &&
-                              pickerCandidates.every(s => selectedStudentIdsToAddSet.has(s.id))
-                            }
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedStudentIdsToAdd(pickerCandidates.map(s => s.id));
-                              } else {
-                                setSelectedStudentIdsToAdd([]);
-                              }
-                            }}
-                            className="rounded text-indigo-600 cursor-pointer"
-                          />
-                        </th>
-                        <th className="py-2.5 px-3">Nama Siswa</th>
-                        <th className="py-2.5 px-3">NISN</th>
-                        <th className="py-2.5 px-3">Kelas</th>
-                        <th className="py-2.5 px-3">Status Ruangan Saat Ini</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {pickerCandidates.length === 0 ? (
-                        <tr>
-                          <td colSpan={5} className="py-8 text-center text-slate-400">
-                            Tidak ditemukan siswa dengan filter ini.
-                          </td>
-                        </tr>
-                      ) : (
-                        pickerCandidates.map(st => {
-                          const isChecked = selectedStudentIdsToAddSet.has(st.id);
-                          const assignedRoom = studentRoomMap.get(st.id);
-                          const isAlreadyInCurrentRoom = assignedRoom?.id === currentArrangementRoom?.id;
+                {/* Modal Tab Body */}
+                <div className="flex-1 overflow-y-auto pt-3 space-y-3">
+                  {managingRoomTab === 'list' && (() => {
+                    const roomStudents = roomStudentsMap.get(managingRoomModal.id) || [];
+                    const q = roomStudentSearch.trim().toLowerCase();
+                    const displayed = !q
+                      ? roomStudents
+                      : roomStudents.filter(s =>
+                          s.name.toLowerCase().includes(q) ||
+                          s.nisn.includes(q) ||
+                          s.classId.toLowerCase().includes(q)
+                        );
 
-                          return (
-                            <tr
-                              key={st.id}
-                              onClick={() => {
-                                if (isChecked) {
-                                  setSelectedStudentIdsToAdd(selectedStudentIdsToAdd.filter(id => id !== st.id));
-                                } else {
-                                  setSelectedStudentIdsToAdd([...selectedStudentIdsToAdd, st.id]);
-                                }
-                              }}
-                              className={`cursor-pointer transition ${
-                                isChecked
-                                  ? 'bg-amber-50/70'
-                                  : isAlreadyInCurrentRoom
-                                  ? 'bg-emerald-50/30 text-slate-500'
-                                  : 'hover:bg-slate-50'
-                              }`}
+                    return (
+                      <div className="space-y-3">
+                        {/* Control bar inside Tab 1 */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-slate-50 p-3 rounded-2xl border border-slate-200">
+                          <div className="w-full sm:w-64">
+                            <FastSearchInput
+                              value={roomStudentSearch}
+                              onSearchChange={setRoomStudentSearch}
+                              placeholder="Cari siswa di ruangan ini..."
+                              className="w-full pl-8 pr-7 py-1.5 rounded-xl bg-white border border-slate-200 text-xs text-slate-900 focus:outline-none"
+                            />
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-2">
+                            {selectedStudentIdsToRemove.length > 0 && (
+                              <>
+                                {/* Move selection to another room */}
+                                <div className="flex items-center gap-1">
+                                  <select
+                                    value={targetMoveRoomId}
+                                    onChange={(e) => setTargetMoveRoomId(e.target.value)}
+                                    className="px-2 py-1.5 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none"
+                                  >
+                                    <option value="">-- Pindah ke Ruang --</option>
+                                    {config.rooms.filter(r => r.id !== managingRoomModal.id).map(r => (
+                                      <option key={r.id} value={r.id}>{r.name}</option>
+                                    ))}
+                                  </select>
+                                  <button
+                                    type="button"
+                                    disabled={!targetMoveRoomId}
+                                    onClick={() => handleMoveSelectedStudentsToRoom(targetMoveRoomId, selectedStudentIdsToRemove)}
+                                    className={`px-3 py-1.5 rounded-xl font-bold text-xs transition cursor-pointer ${
+                                      targetMoveRoomId
+                                        ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs'
+                                        : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                    }`}
+                                  >
+                                    Pindahkan ({selectedStudentIdsToRemove.length})
+                                  </button>
+                                </div>
+
+                                {/* Remove selection from room */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveStudentsFromRoom(selectedStudentIdsToRemove)}
+                                  className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs transition shadow-xs cursor-pointer"
+                                >
+                                  Keluarkan ({selectedStudentIdsToRemove.length}) ✕
+                                </button>
+                              </>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() => handleClearRoom(managingRoomModal.id)}
+                              className="px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs border border-rose-200 transition cursor-pointer"
+                              title="Kosongkan seluruh siswa dari ruangan ini"
                             >
-                              <td className="py-2 px-3" onClick={(e) => e.stopPropagation()}>
+                              Kosongkan Semua 🗑️
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Student Table */}
+                        {displayed.length === 0 ? (
+                          <div className="p-8 text-center text-xs text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                            {roomStudents.length === 0
+                              ? 'Ruangan ini masih kosong. Silakan klik tab "Tambah / Pindahkan Siswa" di atas untuk mengisi peserta.'
+                              : 'Tidak ditemukan siswa yang sesuai pencarian.'}
+                          </div>
+                        ) : (
+                          <div className="overflow-x-auto rounded-2xl border border-slate-200 max-h-96 overflow-y-auto">
+                            <table className="w-full text-xs text-left">
+                              <thead className="bg-slate-50 text-slate-700 font-bold border-b border-slate-200 sticky top-0 z-10">
+                                <tr>
+                                  <th className="py-2.5 px-3 w-8">
+                                    <input
+                                      type="checkbox"
+                                      checked={
+                                        displayed.length > 0 &&
+                                        displayed.every(s => selectedStudentIdsToRemoveSet.has(s.id))
+                                      }
+                                      onChange={(e) => {
+                                        if (e.target.checked) {
+                                          setSelectedStudentIdsToRemove(displayed.map(s => s.id));
+                                        } else {
+                                          setSelectedStudentIdsToRemove([]);
+                                        }
+                                      }}
+                                      className="rounded text-rose-600 cursor-pointer"
+                                    />
+                                  </th>
+                                  <th className="py-2.5 px-3">No / Meja</th>
+                                  <th className="py-2.5 px-3">Nama Lengkap Siswa</th>
+                                  <th className="py-2.5 px-3">NISN</th>
+                                  <th className="py-2.5 px-3">Kelas Asal</th>
+                                  <th className="py-2.5 px-3 text-right">Aksi</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100">
+                                {displayed.map((st, idx) => {
+                                  const isChecked = selectedStudentIdsToRemoveSet.has(st.id);
+                                  return (
+                                    <tr key={st.id} className="hover:bg-slate-50 transition">
+                                      <td className="py-2 px-3">
+                                        <input
+                                          type="checkbox"
+                                          checked={isChecked}
+                                          onChange={(e) => {
+                                            if (e.target.checked) {
+                                              setSelectedStudentIdsToRemove([...selectedStudentIdsToRemove, st.id]);
+                                            } else {
+                                              setSelectedStudentIdsToRemove(selectedStudentIdsToRemove.filter(id => id !== st.id));
+                                            }
+                                          }}
+                                          className="rounded text-rose-600 cursor-pointer"
+                                        />
+                                      </td>
+                                      <td className="py-2 px-3">
+                                        <span className="w-6 h-6 rounded-md bg-slate-100 text-slate-600 font-mono font-bold text-[11px] inline-flex items-center justify-center">
+                                          {String(idx + 1).padStart(2, '0')}
+                                        </span>
+                                      </td>
+                                      <td className="py-2 px-3 font-bold text-slate-900">
+                                        {st.name}
+                                      </td>
+                                      <td className="py-2 px-3 font-mono text-slate-600">
+                                        {st.nisn}
+                                      </td>
+                                      <td className="py-2 px-3">
+                                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-black border ${
+                                          st.classId.startsWith('7')
+                                            ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                            : st.classId.startsWith('8')
+                                            ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                            : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                        }`}>
+                                          {st.classId}
+                                        </span>
+                                      </td>
+                                      <td className="py-2 px-3 text-right">
+                                        <button
+                                          type="button"
+                                          onClick={() => handleRemoveStudentsFromRoom([st.id])}
+                                          className="w-6 h-6 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition inline-flex items-center justify-center font-bold text-xs cursor-pointer"
+                                          title="Keluarkan dari ruangan ini"
+                                        >
+                                          ✕
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  {managingRoomTab === 'add' && (
+                    <div className="space-y-3">
+                      {/* Top Action Bar for Add */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-slate-50 p-3 rounded-2xl border border-slate-200">
+                        <div className="text-xs text-slate-600">
+                          Pilih siswa di bawah lalu klik tombol di kanan untuk menambahkan ke <strong>{managingRoomModal.name}</strong>.
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={handleAddSelectedStudentsToRoom}
+                          disabled={selectedStudentIdsToAdd.length === 0}
+                          className={`px-4 py-2 rounded-xl font-black text-xs transition shadow-md flex items-center gap-1.5 cursor-pointer ${
+                            selectedStudentIdsToAdd.length > 0
+                              ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20 active:scale-95'
+                              : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                          }`}
+                        >
+                          <span>+ Masukkan {selectedStudentIdsToAdd.length} Siswa Terpilih</span>
+                        </button>
+                      </div>
+
+                      {/* Filters */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                            1. Filter Kelas Asal:
+                          </label>
+                          <select
+                            value={pickerClassFilter}
+                            onChange={(e) => {
+                              setPickerClassFilter(e.target.value);
+                              setSelectedStudentIdsToAdd([]);
+                            }}
+                            className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:border-amber-500 cursor-pointer"
+                          >
+                            <option value="all">Semua Kelas</option>
+                            {SCHOOL_CLASSES.map(c => (
+                              <option key={c.id} value={c.id}>{c.name}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                            2. Status Ruangan:
+                          </label>
+                          <select
+                            value={pickerStatusFilter}
+                            onChange={(e) => setPickerStatusFilter(e.target.value as any)}
+                            className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-800 focus:outline-none focus:border-amber-500 cursor-pointer"
+                          >
+                            <option value="all">Semua Siswa</option>
+                            <option value="unassigned">Hanya yang Belum Dapat Ruang</option>
+                            <option value="other_room">Dari Ruangan Lain (Pindahkan)</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                            3. Cari Siswa:
+                          </label>
+                          <FastSearchInput
+                            value={pickerSearchQuery}
+                            onSearchChange={setPickerSearchQuery}
+                            placeholder="Ketik nama atau NISN..."
+                            className="w-full pl-8 pr-7 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-amber-500"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Quick Select Buttons */}
+                      <div className="flex flex-wrap items-center gap-1.5 p-2 rounded-xl bg-amber-50/60 border border-amber-200/60 text-xs">
+                        <span className="text-[11px] font-bold text-amber-900 mr-1">
+                          ⚡ Pilih Cepat:
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleQuickSelectHalf('top')}
+                          className="px-2.5 py-1 rounded-lg bg-white border border-amber-300 hover:bg-amber-100 text-amber-950 font-bold text-[11px] transition cursor-pointer"
+                        >
+                          Pilih 50% Pertama (Atas)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleQuickSelectHalf('bottom')}
+                          className="px-2.5 py-1 rounded-lg bg-white border border-amber-300 hover:bg-amber-100 text-amber-950 font-bold text-[11px] transition cursor-pointer"
+                        >
+                          Pilih 50% Kedua (Bawah)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedStudentIdsToAdd(pickerCandidates.map(s => s.id))}
+                          className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 font-bold text-[11px] transition cursor-pointer"
+                        >
+                          Pilih Semua ({pickerCandidates.length})
+                        </button>
+                        {selectedStudentIdsToAdd.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedStudentIdsToAdd([])}
+                            className="px-2.5 py-1 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 font-bold text-[11px] transition cursor-pointer ml-auto"
+                          >
+                            Batal Pilih (0)
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Candidate Table */}
+                      <div className="overflow-x-auto rounded-2xl border border-slate-200 max-h-80 overflow-y-auto">
+                        <table className="w-full text-xs text-left">
+                          <thead className="bg-slate-50 text-slate-700 font-bold border-b border-slate-200 sticky top-0 z-10">
+                            <tr>
+                              <th className="py-2.5 px-3 w-8">
                                 <input
                                   type="checkbox"
-                                  checked={isChecked}
+                                  checked={
+                                    pickerCandidates.length > 0 &&
+                                    pickerCandidates.every(s => selectedStudentIdsToAddSet.has(s.id))
+                                  }
                                   onChange={(e) => {
                                     if (e.target.checked) {
-                                      setSelectedStudentIdsToAdd([...selectedStudentIdsToAdd, st.id]);
+                                      setSelectedStudentIdsToAdd(pickerCandidates.map(s => s.id));
                                     } else {
-                                      setSelectedStudentIdsToAdd(selectedStudentIdsToAdd.filter(id => id !== st.id));
+                                      setSelectedStudentIdsToAdd([]);
                                     }
                                   }}
                                   className="rounded text-indigo-600 cursor-pointer"
                                 />
-                              </td>
-                              <td className="py-2 px-3 font-bold text-slate-900">
-                                {st.name}
-                              </td>
-                              <td className="py-2 px-3 font-mono text-slate-600">
-                                {st.nisn}
-                              </td>
-                              <td className="py-2 px-3">
-                                <span className={`px-2 py-0.5 rounded-md text-[10px] font-black border ${
-                                  st.classId.startsWith('7')
-                                    ? 'bg-blue-50 text-blue-700 border-blue-200'
-                                    : st.classId.startsWith('8')
-                                    ? 'bg-purple-50 text-purple-700 border-purple-200'
-                                    : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                }`}>
-                                  {st.classId}
-                                </span>
-                              </td>
-                              <td className="py-2 px-3">
-                                {isAlreadyInCurrentRoom ? (
-                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                                    ✓ Sudah di {currentArrangementRoom?.name}
-                                  </span>
-                                ) : assignedRoom ? (
-                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">
-                                    📍 Sedang di {assignedRoom.name}
-                                  </span>
-                                ) : (
-                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
-                                    ⚪ Belum Ada Ruang
-                                  </span>
-                                )}
-                              </td>
+                              </th>
+                              <th className="py-2.5 px-3">Nama Siswa</th>
+                              <th className="py-2.5 px-3">NISN</th>
+                              <th className="py-2.5 px-3">Kelas</th>
+                              <th className="py-2.5 px-3">Status Saat Ini</th>
                             </tr>
-                          );
-                        })
-                      )}
-                    </tbody>
-                  </table>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {pickerCandidates.length === 0 ? (
+                              <tr>
+                                <td colSpan={5} className="py-8 text-center text-slate-400">
+                                  Tidak ditemukan siswa dengan filter ini.
+                                </td>
+                              </tr>
+                            ) : (
+                              pickerCandidates.map(st => {
+                                const isChecked = selectedStudentIdsToAddSet.has(st.id);
+                                const assignedRoom = studentRoomMap.get(st.id);
+                                const isAlreadyInCurrentRoom = assignedRoom?.id === managingRoomModal.id;
+
+                                return (
+                                  <tr
+                                    key={st.id}
+                                    onClick={() => {
+                                      if (isChecked) {
+                                        setSelectedStudentIdsToAdd(selectedStudentIdsToAdd.filter(id => id !== st.id));
+                                      } else {
+                                        setSelectedStudentIdsToAdd([...selectedStudentIdsToAdd, st.id]);
+                                      }
+                                    }}
+                                    className={`cursor-pointer transition ${
+                                      isChecked
+                                        ? 'bg-amber-50/70'
+                                        : isAlreadyInCurrentRoom
+                                        ? 'bg-emerald-50/30 text-slate-500'
+                                        : 'hover:bg-slate-50'
+                                    }`}
+                                  >
+                                    <td className="py-2 px-3" onClick={(e) => e.stopPropagation()}>
+                                      <input
+                                        type="checkbox"
+                                        checked={isChecked}
+                                        onChange={(e) => {
+                                          if (e.target.checked) {
+                                            setSelectedStudentIdsToAdd([...selectedStudentIdsToAdd, st.id]);
+                                          } else {
+                                            setSelectedStudentIdsToAdd(selectedStudentIdsToAdd.filter(id => id !== st.id));
+                                          }
+                                        }}
+                                        className="rounded text-indigo-600 cursor-pointer"
+                                      />
+                                    </td>
+                                    <td className="py-2 px-3 font-bold text-slate-900">
+                                      {st.name}
+                                    </td>
+                                    <td className="py-2 px-3 font-mono text-slate-600">
+                                      {st.nisn}
+                                    </td>
+                                    <td className="py-2 px-3">
+                                      <span className={`px-2 py-0.5 rounded-md text-[10px] font-black border ${
+                                        st.classId.startsWith('7')
+                                          ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                          : st.classId.startsWith('8')
+                                          ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                          : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                      }`}>
+                                        {st.classId}
+                                      </span>
+                                    </td>
+                                    <td className="py-2 px-3">
+                                      {isAlreadyInCurrentRoom ? (
+                                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                                          ✓ Sudah di {managingRoomModal.name}
+                                        </span>
+                                      ) : assignedRoom ? (
+                                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">
+                                          📍 Sedang di {assignedRoom.name}
+                                        </span>
+                                      ) : (
+                                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
+                                          ⚪ Belum Ada Ruang
+                                        </span>
+                                      )}
+                                    </td>
+                                  </tr>
+                                );
+                              })
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Modal Footer */}
+                <div className="pt-3 border-t border-slate-100 flex items-center justify-between shrink-0">
+                  <span className="text-xs text-slate-400">
+                    Otomatis sinkron ke server saat ditutup.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setManagingRoomModal(null)}
+                    className="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black text-xs transition cursor-pointer active:scale-95"
+                  >
+                    Selesai &amp; Tutup
+                  </button>
                 </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 
