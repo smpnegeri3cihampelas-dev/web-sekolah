@@ -39,7 +39,11 @@ export async function GET(req: Request) {
       status: r.status,
       teacherName: r.teacher_name,
       instructions: r.instructions,
-      examDate: r.exam_date,
+      examDate: r.exam_date
+        ? (typeof r.exam_date === 'string'
+            ? r.exam_date.split('T')[0]
+            : new Date(r.exam_date).toISOString().split('T')[0])
+        : null,
       startTime: r.start_time,
       endTime: r.end_time,
       emergencyPaused: Boolean(r.emergency_paused),
@@ -82,6 +86,9 @@ export async function POST(req: Request) {
 
     const pkgId = id || `cbt-${Date.now()}`;
     const totalQuestions = questions ? questions.length : 0;
+    const cleanExamDate = examDate
+      ? (typeof examDate === 'string' ? examDate.split('T')[0] : new Date(examDate).toISOString().split('T')[0])
+      : null;
 
     await query(`
       INSERT INTO cbt_exam_packages (
@@ -92,9 +99,21 @@ export async function POST(req: Request) {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON DUPLICATE KEY UPDATE
         title=VALUES(title),
+        subject=VALUES(subject),
+        grade_level=VALUES(grade_level),
+        target_classes=VALUES(target_classes),
+        semester=VALUES(semester),
+        academic_year=VALUES(academic_year),
+        duration_minutes=VALUES(duration_minutes),
         token=VALUES(token),
-        status=VALUES(status),
+        passing_grade=VALUES(passing_grade),
         total_questions=VALUES(total_questions),
+        status=VALUES(status),
+        teacher_name=VALUES(teacher_name),
+        instructions=VALUES(instructions),
+        exam_date=VALUES(exam_date),
+        start_time=VALUES(start_time),
+        end_time=VALUES(end_time),
         emergency_paused=VALUES(emergency_paused),
         emergency_pause_reason=VALUES(emergency_pause_reason),
         questions=VALUES(questions);
@@ -113,7 +132,7 @@ export async function POST(req: Request) {
       status || 'active',
       teacherName || 'Panitia Ujian',
       instructions || null,
-      examDate || null,
+      cleanExamDate,
       startTime || null,
       endTime || null,
       emergencyPaused ? 1 : 0,

@@ -206,10 +206,15 @@ export async function syncCbtWithCloud(): Promise<void> {
     if (pkgRes.ok) {
       const { data } = await pkgRes.json();
       if (Array.isArray(data)) {
-        const cleaned = data.filter((p: any) => {
-          const tName = p.teacherName || '';
-          return !tName.includes('Cucu Rohaeti') && !tName.includes('Erma Rismayanti');
-        });
+        const cleaned = data
+          .filter((p: any) => {
+            const tName = p.teacherName || '';
+            return !tName.includes('Cucu Rohaeti') && !tName.includes('Erma Rismayanti');
+          })
+          .map((p: any) => ({
+            ...p,
+            examDate: p.examDate ? p.examDate.split('T')[0] : null
+          }));
         localStorage.setItem(CBT_PACKAGES_KEY, JSON.stringify(cleaned));
         window.dispatchEvent(new Event('cbtPackagesUpdated'));
       }

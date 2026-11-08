@@ -16,6 +16,7 @@ const dbConfig = {
   queueLimit: 0,
   enableKeepAlive: true,
   keepAliveInitialDelay: 10000,
+  dateStrings: true,
 };
 
 export const pool: Pool =

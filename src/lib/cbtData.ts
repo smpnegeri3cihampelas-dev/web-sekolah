@@ -856,9 +856,9 @@ export function getStoredCbtPackages(): CbtExamPackage[] {
       }
       return cleaned.map((p: CbtExamPackage) => ({
         ...p,
-        examDate: p.examDate || new Date().toISOString().split('T')[0],
-        startTime: (p.startTime === '07:30' && p.endTime === '09:00') ? '06:00' : (p.startTime || '06:00'),
-        endTime: (p.startTime === '07:30' && p.endTime === '09:00') ? '23:59' : (p.endTime || '23:59'),
+        examDate: p.examDate ? p.examDate.split('T')[0] : new Date().toISOString().split('T')[0],
+        startTime: p.startTime || '07:30',
+        endTime: p.endTime || '09:00',
         emergencyPaused: Boolean(p.emergencyPaused)
       }));
     }
@@ -885,12 +885,16 @@ export function deleteStoredCbtPackage(id: string) {
 export function saveStoredCbtPackages(packages: CbtExamPackage[]) {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.setItem(CBT_PACKAGES_KEY, JSON.stringify(packages));
+    const sanitized = packages.map(p => ({
+      ...p,
+      examDate: p.examDate ? p.examDate.split('T')[0] : new Date().toISOString().split('T')[0]
+    }));
+    localStorage.setItem(CBT_PACKAGES_KEY, JSON.stringify(sanitized));
     window.dispatchEvent(new Event('cbtPackagesUpdated'));
     // Asynchronous background cloud sync to Hostinger MySQL
     try {
       import('./cloudSync').then(m => {
-        packages.forEach(p => m.pushCbtPackageToCloud(p));
+        sanitized.forEach(p => m.pushCbtPackageToCloud(p));
       }).catch(() => {});
     } catch {}
   } catch (e) {
@@ -966,7 +970,7 @@ export function evaluateCbtPackageSchedule(
   const minutes = String(now.getMinutes()).padStart(2, '0');
   const currentTimeStr = `${hours}:${minutes}`;
 
-  const targetDate = pkg.examDate || todayStr;
+  const targetDate = pkg.examDate ? pkg.examDate.split('T')[0] : todayStr;
   const startTime = pkg.startTime || '00:00';
   const endTime = pkg.endTime || '23:59';
   const scheduleDisplay = `${startTime} - ${endTime} WIB`;

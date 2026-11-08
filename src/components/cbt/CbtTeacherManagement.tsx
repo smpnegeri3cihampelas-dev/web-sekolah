@@ -22,6 +22,25 @@ interface CbtTeacherManagementProps {
   activeStudents: Student[];
 }
 
+// Helper format tanggal Indonesia (contoh: "Min, 8 Nov 2026")
+function formatIndonesianExamDate(dateStr?: string): string {
+  if (!dateStr) return 'Hari Ini';
+  const clean = dateStr.split('T')[0];
+  const parts = clean.split('-');
+  if (parts.length === 3) {
+    const y = Number(parts[0]);
+    const m = Number(parts[1]) - 1;
+    const d = Number(parts[2]);
+    const date = new Date(y, m, d);
+    if (!isNaN(date.getTime())) {
+      const days = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+      return `${days[date.getDay()]}, ${d} ${months[m]} ${y}`;
+    }
+  }
+  return clean;
+}
+
 export default function CbtTeacherManagement({
   teacherName,
   teacherSubject,
@@ -30,6 +49,12 @@ export default function CbtTeacherManagement({
 }: CbtTeacherManagementProps) {
   const [packages, setPackages] = useState<CbtExamPackage[]>([]);
   const [activeTab, setActiveTab] = useState<'packages' | 'scores'>('packages');
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 4000);
+  };
 
   // Filter packages strictly for this teacher / teacher's subject
   const myPackages = useMemo(() => {
@@ -81,7 +106,8 @@ export default function CbtTeacherManagement({
 
   const openScheduleModal = (pkg: CbtExamPackage) => {
     setScheduleModalPkg(pkg);
-    setEditSchedDate(pkg.examDate || new Date().toISOString().split('T')[0]);
+    const rawDate = pkg.examDate ? pkg.examDate.split('T')[0] : new Date().toISOString().split('T')[0];
+    setEditSchedDate(rawDate);
     setEditSchedStartTime(pkg.startTime || '07:30');
     setEditSchedEndTime(pkg.endTime || '09:00');
     setEditSchedDuration(pkg.durationMinutes || 60);
@@ -91,11 +117,18 @@ export default function CbtTeacherManagement({
     e.preventDefault();
     if (!scheduleModalPkg) return;
 
+    if (editSchedStartTime >= editSchedEndTime) {
+      alert('Jam mulai harus lebih awal daripada jam selesai.');
+      return;
+    }
+
+    const cleanDate = editSchedDate ? editSchedDate.split('T')[0] : new Date().toISOString().split('T')[0];
+
     const updated = packages.map(p => {
       if (p.id === scheduleModalPkg.id) {
         return {
           ...p,
-          examDate: editSchedDate,
+          examDate: cleanDate,
           startTime: editSchedStartTime,
           endTime: editSchedEndTime,
           durationMinutes: editSchedDuration,
@@ -108,6 +141,7 @@ export default function CbtTeacherManagement({
     saveStoredCbtPackages(updated);
     setPackages(updated);
     setScheduleModalPkg(null);
+    showToast(`✓ Jadwal ujian berhasil disimpan: ${formatIndonesianExamDate(cleanDate)} (${editSchedStartTime} - ${editSchedEndTime} WIB)`);
   };
 
   // Handle grade change and auto-set target classes
@@ -435,7 +469,7 @@ export default function CbtTeacherManagement({
                           Jadwal Sesi Ujian
                         </span>
                         <span className="font-bold text-slate-800 text-xs">
-                          📅 {pkg.examDate || 'Hari Ini'} • {pkg.startTime || '07:30'} - {pkg.endTime || '09:00'} WIB
+                          📅 {formatIndonesianExamDate(pkg.examDate)} • {pkg.startTime || '07:30'} - {pkg.endTime || '09:00'} WIB
                         </span>
                       </div>
                     </div>
@@ -1321,6 +1355,14 @@ export default function CbtTeacherManagement({
           onSave={handleSaveQuestion}
           onClose={() => setEditingQuestion(null)}
         />
+      )}
+
+      {/* TOAST NOTIFIKASI */}
+      {toastMsg && (
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white font-bold text-xs px-4 py-3 rounded-2xl shadow-2xl border border-slate-700 animate-fade-in flex items-center gap-2">
+          <span>✅</span>
+          <span>{toastMsg}</span>
+        </div>
       )}
 
     </div>
