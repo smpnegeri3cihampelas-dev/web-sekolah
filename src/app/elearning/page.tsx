@@ -927,17 +927,17 @@ const PiketMonthlyReportSection = React.memo(function PiketMonthlyReportSection(
   return (
     <div className="space-y-4">
       {/* Filter Card (Meja Piket) */}
-      <div className="bg-white border border-indigo-100 rounded-2xl p-4 sm:p-5 shadow-sm space-y-4">
+      <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-xs space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
           <div>
             <h2 className="text-base font-bold text-slate-900 tracking-tight flex items-center gap-2">
-              <span>📊 Matriks Presensi Bulanan</span>
+              <span>Matriks Presensi Bulanan</span>
               <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 font-semibold">
                 Kelas {selectedClassId}
               </span>
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              Tinjau kalender kehadiran tgl 1 s/d 31 serta unduh berkas laporan presensi.
+              Rekapitulasi presensi tanggal 1 s/d 31 per rombel.
             </p>
           </div>
 
@@ -945,7 +945,7 @@ const PiketMonthlyReportSection = React.memo(function PiketMonthlyReportSection(
             <button
               type="button"
               onClick={() => onExportExcel(selectedClassId, selectedMonth, selectedYear)}
-              className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-md shadow-emerald-600/20 flex items-center gap-2 cursor-pointer"
+              className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-sm flex items-center gap-2 cursor-pointer"
             >
               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/>
@@ -955,7 +955,7 @@ const PiketMonthlyReportSection = React.memo(function PiketMonthlyReportSection(
             <button
               type="button"
               onClick={() => window.print()}
-              className="px-3.5 py-2.5 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 font-semibold text-xs transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+              className="px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-semibold text-xs transition flex items-center gap-1.5 cursor-pointer shadow-xs"
             >
               <span>🖨️ Cetak</span>
             </button>
@@ -965,7 +965,7 @@ const PiketMonthlyReportSection = React.memo(function PiketMonthlyReportSection(
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">
-              Rombel:
+              Kelas / Rombel:
             </label>
             <select
               value={selectedClassId}
@@ -1066,18 +1066,13 @@ const PiketMonthlyReportSection = React.memo(function PiketMonthlyReportSection(
       </div>
 
       {/* Table Matriks Bulanan Meja Piket */}
-      <div className="bg-white border border-indigo-100 rounded-2xl shadow-sm overflow-hidden">
-        <div className="p-4 bg-slate-50 border-b border-indigo-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <div>
-            <h3 className="text-sm font-extrabold text-slate-900 tracking-wide uppercase">
-              LAPORAN ABSENSI — KELAS {selectedClassId} ({monthName.toUpperCase()} {selectedYear})
-            </h3>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Petugas Jaga: <span className="font-semibold text-slate-800">{piketDutyTeacher}</span> • Total {studentsInReport.length} Siswa
-            </p>
-          </div>
-          <span className="text-xs text-slate-500 font-medium hidden sm:inline-block">
-            Format Kalender Presensi Resmi
+      <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
+        <div className="px-4 py-3 bg-slate-50 border-b border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+          <span className="font-bold text-slate-900">
+            Presensi Kelas {selectedClassId} — {monthName} {selectedYear} ({studentsInReport.length} Siswa)
+          </span>
+          <span className="text-slate-500">
+            Petugas: <strong className="text-slate-800">{piketDutyTeacher}</strong>
           </span>
         </div>
 
@@ -1306,7 +1301,7 @@ export default function ELearningPage() {
     const m = new Date().getMonth() + 1;
     return m >= 7 ? `${y}/${y + 1}` : `${y - 1}/${y}`;
   });
-  const [piketViewTab, setPiketViewTab] = useState<'live' | 'laporan' | 'pengawas'>('live');
+  const [piketViewTab, setPiketViewTab] = useState<'live' | 'laporan'>('live');
 
   // CBT Active Exam Session for Student / Teacher Preview
   const [activeCbtExamSession, setActiveCbtExamSession] = useState<{
@@ -4425,43 +4420,29 @@ export default function ELearningPage() {
 
               {/* Navigation Tabs & Actions Bar */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-1">
-                {/* Tab Switcher: Live Hari Ini vs Matriks Bulanan Kelas */}
-                <div className="inline-flex items-center p-1 rounded-xl bg-slate-100 border border-slate-200 text-xs font-semibold">
+                {/* Tab Switcher: Live Hari Ini vs Matriks Bulanan */}
+                <div className="inline-flex items-center gap-1 bg-slate-100/90 p-1 rounded-xl border border-slate-200/80 text-xs">
                   <button
                     type="button"
                     onClick={() => setPiketViewTab('live')}
-                    className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer flex items-center gap-1.5 ${
+                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
                       piketViewTab === 'live'
-                        ? 'bg-white text-emerald-700 shadow-sm font-bold'
-                        : 'text-slate-600 hover:text-slate-900'
+                        ? 'bg-white text-emerald-700 font-bold shadow-xs border border-emerald-100/60'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-white/60 font-medium'
                     }`}
                   >
-                    <span>🏫</span>
-                    <span>Live Hari Ini</span>
+                    Live Hari Ini
                   </button>
                   <button
                     type="button"
                     onClick={() => setPiketViewTab('laporan')}
-                    className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer flex items-center gap-1.5 ${
+                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
                       piketViewTab === 'laporan'
-                        ? 'bg-white text-emerald-700 shadow-sm font-bold'
-                        : 'text-slate-600 hover:text-slate-900'
+                        ? 'bg-white text-emerald-700 font-bold shadow-xs border border-emerald-100/60'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-white/60 font-medium'
                     }`}
                   >
-                    <span>📊</span>
-                    <span>Matriks Bulanan Kelas</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPiketViewTab('pengawas')}
-                    className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer flex items-center gap-1.5 ${
-                      piketViewTab === 'pengawas'
-                        ? 'bg-white text-emerald-700 shadow-sm font-bold'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    <span>📋</span>
-                    <span>Pengawas CBT</span>
+                    Matriks Bulanan
                   </button>
                 </div>
 
@@ -4471,10 +4452,12 @@ export default function ELearningPage() {
                     <button
                       type="button"
                       onClick={handleExportPiketExcel}
-                      className="px-3.5 py-1.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-semibold text-xs transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+                      className="px-3.5 py-1.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-semibold text-xs transition flex items-center gap-1.5 cursor-pointer shadow-xs"
                       title="Unduh rekapitulasi presensi harian seluruh rombel hari ini (.xlsx)"
                     >
-                      <span>📋</span>
+                      <svg className="w-3.5 h-3.5 text-slate-500" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/>
+                      </svg>
                       <span>Export Harian (.xlsx)</span>
                     </button>
                   )}
@@ -4482,11 +4465,11 @@ export default function ELearningPage() {
                   <button
                     type="button"
                     onClick={handleExportSchoolSemesterExcel}
-                    className="px-3.5 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer shadow-sm"
-                    title="Unduh rekapitulasi kehadiran 1 semester seluruh sekolah (17 rombel & 535 siswa) untuk Kesiswaan / BK (.xlsx)"
+                    className="px-3.5 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                    title="Unduh rekapitulasi kehadiran 1 semester seluruh sekolah (.xlsx)"
                   >
                     <span>📥</span>
-                    <span>Rekap 1 Semester</span>
+                    <span>Rekap Semester</span>
                   </button>
                 </div>
               </div>
@@ -4494,377 +4477,357 @@ export default function ELearningPage() {
 
             {/* TAMPILAN PIKET: LIVE MONITORING HARI INI */}
             {piketViewTab === 'live' && (
-              <div className="space-y-6">
-                {/* TOP STATS CARDS: CLEAN & MINIMALIST */}
+              <div className="space-y-5">
+                {/* TOP STATS CARDS */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5">
-                  <div className="p-3.5 rounded-xl bg-white border border-slate-200 shadow-sm">
-                    <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Total Siswa</div>
+                  <div className="p-3 rounded-xl bg-white border border-slate-200/80 shadow-xs">
+                    <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total Siswa</div>
                     <div className="text-xl font-bold text-slate-900 mt-0.5">{activeStudents.length}</div>
                   </div>
 
-                  <div className="p-3.5 rounded-xl bg-emerald-50/80 border border-emerald-200 shadow-sm">
-                    <div className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">Hadir (H)</div>
-                    <div className="text-xl font-black text-emerald-700 mt-0.5">{schoolStats.hadir}</div>
+                  <div className="p-3 rounded-xl bg-white border border-slate-200/80 shadow-xs">
+                    <div className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">Hadir (H)</div>
+                    <div className="text-xl font-black text-emerald-600 mt-0.5">{schoolStats.hadir}</div>
                   </div>
 
-                  <div className="p-3.5 rounded-xl bg-blue-50/80 border border-blue-200 shadow-sm">
-                    <div className="text-[10px] font-bold text-blue-800 uppercase tracking-wider">Sakit (S)</div>
-                    <div className="text-xl font-black text-blue-700 mt-0.5">{schoolStats.sakit}</div>
+                  <div className="p-3 rounded-xl bg-white border border-slate-200/80 shadow-xs">
+                    <div className="text-[10px] font-bold text-blue-700 uppercase tracking-wider">Sakit (S)</div>
+                    <div className="text-xl font-black text-blue-600 mt-0.5">{schoolStats.sakit}</div>
                   </div>
 
-                  <div className="p-3.5 rounded-xl bg-amber-50/80 border border-amber-200 shadow-sm">
-                    <div className="text-[10px] font-bold text-amber-800 uppercase tracking-wider">Izin (I)</div>
-                    <div className="text-xl font-black text-amber-700 mt-0.5">{schoolStats.izin}</div>
+                  <div className="p-3 rounded-xl bg-white border border-slate-200/80 shadow-xs">
+                    <div className="text-[10px] font-bold text-amber-700 uppercase tracking-wider">Izin (I)</div>
+                    <div className="text-xl font-black text-amber-600 mt-0.5">{schoolStats.izin}</div>
                   </div>
 
-                  <div className="p-3.5 rounded-xl bg-rose-50/80 border border-rose-200 shadow-sm">
-                    <div className="text-[10px] font-bold text-rose-800 uppercase tracking-wider">Alpa (A)</div>
-                    <div className="text-xl font-black text-rose-700 mt-0.5">{schoolStats.alpa}</div>
+                  <div className="p-3 rounded-xl bg-white border border-slate-200/80 shadow-xs">
+                    <div className="text-[10px] font-bold text-rose-700 uppercase tracking-wider">Alpa (A)</div>
+                    <div className="text-xl font-black text-rose-600 mt-0.5">{schoolStats.alpa}</div>
                   </div>
 
-                  <div className="p-3.5 rounded-xl bg-orange-50/80 border border-orange-200 shadow-sm">
-                    <div className="text-[10px] font-bold text-orange-800 uppercase tracking-wider">Telat (T)</div>
-                    <div className="text-xl font-black text-orange-700 mt-0.5">{schoolStats.terlambat}</div>
+                  <div className="p-3 rounded-xl bg-white border border-slate-200/80 shadow-xs">
+                    <div className="text-[10px] font-bold text-orange-700 uppercase tracking-wider">Telat (T)</div>
+                    <div className="text-xl font-black text-orange-600 mt-0.5">{schoolStats.terlambat}</div>
                   </div>
 
-                  <div className="p-3.5 rounded-xl bg-rose-50/90 border border-rose-300 shadow-sm">
-                    <div className="text-[10px] font-bold text-rose-800 uppercase tracking-wider flex items-center gap-1">
-                      <span>🚪</span>
-                      <span>Keluar (K)</span>
-                    </div>
+                  <div className="p-3 rounded-xl bg-white border border-slate-200/80 shadow-xs">
+                    <div className="text-[10px] font-bold text-rose-800 uppercase tracking-wider">Keluar (K)</div>
                     <div className="text-xl font-black text-rose-700 mt-0.5">{schoolStats.keluar}</div>
                   </div>
                 </div>
 
-            {/* DUA KOLOM: PETA KELAS (KIRI) & POS MEJA PIKET / SISWA TELAT (KANAN) */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* DUA KOLOM: PETA KELAS (KIRI) & POS MEJA PIKET (KANAN) */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
-              {/* KOLOM KIRI (2/3): PETA KELAS (LIVE GRID MONITORING) */}
-              <div className="lg:col-span-2 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                    <span>Peta Status Seluruh Rombel</span>
-                    <span className="text-xs font-normal text-slate-500">(Live Status Hari Ini)</span>
-                  </h2>
-                  <div className="text-xs flex items-center gap-3">
-                    <span className="flex items-center gap-1.5 text-emerald-700 font-semibold">
-                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" /> Sudah Diabsen
-                    </span>
-                    <span className="flex items-center gap-1.5 text-amber-700 font-semibold">
-                      <span className="w-2.5 h-2.5 rounded-full bg-amber-500" /> Belum Diabsen
-                    </span>
-                  </div>
-                </div>
+                  {/* KOLOM KIRI (2/3): PETA KELAS */}
+                  <div className="lg:col-span-2 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-sm font-bold text-slate-900 tracking-tight flex items-center gap-1.5">
+                        <span>Status Presensi Rombel</span>
+                        <span className="text-xs font-normal text-slate-500">(17 Kelas)</span>
+                      </h2>
+                      <div className="text-xs flex items-center gap-3">
+                        <span className="flex items-center gap-1.5 text-emerald-700 font-semibold text-[11px]">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500" /> Sudah Diabsen
+                        </span>
+                        <span className="flex items-center gap-1.5 text-amber-700 font-semibold text-[11px]">
+                          <span className="w-2 h-2 rounded-full bg-amber-500" /> Belum Diabsen
+                        </span>
+                      </div>
+                    </div>
 
-                {/* Grid Rombel Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5">
-                  {SCHOOL_CLASSES.map(cls => {
-                    const session = attendanceData[cls.id];
-                    const classSessions = sessions.filter(s => s.date === todayStr && s.classId === cls.id);
-                    const isDone = classSessions.length > 0 || Boolean(session?.isSubmitted && session?.date === todayStr);
-                    const students = activeStudents.filter(s => s.classId === cls.id);
-                    
-                    // Count anomalies (S, I, A, T, K) across all sessions for this class today
-                    let sick = 0, leave = 0, absent = 0, late = 0, keluar = 0;
-                    students.forEach(st => {
-                      if (st.status === 'Keluar') {
-                        keluar++;
-                        return;
-                      }
-                      let stStatus: AttendanceStatus | undefined;
-                      for (const s of classSessions) {
-                        if (s.records?.[st.id] && s.records[st.id] !== 'H') {
-                          stStatus = s.records[st.id];
-                          break;
-                        }
-                      }
-                      if (!stStatus && session?.records?.[st.id]) {
-                        stStatus = session.records[st.id];
-                      }
-                      if (stStatus === 'S') sick++;
-                      else if (stStatus === 'I') leave++;
-                      else if (stStatus === 'A') absent++;
-                      else if (stStatus === 'T') late++;
-                      else if (stStatus === 'K') keluar++;
-                    });
+                    {/* Grid Rombel Cards */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                      {SCHOOL_CLASSES.map(cls => {
+                        const session = attendanceData[cls.id];
+                        const classSessions = sessions.filter(s => s.date === todayStr && s.classId === cls.id);
+                        const isDone = classSessions.length > 0 || Boolean(session?.isSubmitted && session?.date === todayStr);
+                        const students = activeStudents.filter(s => s.classId === cls.id);
+                        
+                        let sick = 0, leave = 0, absent = 0, late = 0, keluar = 0;
+                        students.forEach(st => {
+                          if (st.status === 'Keluar') {
+                            keluar++;
+                            return;
+                          }
+                          let stStatus: AttendanceStatus | undefined;
+                          for (const s of classSessions) {
+                            if (s.records?.[st.id] && s.records[st.id] !== 'H') {
+                              stStatus = s.records[st.id];
+                              break;
+                            }
+                          }
+                          if (!stStatus && session?.records?.[st.id]) {
+                            stStatus = session.records[st.id];
+                          }
+                          if (stStatus === 'S') sick++;
+                          else if (stStatus === 'I') leave++;
+                          else if (stStatus === 'A') absent++;
+                          else if (stStatus === 'T') late++;
+                          else if (stStatus === 'K') keluar++;
+                        });
 
-                    return (
-                      <div
-                        key={cls.id}
-                        onClick={() => handleOpenPiketClassModal(cls.id)}
-                        className={`p-4 rounded-2xl border-2 transition cursor-pointer relative overflow-hidden group shadow-sm hover:shadow-md ${
-                          isDone 
-                            ? 'bg-white border-emerald-300 hover:border-emerald-500' 
-                            : 'bg-white border-amber-300 hover:border-amber-500'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-base font-bold text-slate-900 group-hover:text-indigo-600 transition">
-                            {cls.name}
-                          </span>
-                          {isDone ? (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                              🟢 {classSessions.length > 0 ? `${classSessions.length} Mapel Diabsen` : 'Selesai Diabsen'}
-                            </span>
-                          ) : (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 animate-pulse">
-                              🟡 Belum Diabsen
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="text-[11px] text-slate-500 mb-3 flex items-center justify-between">
-                          <span>Total: <span className="text-slate-800 font-semibold">{cls.totalStudents} Siswa</span></span>
-                          <span className="text-[10px] text-slate-400 font-mono font-medium">2026/2027</span>
-                        </div>
-
-                        {/* Summary Numbers inside Class Card */}
-                        {isDone ? (
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between text-xs py-1.5 px-2 rounded-lg bg-slate-50 border border-slate-100">
-                              <span className="text-slate-500">Mapel:</span>
-                              <span className="font-semibold text-slate-800 truncate max-w-[130px]" title={classSessions.map(cs => `${cs.subject} (${cs.teacherName})`).join(', ') || session?.teacherName}>
-                                {classSessions.length > 0 
-                                  ? classSessions.map(cs => cs.subject.split(' ')[0]).join(', ')
-                                  : (session?.teacherName?.split(',')[0] || '-')}
+                        return (
+                          <div
+                            key={cls.id}
+                            onClick={() => handleOpenPiketClassModal(cls.id)}
+                            className={`p-3.5 rounded-2xl border transition cursor-pointer relative overflow-hidden group shadow-2xs hover:shadow-md ${
+                              isDone 
+                                ? 'bg-white border-emerald-200/90 hover:border-emerald-400' 
+                                : 'bg-white border-amber-200/90 hover:border-amber-400'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-base font-bold text-slate-900 group-hover:text-indigo-600 transition">
+                                {cls.name}
                               </span>
-                            </div>
-
-                            <div className={`grid ${keluar > 0 ? 'grid-cols-5' : 'grid-cols-4'} gap-1 text-center font-mono text-[11px]`}>
-                              <div className="p-1 rounded bg-blue-50 text-blue-800 border border-blue-200 font-bold">
-                                S: {sick}
-                              </div>
-                              <div className="p-1 rounded bg-amber-50 text-amber-800 border border-amber-200 font-bold">
-                                I: {leave}
-                              </div>
-                              <div className="p-1 rounded bg-rose-50 text-rose-800 border border-rose-200 font-bold">
-                                A: {absent}
-                              </div>
-                              <div className="p-1 rounded bg-orange-50 text-orange-800 border border-orange-200 font-bold">
-                                T: {late}
-                              </div>
-                              {keluar > 0 && (
-                                <div className="p-1 rounded bg-rose-100 text-rose-900 border border-rose-300 font-bold" title="Siswa Keluar / Pindah">
-                                  K: {keluar}
-                                </div>
+                              {isDone ? (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                  🟢 {classSessions.length > 0 ? `${classSessions.length} Mapel` : 'Selesai'}
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 animate-pulse">
+                                  🟡 Belum Diabsen
+                                </span>
                               )}
                             </div>
-                            <div className="text-[10px] text-slate-500 text-right font-medium">
-                              Waktu: <span className="font-mono text-slate-700 font-semibold">{classSessions[classSessions.length - 1]?.submittedAt || session?.submittedAt || '-'}</span>
+
+                            <div className="text-[11px] text-slate-500 mb-2.5">
+                              Total: <span className="text-slate-800 font-semibold">{cls.totalStudents} Siswa</span>
                             </div>
-                            <div className="pt-1 flex items-center justify-between text-[11px]">
-                              <span className="text-indigo-600 font-bold group-hover:underline">
-                                ✏️ Buka Rincian / Buku Piket →
-                              </span>
-                            </div>
+
+                            {/* Summary Numbers inside Class Card */}
+                            {isDone ? (
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between text-xs py-1 px-2 rounded-lg bg-slate-50 border border-slate-100">
+                                  <span className="text-slate-500 text-[11px]">Mapel:</span>
+                                  <span className="font-semibold text-slate-800 truncate max-w-[130px] text-[11px]" title={classSessions.map(cs => `${cs.subject} (${cs.teacherName})`).join(', ') || session?.teacherName}>
+                                    {classSessions.length > 0 
+                                      ? classSessions.map(cs => cs.subject.split(' ')[0]).join(', ')
+                                      : (session?.teacherName?.split(',')[0] || '-')}
+                                  </span>
+                                </div>
+
+                                <div className={`grid ${keluar > 0 ? 'grid-cols-5' : 'grid-cols-4'} gap-1 text-center font-mono text-[11px]`}>
+                                  <div className="p-1 rounded bg-blue-50 text-blue-800 border border-blue-200 font-bold">
+                                    S: {sick}
+                                  </div>
+                                  <div className="p-1 rounded bg-amber-50 text-amber-800 border border-amber-200 font-bold">
+                                    I: {leave}
+                                  </div>
+                                  <div className="p-1 rounded bg-rose-50 text-rose-800 border border-rose-200 font-bold">
+                                    A: {absent}
+                                  </div>
+                                  <div className="p-1 rounded bg-orange-50 text-orange-800 border border-orange-200 font-bold">
+                                    T: {late}
+                                  </div>
+                                  {keluar > 0 && (
+                                    <div className="p-1 rounded bg-rose-100 text-rose-900 border border-rose-300 font-bold" title="Siswa Keluar / Pindah">
+                                      K: {keluar}
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="pt-1 flex items-center justify-between text-[11px]">
+                                  <span className="text-slate-400 font-mono text-[10px]">
+                                    {classSessions[classSessions.length - 1]?.submittedAt || session?.submittedAt ? `Pkl ${classSessions[classSessions.length - 1]?.submittedAt || session?.submittedAt}` : ''}
+                                  </span>
+                                  <span className="text-indigo-600 font-bold group-hover:underline">
+                                    Buka Presensi →
+                                  </span>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="py-2 text-center space-y-2">
+                                <span className="text-xs text-amber-700 font-semibold block">
+                                  Jam Kosong / Belum Diabsen
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOpenPiketClassModal(cls.id);
+                                  }}
+                                  className="w-full py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs transition shadow-2xs flex items-center justify-center gap-1.5 cursor-pointer"
+                                >
+                                  <span>Absenkan sbg Piket →</span>
+                                </button>
+                              </div>
+                            )}
                           </div>
-                        ) : (
-                          <div className="py-2 text-center space-y-2.5">
-                            <span className="text-xs text-amber-700 font-semibold block">
-                              Guru Belum Hadir / Jam Kosong
-                            </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* KOLOM KANAN (1/3): POS MEJA PIKET */}
+                  <div className="space-y-4">
+                    <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-xs">
+                      <div className="flex items-center gap-2 mb-3 pb-2 border-b border-slate-100">
+                        <span className="w-7 h-7 rounded-lg bg-orange-50 text-orange-600 border border-orange-200 flex items-center justify-center font-bold text-xs">
+                          ⏱️
+                        </span>
+                        <div>
+                          <h3 className="text-sm font-bold text-slate-900">Catat Siswa Telat / Izin</h3>
+                          <p className="text-[11px] text-slate-500">Layanan meja piket & gerbang</p>
+                        </div>
+                      </div>
+
+                      <form onSubmit={handlePiketActionSubmit} className="space-y-3 text-xs">
+                        <div>
+                          <label className="block text-slate-700 font-semibold mb-1">
+                            Kelas:
+                          </label>
+                          <select
+                            value={piketSelectedClass}
+                            onChange={(e) => {
+                              setPiketSelectedClass(e.target.value);
+                              const firstStudent = activeStudents.find(s => s.classId === e.target.value);
+                              if (firstStudent) setPiketSelectedStudentId(firstStudent.id);
+                            }}
+                            className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-indigo-500 focus:bg-white transition"
+                          >
+                            {SCHOOL_CLASSES.map(c => (
+                              <option key={c.id} value={c.id}>{c.name} ({c.totalStudents} Siswa)</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-slate-700 font-semibold mb-1">
+                            Nama Siswa:
+                          </label>
+                          <select
+                            value={piketSelectedStudentId}
+                            onChange={(e) => setPiketSelectedStudentId(e.target.value)}
+                            className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-indigo-500 focus:bg-white transition"
+                          >
+                            {activeStudents.filter(s => s.classId === piketSelectedClass).map(s => (
+                              <option key={s.id} value={s.id} disabled={s.status === 'Keluar'}>
+                                {s.name} ({s.gender}){s.status === 'Keluar' ? ' [🚪 KELUAR SEKOLAH]' : ''}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-slate-700 font-semibold mb-1">
+                            Status Kehadiran:
+                          </label>
+                          <div className="grid grid-cols-3 gap-1.5">
                             <button
                               type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleOpenPiketClassModal(cls.id);
-                              }}
-                              className="w-full py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs transition shadow-md shadow-amber-500/20 flex items-center justify-center gap-1.5 cursor-pointer"
+                              onClick={() => { setPiketActionStatus('T'); setPiketActionNote('Terlambat'); }}
+                              className={`py-2 rounded-lg font-bold text-center border transition cursor-pointer ${
+                                piketActionStatus === 'T'
+                                  ? 'bg-orange-500 text-white border-orange-500 shadow-sm'
+                                  : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                              }`}
                             >
-                              <span>📝</span>
-                              <span>Absenkan sbg Piket</span>
+                              Telat (T)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => { setPiketActionStatus('S'); setPiketActionNote('Sakit'); }}
+                              className={`py-2 rounded-lg font-bold text-center border transition cursor-pointer ${
+                                piketActionStatus === 'S'
+                                  ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                                  : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                              }`}
+                            >
+                              Sakit (S)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => { setPiketActionStatus('I'); setPiketActionNote('Izin'); }}
+                              className={`py-2 rounded-lg font-bold text-center border transition cursor-pointer ${
+                                piketActionStatus === 'I'
+                                  ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
+                                  : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                              }`}
+                            >
+                              Izin (I)
                             </button>
                           </div>
-                        )}
-
-                        <div className="mt-2 pt-2 border-t border-slate-100 text-[11px] text-center text-slate-400 group-hover:text-indigo-600 transition">
-                          Klik kartu untuk buka presensi kelas ini
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
 
-              {/* KOLOM KANAN (1/3): POS MEJA PIKET (AKSI SISWA TELAT & SURAT IZIN) */}
-              <div className="space-y-4">
-                <div className="bg-white border border-indigo-100 rounded-2xl p-5 shadow-sm">
-                  <div className="flex items-center gap-2 mb-3 pb-2 border-b border-indigo-50">
-                    <span className="w-7 h-7 rounded-lg bg-orange-50 text-orange-600 border border-orange-200 flex items-center justify-center font-bold text-xs">
-                      ⏱️
-                    </span>
-                    <div>
-                      <h3 className="text-sm font-bold text-slate-900">Pos Gerbang / Piket</h3>
-                      <p className="text-[11px] text-slate-500">Catat Siswa Telat atau Izin</p>
-                    </div>
-                  </div>
+                        <div>
+                          <label className="block text-slate-700 font-semibold mb-1">
+                            Keterangan:
+                          </label>
+                          <input
+                            type="text"
+                            value={piketActionNote}
+                            onChange={(e) => setPiketActionNote(e.target.value)}
+                            placeholder="Alasan terlambat / izin..."
+                            className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-indigo-500 focus:bg-white transition"
+                          />
+                        </div>
 
-                  <form onSubmit={handlePiketActionSubmit} className="space-y-3 text-xs">
-                    <div>
-                      <label className="block text-slate-700 font-semibold mb-1">
-                        Kelas Siswa:
-                      </label>
-                      <select
-                        value={piketSelectedClass}
-                        onChange={(e) => {
-                          setPiketSelectedClass(e.target.value);
-                          const firstStudent = activeStudents.find(s => s.classId === e.target.value);
-                          if (firstStudent) setPiketSelectedStudentId(firstStudent.id);
-                        }}
-                        className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-indigo-500 focus:bg-white transition"
-                      >
-                        {SCHOOL_CLASSES.map(c => (
-                          <option key={c.id} value={c.id}>{c.name} ({c.totalStudents} Siswa)</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-slate-700 font-semibold mb-1">
-                        Nama Siswa:
-                      </label>
-                      <select
-                        value={piketSelectedStudentId}
-                        onChange={(e) => setPiketSelectedStudentId(e.target.value)}
-                        className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-indigo-500 focus:bg-white transition"
-                      >
-                        {activeStudents.filter(s => s.classId === piketSelectedClass).map(s => (
-                          <option key={s.id} value={s.id} disabled={s.status === 'Keluar'}>
-                            {s.name} ({s.gender}){s.status === 'Keluar' ? ' [🚪 KELUAR SEKOLAH]' : ''}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-slate-700 font-semibold mb-1">
-                        Status Kehadiran:
-                      </label>
-                      <div className="grid grid-cols-3 gap-1.5">
                         <button
-                          type="button"
-                          onClick={() => { setPiketActionStatus('T'); setPiketActionNote('Terlambat sampai gerbang'); }}
-                          className={`py-2 rounded-lg font-bold text-center border transition cursor-pointer ${
-                            piketActionStatus === 'T'
-                              ? 'bg-orange-500 text-white border-orange-500 shadow-md shadow-orange-500/20'
-                              : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                          }`}
+                          type="submit"
+                          className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"
                         >
-                          Terlambat (T)
+                          <span>Simpan Status</span>
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => { setPiketActionStatus('S'); setPiketActionNote('Surat dokter diserahkan ke piket'); }}
-                          className={`py-2 rounded-lg font-bold text-center border transition cursor-pointer ${
-                            piketActionStatus === 'S'
-                              ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-500/20'
-                              : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                          }`}
-                        >
-                          Sakit (S)
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => { setPiketActionStatus('I'); setPiketActionNote('Surat izin dari orang tua'); }}
-                          className={`py-2 rounded-lg font-bold text-center border transition cursor-pointer ${
-                            piketActionStatus === 'I'
-                              ? 'bg-amber-500 text-white border-amber-500 shadow-md shadow-amber-500/20'
-                              : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                          }`}
-                        >
-                          Izin (I)
-                        </button>
-                      </div>
+                      </form>
                     </div>
 
-                    <div>
-                      <label className="block text-slate-700 font-semibold mb-1">
-                        Catatan Piket:
-                      </label>
-                      <input
-                        type="text"
-                        value={piketActionNote}
-                        onChange={(e) => setPiketActionNote(e.target.value)}
-                        placeholder="Contoh: Terlambat karena kendaraan mogok..."
-                        className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-indigo-500 focus:bg-white transition"
-                      />
-                    </div>
-
-                    <button
-                      type="submit"
-                      className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-1.5 cursor-pointer"
-                    >
-                      <span>Update Status via Meja Piket</span>
-                      <span>→</span>
-                    </button>
-                  </form>
-                </div>
-
-                {/* WIDGET: REKAP SISWA KELUAR / MUTASI SEKOLAH */}
-                <div className="bg-white border border-rose-100 rounded-2xl p-5 shadow-sm space-y-3">
-                  <div className="flex items-center justify-between pb-2 border-b border-rose-50">
-                    <div className="flex items-center gap-2">
-                      <span className="w-7 h-7 rounded-lg bg-rose-50 text-rose-600 border border-rose-200 flex items-center justify-center font-bold text-xs">
-                        🚪
-                      </span>
-                      <div>
-                        <h3 className="text-sm font-bold text-slate-900">Siswa Keluar / Mutasi</h3>
-                        <p className="text-[11px] text-slate-500">Data tetap tersimpan di sistem</p>
-                      </div>
-                    </div>
-                    <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
-                      {activeStudents.filter(s => s.status === 'Keluar').length} Siswa
-                    </span>
-                  </div>
-
-                  {activeStudents.filter(s => s.status === 'Keluar').length === 0 ? (
-                    <div className="text-center py-4 text-xs text-slate-400">
-                      <span>✓</span> Belum ada siswa berstatus keluar. Semua siswa terdaftar aktif.
-                    </div>
-                  ) : (
-                    <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-                      {activeStudents.filter(s => s.status === 'Keluar').map(st => (
-                        <div key={st.id} className="p-2.5 rounded-xl bg-rose-50/50 border border-rose-100 text-xs flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <div className="font-bold text-slate-800 truncate flex items-center gap-1.5">
-                              <span className="line-through">{st.name}</span>
-                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 font-semibold">{st.classId}</span>
-                            </div>
-                            <div className="text-[11px] text-rose-700 mt-0.5">
-                              {st.exitReason || 'Keluar / Mutasi Sekolah'}
-                            </div>
-                            <div className="text-[10px] text-slate-400 mt-0.5">
-                              {st.exitDate ? `Tgl: ${st.exitDate}` : ''} {st.exitMarkedBy ? `• Oleh: ${st.exitMarkedBy}` : ''}
-                            </div>
+                    {/* WIDGET: REKAP SISWA KELUAR / MUTASI SEKOLAH */}
+                    <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-xs space-y-3">
+                      <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                        <div className="flex items-center gap-2">
+                          <span className="w-7 h-7 rounded-lg bg-rose-50 text-rose-600 border border-rose-200 flex items-center justify-center font-bold text-xs">
+                            🚪
+                          </span>
+                          <div>
+                            <h3 className="text-sm font-bold text-slate-900">Siswa Keluar / Mutasi</h3>
+                            <p className="text-[11px] text-slate-500">Arsip data siswa nonaktif</p>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => setRestoreModalStudent(st)}
-                            className="px-2 py-1 rounded-lg bg-white border border-rose-200 text-rose-700 hover:bg-rose-100 text-[11px] font-bold transition flex-shrink-0 cursor-pointer shadow-xs"
-                            title="Pulihkan kembali siswa menjadi aktif"
-                          >
-                            🔄 Pulihkan
-                          </button>
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                        <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
+                          {activeStudents.filter(s => s.status === 'Keluar').length} Siswa
+                        </span>
+                      </div>
 
-                {/* Info Card for Duty Teachers */}
-                <div className="p-4 rounded-2xl bg-indigo-50/70 border border-indigo-200 text-xs space-y-2">
-                  <div className="font-bold text-indigo-900 flex items-center gap-1.5">
-                    <span>💡 Tips Efisiensi Jam Piket:</span>
+                      {activeStudents.filter(s => s.status === 'Keluar').length === 0 ? (
+                        <div className="text-center py-4 text-xs text-slate-400">
+                          Semua siswa terdaftar aktif
+                        </div>
+                      ) : (
+                        <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                          {activeStudents.filter(s => s.status === 'Keluar').map(st => (
+                            <div key={st.id} className="p-2.5 rounded-xl bg-rose-50/50 border border-rose-100 text-xs flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <div className="font-bold text-slate-800 truncate flex items-center gap-1.5">
+                                  <span className="line-through">{st.name}</span>
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 font-semibold">{st.classId}</span>
+                                </div>
+                                <div className="text-[11px] text-rose-700 mt-0.5">
+                                  {st.exitReason || 'Keluar / Mutasi Sekolah'}
+                                </div>
+                                <div className="text-[10px] text-slate-400 mt-0.5">
+                                  {st.exitDate ? `Tgl: ${st.exitDate}` : ''} {st.exitMarkedBy ? `• Oleh: ${st.exitMarkedBy}` : ''}
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setRestoreModalStudent(st)}
+                                className="px-2 py-1 rounded-lg bg-white border border-rose-200 text-rose-700 hover:bg-rose-100 text-[11px] font-bold transition flex-shrink-0 cursor-pointer shadow-xs"
+                                title="Pulihkan kembali siswa menjadi aktif"
+                              >
+                                🔄 Pulihkan
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <p className="text-slate-600 text-[11px] leading-relaxed">
-                    Jika ada kelas yang masih berwarna kuning setelah jam 07.30, guru piket bisa langsung mengonfirmasi ketua kelas atau menugaskan guru pengganti (inval).
-                  </p>
+
                 </div>
               </div>
-
-            </div>
-          </div>
-        )}
+            )}
 
             {/* TAMPILAN PIKET: LAPORAN MATRIKS BULANAN ROMBEL */}
             {piketViewTab === 'laporan' && (
@@ -4877,21 +4840,6 @@ export default function ELearningPage() {
                 classStudentCounts={classStudentCounts}
                 piketDutyTeacher={piketDutyTeacher}
                 onExportExcel={handleExportPiketMonthlyMatrixExcel}
-              />
-            )}
-
-            {/* TAMPILAN PIKET: PENGAWAS RUANG CBT */}
-            {piketViewTab === 'pengawas' && (
-              <CbtSupervisorRoom
-                currentTeacherName={piketDutyTeacher || currentUser?.name || 'Guru Pengawas Ruang'}
-                activeStudents={activeStudents}
-                onOpenExamForStudent={(pkg, st, roomName) => {
-                  setActiveCbtExamSession({
-                    exam: pkg,
-                    student: st,
-                    roomName: roomName
-                  });
-                }}
               />
             )}
 
@@ -4913,21 +4861,18 @@ export default function ELearningPage() {
                 >
                   
                   {/* Modal Header */}
-                  <div className="p-5 border-b border-indigo-100 bg-slate-50 flex-shrink-0">
-                    <div className="flex items-center justify-between gap-3 mb-2">
-                      <div className="flex items-center gap-2.5">
-                        <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                          🏢 MODE PIKET
-                        </span>
-                        <h3 className="text-lg font-bold text-slate-900">
-                          Presensi & Rincian {detailModalClassId}
+                  <div className="p-4 sm:p-5 border-b border-slate-100 bg-slate-50 flex-shrink-0">
+                    <div className="flex items-center justify-between gap-3 mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-base sm:text-lg font-bold text-slate-900">
+                          Presensi Kelas {detailModalClassId}
                         </h3>
-                        <span className={`text-xs px-2 py-0.5 rounded font-semibold ${
+                        <span className={`text-xs px-2.5 py-0.5 rounded-full font-semibold ${
                           attendanceData[detailModalClassId]?.isSubmitted 
                             ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' 
                             : 'bg-amber-50 text-amber-800 border border-amber-200'
                         }`}>
-                          {attendanceData[detailModalClassId]?.isSubmitted ? 'Sudah Diabsen' : 'Belum Diabsen (Bisa Diabsenkan Piket)'}
+                          {attendanceData[detailModalClassId]?.isSubmitted ? 'Sudah Diabsen' : 'Belum Diabsen'}
                         </span>
                       </div>
                       <button
@@ -4943,14 +4888,14 @@ export default function ELearningPage() {
                         <p>
                           Total: <span className="font-semibold text-slate-900">{activeStudents.filter(s => s.classId === detailModalClassId).length} Siswa</span>
                           {attendanceData[detailModalClassId]?.teacherName && (
-                            <span> • Sesi terakhir: <span className="text-indigo-700 font-semibold">{attendanceData[detailModalClassId]?.teacherName} ({attendanceData[detailModalClassId]?.subject})</span></span>
+                            <span> • Sesi: <span className="text-indigo-700 font-semibold">{attendanceData[detailModalClassId]?.teacherName} ({attendanceData[detailModalClassId]?.subject})</span></span>
                           )}
                         </p>
                         {detailModalClassId && sessions.filter(s => s.date === todayStr && s.classId === detailModalClassId).length > 0 && (
-                          <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-                            <span className="text-[11px] font-semibold text-slate-500">Sesi Masuk Hari Ini:</span>
+                          <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                            <span className="text-[11px] font-semibold text-slate-500">Sesi Hari Ini:</span>
                             {sessions.filter(s => s.date === todayStr && s.classId === detailModalClassId).map(s => (
-                              <span key={s.id} className="px-2 py-0.5 rounded-md bg-indigo-50 border border-indigo-200 text-indigo-700 font-medium text-[11px]">
+                              <span key={s.id} className="px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-700 font-medium text-[11px]">
                                 {s.subject} ({s.teacherName.split(',')[0]} • {s.submittedAt})
                               </span>
                             ))}
@@ -4960,19 +4905,17 @@ export default function ELearningPage() {
                       <button
                         type="button"
                         onClick={handleSetPiketAllHadir}
-                        className="self-start sm:self-auto px-3 py-1 rounded-lg bg-white hover:bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-700 transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+                        className="self-start sm:self-auto px-3 py-1 rounded-lg bg-white hover:bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-700 transition flex items-center gap-1.5 cursor-pointer shadow-xs"
                       >
                         <span>⚡</span>
-                        <span>Tandai Semua Hadir</span>
+                        <span>Semua Hadir</span>
                       </button>
                     </div>
                   </div>
 
-                  {/* Petunjuk Guru Piket */}
-                  <div className="px-5 py-2.5 bg-emerald-50/50 border-b border-emerald-100 flex flex-wrap items-center justify-between gap-2 text-xs">
-                    <span className="text-emerald-900 font-medium">
-                      💡 Klik tombol status pada siswa jika ada yang Sakit/Izin/Alpa/Telat, lalu klik "Simpan Presensi".
-                    </span>
+                  {/* Legenda Status */}
+                  <div className="px-4 py-2 bg-slate-50/60 border-b border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                    <span className="font-medium text-slate-700">Daftar Siswa ({activeStudents.filter(s => s.classId === detailModalClassId).length})</span>
                     <div className="flex items-center gap-1.5 font-bold text-[11px]">
                       <span className="text-emerald-700">H: Hadir</span> •
                       <span className="text-blue-700">S: Sakit</span> •
@@ -5157,17 +5100,17 @@ export default function ELearningPage() {
                     })}
                   </div>
 
-                  {/* Modal Footer (Simpan oleh Guru Piket) */}
-                  <div className="p-4 border-t border-indigo-100 bg-slate-50 flex flex-col sm:flex-row items-center justify-between gap-3 flex-shrink-0">
+                  {/* Modal Footer */}
+                  <div className="p-3.5 sm:p-4 border-t border-slate-100 bg-slate-50 flex flex-col sm:flex-row items-center justify-between gap-3 flex-shrink-0">
                     <div className="text-xs text-slate-500 text-center sm:text-left">
-                      Petugas pengesah: <span className="text-slate-900 font-semibold">{piketDutyTeacher} (Piket)</span>
+                      Petugas: <span className="text-slate-900 font-semibold">{piketDutyTeacher}</span>
                     </div>
 
                     <div className="flex items-center gap-2.5 w-full sm:w-auto">
                       <button
                         type="button"
                         onClick={() => setDetailModalClassId(null)}
-                        className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 font-semibold text-xs hover:bg-slate-100 transition cursor-pointer shadow-sm"
+                        className="flex-1 sm:flex-none px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 font-semibold text-xs hover:bg-slate-100 transition cursor-pointer shadow-xs"
                       >
                         Tutup
                       </button>
@@ -5175,9 +5118,9 @@ export default function ELearningPage() {
                       <button
                         type="button"
                         onClick={handleSavePiketAttendance}
-                        className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-lg shadow-emerald-600/25 flex items-center justify-center gap-1.5 cursor-pointer"
+                        className="flex-1 sm:flex-none px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"
                       >
-                        <span>💾 Simpan Presensi (sbg Guru Piket)</span>
+                        <span>Simpan Presensi</span>
                       </button>
                     </div>
                   </div>
