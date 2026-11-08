@@ -24,24 +24,39 @@ export async function GET(req: Request) {
 
     const rows = await query<any[]>(sql, params);
     
-    // Parse json columns
-    const assignments = rows.map(r => ({
-      id: r.id,
-      title: r.title,
-      subject: r.subject,
-      teacherName: r.teacher_name,
-      teacherNip: r.teacher_nip,
-      targetClass: r.target_class,
-      dueDate: r.due_date,
-      description: r.description,
-      allowUpload: Boolean(r.allow_upload),
-      materialUrl: r.material_url,
-      materialName: r.material_name,
-      videoUrl: r.video_url,
-      videoTitle: r.video_title,
-      quizQuestions: r.quiz_questions ? JSON.parse(r.quiz_questions) : [],
-      createdAt: r.created_at
-    }));
+    // Parse json columns safely
+    const assignments = rows.map(r => {
+      let parsedQuiz: any[] = [];
+      if (r.quiz_questions) {
+        if (typeof r.quiz_questions === 'string') {
+          try {
+            parsedQuiz = JSON.parse(r.quiz_questions);
+          } catch {
+            parsedQuiz = [];
+          }
+        } else if (Array.isArray(r.quiz_questions)) {
+          parsedQuiz = r.quiz_questions;
+        }
+      }
+
+      return {
+        id: r.id,
+        title: r.title,
+        subject: r.subject,
+        teacherName: r.teacher_name,
+        teacherNip: r.teacher_nip,
+        targetClass: r.target_class,
+        dueDate: r.due_date,
+        description: r.description,
+        allowUpload: Boolean(r.allow_upload),
+        materialUrl: r.material_url,
+        materialName: r.material_name,
+        videoUrl: r.video_url,
+        videoTitle: r.video_title,
+        quizQuestions: parsedQuiz.length > 0 ? parsedQuiz : undefined,
+        createdAt: r.created_at
+      };
+    });
 
     return NextResponse.json({ success: true, count: assignments.length, data: assignments });
   } catch (error: any) {

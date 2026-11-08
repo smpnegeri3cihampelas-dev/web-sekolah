@@ -30,24 +30,39 @@ export async function GET(req: Request) {
 
     const rows = await query<any[]>(sql, params);
 
-    const submissions = rows.map(r => ({
-      id: r.id,
-      assignmentId: r.assignment_id,
-      studentId: r.student_id,
-      studentName: r.student_name,
-      studentClass: r.student_class,
-      submittedAt: r.submitted_at,
-      fileName: r.file_name,
-      fileSize: r.file_size,
-      fileData: r.file_url,
-      videoUrl: r.video_url,
-      answerText: r.answer_text,
-      grade: r.grade,
-      feedback: r.feedback,
-      status: r.status,
-      quizAnswers: r.quiz_answers ? JSON.parse(r.quiz_answers) : undefined,
-      quizScore: r.quiz_score
-    }));
+    const submissions = rows.map(r => {
+      let parsedAnswers: any = undefined;
+      if (r.quiz_answers) {
+        if (typeof r.quiz_answers === 'string') {
+          try {
+            parsedAnswers = JSON.parse(r.quiz_answers);
+          } catch {
+            parsedAnswers = undefined;
+          }
+        } else {
+          parsedAnswers = r.quiz_answers;
+        }
+      }
+
+      return {
+        id: r.id,
+        assignmentId: r.assignment_id,
+        studentId: r.student_id,
+        studentName: r.student_name,
+        studentClass: r.student_class,
+        submittedAt: r.submitted_at,
+        fileName: r.file_name,
+        fileSize: r.file_size,
+        fileData: r.file_url,
+        videoUrl: r.video_url,
+        answerText: r.answer_text,
+        grade: r.grade,
+        feedback: r.feedback,
+        status: r.status,
+        quizAnswers: parsedAnswers,
+        quizScore: r.quiz_score
+      };
+    });
 
     return NextResponse.json({ success: true, count: submissions.length, data: submissions });
   } catch (error: any) {

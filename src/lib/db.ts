@@ -9,7 +9,7 @@ const dbConfig = {
   host: process.env.DB_HOST || '153.92.15.3',
   port: Number(process.env.DB_PORT) || 3306,
   user: process.env.DB_USER || 'u571416603_spentic_admin',
-  password: process.env.DB_PASSWORD || '',
+  password: process.env.DB_PASSWORD || '@Spentic2026',
   database: process.env.DB_NAME || 'u571416603_spentic_db',
   waitForConnections: true,
   connectionLimit: 10,

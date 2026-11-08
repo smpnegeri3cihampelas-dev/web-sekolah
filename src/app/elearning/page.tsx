@@ -1531,11 +1531,26 @@ export default function ELearningPage() {
     window.addEventListener('elearningSessionsUpdated', handleDataUpdate);
     window.addEventListener('elearningAssignmentsUpdated', handleDataUpdate);
     window.addEventListener('elearningSubmissionsUpdated', handleDataUpdate);
+
+    // Auto sync on tab focus & periodic sync every 25 seconds
+    const handleFocusSync = () => {
+      try {
+        import('@/lib/cloudSync').then(m => {
+          m.syncElearningWithCloud();
+          m.syncCbtWithCloud();
+        }).catch(() => {});
+      } catch {}
+    };
+    window.addEventListener('focus', handleFocusSync);
+    const syncTimer = setInterval(handleFocusSync, 25000);
+
     return () => {
       window.removeEventListener('elearningAttendanceUpdated', handleDataUpdate);
       window.removeEventListener('elearningSessionsUpdated', handleDataUpdate);
       window.removeEventListener('elearningAssignmentsUpdated', handleDataUpdate);
       window.removeEventListener('elearningSubmissionsUpdated', handleDataUpdate);
+      window.removeEventListener('focus', handleFocusSync);
+      clearInterval(syncTimer);
     };
   }, []);
 
@@ -1636,6 +1651,15 @@ export default function ELearningPage() {
         })
       }).catch(() => {});
     } catch {}
+
+    // Immediate background Cloud Synchronization on login
+    try {
+      import('@/lib/cloudSync').then(m => {
+        m.syncElearningWithCloud();
+        m.syncCbtWithCloud();
+      }).catch(() => {});
+    } catch {}
+
     showToast(`Selamat datang di SIAP SPENTIC, ${user.name}!`, 'success');
   };
 
@@ -2308,6 +2332,12 @@ export default function ELearningPage() {
     saveStoredAssignment(newAssignment);
     setAssignments(getStoredAssignments());
     setIsCreateAsgModalOpen(false);
+    try {
+      import('@/lib/cloudSync').then(m => {
+        m.pushAssignmentToCloud(newAssignment);
+        m.syncElearningWithCloud();
+      }).catch(() => {});
+    } catch {}
     showToast(`Tugas baru berhasil diterbitkan untuk Kelas ${newAssignment.targetClass}!`, 'success');
   };
 
@@ -5191,8 +5221,13 @@ export default function ELearningPage() {
           }).length;
 
           // 2. Tugas & PR Data
+          const cleanClass = (cls: string = '') => (cls || '').replace(/^Kelas\s+/i, '').trim().toUpperCase();
+          const studentClassClean = cleanClass(studentClass);
           const myAssignments = assignments
-            .filter(a => a.targetClass === studentClass || a.targetClass === 'Semua')
+            .filter(a => {
+              const asgClassClean = cleanClass(a.targetClass);
+              return asgClassClean === studentClassClean || asgClassClean === 'SEMUA' || a.targetClass === 'Semua';
+            })
             .map(a => {
               if (a.subject && (a.subject.includes('&') || a.subject.includes(' dan '))) {
                 const titleLower = (a.title || '').toLowerCase();

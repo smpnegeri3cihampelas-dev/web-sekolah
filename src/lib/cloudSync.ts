@@ -36,19 +36,31 @@ export async function syncElearningWithCloud(): Promise<void> {
   if (typeof window === 'undefined') return;
 
   try {
-    // 1. Sync Assignments
+    // 1. Sync Assignments (Two-Way Synchronization)
     const asgRes = await fetch('/api/elearning/assignments', { cache: 'no-store' });
     if (asgRes.ok) {
       const { data } = await asgRes.json();
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         const local = getStoredAssignments();
-        const localMap = new Map(local.map(a => [a.id, a]));
-        data.forEach((cloudAsg: Assignment) => {
-          localMap.set(cloudAsg.id, cloudAsg);
+        const cloudIds = new Set(data.map((c: Assignment) => c.id));
+
+        // Push any unsynced local assignments to cloud MySQL
+        local.forEach((localAsg: Assignment) => {
+          if (!cloudIds.has(localAsg.id) && !localAsg.id.startsWith('asg-sample-')) {
+            pushAssignmentToCloud(localAsg);
+          }
         });
-        const merged = Array.from(localMap.values());
-        localStorage.setItem(ASSIGNMENTS_STORAGE_KEY, JSON.stringify(merged));
-        window.dispatchEvent(new Event('elearningAssignmentsUpdated'));
+
+        // Merge cloud assignments with local storage
+        if (data.length > 0) {
+          const localMap = new Map(local.map(a => [a.id, a]));
+          data.forEach((cloudAsg: Assignment) => {
+            localMap.set(cloudAsg.id, cloudAsg);
+          });
+          const merged = Array.from(localMap.values());
+          localStorage.setItem(ASSIGNMENTS_STORAGE_KEY, JSON.stringify(merged));
+          window.dispatchEvent(new Event('elearningAssignmentsUpdated'));
+        }
       }
     }
   } catch (err) {
@@ -56,19 +68,30 @@ export async function syncElearningWithCloud(): Promise<void> {
   }
 
   try {
-    // 2. Sync Submissions
+    // 2. Sync Submissions (Two-Way Synchronization)
     const subRes = await fetch('/api/elearning/submissions', { cache: 'no-store' });
     if (subRes.ok) {
       const { data } = await subRes.json();
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         const local = getStoredSubmissions();
-        const localMap = new Map(local.map(s => [s.id, s]));
-        data.forEach((cloudSub: AssignmentSubmission) => {
-          localMap.set(cloudSub.id, cloudSub);
+        const cloudIds = new Set(data.map((s: AssignmentSubmission) => s.id));
+
+        // Push any local submission not yet on server
+        local.forEach((localSub: AssignmentSubmission) => {
+          if (!cloudIds.has(localSub.id)) {
+            pushSubmissionToCloud(localSub);
+          }
         });
-        const merged = Array.from(localMap.values());
-        localStorage.setItem(SUBMISSIONS_STORAGE_KEY, JSON.stringify(merged));
-        window.dispatchEvent(new Event('elearningSubmissionsUpdated'));
+
+        if (data.length > 0) {
+          const localMap = new Map(local.map(s => [s.id, s]));
+          data.forEach((cloudSub: AssignmentSubmission) => {
+            localMap.set(cloudSub.id, cloudSub);
+          });
+          const merged = Array.from(localMap.values());
+          localStorage.setItem(SUBMISSIONS_STORAGE_KEY, JSON.stringify(merged));
+          window.dispatchEvent(new Event('elearningSubmissionsUpdated'));
+        }
       }
     }
   } catch (err) {
@@ -80,15 +103,25 @@ export async function syncElearningWithCloud(): Promise<void> {
     const sessRes = await fetch('/api/elearning/sessions', { cache: 'no-store' });
     if (sessRes.ok) {
       const { data } = await sessRes.json();
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         const local = getStoredSessions();
-        const localMap = new Map(local.map(s => [s.id, s]));
-        data.forEach((cloudSess: SubjectSession) => {
-          localMap.set(cloudSess.id, cloudSess);
+        const cloudIds = new Set(data.map((s: SubjectSession) => s.id));
+
+        local.forEach((localSess: SubjectSession) => {
+          if (!cloudIds.has(localSess.id)) {
+            pushSubjectSessionToCloud(localSess);
+          }
         });
-        const merged = Array.from(localMap.values());
-        localStorage.setItem(SESSIONS_STORAGE_KEY, JSON.stringify(merged));
-        window.dispatchEvent(new Event('elearningSessionsUpdated'));
+
+        if (data.length > 0) {
+          const localMap = new Map(local.map(s => [s.id, s]));
+          data.forEach((cloudSess: SubjectSession) => {
+            localMap.set(cloudSess.id, cloudSess);
+          });
+          const merged = Array.from(localMap.values());
+          localStorage.setItem(SESSIONS_STORAGE_KEY, JSON.stringify(merged));
+          window.dispatchEvent(new Event('elearningSessionsUpdated'));
+        }
       }
     }
   } catch (err) {
