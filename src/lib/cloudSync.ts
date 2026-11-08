@@ -28,6 +28,62 @@ const SESSIONS_STORAGE_KEY = 'spentic_elearning_subject_sessions_v1';
 const CBT_PACKAGES_KEY = 'spentic_cbt_packages_v1';
 const CBT_STUDENT_SESSIONS_KEY = 'spentic_cbt_student_sessions_v1';
 const CBT_PANITIA_CONFIG_KEY = 'cbt_panitia_config_v2';
+const DELETED_ASG_KEY = 'spentic_deleted_asg_ids_v1';
+const PENDING_ASG_UPLOADS_KEY = 'spentic_pending_asg_uploads_v1';
+
+// Tombstone tracking for deleted assignments
+export function getDeletedAssignmentIds(): Set<string> {
+  if (typeof window === 'undefined') return new Set();
+  try {
+    const raw = localStorage.getItem(DELETED_ASG_KEY);
+    return new Set(raw ? JSON.parse(raw) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+export function recordDeletedAssignmentId(id: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const current = getDeletedAssignmentIds();
+    current.add(id);
+    localStorage.setItem(DELETED_ASG_KEY, JSON.stringify(Array.from(current)));
+  } catch {}
+}
+
+export function unmarkDeletedAssignmentId(id: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const current = getDeletedAssignmentIds();
+    if (current.has(id)) {
+      current.delete(id);
+      localStorage.setItem(DELETED_ASG_KEY, JSON.stringify(Array.from(current)));
+    }
+  } catch {}
+}
+
+export function queuePendingAssignmentUpload(assignment: Assignment): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const raw = localStorage.getItem(PENDING_ASG_UPLOADS_KEY);
+    const list: Assignment[] = raw ? JSON.parse(raw) : [];
+    const idx = list.findIndex(a => a.id === assignment.id);
+    if (idx >= 0) list[idx] = assignment;
+    else list.push(assignment);
+    localStorage.setItem(PENDING_ASG_UPLOADS_KEY, JSON.stringify(list));
+  } catch {}
+}
+
+export function dequeuePendingAssignmentUpload(id: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const raw = localStorage.getItem(PENDING_ASG_UPLOADS_KEY);
+    if (!raw) return;
+    const list: Assignment[] = JSON.parse(raw);
+    const filtered = list.filter(a => a.id !== id);
+    localStorage.setItem(PENDING_ASG_UPLOADS_KEY, JSON.stringify(filtered));
+  } catch {}
+}
 
 /**
  * Sync E-Learning assignments, submissions, and subject sessions from Hostinger database
@@ -36,31 +92,40 @@ export async function syncElearningWithCloud(): Promise<void> {
   if (typeof window === 'undefined') return;
 
   try {
-    // 1. Sync Assignments (Two-Way Synchronization)
+    // 1. Sync Assignments: Database MariaDB is Single Source of Truth
     const asgRes = await fetch('/api/elearning/assignments', { cache: 'no-store' });
     if (asgRes.ok) {
       const { data } = await asgRes.json();
       if (Array.isArray(data)) {
-        const local = getStoredAssignments();
-        const cloudIds = new Set(data.map((c: Assignment) => c.id));
+        const deletedIds = getDeletedAssignmentIds();
 
-        // Push any unsynced local assignments to cloud MySQL
-        local.forEach((localAsg: Assignment) => {
-          if (!cloudIds.has(localAsg.id) && !localAsg.id.startsWith('asg-sample-')) {
-            pushAssignmentToCloud(localAsg);
+        // If cloud still has an assignment that was explicitly deleted, delete from cloud
+        data.forEach((cloudAsg: Assignment) => {
+          if (deletedIds.has(cloudAsg.id)) {
+            deleteAssignmentFromCloud(cloudAsg.id);
           }
         });
 
-        // Merge cloud assignments with local storage
-        if (data.length > 0) {
-          const localMap = new Map(local.map(a => [a.id, a]));
-          data.forEach((cloudAsg: Assignment) => {
-            localMap.set(cloudAsg.id, cloudAsg);
-          });
-          const merged = Array.from(localMap.values());
-          localStorage.setItem(ASSIGNMENTS_STORAGE_KEY, JSON.stringify(merged));
-          window.dispatchEvent(new Event('elearningAssignmentsUpdated'));
-        }
+        // Filter out deleted assignments
+        const activeCloudAssignments = data.filter((c: Assignment) => !deletedIds.has(c.id));
+
+        // Flush any offline queued pending assignments created by teacher
+        try {
+          const rawPending = localStorage.getItem(PENDING_ASG_UPLOADS_KEY);
+          if (rawPending) {
+            const pendingList: Assignment[] = JSON.parse(rawPending);
+            for (const pendingAsg of pendingList) {
+              if (!deletedIds.has(pendingAsg.id)) {
+                const ok = await pushAssignmentToCloud(pendingAsg);
+                if (ok) dequeuePendingAssignmentUpload(pendingAsg.id);
+              }
+            }
+          }
+        } catch {}
+
+        // Overwrite local cache with current authoritative cloud data
+        localStorage.setItem(ASSIGNMENTS_STORAGE_KEY, JSON.stringify(activeCloudAssignments));
+        window.dispatchEvent(new Event('elearningAssignmentsUpdated'));
       }
     }
   } catch (err) {
@@ -193,13 +258,26 @@ export async function syncCbtWithCloud(): Promise<void> {
 // ASYNCHRONOUS BACKGROUND WRITERS TO HOSTINGER DATABASE
 // -------------------------------------------------------------
 
-export function pushAssignmentToCloud(assignment: Assignment): void {
-  if (typeof window === 'undefined') return;
-  fetch('/api/elearning/assignments', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(assignment)
-  }).catch(err => console.warn('Background assignment upload queued:', err));
+export async function pushAssignmentToCloud(assignment: Assignment): Promise<boolean> {
+  if (typeof window === 'undefined') return false;
+  unmarkDeletedAssignmentId(assignment.id);
+  try {
+    const res = await fetch('/api/elearning/assignments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(assignment)
+    });
+    if (res.ok) {
+      dequeuePendingAssignmentUpload(assignment.id);
+      return true;
+    }
+    queuePendingAssignmentUpload(assignment);
+    return false;
+  } catch (err) {
+    console.warn('Background assignment upload queued:', err);
+    queuePendingAssignmentUpload(assignment);
+    return false;
+  }
 }
 
 export function pushSubmissionToCloud(submission: AssignmentSubmission): void {
@@ -254,9 +332,17 @@ export function deleteCbtPackageFromCloud(id: string): void {
   }).catch(err => console.warn('Background CBT package delete queued:', err));
 }
 
-export function deleteAssignmentFromCloud(id: string): void {
-  if (typeof window === 'undefined') return;
-  fetch(`/api/elearning/assignments?id=${encodeURIComponent(id)}`, {
-    method: 'DELETE'
-  }).catch(err => console.warn('Background assignment delete queued:', err));
+export async function deleteAssignmentFromCloud(id: string): Promise<boolean> {
+  if (typeof window === 'undefined') return false;
+  recordDeletedAssignmentId(id);
+  dequeuePendingAssignmentUpload(id);
+  try {
+    const res = await fetch(`/api/elearning/assignments?id=${encodeURIComponent(id)}`, {
+      method: 'DELETE'
+    });
+    return res.ok;
+  } catch (err) {
+    console.warn('Background assignment delete queued:', err);
+    return false;
+  }
 }

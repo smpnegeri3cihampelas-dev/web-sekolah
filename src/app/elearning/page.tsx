@@ -2341,10 +2341,15 @@ export default function ELearningPage() {
     showToast(`Tugas baru berhasil diterbitkan untuk Kelas ${newAssignment.targetClass}!`, 'success');
   };
 
-  const handleDeleteAssignment = (id: string, title: string) => {
+  const handleDeleteAssignment = async (id: string, title: string) => {
     if (confirm(`Yakin ingin menghapus tugas "${title}"?`)) {
       deleteStoredAssignment(id);
       setAssignments(getStoredAssignments());
+      try {
+        const { deleteAssignmentFromCloud, syncElearningWithCloud } = await import('@/lib/cloudSync');
+        await deleteAssignmentFromCloud(id);
+        await syncElearningWithCloud();
+      } catch {}
       showToast('Tugas berhasil dihapus.', 'info');
     }
   };

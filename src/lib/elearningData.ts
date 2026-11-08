@@ -4991,7 +4991,10 @@ export function saveStoredAssignment(assignment: Assignment) {
     window.dispatchEvent(new Event('elearningAssignmentsUpdated'));
     // Asynchronous background cloud sync to Hostinger MySQL
     try {
-      import('./cloudSync').then(m => m.pushAssignmentToCloud(assignment)).catch(() => {});
+      import('./cloudSync').then(m => {
+        m.unmarkDeletedAssignmentId(assignment.id);
+        m.pushAssignmentToCloud(assignment);
+      }).catch(() => {});
     } catch {}
   } catch (e) {
     console.error('Failed saving assignment to localStorage', e);
@@ -5005,7 +5008,10 @@ export function deleteStoredAssignment(id: string) {
     localStorage.setItem(ASSIGNMENTS_STORAGE_KEY, JSON.stringify(list));
     window.dispatchEvent(new Event('elearningAssignmentsUpdated'));
     try {
-      import('./cloudSync').then(m => m.deleteAssignmentFromCloud(id)).catch(() => {});
+      import('./cloudSync').then(m => {
+        m.recordDeletedAssignmentId(id);
+        m.deleteAssignmentFromCloud(id);
+      }).catch(() => {});
     } catch {}
   } catch (e) {
     console.error('Failed deleting assignment from localStorage', e);

@@ -132,8 +132,9 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ success: false, message: 'ID tugas wajib disertakan!' }, { status: 400 });
     }
 
+    await query('DELETE FROM assignment_submissions WHERE assignment_id = ?', [id]);
     await query('DELETE FROM assignments WHERE id = ?', [id]);
-    return NextResponse.json({ success: true, message: `Tugas ${id} berhasil dihapus dari database!` });
+    return NextResponse.json({ success: true, message: `Tugas ${id} beserta pengumpulannya berhasil dihapus dari database!` });
   } catch (error: any) {
     console.error('Error deleting assignment:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
