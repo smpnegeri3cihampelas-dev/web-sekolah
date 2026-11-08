@@ -236,6 +236,12 @@ export default function CbtStudentExamRoom({
 
   // Real-time listener: jika Pengawas membuka kunci dari meja pengawas/panitia secara remote
   const handleRemoteUnlock = useCallback(async (isManualClick: boolean = false) => {
+    // PENTING: Hanya jalankan remote unlock jika siswa MEMANG SEDANG TERKUNCI atau mengklik tombol manual!
+    // Jangan pernah mereset jika siswa sedang aktif mengerjakan ujian agar sistem anti-curang tidak terhapus otomatis!
+    if (!isLockedRef.current && !isLockedByViolation && !isManualClick) {
+      return;
+    }
+
     try {
       // 1. Cek status ke server database MariaDB
       let serverViolationCount = 0;
@@ -256,7 +262,7 @@ export default function CbtStudentExamRoom({
         unlockStoredStudentCbtSession(exam.id, student.id);
         if (student.nisn) unlockStoredStudentCbtSession(exam.id, student.nisn);
 
-        lastViolationTimeRef.current = Date.now() + 10000;
+        lastViolationTimeRef.current = Date.now() + 3000;
         isLockedRef.current = false;
         setIsLockedByViolation(false);
         setViolationCount(0);
@@ -291,7 +297,7 @@ export default function CbtStudentExamRoom({
           alert(`ℹ️ Di Meja Pengawas, sesi ini masih berstatus terkunci (${count}x keluar).\n\nSilakan minta Guru Pengawas menekan tombol hijau "🔓 Buka Kunci" pada baris nama Anda di Meja Pengawas.`);
         }
       } else {
-        lastViolationTimeRef.current = Date.now() + 10000;
+        lastViolationTimeRef.current = Date.now() + 3000;
         isLockedRef.current = false;
         setIsLockedByViolation(false);
         setViolationCount(0);
@@ -304,7 +310,7 @@ export default function CbtStudentExamRoom({
     } catch (e) {
       console.error('Remote unlock sync error', e);
     }
-  }, [exam.id, student.id, student.nisn]);
+  }, [exam.id, student.id, student.nisn, isLockedByViolation]);
 
   useEffect(() => {
     const handlePkgsUpdate = () => {
@@ -316,11 +322,10 @@ export default function CbtStudentExamRoom({
     };
 
     const handleSyncSession = () => {
-      handleRemoteUnlock(false);
+      if (isLockedRef.current || isLockedByViolation) {
+        handleRemoteUnlock(false);
+      }
     };
-
-    // Sinkronkan langsung saat komponen dibuka
-    handleRemoteUnlock(false);
 
     window.addEventListener('cbtPackagesUpdated', handlePkgsUpdate);
     window.addEventListener('cbtSessionsUpdated', handleSyncSession);
@@ -331,7 +336,7 @@ export default function CbtStudentExamRoom({
       window.removeEventListener('cbtSessionsUpdated', handleSyncSession);
       window.removeEventListener('storage', handleSyncSession);
     };
-  }, [exam.id, handleRemoteUnlock]);
+  }, [exam.id, handleRemoteUnlock, isLockedByViolation]);
 
   // Audio playing ref
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -388,7 +393,7 @@ export default function CbtStudentExamRoom({
     }
   };
 
-  const lastViolationTimeRef = useRef<number>(Date.now() + 10000);
+  const lastViolationTimeRef = useRef<number>(Date.now() + 3000);
 
   // Helper: Trigger Violation with Standard 3-Strike Policy (Standar ANBK / Pusmendik)
   const triggerViolation = (reasonText: string) => {
@@ -396,12 +401,12 @@ export default function CbtStudentExamRoom({
     if (isExamCompleted || isExamPaused || isLockedRef.current || isLockedByViolation) return;
 
     const now = Date.now();
-    // Abaikan jika masih dalam masa tenggang awal
+    // Abaikan jika masih dalam masa tenggang awal (3 detik pertama saat masuk)
     if (now < lastViolationTimeRef.current) {
       return;
     }
-    // Minimal jeda 2 detik antar pelanggaran agar tidak dobel hitungan
-    if (now - lastViolationTimeRef.current < 2000) {
+    // Minimal jeda 1.5 detik antar pelanggaran agar tidak dobel hitungan dari 2 event sekaligus
+    if (now - lastViolationTimeRef.current < 1500) {
       return;
     }
     lastViolationTimeRef.current = now;
@@ -421,7 +426,7 @@ export default function CbtStudentExamRoom({
         isLockedRef.current = false;
         setIsLockedByViolation(false);
         setWarningMessage(
-          `⚠️ PERINGATAN INTEGRITAS (${nextCount}/3): ${reasonText}\n\nMohon tetap berada di lembar ujian layar penuh! Sisa toleransi: ${3 - nextCount}x sebelum sistem membekukan total lembar ujian.`
+          `⚠️ PERINGATAN INTEGRITAS (${nextCount}/3): ${reasonText}\n\nAnda terdeteksi keluar dari lembar ujian CBT! Mohon jangan berpindah tab, meminimalkan browser, atau membuka aplikasi lain.\n\nSisa toleransi: ${3 - nextCount}x sebelum lembar ujian DIBEKUKAN TOTAL.`
         );
       }
       return nextCount;
@@ -464,7 +469,7 @@ export default function CbtStudentExamRoom({
         unlockStoredStudentCbtSession(exam.id, student.id);
         if (student.nisn) unlockStoredStudentCbtSession(exam.id, student.nisn);
         persistSession(answers, doubtfuls, 0);
-        lastViolationTimeRef.current = Date.now() + 10000;
+        lastViolationTimeRef.current = Date.now() + 3000;
         enterFullscreen();
       }, 700);
     } else {
@@ -506,8 +511,8 @@ export default function CbtStudentExamRoom({
         blurCounter = 0;
       } else if (!document.hasFocus()) {
         blurCounter++;
-        // Hanya picu jika kehilangan fokus lebih dari 3 detik terus menerus (mencegah false-positive saat animasi fullscreen)
-        if (blurCounter >= 3) {
+        // Picu jika kehilangan fokus lebih dari 2 detik (mencegah false-positive saat animasi awal)
+        if (blurCounter >= 2) {
           triggerViolation('Terdeteksi keluar dari layar ujian CBT (membuka aplikasi lain di komputer/HP)!');
           blurCounter = 0;
         }
@@ -1534,6 +1539,7 @@ export default function CbtStudentExamRoom({
               type="button"
               onClick={() => {
                 setWarningMessage(null);
+                lastViolationTimeRef.current = Date.now() + 2000;
                 enterFullscreen();
               }}
               className="w-full py-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs transition shadow-lg shadow-amber-600/30 cursor-pointer active:scale-95 flex items-center justify-center gap-2"
