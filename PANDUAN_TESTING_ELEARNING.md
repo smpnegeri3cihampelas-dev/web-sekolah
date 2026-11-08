@@ -61,26 +61,39 @@ Dokumen ini memuat panduan langkah demi langkah serta lembar uji (*checklist*) u
 
 ---
 
-### 🟣 FASE 3: Simulasi Asesmen CBT (Panitia ↔ Siswa ↔ Pengawas)
-- [ ] **3.1. Panitia Menyiapkan Token Ujian:**
-  - Login sebagai **Panitia Asesmen CBT** (username: `panitia`, password: `panitia123`).
-  - Di **Command Center**, periksa paket ujian aktif lalu buat/rilis **Token Ujian** (misal: kombinasi 5–6 digit).
-- [ ] **3.2. Siswa Memasuki Bilik Ujian CBT:**
+### 🟣 FASE 3: Simulasi Asesmen CBT (Guru ↔ Panitia ↔ Siswa ↔ Pengawas)
+- [ ] **3.1. Guru Membuat Paket Ujian & Butir Soal CBT:**
+  - Login sebagai **Guru Mapel** (`rohidin` / `guru123`), lalu buka tab menu **CBT**.
+  - Klik tombol **"+ Buat Paket Ujian"** (nama paket: `[UJI COBA] Asesmen B. Inggris`, rombel target: **7-A**, durasi: **30 Menit**).
+  - Klik tombol **"Edit Soal"** -> klik **"+ Tambah Soal"** (buat 1–2 butir soal pilihan ganda sederhana) -> klik **Simpan**.
+- [ ] **3.2. Panitia Menjadwalkan Pengawas Ruangan:**
+  - Login sebagai **Panitia Asesmen CBT** (`panitia` / `panitia123`).
+  - Buka tab menu **"2. Jadwal Pengawas"**.
+  - Uji tombol **"⚡ Sinkronkan dari Guru"** (otomatis menarik paket soal yang baru dibuat) atau tombol **"🔄 Rotasi Otomatis"** untuk mengatur penugasan guru pengawas di Ruang 01 s/d 17.
+  - Periksa apakah nama guru pengawas terdistribusi dengan benar pada masing-masing ruangan.
+- [ ] **3.3. Panitia Merilis Token Ujian:**
+  - Di Command Center, buka tab **"3. Live Monitoring"**, cari paket ujian yang baru dibuat guru, lalu buat/rilis **Token Ujian** (misal: kombinasi 5–6 digit).
+- [ ] **3.4. Guru Masuk ke Ruang Pengawas:**
+  - Di akun Guru (`rohidin` / `guru123`), buka tab menu **"Pengawas"** untuk membuka ruang pengawas bilik ujian sesuai yang dijadwalkan panitia.
+- [ ] **3.5. Siswa Memasuki Bilik Ujian CBT:**
   - Di akun Siswa, masuk ke menu **Asesmen CBT**.
   - Pilih paket ujian yang sedang dibuka, ketik Token Ujian dari Panitia, lalu klik **Mulai Ujian**.
-- [ ] **3.3. Pengerjaan Soal di Bilik Ujian (`CbtStudentExamRoom`):**
+- [ ] **3.6. Pengerjaan Soal di Bilik Ujian (`CbtStudentExamRoom`):**
   - [ ] Periksa jalannya **Countdown Timer** (waktu mundur).
   - [ ] Pilih opsi jawaban pilihan ganda (A/B/C/D).
   - [ ] Uji tombol **"Ragu-ragu"** -> pastikan nomor soal pada kisi navigasi berubah warna menjadi kuning/oranye.
   - [ ] Klik kisi nomor soal lain untuk melompat antar nomor soal secara acak.
-- [ ] **3.4. Selesai & Kirim Ujian:**
+- [ ] **3.7. Selesai & Kirim Ujian:**
   - Pada soal terakhir, klik tombol **"Selesai & Kumpulkan Ujian"** -> setujui dialog konfirmasi akhir.
-- [ ] **3.5. Monitoring Panitia / Pengawas:**
+- [ ] **3.8. Monitoring Panitia / Pengawas:**
   - Di Command Center Panitia, pantau status siswa yang berganti dari *"Sedang Mengerjakan"* menjadi *"Selesai"*.
-- [ ] **3.6. Uji Fitur Reset Sesi:**
+- [ ] **3.9. Uji Fitur Reset Sesi:**
   - Coba klik tombol **"Reset Sesi Siswa"** di tabel monitoring panitia (berguna jika peserta mengalami kendala perangkat mendadak dan perlu masuk ulang).
-- [ ] **3.7. Rekap Nilai Hasil CBT:**
-  - Buka tab **Rekap Nilai CBT** di Command Center Panitia -> pastikan nilai otomatis terhitung dan coba tombol **Export Hasil CBT ke Excel**.
+- [ ] **3.10. Rekap Nilai Hasil CBT, BAP & Leger Guru:**
+  - Di Command Center Panitia, periksa tab **"6. BAP & Berita Acara"** (pastikan nama pengawas ruangan otomatis tercantum di lembar BAP).
+  - Buka tab **CBT** di akun Guru -> periksa tab **Rekap Nilai / Leger** untuk melihat skor siswa yang otomatis masuk, lalu coba tombol **Export Hasil CBT ke Excel**.
+- [ ] **3.11. Pembersihan Data (*Clean-Up* Paket):**
+  - Di tab CBT akun Guru, klik ikon **Hapus** pada paket ujian uji coba agar daftar bank soal tetap bersih.
 
 ---
 

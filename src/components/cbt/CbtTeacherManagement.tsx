@@ -20,15 +20,13 @@ interface CbtTeacherManagementProps {
   teacherSubject?: string;
   teacherClasses?: string[];
   activeStudents: Student[];
-  onPreviewExamAsStudent?: (pkg: CbtExamPackage) => void;
 }
 
 export default function CbtTeacherManagement({
   teacherName,
   teacherSubject,
   teacherClasses,
-  activeStudents,
-  onPreviewExamAsStudent
+  activeStudents
 }: CbtTeacherManagementProps) {
   const [packages, setPackages] = useState<CbtExamPackage[]>([]);
   const [activeTab, setActiveTab] = useState<'packages' | 'scores'>('packages');
@@ -506,17 +504,6 @@ export default function CbtTeacherManagement({
                     >
                       <span>✏️ Edit Soal ({pkg.questions.length})</span>
                     </button>
-
-                    {onPreviewExamAsStudent && (
-                      <button
-                        type="button"
-                        onClick={() => onPreviewExamAsStudent(pkg)}
-                        className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition cursor-pointer flex items-center gap-1"
-                        title="Pratinjau antarmuka pengerjaan siswa"
-                      >
-                        <span>👁️ Preview</span>
-                      </button>
-                    )}
                   </div>
 
                   <div className="flex items-center gap-1.5">
@@ -673,10 +660,31 @@ export default function CbtTeacherManagement({
                               : 'bg-slate-50 border-slate-200 text-slate-600'
                           }`}
                         >
-                          <span className="mr-1">[{String.fromCharCode(65 + oIdx)}]</span>
+                          <span className="mr-1 font-mono">[{String.fromCharCode(65 + oIdx)}]</span>
                           {opt} {oIdx === q.correctOptionIndex && '✓ (Kunci)'}
                         </div>
                       ))}
+                    </div>
+                  )}
+
+                  {q.type === 'pg_kompleks' && q.options && (
+                    <div className="grid grid-cols-2 gap-2 text-[11px]">
+                      {q.options.map((opt, oIdx) => {
+                        const isKey = (q.correctOptionIndices || []).includes(oIdx);
+                        return (
+                          <div
+                            key={oIdx}
+                            className={`p-2 rounded-lg border ${
+                              isKey
+                                ? 'bg-purple-50 border-purple-300 text-purple-900 font-bold'
+                                : 'bg-slate-50 border-slate-200 text-slate-600'
+                            }`}
+                          >
+                            <span className="mr-1 font-mono">[{String.fromCharCode(65 + oIdx)}]</span>
+                            {opt} {isKey && '✓ (Kunci Benar)'}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
 
@@ -694,11 +702,15 @@ export default function CbtTeacherManagement({
                   )}
 
                   {q.type === 'menjodohkan' && q.matchingPairs && (
-                    <div className="text-[11px] space-y-1">
+                    <div className="text-[11px] space-y-1.5">
                       {q.matchingPairs.map((p, pIdx) => (
-                        <div key={p.id} className="flex justify-between p-1.5 rounded bg-slate-50 border border-slate-100">
-                          <span className="font-semibold text-slate-800">{pIdx + 1}. {p.leftPrompt}</span>
-                          <span className="text-emerald-700 font-medium">➔ {p.rightMatch}</span>
+                        <div key={p.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-2 rounded-lg bg-slate-50 border border-slate-200 gap-1.5">
+                          <span className="font-semibold text-slate-800 text-xs">
+                            <span className="text-slate-400 font-mono mr-1">{pIdx + 1}.</span> {p.leftPrompt}
+                          </span>
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-100 border border-emerald-300 text-emerald-800 font-bold text-xs">
+                            <span className="text-emerald-600">✓ Kunci:</span> {p.rightMatch}
+                          </span>
                         </div>
                       ))}
                     </div>

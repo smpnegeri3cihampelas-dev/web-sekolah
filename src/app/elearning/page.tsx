@@ -4384,14 +4384,6 @@ export default function ELearningPage() {
                 teacherSubject={currentTeacher.subject}
                 teacherClasses={currentTeacher.classes}
                 activeStudents={activeStudents}
-                onPreviewExamAsStudent={(pkg) => {
-                  const studentToUse = activeStudents[0] || INITIAL_STUDENTS[0];
-                  setActiveCbtExamSession({
-                    exam: pkg,
-                    student: studentToUse,
-                    roomName: 'Ruang Pratinjau Guru'
-                  });
-                }}
               />
             )}
 

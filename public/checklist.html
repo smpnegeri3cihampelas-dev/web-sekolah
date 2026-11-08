@@ -342,32 +342,48 @@
     <div class="section-card">
       <div class="section-title">
         <span class="badge badge-purple"></span>
-        FASE 3: Simulasi Asesmen CBT (Panitia ↔ Siswa ↔ Pengawas)
+        FASE 3: Simulasi Asesmen CBT (Guru ↔ Panitia ↔ Siswa ↔ Pengawas)
       </div>
       <div class="checklist-items">
         <label class="check-label">
+          <input type="checkbox" data-id="c0" class="check-input">
+          <span class="check-text"><strong>1. Guru Buat Paket & Soal CBT:</strong> Di akun Guru, buka tab <strong>CBT</strong> -> klik <em>"+ Buat Paket Ujian"</em> (judul: <code>[UJI COBA] Asesmen B. Inggris</code>, kelas target: 7-A, durasi: 30 menit). Klik <em>"Edit Soal"</em> -> <em>"+ Tambah Soal"</em> (buat 1-2 butir soal) -> Simpan.</span>
+        </label>
+        <label class="check-label">
+          <input type="checkbox" data-id="c_sched" class="check-input">
+          <span class="check-text"><strong>2. Panitia Jadwalkan Pengawas:</strong> Login Panitia (<code>panitia</code> / <code>panitia123</code>) -> buka tab <strong>"2. Jadwal Pengawas"</strong> -> coba tombol <em>"⚡ Sinkronkan dari Guru"</em> atau <em>"🔄 Rotasi Otomatis"</em> untuk mengatur penugasan guru pengawas di Ruang 01 s/d 17.</span>
+        </label>
+        <label class="check-label">
           <input type="checkbox" data-id="c1" class="check-input">
-          <span class="check-text"><strong>1. Panitia Rilis Token:</strong> Login Panitia (<code>panitia</code> / <code>panitia123</code>) -> di Command Center rilis/salin Token Ujian.</span>
+          <span class="check-text"><strong>3. Panitia Rilis Token:</strong> Di Command Center tab <em>"3. Live Monitoring"</em>, cari paket ujian tersebut lalu rilis/salin <strong>Token Ujian</strong>.</span>
+        </label>
+        <label class="check-label">
+          <input type="checkbox" data-id="c_superv" class="check-input">
+          <span class="check-text"><strong>4. Guru Masuk Ruang Pengawas:</strong> Di akun Guru (atau login guru yang dijadwalkan), buka tab <strong>"Pengawas"</strong> untuk memastikan bilik ruang ujian dan daftar peserta ujian tampil siap diawasi.</span>
         </label>
         <label class="check-label">
           <input type="checkbox" data-id="c2" class="check-input">
-          <span class="check-text"><strong>2. Siswa Masuk Ujian:</strong> Di akun Siswa, buka tab Asesmen CBT -> pilih ujian aktif & masukkan token -> klik Mulai Ujian.</span>
+          <span class="check-text"><strong>5. Siswa Masuk Ujian:</strong> Di akun Siswa, buka tab Asesmen CBT -> pilih paket ujian tersebut & masukkan token -> klik Mulai Ujian.</span>
         </label>
         <label class="check-label">
           <input type="checkbox" data-id="c3" class="check-input">
-          <span class="check-text"><strong>3. Jalannya Bilik Ujian:</strong> Cek countdown timer berjalan, jawab soal pilihan ganda, uji tombol <em>"Ragu-ragu"</em> & navigasi nomor soal.</span>
+          <span class="check-text"><strong>6. Jalannya Bilik Ujian:</strong> Cek countdown timer berjalan, jawab soal pilihan ganda, uji tombol <em>"Ragu-ragu"</em> & navigasi nomor soal.</span>
         </label>
         <label class="check-label">
           <input type="checkbox" data-id="c4" class="check-input">
-          <span class="check-text"><strong>4. Selesai & Kirim Ujian:</strong> Pada soal terakhir klik <em>"Selesai & Kumpulkan Ujian"</em> -> setujui dialog konfirmasi akhir.</span>
+          <span class="check-text"><strong>7. Selesai & Kirim Ujian:</strong> Pada soal terakhir klik <em>"Selesai & Kumpulkan Ujian"</em> -> setujui dialog konfirmasi akhir.</span>
         </label>
         <label class="check-label">
           <input type="checkbox" data-id="c5" class="check-input">
-          <span class="check-text"><strong>5. Monitoring Panitia:</strong> Di layar panitia, pastikan status siswa berubah menjadi <em>"Selesai"</em>. Coba tombol <em>"Reset Sesi Siswa"</em>.</span>
+          <span class="check-text"><strong>8. Monitoring Panitia:</strong> Di layar panitia, pastikan status siswa berubah menjadi <em>"Selesai"</em>. Coba tombol <em>"Reset Sesi Siswa"</em>.</span>
         </label>
         <label class="check-label">
           <input type="checkbox" data-id="c6" class="check-input">
-          <span class="check-text"><strong>6. Rekap Nilai CBT:</strong> Cek skor otomatis di tab Rekap Nilai Panitia dan uji tombol Export Nilai ke Excel.</span>
+          <span class="check-text"><strong>9. Rekap Nilai CBT, BAP & Leger:</strong> Cek tab <em>"6. BAP & Berita Acara"</em> di Panitia serta tab CBT Guru (Leger Nilai) dan uji tombol Export Nilai ke Excel.</span>
+        </label>
+        <label class="check-label">
+          <input type="checkbox" data-id="c7" class="check-input">
+          <span class="check-text"><strong>10. Clean-Up Paket Ujian:</strong> Di tab CBT Guru, klik ikon <strong>Hapus</strong> pada paket ujian uji coba agar bank soal tetap bersih.</span>
         </label>
       </div>
     </div>
