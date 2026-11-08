@@ -415,11 +415,32 @@ export function saveStoredSupervisorSchedule(schedule: CbtSupervisorSchedule) {
   }
 }
 
-export function getDefaultSchoolRooms(allStudents?: Student[]): CbtExamRoomConfig[] {
-  // 17 Rombel Resmi SMP Negeri 3 Cihampelas:
-  // Kelas 7: 7-A s.d 7-F (6 Kelas)
-  // Kelas 8: 8-A s.d 8-F (6 Kelas)
-  // Kelas 9: 9-A s.d 9-E (5 Kelas, sampai 9-E)
+/**
+ * 17 Ruangan Bersih / Kosong (0 Peserta)
+ * Digunakan sebagai default state awal agar panitia memiliki lembar bersih penuh
+ * dan dapat memilih metode pengisian (Auto-Silang atau Rombel Murni) dengan leluasa.
+ */
+export function getEmptySchoolRooms(): CbtExamRoomConfig[] {
+  const rooms: CbtExamRoomConfig[] = [];
+  for (let i = 1; i <= 17; i++) {
+    const num = String(i).padStart(2, '0');
+    rooms.push({
+      id: `ruang-${num}`,
+      name: `Ruang ${num}`,
+      classes: [],
+      capacity: 35,
+      label: `Ruang ${num} (Kosong)`,
+      supervisorName: 'Guru Pengawas',
+      assignedStudentIds: []
+    });
+  }
+  return rooms;
+}
+
+/**
+ * 17 Ruangan Rombel Murni (7-A s.d 9-E)
+ */
+export function getPureClassSchoolRooms(allStudents?: Student[]): CbtExamRoomConfig[] {
   const roomList: { num: string; classId: string; capacity: number }[] = [
     { num: '01', classId: '7-A', capacity: 35 },
     { num: '02', classId: '7-B', capacity: 35 },
@@ -440,7 +461,7 @@ export function getDefaultSchoolRooms(allStudents?: Student[]): CbtExamRoomConfi
     { num: '17', classId: '9-E', capacity: 30 },
   ];
 
-  const rooms: CbtExamRoomConfig[] = roomList.map(r => {
+  return roomList.map(r => {
     const studentIds = allStudents && Array.isArray(allStudents)
       ? allStudents.filter(s => s.classId === r.classId).map(s => s.id)
       : [];
@@ -455,8 +476,11 @@ export function getDefaultSchoolRooms(allStudents?: Student[]): CbtExamRoomConfi
       assignedStudentIds: studentIds
     };
   });
+}
 
-  return rooms;
+export function getDefaultSchoolRooms(allStudents?: Student[]): CbtExamRoomConfig[] {
+  // Default awal adalah ruangan kosong bersih (0 siswa)
+  return getEmptySchoolRooms();
 }
 
 const CBT_PANITIA_CONFIG_KEY = 'cbt_panitia_config_v2';
@@ -539,10 +563,16 @@ export function saveStoredCbtPanitiaConfig(config: CbtPanitiaConfig) {
 export function getStudentsForRoom(room: CbtExamRoomConfig | undefined | null, allStudents: Student[]): Student[] {
   if (!room) return [];
   
-  // Prioritas 1: Penempatan eksplisit per-ID
-  if (room.assignedStudentIds && Array.isArray(room.assignedStudentIds) && room.assignedStudentIds.length > 0) {
+  // Prioritas 1: Penempatan eksplisit per-ID (termasuk jika sengaja dikosongkan [])
+  if (Array.isArray(room.assignedStudentIds)) {
+    if (room.assignedStudentIds.length === 0) return [];
     const idSet = new Set(room.assignedStudentIds);
     return allStudents.filter(s => idSet.has(s.id));
+  }
+
+  // Jika classes kosong
+  if (!room.classes || room.classes.length === 0) {
+    return [];
   }
 
   // Prioritas 2: Rombel tunggal murni

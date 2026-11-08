@@ -19,6 +19,8 @@ import {
   updateRoomMetadata,
   splitTwoClassesAcrossTwoRooms,
   getDefaultSchoolRooms,
+  getEmptySchoolRooms,
+  getPureClassSchoolRooms,
   autoCrossSplitClasses7And8,
   registerEmergencyStudentToCbt,
   evaluateCbtPackageSchedule,
@@ -1509,25 +1511,48 @@ export default function CbtPanitiaCommandCenter({
     showAlert(`Ruangan ${room.name} telah dikosongkan.`);
   };
 
-  // Reset all rooms to default pure single-class rooms
-  const handleResetToDefaultPureRooms = () => {
-    if (!confirm('Apakah Anda yakin ingin MENGEMBALIKAN susunan ruangan ke default (17 Ruangan Kelas Murni: 7-A s.d 9-E)? Seluruh pembagian kustom akan direset.')) {
+  // 🗑️ Kosongkan Seluruh Ruangan (Reset Bersih ke 0 Siswa)
+  const handleClearAllRooms = () => {
+    if (!confirm('Apakah Anda yakin ingin MENGOSONGKAN SELURUH RUANGAN (0 siswa di semua 17 ruang)?\n\nSeluruh ruangan akan menjadi kosong bersih (0 / 35 Kursi). Anda dapat mengisinya kembali kapan saja dengan menekan tombol Auto-Silang atau Isi Rombel.')) {
       return;
     }
 
-    const defaultRooms = getDefaultSchoolRooms(activeStudents);
+    const emptyRooms = getEmptySchoolRooms();
     const updatedConfig: CbtPanitiaConfig = {
       ...config,
-      rooms: defaultRooms
+      rooms: emptyRooms
     };
 
     saveStoredCbtPanitiaConfig(updatedConfig);
     setConfig(updatedConfig);
     if (managingRoomModal) {
-      setManagingRoomModal(defaultRooms.find(r => r.id === managingRoomModal.id) || null);
+      setManagingRoomModal(emptyRooms.find(r => r.id === managingRoomModal.id) || null);
     }
-    showAlert('🔄 Susunan ruangan berhasil dikembalikan ke 17 Ruangan Kelas Murni!');
+    showAlert('🗑️ Seluruh ruangan berhasil dikosongkan (0 siswa)!');
   };
+
+  // 🔄 Isi Seluruh Ruangan Sesuai Rombel Murni (7-A s.d 9-E)
+  const handleFillPureRooms = () => {
+    if (!confirm('Isi seluruh ruangan sesuai rombel kelas murni asal?\n\n• Ruang 01 = Kelas 7-A\n• Ruang 02 = Kelas 7-B\n...\n• Ruang 17 = Kelas 9-E\n\nSetiap ruangan akan terisi siswa dari rombel aslinya.')) {
+      return;
+    }
+
+    const pureRooms = getPureClassSchoolRooms(activeStudents);
+    const updatedConfig: CbtPanitiaConfig = {
+      ...config,
+      rooms: pureRooms
+    };
+
+    saveStoredCbtPanitiaConfig(updatedConfig);
+    setConfig(updatedConfig);
+    if (managingRoomModal) {
+      setManagingRoomModal(pureRooms.find(r => r.id === managingRoomModal.id) || null);
+    }
+    showAlert('🔄 Seluruh 17 ruangan berhasil diisi sesuai Rombel Murni (7-A s.d 9-E)!');
+  };
+
+  // Reset all rooms alias for compatibility
+  const handleResetToDefaultPureRooms = handleFillPureRooms;
 
   // ⚡ One-Click Auto Cross-Split for Grade 7 & 8 (Ruang 01-12) and Grade 9 Pure (Ruang 13-17)
   const handleAutoCrossSplitAll = () => {
@@ -2181,26 +2206,37 @@ export default function CbtPanitiaCommandCenter({
                 <span>Auto-Silang Kelas 7 &amp; 8 (12 Ruang)</span>
               </button>
 
+              {/* 🔄 ISI ROMBEL MURNI */}
+              <button
+                type="button"
+                onClick={handleFillPureRooms}
+                className="px-3.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-900 font-bold text-xs border border-indigo-200 transition flex items-center gap-1.5 cursor-pointer active:scale-95"
+                title="Isi seluruh ruangan sesuai rombel asal masing-masing (Ruang 01 = 7-A s.d Ruang 17 = 9-E)"
+              >
+                <span>🔄</span>
+                <span>Isi Rombel Murni (7A - 9E)</span>
+              </button>
+
               {/* 🔀 MANUAL SPLIT MODAL */}
               <button
                 type="button"
                 onClick={() => setShowSplitModal(true)}
                 className="px-3 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold text-xs border border-amber-200 transition flex items-center gap-1.5 cursor-pointer active:scale-95"
-                title="Bagi silang manual antara 2 kelas ke 2 ruangan"
+                title="Bagi silang manual antara 2 kelas tertentu ke 2 ruangan"
               >
                 <span>🔀</span>
                 <span>Bagi Silang 2 Kelas</span>
               </button>
 
-              {/* 🔄 RESET TO PURE */}
+              {/* 🗑️ KOSONGKAN SEMUA RUANGAN */}
               <button
                 type="button"
-                onClick={handleResetToDefaultPureRooms}
-                className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition border border-slate-200 flex items-center gap-1.5 cursor-pointer active:scale-95"
-                title="Kembalikan semua ruangan ke rombel utuh (7-A s.d 9-E)"
+                onClick={handleClearAllRooms}
+                className="px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs transition border border-rose-200 flex items-center gap-1.5 cursor-pointer active:scale-95"
+                title="Kosongkan seluruh ruangan (0 siswa di semua ruang) untuk menyusun dari lembar bersih"
               >
-                <span>🔄</span>
-                <span>Reset Rombel Murni</span>
+                <span>🗑️</span>
+                <span>Kosongkan Semua (Reset 0)</span>
               </button>
 
               {/* ➕ TAMBAH RUANGAN */}
@@ -2245,52 +2281,92 @@ export default function CbtPanitiaCommandCenter({
             const unassignedCount = Math.max(0, activeStudents.length - totalAssigned);
 
             return (
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-2xs">
-                  <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Ruangan</div>
-                  <div className="text-xl font-black text-slate-900 mt-0.5 flex items-center gap-1.5">
-                    <span>🏢</span>
-                    <span>{config.rooms.length} Ruang</span>
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-2xs">
+                    <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Ruangan</div>
+                    <div className="text-xl font-black text-slate-900 mt-0.5 flex items-center gap-1.5">
+                      <span>🏢</span>
+                      <span>{config.rooms.length} Ruang</span>
+                    </div>
+                    <div className="text-[11px] text-slate-400 mt-0.5">
+                      {crossCount} Silang • {pureCount} Murni {emptyCount > 0 && `• ${emptyCount} Kosong`}
+                    </div>
                   </div>
-                  <div className="text-[11px] text-slate-400 mt-0.5">
-                    {crossCount} Silang • {pureCount} Murni {emptyCount > 0 && `• ${emptyCount} Kosong`}
+
+                  <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-2xs">
+                    <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Peserta Terdistribusi</div>
+                    <div className="text-xl font-black text-emerald-700 mt-0.5 flex items-center gap-1.5">
+                      <span>👥</span>
+                      <span>{totalAssigned} Siswa</span>
+                    </div>
+                    <div className="text-[11px] text-slate-400 mt-0.5">
+                      Dari {activeStudents.length} total siswa
+                    </div>
+                  </div>
+
+                  <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-2xs">
+                    <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Belum Dapat Ruangan</div>
+                    <div className={`text-xl font-black mt-0.5 flex items-center gap-1.5 ${
+                      unassignedCount > 0 ? 'text-amber-600' : 'text-slate-400'
+                    }`}>
+                      <span>{unassignedCount > 0 ? '⚠️' : '✓'}</span>
+                      <span>{unassignedCount} Siswa</span>
+                    </div>
+                    <div className="text-[11px] text-slate-400 mt-0.5">
+                      {unassignedCount === 0 ? 'Semua peserta sudah terbagi' : 'Perlu dialokasikan ke ruangan'}
+                    </div>
+                  </div>
+
+                  <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-2xs">
+                    <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Rata-Rata per Ruang</div>
+                    <div className="text-xl font-black text-indigo-700 mt-0.5 flex items-center gap-1.5">
+                      <span>🪑</span>
+                      <span>{config.rooms.length > 0 ? Math.round(totalAssigned / config.rooms.length) : 0} Siswa</span>
+                    </div>
+                    <div className="text-[11px] text-slate-400 mt-0.5">
+                      Standar ~35 kursi per ruangan
+                    </div>
                   </div>
                 </div>
 
-                <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-2xs">
-                  <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Peserta Terdistribusi</div>
-                  <div className="text-xl font-black text-emerald-700 mt-0.5 flex items-center gap-1.5">
-                    <span>👥</span>
-                    <span>{totalAssigned} Siswa</span>
-                  </div>
-                  <div className="text-[11px] text-slate-400 mt-0.5">
-                    Dari {activeStudents.length} total siswa
-                  </div>
-                </div>
+                {/* Banner Panduan jika semua ruangan masih bersih (0 Siswa) */}
+                {totalAssigned === 0 && (
+                  <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-amber-500/10 via-amber-50/50 to-orange-50 border border-amber-300 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-2xl bg-amber-500 text-slate-950 flex items-center justify-center text-xl shrink-0 font-bold shadow-xs">
+                        💡
+                      </div>
+                      <div>
+                        <h4 className="font-black text-slate-900 text-sm">
+                          Semua Ruangan Masih Bersih (0 Siswa / Siap Disusun)
+                        </h4>
+                        <p className="text-xs text-slate-600 mt-0.5">
+                          Ruangan saat ini kosong. Anda bisa langsung mengisi otomatis lewat tombol di samping, atau atur manual per ruangan.
+                        </p>
+                      </div>
+                    </div>
 
-                <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-2xs">
-                  <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Belum Dapat Ruangan</div>
-                  <div className={`text-xl font-black mt-0.5 flex items-center gap-1.5 ${
-                    unassignedCount > 0 ? 'text-amber-600' : 'text-slate-400'
-                  }`}>
-                    <span>{unassignedCount > 0 ? '⚠️' : '✓'}</span>
-                    <span>{unassignedCount} Siswa</span>
+                    <div className="flex flex-wrap items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={handleAutoCrossSplitAll}
+                        className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs transition shadow-md shadow-amber-500/20 flex items-center gap-1.5 cursor-pointer active:scale-95"
+                      >
+                        <span>⚡</span>
+                        <span>Isi Auto-Silang (12 Ruang)</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleFillPureRooms}
+                        className="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-800 font-bold text-xs border border-slate-200 transition flex items-center gap-1.5 cursor-pointer active:scale-95"
+                      >
+                        <span>🔄</span>
+                        <span>Isi Rombel Murni</span>
+                      </button>
+                    </div>
                   </div>
-                  <div className="text-[11px] text-slate-400 mt-0.5">
-                    {unassignedCount === 0 ? 'Semua peserta sudah terbagi' : 'Perlu dialokasikan ke ruangan'}
-                  </div>
-                </div>
-
-                <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-2xs">
-                  <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Rata-Rata per Ruang</div>
-                  <div className="text-xl font-black text-indigo-700 mt-0.5 flex items-center gap-1.5">
-                    <span>🪑</span>
-                    <span>{config.rooms.length > 0 ? Math.round(totalAssigned / config.rooms.length) : 0} Siswa</span>
-                  </div>
-                  <div className="text-[11px] text-slate-400 mt-0.5">
-                    Standar ~35 kursi per ruangan
-                  </div>
-                </div>
+                )}
               </div>
             );
           })()}
@@ -2675,10 +2751,28 @@ export default function CbtPanitiaCommandCenter({
 
                         {/* Student Table */}
                         {displayed.length === 0 ? (
-                          <div className="p-8 text-center text-xs text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                            {roomStudents.length === 0
-                              ? 'Ruangan ini masih kosong. Silakan klik tab "Tambah / Pindahkan Siswa" di atas untuk mengisi peserta.'
-                              : 'Tidak ditemukan siswa yang sesuai pencarian.'}
+                          <div className="p-10 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 space-y-3">
+                            <div className="text-4xl">🪑</div>
+                            <div className="font-bold text-slate-800 text-sm">
+                              {roomStudents.length === 0
+                                ? 'Ruangan Ini Saat Ini Masih Kosong (0 Siswa)'
+                                : 'Tidak ditemukan siswa yang sesuai pencarian'}
+                            </div>
+                            <p className="text-xs text-slate-500 max-w-md mx-auto">
+                              {roomStudents.length === 0
+                                ? 'Belum ada peserta yang ditempatkan di ruangan ini. Klik tab "Tambah / Pindahkan Siswa" di atas untuk menambahkan peserta secara fleksibel.'
+                                : 'Coba periksa kembali ejaan nama atau NISN yang Anda masukkan.'}
+                            </p>
+                            {roomStudents.length === 0 && (
+                              <button
+                                type="button"
+                                onClick={() => setManagingRoomTab('add')}
+                                className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition shadow-xs cursor-pointer inline-flex items-center gap-1.5 active:scale-95"
+                              >
+                                <span>➕</span>
+                                <span>Buka Tab Tambah Siswa</span>
+                              </button>
+                            )}
                           </div>
                         ) : (
                           <div className="overflow-x-auto rounded-2xl border border-slate-200 max-h-96 overflow-y-auto">
