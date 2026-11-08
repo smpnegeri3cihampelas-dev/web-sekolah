@@ -70,6 +70,7 @@ export default function CbtStudentExamRoom({
   const [unlockTokenInput, setUnlockTokenInput] = useState<string>('');
   const [unlockError, setUnlockError] = useState<string | null>(null);
   const [unlockSuccess, setUnlockSuccess] = useState<string | null>(null);
+  const [showPinInput, setShowPinInput] = useState<boolean>(false);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(() => {
     if (typeof document === 'undefined') return false;
     return Boolean(
@@ -257,7 +258,7 @@ export default function CbtStudentExamRoom({
     }
   };
 
-  const lastViolationTimeRef = useRef<number>(Date.now() + 3000);
+  const lastViolationTimeRef = useRef<number>(Date.now() + 5000);
 
   // Helper: Trigger Violation with ZERO-TOLERANCE (Sekali Keluar Langsung Terkunci Mati!)
   const triggerViolation = (reasonText: string) => {
@@ -1466,6 +1467,58 @@ export default function CbtStudentExamRoom({
                   <span>🔄</span>
                   <span>Cek Status Buka Kunci Pengawas</span>
                 </button>
+
+                {/* Alternatif: Masukkan PIN Rahasia Pengawas di Tempat */}
+                <div className="pt-2 border-t border-slate-800/80">
+                  {!showPinInput ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowPinInput(true)}
+                      className="text-[11px] text-slate-400 hover:text-amber-400 transition cursor-pointer underline underline-offset-2"
+                    >
+                      🔑 Atau Buka di Tempat (PIN Pengawas)
+                    </button>
+                  ) : (
+                    <div className="space-y-2 pt-1 text-left bg-slate-950/60 p-2.5 rounded-xl border border-slate-800">
+                      <label className="block text-[10px] font-bold text-amber-300 uppercase tracking-wider text-center">
+                        PIN Khusus Pengawas Ruang:
+                      </label>
+                      <div className="flex gap-1.5">
+                        <input
+                          type="password"
+                          placeholder="Ketik PIN (cth: SPENTIC99)"
+                          value={unlockTokenInput}
+                          onChange={(e) => setUnlockTokenInput(e.target.value.toUpperCase())}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleUnlockExam();
+                            }
+                          }}
+                          className="flex-1 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-amber-300 font-mono font-bold text-center text-xs focus:outline-none focus:border-amber-400"
+                          autoFocus
+                        />
+                        <button
+                          type="button"
+                          onClick={handleUnlockExam}
+                          className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition cursor-pointer active:scale-95"
+                        >
+                          Buka 🔓
+                        </button>
+                      </div>
+                      {unlockError && (
+                        <p className="text-[11px] text-rose-400 text-center font-semibold mt-1">
+                          {unlockError}
+                        </p>
+                      )}
+                      {unlockSuccess && (
+                        <p className="text-[11px] text-emerald-400 text-center font-semibold mt-1">
+                          ✅ {unlockSuccess}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
