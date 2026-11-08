@@ -4212,13 +4212,15 @@ export default function ELearningPage() {
                       </span>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => setIsCreateAsgModalOpen(true)}
-                      className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-sm flex items-center gap-1.5 cursor-pointer self-start sm:self-auto"
-                    >
-                      <span>+ Buat Tugas Baru</span>
-                    </button>
+                    {myTasks.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setIsCreateAsgModalOpen(true)}
+                        className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-sm flex items-center gap-1.5 cursor-pointer self-start sm:self-auto"
+                      >
+                        <span>+ Buat Tugas Baru</span>
+                      </button>
+                    )}
                   </div>
 
                   {/* My Assignments List */}
@@ -4234,9 +4236,9 @@ export default function ELearningPage() {
                       <button
                         type="button"
                         onClick={() => setIsCreateAsgModalOpen(true)}
-                        className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition shadow-sm cursor-pointer"
+                        className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition shadow-sm cursor-pointer inline-flex items-center gap-1.5"
                       >
-                        + Buat Tugas Pertama
+                        <span>+ Buat Tugas Baru</span>
                       </button>
                     </div>
                   ) : (
