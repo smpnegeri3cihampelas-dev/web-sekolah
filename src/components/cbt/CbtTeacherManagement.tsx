@@ -590,6 +590,14 @@ export default function CbtTeacherManagement({
               >
                 <span>+ Tambah Butir Soal</span>
               </button>
+              <button
+                type="button"
+                onClick={() => setSelectedPackageForEdit(null)}
+                className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-sm flex items-center gap-1.5 cursor-pointer"
+                title="Selesai dan kembali ke daftar paket"
+              >
+                <span>✓ Selesai &amp; Simpan Paket</span>
+              </button>
             </div>
           </div>
 
@@ -1411,8 +1419,9 @@ function QuestionEditorModal({
           </button>
         </div>
 
-        {/* Scrollable Form Body */}
-        <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto flex-1 pr-1 text-xs">
+        {/* Form Body with Fixed Bottom Footer */}
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+          <div className="space-y-4 overflow-y-auto flex-1 pr-1.5 text-xs pb-3">
           
           {/* 1. Pilih Tipe Soal */}
           <div>
@@ -1715,22 +1724,29 @@ function QuestionEditorModal({
               ))}
             </div>
           )}
+          </div>
 
-          {/* Footer Save */}
-          <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-2 flex-shrink-0">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold cursor-pointer"
-            >
-              Batal
-            </button>
-            <button
-              type="submit"
-              className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold cursor-pointer shadow-md shadow-indigo-600/20"
-            >
-              Simpan Butir Soal Ini ✓
-            </button>
+          {/* Footer Save - Always Fixed at the Bottom */}
+          <div className="pt-3 border-t border-slate-200 flex items-center justify-between gap-2 flex-shrink-0 bg-white">
+            <span className="text-[11px] text-slate-400 font-medium hidden sm:inline">
+              💡 Pastikan tipe &amp; kunci jawaban terisi sebelum menyimpan.
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold cursor-pointer text-xs transition"
+              >
+                Batal
+              </button>
+              <button
+                type="submit"
+                className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold cursor-pointer shadow-md shadow-indigo-600/20 text-xs transition flex items-center gap-1.5"
+              >
+                <span>💾</span>
+                <span>Simpan Butir Soal Ini ✓</span>
+              </button>
+            </div>
           </div>
         </form>
 
