@@ -1,0 +1,48 @@
+name: Deploy to Hostinger
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Auto Deploy smpn3cihampelas.sch.id
+    runs-on: ubuntu-latest
+    steps:
+      - name: Hubungkan & Update Server Hostinger via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: 46.202.138.216
+          port: 65002
+          username: u571416603
+          password: ${{ secrets.HOSTINGER_SSH_PASSWORD }}
+          script_stop: false
+          script: |
+            echo "=== TERHUBUNG KE HOSTINGER ==="
+            
+            # Masuk ke direktori web
+            if [ -d "$HOME/domains/smpn3cihampelas.sch.id/public_html" ]; then
+              cd "$HOME/domains/smpn3cihampelas.sch.id/public_html"
+            elif [ -d "$HOME/public_html" ]; then
+              cd "$HOME/public_html"
+            fi
+
+            # Tarik update kodingan terbaru
+            echo "Menarik kode terbaru dari GitHub..."
+            git reset --hard HEAD
+            git pull origin main
+
+            # Install & Build Next.js
+            echo "Building aplikasi Next.js..."
+            npm install --production=false
+            npm run build
+
+            # Refresh proses server
+            if command -v pm2 &> /dev/null; then
+              pm2 restart all || true
+            fi
+            mkdir -p tmp && touch tmp/restart.txt
+
+            echo "=== AUTO DEPLOY BERHASIL 100% ==="
