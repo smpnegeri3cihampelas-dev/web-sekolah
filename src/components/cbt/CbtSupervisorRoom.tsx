@@ -826,6 +826,16 @@ export default function CbtSupervisorRoom({
           </div>
         </div>
 
+        {/* Anti-cheat Policy Info for Supervisor */}
+        <div className="px-4 py-2 bg-amber-50 border-b border-amber-200/80 flex items-center justify-between gap-3 text-xs text-amber-900">
+          <div className="flex items-center gap-2">
+            <span className="text-base">🛡️</span>
+            <span>
+              <strong>Proteksi CBT SPENTIC (Toleransi 1x):</strong> Siswa yang keluar layar / pindah tab otomatis terkunci. Klik tombol hijau <strong>"🔓 Buka Kunci"</strong> pada baris siswa, atau masukkan PIN darurat di layar siswa: <strong className="font-mono bg-amber-200/80 px-1.5 py-0.5 rounded text-amber-950">SPENTIC2026</strong>.
+            </span>
+          </div>
+        </div>
+
         {/* Banner Mode Terkunci Pasca Penyerahan BAP */}
         {isBapSaved && (
           <div className="p-3.5 bg-gradient-to-r from-emerald-50 via-teal-50 to-indigo-50 border-b border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -1027,20 +1037,14 @@ export default function CbtSupervisorRoom({
                           <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
                             ✓ Selesai ({session.score}/100)
                           </span>
-                        ) : session?.violationCount && session.violationCount >= 3 ? (
-                          <div className="space-y-0.5">
-                            <span className="inline-block px-2 py-0.5 rounded text-[10px] font-black bg-rose-600 text-white animate-pulse shadow-xs">
-                              🔒 TERKUNCI ({session.violationCount}x Keluar)
-                            </span>
-                            <div className="text-[9px] text-rose-600 font-semibold">
-                              Pelanggaran Integritas
-                            </div>
-                          </div>
                         ) : session?.violationCount && session.violationCount >= 1 ? (
                           <div className="space-y-0.5">
-                            <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
-                              ⚠️ Peringatan ({session.violationCount}/3)
+                            <span className="inline-block px-2 py-0.5 rounded text-[10px] font-black bg-rose-600 text-white animate-pulse shadow-xs">
+                              🔒 TERKUNCI (Terdeteksi Keluar)
                             </span>
+                            <div className="text-[9px] text-rose-600 font-semibold">
+                              Wajib Buka Kunci
+                            </div>
                           </div>
                         ) : session ? (
                           <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 animate-pulse">

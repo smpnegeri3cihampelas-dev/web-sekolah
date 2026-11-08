@@ -163,18 +163,12 @@ export default function CbtStudentExamRoom({
     effectiveSession?.violationCount || 0
   );
 
-  // Model CBT: Toleransi 3x Pelanggaran sebelum Pembekuan Total (Standar Kemendikbud/ANBK)
+  // Model CBT: Zero-Tolerance (1x Keluar = Langsung Terkunci Mati Sesuai Permintaan Sekolah)
   const [isLockedByViolation, setIsLockedByViolation] = useState<boolean>(() => {
-    const hasAnswers = effectiveSession?.answers && Object.keys(effectiveSession.answers).length > 0;
-    return Boolean(hasAnswers && effectiveSession?.violationCount && effectiveSession.violationCount >= 3);
+    return Boolean(effectiveSession?.violationCount && effectiveSession.violationCount >= 1);
   });
   const isLockedRef = useRef<boolean>(
-    Boolean(
-      effectiveSession?.answers &&
-      Object.keys(effectiveSession.answers).length > 0 &&
-      effectiveSession?.violationCount &&
-      effectiveSession.violationCount >= 3
-    )
+    Boolean(effectiveSession?.violationCount && effectiveSession.violationCount >= 1)
   );
   useEffect(() => {
     isLockedRef.current = isLockedByViolation;
@@ -210,7 +204,6 @@ export default function CbtStudentExamRoom({
   const [fontSizeClass, setFontSizeClass] = useState<'text-sm' | 'text-base' | 'text-lg'>('text-base');
   const [zoomImageUrl, setZoomImageUrl] = useState<string | null>(null);
   const [showSubmitModal, setShowSubmitModal] = useState<boolean>(false);
-  const [warningMessage, setWarningMessage] = useState<string | null>(null);
   const [isExamCompleted, setIsExamCompleted] = useState<boolean>(
     Boolean(initialSession?.isSubmitted)
   );
@@ -257,55 +250,30 @@ export default function CbtStudentExamRoom({
         console.warn('Gagal cek status remote ke server:', err);
       }
 
-      // 2. Jika di server tidak ada record (bersih) atau pelanggaran < 3, atau siswa menekan tombol sinkron:
-      if (!serverAnswersFound || serverViolationCount < 3) {
+      // 2. Jika di server status pelanggaran sudah 0 (sudah dibuka oleh pengawas) atau sesi baru bersih:
+      if (!serverAnswersFound || serverViolationCount === 0) {
         unlockStoredStudentCbtSession(exam.id, student.id);
         if (student.nisn) unlockStoredStudentCbtSession(exam.id, student.nisn);
 
-        lastViolationTimeRef.current = Date.now() + 3000;
+        lastViolationTimeRef.current = Date.now() + 5000;
         isLockedRef.current = false;
         setIsLockedByViolation(false);
         setViolationCount(0);
         setUnlockError(null);
         enterFullscreen();
         if (isManualClick) {
-          alert('✅ Akses ujian berhasil dibuka! Silakan lanjutkan pengerjaan soal.');
+          alert('✅ Kunci ujian telah berhasil dibuka oleh Pengawas! Melanjutkan lembar ujian...');
         }
         return;
       }
 
-      // 3. Jika di server memang tercatat pelanggaran keras (>= 3):
-      const sessions = getStoredStudentCbtSessions();
-      const key = `${exam.id}_${student.id}`;
-      let current: CbtStudentAnswerState | undefined = sessions[key];
-      if (!current && student.nisn) {
-        current = sessions[`${exam.id}_${student.nisn}`];
-      }
-      if (!current) {
-        current = Object.values(sessions).find(s => 
-          (s.studentId === student.id || (student.nisn && (s.studentNisn === student.nisn || s.studentId === student.nisn))) &&
-          (!s.examId || s.examId === exam.id)
-        );
-      }
-
-      if (serverViolationCount >= 3 || (current?.violationCount && current.violationCount >= 3)) {
-        const count = Math.max(serverViolationCount, current?.violationCount || 0);
-        setViolationCount(count);
-        setIsLockedByViolation(true);
-        isLockedRef.current = true;
-        if (isManualClick) {
-          alert(`ℹ️ Di Meja Pengawas, sesi ini masih berstatus terkunci (${count}x keluar).\n\nSilakan minta Guru Pengawas menekan tombol hijau "🔓 Buka Kunci" pada baris nama Anda di Meja Pengawas.`);
-        }
-      } else {
-        lastViolationTimeRef.current = Date.now() + 3000;
-        isLockedRef.current = false;
-        setIsLockedByViolation(false);
-        setViolationCount(0);
-        setUnlockError(null);
-        enterFullscreen();
-        if (isManualClick) {
-          alert('✅ Akses ujian berhasil dibuka!');
-        }
+      // 3. Jika di server memang masih tercatat pelanggaran (>= 1):
+      const count = Math.max(serverViolationCount, 1);
+      setViolationCount(count);
+      setIsLockedByViolation(true);
+      isLockedRef.current = true;
+      if (isManualClick) {
+        alert('ℹ️ Di Meja Pengawas, sesi ini masih berstatus terkunci.\n\nSilakan minta Guru Pengawas menekan tombol hijau "🔓 Buka Kunci" pada baris nama Anda di Meja Pengawas, atau masukkan PIN Pengawas SPENTIC2026 di bawah.');
       }
     } catch (e) {
       console.error('Remote unlock sync error', e);
@@ -393,60 +361,31 @@ export default function CbtStudentExamRoom({
     }
   };
 
-  const lastViolationTimeRef = useRef<number>(Date.now() + 3000);
+  const lastViolationTimeRef = useRef<number>(Date.now() + 5000);
 
-  // Helper: Trigger Violation with Standard 3-Strike Policy (Standar ANBK / Pusmendik)
+  // Helper: Trigger Violation with ZERO-TOLERANCE (Sekali Keluar = Langsung Terkunci Mati!)
   const triggerViolation = (reasonText: string) => {
     // PENTING: Jika ujian sudah selesai, dijeda, atau SUDAH TERKUNCI, JANGAN tambahkan pelanggaran lagi!
     if (isExamCompleted || isExamPaused || isLockedRef.current || isLockedByViolation) return;
 
     const now = Date.now();
-    // Abaikan jika masih dalam masa tenggang awal (3 detik pertama saat masuk)
+    // Abaikan jika masih dalam masa tenggang awal (5 detik pertama saat masuk layar penuh)
     if (now < lastViolationTimeRef.current) {
-      return;
-    }
-    // Minimal jeda 1.5 detik antar pelanggaran agar tidak dobel hitungan dari 2 event sekaligus
-    if (now - lastViolationTimeRef.current < 1500) {
       return;
     }
     lastViolationTimeRef.current = now;
 
-    setViolationCount(prev => {
-      const nextCount = prev + 1;
-      persistSession(answers, doubtfuls, nextCount);
+    // Zero-Tolerance: 1x keluar = LANGSUNG KUNCI MATI!
+    setViolationCount(1);
+    persistSession(answers, doubtfuls, 1);
 
-      // Standar CBT Nasional:
-      // Pelanggaran 1 & 2: Peringatan Integritas
-      // Pelanggaran 3+: Kunci Mati Lembar Ujian
-      if (nextCount >= 3) {
-        isLockedRef.current = true;
-        setIsLockedByViolation(true);
-        setWarningMessage(null);
-      } else {
-        isLockedRef.current = false;
-        setIsLockedByViolation(false);
-        setWarningMessage(
-          `⚠️ PERINGATAN INTEGRITAS (${nextCount}/3): ${reasonText}\n\nAnda terdeteksi keluar dari lembar ujian CBT! Mohon jangan berpindah tab, meminimalkan browser, atau membuka aplikasi lain.\n\nSisa toleransi: ${3 - nextCount}x sebelum lembar ujian DIBEKUKAN TOTAL.`
-        );
-      }
-      return nextCount;
-    });
+    isLockedRef.current = true;
+    setIsLockedByViolation(true);
   };
 
-  // Helper: Supervisor Unlock Logic (PIN Pengawas Ruangan / Panitia)
+  // Helper: Supervisor Unlock Logic (PIN Pengawas Ruangan: SPENTIC2026)
   const handleUnlockExam = () => {
     const cleanInput = unlockTokenInput.trim().toUpperCase();
-    const validSupervisorPins = [
-      'SPENTIC99',
-      'SPENTIC2026',
-      '999999',
-      '123456',
-      'GURU2026',
-      'PENGAWAS2026',
-      'PANITIA2026',
-      'ADMIN2026',
-      'CIHAMPELAS'
-    ];
 
     if (!cleanInput) {
       setUnlockError('Harap masukkan PIN Rahasia Pengawas!');
@@ -458,7 +397,7 @@ export default function CbtStudentExamRoom({
       return;
     }
 
-    if (validSupervisorPins.includes(cleanInput)) {
+    if (cleanInput === 'SPENTIC2026') {
       setUnlockError(null);
       setUnlockSuccess('Kunci ujian berhasil dibuka oleh Pengawas!');
       setTimeout(() => {
@@ -469,9 +408,9 @@ export default function CbtStudentExamRoom({
         unlockStoredStudentCbtSession(exam.id, student.id);
         if (student.nisn) unlockStoredStudentCbtSession(exam.id, student.nisn);
         persistSession(answers, doubtfuls, 0);
-        lastViolationTimeRef.current = Date.now() + 3000;
+        lastViolationTimeRef.current = Date.now() + 5000;
         enterFullscreen();
-      }, 700);
+      }, 500);
     } else {
       setUnlockError('❌ PIN Pengawas salah! Hanya Guru Pengawas yang berhak membuka lembar ujian ini.');
     }
@@ -988,11 +927,9 @@ export default function CbtStudentExamRoom({
 
             {/* VIOLATION COUNTER BADGE */}
             {violationCount > 0 && (
-              <div className={`px-2.5 py-1.5 rounded-xl border flex items-center gap-1.5 text-xs font-bold ${
-                violationCount >= 3 ? 'bg-rose-950 border-rose-500 text-rose-300 animate-pulse' : 'bg-amber-950/80 border-amber-500/70 text-amber-300'
-              }`}>
-                <span>{violationCount >= 3 ? '🔒' : '⚠️'}</span>
-                <span>{violationCount >= 3 ? `Terkunci (${violationCount}x Keluar)` : `Peringatan (${violationCount}/3)`}</span>
+              <div className="px-2.5 py-1.5 rounded-xl border flex items-center gap-1.5 text-xs font-bold bg-rose-950 border-rose-500 text-rose-300 animate-pulse">
+                <span>🔒</span>
+                <span>Terkunci (Terdeteksi Keluar)</span>
               </div>
             )}
 
@@ -1514,44 +1451,7 @@ export default function CbtStudentExamRoom({
         </div>
       )}
 
-      {/* MODAL PERINGATAN CURANG / PINDAH TAB (TOLERANSI 1 & 2) */}
-      {warningMessage && !isLockedByViolation && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/85 backdrop-blur-md">
-          <div className="bg-white border-2 border-amber-500 rounded-3xl p-6 sm:p-7 max-w-md w-full text-center space-y-4 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-            <div className="w-16 h-16 rounded-full bg-amber-100 text-amber-600 border border-amber-200 mx-auto flex items-center justify-center text-3xl font-black">
-              ⚠️
-            </div>
-            <div className="space-y-1">
-              <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-800 text-[11px] font-black uppercase tracking-wider">
-                Peringatan Integritas ({violationCount}/3)
-              </span>
-              <h3 className="text-base sm:text-lg font-bold text-slate-900 pt-1">
-                Terdeteksi Meninggalkan Ujian
-              </h3>
-            </div>
-            <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-900 leading-relaxed text-left space-y-1.5">
-              <p className="font-semibold whitespace-pre-line">{warningMessage}</p>
-              <p className="text-[11px] text-amber-800 border-t border-amber-200/80 pt-1.5">
-                Aktivitas ini dicatat di monitor Panitia & Pengawas Ruangan. Sisa kesempatan: <strong>{Math.max(0, 3 - violationCount)}x</strong> sebelum sistem <strong>MENGUNCI TOTAL</strong> lembar ujian Anda.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                setWarningMessage(null);
-                lastViolationTimeRef.current = Date.now() + 2000;
-                enterFullscreen();
-              }}
-              className="w-full py-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs transition shadow-lg shadow-amber-600/30 cursor-pointer active:scale-95 flex items-center justify-center gap-2"
-            >
-              <span>Saya Mengerti & Lanjutkan Ujian</span>
-              <span>→</span>
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL LOCKDOWN RESMI CBT (REMOTE UNLOCK ONLY - RINGKAS & RAPIH) */}
+      {/* MODAL LOCKDOWN RESMI CBT (ZERO TOLERANCE: 1X KELUAR = TERKUNCI MATI) */}
       {isLockedByViolation && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/95 backdrop-blur-md select-none">
           <div className="bg-slate-900 border border-rose-500/80 rounded-2xl sm:rounded-3xl p-5 sm:p-6 max-w-sm sm:max-w-md w-full text-center space-y-3.5 shadow-2xl shadow-rose-950/80 max-h-[92vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
@@ -1573,7 +1473,7 @@ export default function CbtStudentExamRoom({
                 Akses Ujian Dibekukan
               </h2>
               <p className="text-xs text-rose-300">
-                Terdeteksi meninggalkan lembar ujian ({violationCount}x keluar).
+                Terdeteksi meninggalkan lembar ujian CBT (Toleransi 1x).
               </p>
             </div>
 
@@ -1593,7 +1493,7 @@ export default function CbtStudentExamRoom({
 
             {/* Concise Instruction */}
             <div className="p-3 rounded-xl bg-rose-950/40 border border-rose-500/30 text-xs text-rose-200 text-center leading-relaxed">
-              ✋ <strong>Angkat tangan</strong> dan lapor ke <strong>Pengawas Ruangan</strong> untuk membuka kunci ujian dari Meja Pengawas.
+              ✋ <strong>Angkat tangan</strong> dan lapor ke <strong>Pengawas Ruangan</strong> untuk membuka kunci ujian dari Meja Pengawas atau melalui PIN Pengawas.
             </div>
 
             {/* Real-time Status & Sync */}
@@ -1606,7 +1506,7 @@ export default function CbtStudentExamRoom({
                 <button
                   type="button"
                   onClick={() => {
-                    lastViolationTimeRef.current = Date.now() + 10000;
+                    lastViolationTimeRef.current = Date.now() + 5000;
                     setIsLockedByViolation(false);
                     enterFullscreen();
                   }}
@@ -1617,7 +1517,7 @@ export default function CbtStudentExamRoom({
                 </button>
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-2.5">
                 <div className="py-2 px-3 rounded-xl bg-slate-950/70 border border-slate-800 flex items-center justify-center gap-2 text-amber-400 font-semibold text-xs">
                   <span className="relative flex h-2 w-2">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
@@ -1625,86 +1525,59 @@ export default function CbtStudentExamRoom({
                   </span>
                   <span>Menunggu Buka Kunci Pengawas...</span>
                 </div>
+
+                {/* Tombol Sinkronisasi Remote dari Meja Pengawas */}
                 <button
                   type="button"
                   onClick={() => {
                     handleRemoteUnlock(true);
                   }}
-                  className="w-full py-2.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black transition border border-amber-400 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 shadow-md"
-                  title="Klik untuk sinkronisasi manual jika pengawas sudah membuka kunci"
+                  className="w-full py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 text-xs font-bold transition border border-amber-500/50 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 shadow-md"
+                  title="Klik untuk sinkronisasi jika pengawas sudah menekan 'Buka Kunci' di Meja Pengawas"
                 >
                   <span>🔄</span>
                   <span>Cek Status Buka Kunci Pengawas</span>
                 </button>
 
-                {(violationCount < 3 || Object.keys(answers).length === 0) && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      unlockStoredStudentCbtSession(exam.id, student.id);
-                      if (student.nisn) unlockStoredStudentCbtSession(exam.id, student.nisn);
-                      lastViolationTimeRef.current = Date.now() + 10000;
-                      isLockedRef.current = false;
-                      setIsLockedByViolation(false);
-                      setViolationCount(0);
-                      enterFullscreen();
-                    }}
-                    className="w-full py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 shadow-md"
-                  >
-                    <span>🛡️ Lanjutkan Ujian (Mode Layar Penuh)</span>
-                  </button>
-                )}
-
-                {/* Alternatif: Masukkan PIN Rahasia Pengawas di Tempat */}
+                {/* Input PIN Pengawas Langsung (Untuk Pengawas yang sedang berkeliling) */}
                 <div className="pt-2 border-t border-slate-800/80">
-                  {!showPinInput ? (
-                    <button
-                      type="button"
-                      onClick={() => setShowPinInput(true)}
-                      className="text-[11px] text-slate-400 hover:text-amber-400 transition cursor-pointer underline underline-offset-2"
-                    >
-                      🔑 Atau Buka di Tempat (PIN Pengawas)
-                    </button>
-                  ) : (
-                    <div className="space-y-2 pt-1 text-left bg-slate-950/60 p-2.5 rounded-xl border border-slate-800">
-                      <label className="block text-[10px] font-bold text-amber-300 uppercase tracking-wider text-center">
-                        PIN Khusus Pengawas Ruang:
-                      </label>
-                      <div className="flex gap-1.5">
-                        <input
-                          type="password"
-                          placeholder="Ketik PIN (cth: SPENTIC99)"
-                          value={unlockTokenInput}
-                          onChange={(e) => setUnlockTokenInput(e.target.value.toUpperCase())}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              handleUnlockExam();
-                            }
-                          }}
-                          className="flex-1 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-amber-300 font-mono font-bold text-center text-xs focus:outline-none focus:border-amber-400"
-                          autoFocus
-                        />
-                        <button
-                          type="button"
-                          onClick={handleUnlockExam}
-                          className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition cursor-pointer active:scale-95"
-                        >
-                          Buka 🔓
-                        </button>
-                      </div>
-                      {unlockError && (
-                        <p className="text-[11px] text-rose-400 text-center font-semibold mt-1">
-                          {unlockError}
-                        </p>
-                      )}
-                      {unlockSuccess && (
-                        <p className="text-[11px] text-emerald-400 text-center font-semibold mt-1">
-                          ✅ {unlockSuccess}
-                        </p>
-                      )}
+                  <div className="space-y-2 pt-1 text-left bg-slate-950/60 p-2.5 rounded-xl border border-slate-800">
+                    <label className="block text-[10px] font-bold text-amber-300 uppercase tracking-wider text-center">
+                      🔑 PIN Pengawas Ruangan:
+                    </label>
+                    <div className="flex gap-1.5">
+                      <input
+                        type="password"
+                        placeholder="Masukkan PIN Pengawas..."
+                        value={unlockTokenInput}
+                        onChange={(e) => setUnlockTokenInput(e.target.value.toUpperCase())}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleUnlockExam();
+                          }
+                        }}
+                        className="flex-1 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-amber-300 font-mono font-bold text-center text-xs focus:outline-none focus:border-amber-400"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleUnlockExam}
+                        className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition cursor-pointer active:scale-95 shadow-xs"
+                      >
+                        Buka 🔓
+                      </button>
                     </div>
-                  )}
+                    {unlockError && (
+                      <p className="text-[11px] text-rose-400 text-center font-semibold mt-1">
+                        {unlockError}
+                      </p>
+                    )}
+                    {unlockSuccess && (
+                      <p className="text-[11px] text-emerald-400 text-center font-semibold mt-1">
+                        ✅ {unlockSuccess}
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
