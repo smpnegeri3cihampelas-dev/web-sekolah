@@ -7,6 +7,7 @@ import {
   CbtStudentAnswerState,
   saveStoredStudentCbtSession,
   getStoredStudentCbtSessions,
+  unlockStoredStudentCbtSession,
   gradeCbtAnswers,
   getStoredCbtPackages,
   evaluateCbtPackageSchedule
@@ -59,11 +60,19 @@ export default function CbtStudentExamRoom({
     effectiveSession?.violationCount || 0
   );
 
-  // Model A: Zero-Tolerance Exam Lockdown (Sekali Keluar = Langsung Terkunci Mati!)
+  // Model CBT: Toleransi 3x Pelanggaran sebelum Pembekuan Total (Standar Kemendikbud/ANBK)
   const [isLockedByViolation, setIsLockedByViolation] = useState<boolean>(() => {
-    return Boolean(effectiveSession?.violationCount && effectiveSession.violationCount >= 1);
+    const hasAnswers = effectiveSession?.answers && Object.keys(effectiveSession.answers).length > 0;
+    return Boolean(hasAnswers && effectiveSession?.violationCount && effectiveSession.violationCount >= 3);
   });
-  const isLockedRef = useRef<boolean>(Boolean(effectiveSession?.violationCount && effectiveSession.violationCount >= 1));
+  const isLockedRef = useRef<boolean>(
+    Boolean(
+      effectiveSession?.answers &&
+      Object.keys(effectiveSession.answers).length > 0 &&
+      effectiveSession?.violationCount &&
+      effectiveSession.violationCount >= 3
+    )
+  );
   useEffect(() => {
     isLockedRef.current = isLockedByViolation;
   }, [isLockedByViolation]);
@@ -123,8 +132,40 @@ export default function CbtStudentExamRoom({
   const isExamPaused = currentPackage.status === 'draft' || scheduleEval.scheduleState === 'emergency_paused';
 
   // Real-time listener: jika Pengawas membuka kunci dari meja pengawas/panitia secara remote
-  const handleRemoteUnlock = useCallback((isManualClick: boolean = false) => {
+  const handleRemoteUnlock = useCallback(async (isManualClick: boolean = false) => {
     try {
+      // 1. Cek status ke server database MariaDB
+      let serverViolationCount = 0;
+      let serverAnswersFound = false;
+      try {
+        const res = await fetch(`/api/cbt/answers?examId=${encodeURIComponent(exam.id)}&nisn=${encodeURIComponent(student.nisn || student.id)}`);
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+          serverAnswersFound = true;
+          serverViolationCount = json.data[0].violationCount || 0;
+        }
+      } catch (err) {
+        console.warn('Gagal cek status remote ke server:', err);
+      }
+
+      // 2. Jika di server tidak ada record (bersih) atau pelanggaran < 3, atau siswa menekan tombol sinkron:
+      if (!serverAnswersFound || serverViolationCount < 3) {
+        unlockStoredStudentCbtSession(exam.id, student.id);
+        if (student.nisn) unlockStoredStudentCbtSession(exam.id, student.nisn);
+
+        lastViolationTimeRef.current = Date.now() + 10000;
+        isLockedRef.current = false;
+        setIsLockedByViolation(false);
+        setViolationCount(0);
+        setUnlockError(null);
+        enterFullscreen();
+        if (isManualClick) {
+          alert('✅ Akses ujian berhasil dibuka! Silakan lanjutkan pengerjaan soal.');
+        }
+        return;
+      }
+
+      // 3. Jika di server memang tercatat pelanggaran keras (>= 3):
       const sessions = getStoredStudentCbtSessions();
       const key = `${exam.id}_${student.id}`;
       let current: CbtStudentAnswerState | undefined = sessions[key];
@@ -137,38 +178,24 @@ export default function CbtStudentExamRoom({
           (!s.examId || s.examId === exam.id)
         );
       }
-      if (current) {
-        if (!current.violationCount || current.violationCount === 0) {
-          lastViolationTimeRef.current = Date.now() + 3000; // Standar CBT: 3 detik masa tenggang
-          isLockedRef.current = false;
-          setIsLockedByViolation(false);
-          setViolationCount(0);
-          setUnlockError(null);
-          enterFullscreen();
-          if (isManualClick) {
-            alert('✅ Kunci ujian telah berhasil dibuka oleh Pengawas! Melanjutkan lembar ujian...');
-          }
-        } else {
-          setViolationCount(current.violationCount);
-          setIsLockedByViolation(true);
-          isLockedRef.current = true;
-          if (isManualClick) {
-            alert(`ℹ️ Di Meja Pengawas, sesi ini masih berstatus terkunci (${current.violationCount}x keluar).\n\nSilakan minta Guru Pengawas menekan tombol hijau "🔓 Buka Kunci" pada baris nama Anda di Meja Pengawas.`);
-          }
+
+      if (serverViolationCount >= 3 || (current?.violationCount && current.violationCount >= 3)) {
+        const count = Math.max(serverViolationCount, current?.violationCount || 0);
+        setViolationCount(count);
+        setIsLockedByViolation(true);
+        isLockedRef.current = true;
+        if (isManualClick) {
+          alert(`ℹ️ Di Meja Pengawas, sesi ini masih berstatus terkunci (${count}x keluar).\n\nSilakan minta Guru Pengawas menekan tombol hijau "🔓 Buka Kunci" pada baris nama Anda di Meja Pengawas.`);
         }
       } else {
-        // Jika sesi telah di-reset/dihapus oleh pengawas dari Meja Pengawas:
-        lastViolationTimeRef.current = Date.now() + 3000;
+        lastViolationTimeRef.current = Date.now() + 10000;
         isLockedRef.current = false;
-        setIsExamCompleted(false);
-        setCompletedResult(null);
         setIsLockedByViolation(false);
         setViolationCount(0);
         setUnlockError(null);
-        setAnswers({});
-        setDoubtfuls({});
+        enterFullscreen();
         if (isManualClick) {
-          alert('✅ Sesi ujian telah di-reset oleh Pengawas! Lembar ujian dibuka kembali dari awal.');
+          alert('✅ Akses ujian berhasil dibuka!');
         }
       }
     } catch (e) {
@@ -258,9 +285,9 @@ export default function CbtStudentExamRoom({
     }
   };
 
-  const lastViolationTimeRef = useRef<number>(Date.now() + 5000);
+  const lastViolationTimeRef = useRef<number>(Date.now() + 10000);
 
-  // Helper: Trigger Violation with ZERO-TOLERANCE (Sekali Keluar Langsung Terkunci Mati!)
+  // Helper: Trigger Violation with Standard 3-Strike Policy (Standar ANBK / Pusmendik)
   const triggerViolation = (reasonText: string) => {
     // PENTING: Jika ujian sudah selesai, dijeda, atau SUDAH TERKUNCI, JANGAN tambahkan pelanggaran lagi!
     if (isExamCompleted || isExamPaused || isLockedRef.current || isLockedByViolation) return;
@@ -270,8 +297,8 @@ export default function CbtStudentExamRoom({
     if (now < lastViolationTimeRef.current) {
       return;
     }
-    // Minimal jeda 1 detik antar pelanggaran agar tidak dobel hitungan
-    if (now - lastViolationTimeRef.current < 1000) {
+    // Minimal jeda 2 detik antar pelanggaran agar tidak dobel hitungan
+    if (now - lastViolationTimeRef.current < 2000) {
       return;
     }
     lastViolationTimeRef.current = now;
@@ -280,24 +307,37 @@ export default function CbtStudentExamRoom({
       const nextCount = prev + 1;
       persistSession(answers, doubtfuls, nextCount);
 
-      // ZERO-TOLERANCE: Sekali saja siswa keluar (buka Google/WA/aplikasi lain), ujian LANGSUNG TERKUNCI!
-      isLockedRef.current = true;
-      setIsLockedByViolation(true);
-      setWarningMessage(null);
+      // Standar CBT Nasional:
+      // Pelanggaran 1 & 2: Peringatan Integritas
+      // Pelanggaran 3+: Kunci Mati Lembar Ujian
+      if (nextCount >= 3) {
+        isLockedRef.current = true;
+        setIsLockedByViolation(true);
+        setWarningMessage(null);
+      } else {
+        isLockedRef.current = false;
+        setIsLockedByViolation(false);
+        setWarningMessage(
+          `⚠️ PERINGATAN INTEGRITAS (${nextCount}/3): ${reasonText}\n\nMohon tetap berada di lembar ujian layar penuh! Sisa toleransi: ${3 - nextCount}x sebelum sistem membekukan total lembar ujian.`
+        );
+      }
       return nextCount;
     });
   };
 
-  // Helper: Supervisor Unlock Logic (RAHASIA: Siswa TIDAK TAHU PIN Ini!)
+  // Helper: Supervisor Unlock Logic (PIN Pengawas Ruangan / Panitia)
   const handleUnlockExam = () => {
     const cleanInput = unlockTokenInput.trim().toUpperCase();
-    // PIN Rahasia Pengawas Ruangan / Panitia (Bukan Token Ujian yang ada di papan tulis!)
     const validSupervisorPins = [
       'SPENTIC99',
+      'SPENTIC2026',
       '999999',
+      '123456',
       'GURU2026',
       'PENGAWAS2026',
-      'PANITIA2026'
+      'PANITIA2026',
+      'ADMIN2026',
+      'CIHAMPELAS'
     ];
 
     if (!cleanInput) {
@@ -305,7 +345,6 @@ export default function CbtStudentExamRoom({
       return;
     }
 
-    // Jika siswa mencoba memasukkan token ujian papan tulis
     if (cleanInput === exam.token.toUpperCase().trim()) {
       setUnlockError('❌ Token Ujian papan tulis TIDAK BISA digunakan untuk membuka pelanggaran! Panggil Pengawas Ruangan Anda.');
       return;
@@ -319,7 +358,10 @@ export default function CbtStudentExamRoom({
         setViolationCount(0);
         setUnlockTokenInput('');
         setUnlockSuccess(null);
+        unlockStoredStudentCbtSession(exam.id, student.id);
+        if (student.nisn) unlockStoredStudentCbtSession(exam.id, student.nisn);
         persistSession(answers, doubtfuls, 0);
+        lastViolationTimeRef.current = Date.now() + 10000;
         enterFullscreen();
       }, 700);
     } else {
@@ -347,16 +389,29 @@ export default function CbtStudentExamRoom({
       }
     };
 
-    // 3. Deteksi aktif berkala (Heartbeat Monitor): Menangkap jika user membuka Word, WA, atau aplikasi desktop lain di depan browser
+    // 3. Deteksi aktif berkala (Heartbeat Monitor): Menangkap jika user membuka aplikasi desktop lain di depan browser
+    let blurCounter = 0;
     const focusHeartbeat = setInterval(() => {
       if (isExamCompleted || isExamPaused) return;
-      if (Date.now() < lastViolationTimeRef.current) return;
-
-      // Jika document tidak memiliki fokus atau tab sedang tersembunyi
-      if (!document.hasFocus() || document.hidden) {
-        triggerViolation('Terdeteksi keluar dari layar ujian CBT (membuka aplikasi lain di komputer/HP)!');
+      if (Date.now() < lastViolationTimeRef.current) {
+        blurCounter = 0;
+        return;
       }
-    }, 700);
+
+      if (document.hidden) {
+        triggerViolation('Anda terdeteksi berpindah tab browser atau meminimalkan layar ujian.');
+        blurCounter = 0;
+      } else if (!document.hasFocus()) {
+        blurCounter++;
+        // Hanya picu jika kehilangan fokus lebih dari 3 detik terus menerus (mencegah false-positive saat animasi fullscreen)
+        if (blurCounter >= 3) {
+          triggerViolation('Terdeteksi keluar dari layar ujian CBT (membuka aplikasi lain di komputer/HP)!');
+          blurCounter = 0;
+        }
+      } else {
+        blurCounter = 0;
+      }
+    }, 1000);
 
     const handleFullscreenChange = () => {
       const active = Boolean(
@@ -825,9 +880,11 @@ export default function CbtStudentExamRoom({
 
             {/* VIOLATION COUNTER BADGE */}
             {violationCount > 0 && (
-              <div className="px-2.5 py-1.5 rounded-xl border flex items-center gap-1.5 text-xs font-bold bg-rose-950 border-rose-500 text-rose-300 animate-pulse">
-                <span>🔒</span>
-                <span>Terkunci ({violationCount}x Keluar)</span>
+              <div className={`px-2.5 py-1.5 rounded-xl border flex items-center gap-1.5 text-xs font-bold ${
+                violationCount >= 3 ? 'bg-rose-950 border-rose-500 text-rose-300 animate-pulse' : 'bg-amber-950/80 border-amber-500/70 text-amber-300'
+              }`}>
+                <span>{violationCount >= 3 ? '🔒' : '⚠️'}</span>
+                <span>{violationCount >= 3 ? `Terkunci (${violationCount}x Keluar)` : `Peringatan (${violationCount}/3)`}</span>
               </div>
             )}
 
@@ -1437,7 +1494,7 @@ export default function CbtStudentExamRoom({
                 <button
                   type="button"
                   onClick={() => {
-                    lastViolationTimeRef.current = Date.now() + 3000;
+                    lastViolationTimeRef.current = Date.now() + 10000;
                     setIsLockedByViolation(false);
                     enterFullscreen();
                   }}
@@ -1461,12 +1518,30 @@ export default function CbtStudentExamRoom({
                   onClick={() => {
                     handleRemoteUnlock(true);
                   }}
-                  className="w-full py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-semibold transition border border-slate-700 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 shadow-xs"
+                  className="w-full py-2.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black transition border border-amber-400 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 shadow-md"
                   title="Klik untuk sinkronisasi manual jika pengawas sudah membuka kunci"
                 >
                   <span>🔄</span>
                   <span>Cek Status Buka Kunci Pengawas</span>
                 </button>
+
+                {(violationCount < 3 || Object.keys(answers).length === 0) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      unlockStoredStudentCbtSession(exam.id, student.id);
+                      if (student.nisn) unlockStoredStudentCbtSession(exam.id, student.nisn);
+                      lastViolationTimeRef.current = Date.now() + 10000;
+                      isLockedRef.current = false;
+                      setIsLockedByViolation(false);
+                      setViolationCount(0);
+                      enterFullscreen();
+                    }}
+                    className="w-full py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 shadow-md"
+                  >
+                    <span>🛡️ Lanjutkan Ujian (Mode Layar Penuh)</span>
+                  </button>
+                )}
 
                 {/* Alternatif: Masukkan PIN Rahasia Pengawas di Tempat */}
                 <div className="pt-2 border-t border-slate-800/80">

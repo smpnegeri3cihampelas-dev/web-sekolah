@@ -1175,6 +1175,13 @@ export function resetStoredStudentCbtSession(examId: string, studentIdOrNisn: st
     localStorage.setItem(CBT_STUDENT_SESSIONS_KEY, JSON.stringify(all));
     window.dispatchEvent(new Event('cbtSessionsUpdated'));
     window.dispatchEvent(new Event('storage'));
+
+    // Sync deletion to cloud database
+    try {
+      fetch(`/api/cbt/answers?examId=${encodeURIComponent(examId)}&studentId=${encodeURIComponent(studentIdOrNisn)}`, {
+        method: 'DELETE'
+      }).catch(() => {});
+    } catch {}
   } catch (e) {
     console.error('Failed resetting student CBT session', e);
   }
@@ -1185,6 +1192,7 @@ export function unlockStoredStudentCbtSession(examId: string, studentIdOrNisn: s
   try {
     const all = getStoredStudentCbtSessions();
     let modified = false;
+    let unlockedSession: CbtStudentAnswerState | null = null;
 
     // 1. Direct key update if exists
     const directKey = `${examId}_${studentIdOrNisn}`;
@@ -1193,6 +1201,7 @@ export function unlockStoredStudentCbtSession(examId: string, studentIdOrNisn: s
         ...all[directKey],
         violationCount: 0
       };
+      unlockedSession = all[directKey];
       modified = true;
     }
 
@@ -1211,6 +1220,7 @@ export function unlockStoredStudentCbtSession(examId: string, studentIdOrNisn: s
           ...sess,
           violationCount: 0
         };
+        unlockedSession = all[k];
         modified = true;
       }
     }
@@ -1219,6 +1229,13 @@ export function unlockStoredStudentCbtSession(examId: string, studentIdOrNisn: s
     localStorage.setItem(CBT_STUDENT_SESSIONS_KEY, JSON.stringify(all));
     window.dispatchEvent(new Event('cbtSessionsUpdated'));
     window.dispatchEvent(new Event('storage'));
+
+    // Sync unlocked session to cloud database
+    if (unlockedSession) {
+      try {
+        import('./cloudSync').then(m => m.pushCbtStudentAnswerToCloud(unlockedSession!)).catch(() => {});
+      } catch {}
+    }
   } catch (e) {
     console.error('Failed unlocking student CBT session', e);
   }

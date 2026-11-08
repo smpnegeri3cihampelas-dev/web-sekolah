@@ -136,3 +136,34 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
+
+export async function DELETE(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const examId = searchParams.get('examId');
+    const studentId = searchParams.get('studentId');
+    const studentNisn = searchParams.get('nisn');
+
+    if (!examId && !studentId && !studentNisn) {
+      return NextResponse.json({ success: false, error: 'Parameter examId or studentId/nisn required' }, { status: 400 });
+    }
+
+    let sql = 'DELETE FROM cbt_student_answers WHERE 1=1';
+    const params: any[] = [];
+    if (examId) {
+      sql += ' AND exam_id = ?';
+      params.push(examId);
+    }
+    if (studentId || studentNisn) {
+      sql += ' AND (student_id = ? OR student_nisn = ?)';
+      params.push(studentId || studentNisn, studentNisn || studentId);
+    }
+
+    await query(sql, params);
+    return NextResponse.json({ success: true, message: 'Data sesi jawaban berhasil direset' });
+  } catch (error: any) {
+    console.error('Error resetting CBT student answer:', error);
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}
+

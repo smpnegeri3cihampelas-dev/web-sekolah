@@ -59,6 +59,7 @@ import {
   getStoredCbtPackages,
   getStoredStudentCbtSessions,
   resetStoredStudentCbtSession,
+  unlockStoredStudentCbtSession,
   getStoredCbtPanitiaConfig,
   getRoomForStudent,
   markStudentCbtAttendancePresent,
@@ -6101,10 +6102,19 @@ export default function ELearningPage() {
                     console.error('Fullscreen request error', e);
                   }
 
-                  // 2. Tandai kehadiran
+                  // 2. Tandai kehadiran & pastikan pelanggaran ter-reset jika belum ada jawaban
                   const currentStudentObj = activeStudents.find(s => s.nisn === currentUser?.nipOrNisn) ||
                     activeStudents.find(s => s.name.toLowerCase() === currentUser?.name?.toLowerCase()) ||
                     activeStudents[0];
+
+                  try {
+                    unlockStoredStudentCbtSession(cbtTokenModalExam.id, currentStudentObj.id);
+                    if (currentStudentObj.nisn) {
+                      unlockStoredStudentCbtSession(cbtTokenModalExam.id, currentStudentObj.nisn);
+                    }
+                  } catch (e) {
+                    console.warn('Auto unlock prior session on start error', e);
+                  }
 
                   const assignedRoom = getRoomForStudent(currentStudentObj, getStoredCbtPanitiaConfig().rooms);
                   const targetRoom = assignedRoom?.name || `Ruang ${currentUser?.classId || '7-A'}`;

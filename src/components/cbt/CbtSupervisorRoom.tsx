@@ -1027,7 +1027,7 @@ export default function CbtSupervisorRoom({
                           <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
                             ✓ Selesai ({session.score}/100)
                           </span>
-                        ) : session?.violationCount && session.violationCount >= 1 ? (
+                        ) : session?.violationCount && session.violationCount >= 3 ? (
                           <div className="space-y-0.5">
                             <span className="inline-block px-2 py-0.5 rounded text-[10px] font-black bg-rose-600 text-white animate-pulse shadow-xs">
                               🔒 TERKUNCI ({session.violationCount}x Keluar)
@@ -1035,6 +1035,12 @@ export default function CbtSupervisorRoom({
                             <div className="text-[9px] text-rose-600 font-semibold">
                               Pelanggaran Integritas
                             </div>
+                          </div>
+                        ) : session?.violationCount && session.violationCount >= 1 ? (
+                          <div className="space-y-0.5">
+                            <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                              ⚠️ Peringatan ({session.violationCount}/3)
+                            </span>
                           </div>
                         ) : session ? (
                           <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 animate-pulse">

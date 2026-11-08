@@ -4634,9 +4634,13 @@ export default function CbtPanitiaCommandCenter({
                             >
                               {sess.isSubmitted ? '✓ Selesai' : '⏳ Mengerjakan'}
                             </span>
-                            {sess.violationCount && sess.violationCount >= 1 ? (
+                            {sess.violationCount && sess.violationCount >= 3 ? (
                               <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-rose-600 text-white animate-pulse">
                                 🔒 TERKUNCI ({sess.violationCount}x Keluar)
+                              </span>
+                            ) : sess.violationCount && sess.violationCount > 0 ? (
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                                ⚠️ Peringatan ({sess.violationCount}/3)
                               </span>
                             ) : null}
                           </div>
