@@ -77,6 +77,13 @@ h1, h2, h3, h4, h5, h6, .font-display {
   letter-spacing: -0.008em;
 }
 
+/* Ensure all select and option elements maintain crisp light theme in dark mode */
+select, option {
+  color-scheme: light !important;
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
 .font-elearning .font-mono,
 .font-dashboard .font-mono {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;

@@ -23,6 +23,109 @@ interface CbtStudentExamRoomProps {
   onExitRoom: () => void;
 }
 
+interface MatchingDropdownProps {
+  value: string;
+  options: string[];
+  placeholder?: string;
+  disabled?: boolean;
+  onChange: (val: string) => void;
+}
+
+function MatchingDropdown({
+  value,
+  options,
+  placeholder = '-- Pilih Pasangan Jawaban --',
+  disabled = false,
+  onChange
+}: MatchingDropdownProps) {
+  const [isOpen, setIsOpen] = useState<boolean>(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen]);
+
+  return (
+    <div className="relative w-full" ref={dropdownRef}>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setIsOpen(!isOpen)}
+        className={`w-full px-3.5 py-2.5 rounded-xl border text-xs font-semibold text-left flex items-center justify-between gap-2 transition cursor-pointer select-none ${
+          disabled
+            ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+            : value
+            ? 'bg-emerald-50/90 border-emerald-400 text-emerald-950 font-bold shadow-xs hover:border-emerald-500'
+            : 'bg-white border-slate-300 text-slate-500 hover:border-slate-400 hover:text-slate-700 shadow-2xs'
+        }`}
+      >
+        <span className="truncate">
+          {value ? (
+            <span className="flex items-center gap-1.5">
+              <span className="text-emerald-600 font-bold">✓</span>
+              <span>{value}</span>
+            </span>
+          ) : (
+            <span className="text-slate-400 font-normal">{placeholder}</span>
+          )}
+        </span>
+        <span className={`text-[10px] text-slate-400 transition-transform duration-200 shrink-0 ${isOpen ? 'rotate-180 text-emerald-600' : ''}`}>
+          ▼
+        </span>
+      </button>
+
+      {isOpen && !disabled && (
+        <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-100 max-h-56 overflow-y-auto">
+          <div className="p-1 space-y-0.5">
+            <button
+              type="button"
+              onClick={() => {
+                onChange('');
+                setIsOpen(false);
+              }}
+              className="w-full px-3 py-2 rounded-lg text-left text-xs font-medium text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition cursor-pointer flex items-center justify-between"
+            >
+              <span>{placeholder}</span>
+              {!value && <span className="text-slate-400">✓</span>}
+            </button>
+            {options.map((opt, idx) => {
+              const isSelected = value === opt;
+              return (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => {
+                    onChange(opt);
+                    setIsOpen(false);
+                  }}
+                  className={`w-full px-3 py-2 rounded-lg text-left text-xs font-semibold transition cursor-pointer flex items-center justify-between gap-2 ${
+                    isSelected
+                      ? 'bg-emerald-600 text-white font-bold'
+                      : 'text-slate-800 hover:bg-emerald-50 hover:text-emerald-900'
+                  }`}
+                >
+                  <span className="truncate">{opt}</span>
+                  {isSelected && <span className="font-bold">✓</span>}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function CbtStudentExamRoom({
   exam,
   student,
@@ -926,11 +1029,11 @@ export default function CbtStudentExamRoom({
         
         {/* KOLOM KIRI (3/4): LEMBAR SOAL */}
         <section className="lg:col-span-3 space-y-4">
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm space-y-5 relative overflow-hidden select-none">
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm space-y-5 relative select-none">
             
             {/* DYNAMIC WATERMARK (ANTI-SCREENSHOT & ANTI-BOCOR SOAL) */}
             <div 
-              className="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden flex flex-wrap items-center justify-around gap-y-16 gap-x-12 p-4 opacity-[0.055] sm:opacity-[0.065] rotate-[-18deg] scale-110"
+              className="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden rounded-2xl flex flex-wrap items-center justify-around gap-y-16 gap-x-12 p-4 opacity-[0.055] sm:opacity-[0.065] rotate-[-18deg] scale-110"
               aria-hidden="true"
             >
               {Array.from({ length: 8 }).map((_, i) => (
@@ -1198,21 +1301,28 @@ export default function CbtStudentExamRoom({
             {/* 4. MENJODOHKAN (MATCHING PAIRS) */}
             {currentQuestion.type === 'menjodohkan' && currentQuestion.matchingPairs && (
               <div className="pt-2 space-y-3">
-                <p className="text-xs text-emerald-700 font-semibold">
-                  ℹ️ Pasangkan premis sebelah kiri dengan pasangan yang tepat di sebelah kanan:
+                <p className="text-xs text-emerald-700 font-semibold flex items-center gap-1.5">
+                  <span>ℹ️</span>
+                  <span>Pasangkan premis sebelah kiri dengan pasangan yang tepat di sebelah kanan:</span>
                 </p>
                 <div className="space-y-2.5">
                   {currentQuestion.matchingPairs.map((pair, pIdx) => {
                     const currentMatch = answers[currentQuestion.id]?.[pair.id] || '';
-                    const availableOptions = currentQuestion.matchingPairs!.map(p => p.rightMatch);
+                    const availableOptions = Array.from(
+                      new Set(
+                        currentQuestion.matchingPairs!
+                          .map(p => p.rightMatch?.trim())
+                          .filter((val): val is string => Boolean(val))
+                      )
+                    );
 
                     return (
                       <div 
                         key={pair.id} 
-                        className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                        className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative"
                       >
                         <div className="sm:w-1/2 flex items-center gap-2">
-                          <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs flex items-center justify-center">
+                          <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs flex items-center justify-center shrink-0">
                             {pIdx + 1}
                           </span>
                           <span className={`font-semibold text-slate-900 ${fontSizeClass}`}>
@@ -1221,19 +1331,15 @@ export default function CbtStudentExamRoom({
                         </div>
 
                         <div className="sm:w-1/2 flex items-center gap-2">
-                          <span className="text-slate-400 font-bold text-xs">➔</span>
-                          <select
-                            value={currentMatch}
-                            onChange={(e) => handleSelectMenjodohkan(pair.id, e.target.value)}
-                            className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 text-xs font-semibold focus:outline-none focus:border-emerald-500 cursor-pointer shadow-2xs"
-                          >
-                            <option value="">-- Pilih Pasangan Jawaban --</option>
-                            {availableOptions.map((opt, oIdx) => (
-                              <option key={oIdx} value={opt}>
-                                {opt}
-                              </option>
-                            ))}
-                          </select>
+                          <span className="text-slate-400 font-bold text-xs shrink-0">➔</span>
+                          <div className="flex-1">
+                            <MatchingDropdown
+                              value={currentMatch}
+                              options={availableOptions}
+                              disabled={isLockedByViolation}
+                              onChange={(val) => handleSelectMenjodohkan(pair.id, val)}
+                            />
+                          </div>
                         </div>
                       </div>
                     );
