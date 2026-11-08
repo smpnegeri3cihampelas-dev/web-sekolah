@@ -2197,80 +2197,67 @@ export default function CbtPanitiaCommandCenter({
               </div>
             </div>
 
-            {/* Row 2: Toolbar Tombol Aksi Cepat */}
-            <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center gap-2">
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1 hidden sm:inline">
-                Aksi Cepat:
-              </span>
+            {/* Row 2: Toolbar Tombol Aksi Cepat (Bersih & Tanpa Duplikasi) */}
+            <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                {/* ⚡ ONE-CLICK AUTO-SILANG 7 & 8 */}
+                <button
+                  type="button"
+                  onClick={handleAutoCrossSplitAll}
+                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs transition shadow-md shadow-amber-500/20 flex items-center gap-1.5 cursor-pointer active:scale-95"
+                  title="Bagi silang otomatis Kelas 7 & 8 ke Ruang 01-12 dan Kelas 9 di Ruang 13-17"
+                >
+                  <span>⚡</span>
+                  <span>Auto-Silang Kelas 7 &amp; 8 (12 Ruang)</span>
+                </button>
 
-              {/* ⚡ ONE-CLICK AUTO-SILANG 7 & 8 */}
-              <button
-                type="button"
-                onClick={handleAutoCrossSplitAll}
-                className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs transition shadow-md shadow-amber-500/20 flex items-center gap-1.5 cursor-pointer active:scale-95"
-                title="Bagi silang otomatis Kelas 7 & 8 ke Ruang 01-12 dan Kelas 9 di Ruang 13-17"
-              >
-                <span>⚡</span>
-                <span>Auto-Silang Kelas 7 &amp; 8 (12 Ruang)</span>
-              </button>
+                {/* 🔄 ISI ROMBEL MURNI */}
+                <button
+                  type="button"
+                  onClick={handleFillPureRooms}
+                  className="px-3.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-900 font-bold text-xs border border-indigo-200 transition flex items-center gap-1.5 cursor-pointer active:scale-95"
+                  title="Isi seluruh ruangan sesuai rombel asal masing-masing (Ruang 01 = 7-A s.d Ruang 17 = 9-E)"
+                >
+                  <span>🔄</span>
+                  <span>Isi Rombel Murni (7A - 9E)</span>
+                </button>
 
-              {/* 🔄 ISI ROMBEL MURNI */}
-              <button
-                type="button"
-                onClick={handleFillPureRooms}
-                className="px-3.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-900 font-bold text-xs border border-indigo-200 transition flex items-center gap-1.5 cursor-pointer active:scale-95"
-                title="Isi seluruh ruangan sesuai rombel asal masing-masing (Ruang 01 = 7-A s.d Ruang 17 = 9-E)"
-              >
-                <span>🔄</span>
-                <span>Isi Rombel Murni (7A - 9E)</span>
-              </button>
+                {/* 🔀 MANUAL SPLIT MODAL */}
+                <button
+                  type="button"
+                  onClick={() => setShowSplitModal(true)}
+                  className="px-3.5 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold text-xs border border-amber-200 transition flex items-center gap-1.5 cursor-pointer active:scale-95"
+                  title="Bagi silang manual antara 2 kelas tertentu ke 2 ruangan"
+                >
+                  <span>🔀</span>
+                  <span>Bagi Silang 2 Kelas</span>
+                </button>
 
-              {/* 🔀 MANUAL SPLIT MODAL */}
-              <button
-                type="button"
-                onClick={() => setShowSplitModal(true)}
-                className="px-3 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold text-xs border border-amber-200 transition flex items-center gap-1.5 cursor-pointer active:scale-95"
-                title="Bagi silang manual antara 2 kelas tertentu ke 2 ruangan"
-              >
-                <span>🔀</span>
-                <span>Bagi Silang 2 Kelas</span>
-              </button>
+                {/* 🗑️ KOSONGKAN SEMUA RUANGAN */}
+                <button
+                  type="button"
+                  onClick={handleClearAllRooms}
+                  className="px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs transition border border-rose-200 flex items-center gap-1.5 cursor-pointer active:scale-95"
+                  title="Kosongkan seluruh ruangan (0 siswa di semua ruang) untuk menyusun dari lembar bersih"
+                >
+                  <span>🗑️</span>
+                  <span>Kosongkan Semua (Reset 0)</span>
+                </button>
+              </div>
 
-              {/* 🗑️ KOSONGKAN SEMUA RUANGAN */}
-              <button
-                type="button"
-                onClick={handleClearAllRooms}
-                className="px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs transition border border-rose-200 flex items-center gap-1.5 cursor-pointer active:scale-95"
-                title="Kosongkan seluruh ruangan (0 siswa di semua ruang) untuk menyusun dari lembar bersih"
-              >
-                <span>🗑️</span>
-                <span>Kosongkan Semua (Reset 0)</span>
-              </button>
-
-              {/* ➕ TAMBAH RUANGAN */}
+              {/* ➕ TAMBAH RUANGAN (Aksi Sekunder) */}
               <button
                 type="button"
                 onClick={handleOpenAddRoomModal}
-                className="px-3 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs border border-emerald-200 transition flex items-center gap-1.5 cursor-pointer active:scale-95"
+                className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs border border-slate-200 transition flex items-center gap-1.5 cursor-pointer active:scale-95 ml-auto"
               >
                 <span>➕</span>
                 <span>Tambah Ruang</span>
               </button>
-
-              {/* 👤➕ SISWA DARURAT */}
-              <button
-                type="button"
-                onClick={() => setShowEmergencyModal(true)}
-                className="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-xs"
-                title="Daftarkan siswa baru/darurat yang belum terdaftar di CBT"
-              >
-                <span>👤➕</span>
-                <span>Siswa Darurat</span>
-              </button>
             </div>
           </div>
 
-          {/* Metric Overview Bar */}
+          {/* Metric Overview Bar (Ringkas 3 Kolom - Tanpa Duplikasi) */}
           {(() => {
             let crossCount = 0;
             let pureCount = 0;
@@ -2289,92 +2276,45 @@ export default function CbtPanitiaCommandCenter({
             const unassignedCount = Math.max(0, activeStudents.length - totalAssigned);
 
             return (
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                  <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-2xs">
-                    <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Ruangan</div>
-                    <div className="text-xl font-black text-slate-900 mt-0.5 flex items-center gap-1.5">
-                      <span>🏢</span>
-                      <span>{config.rooms.length} Ruang</span>
-                    </div>
-                    <div className="text-[11px] text-slate-400 mt-0.5">
-                      {crossCount} Silang • {pureCount} Murni {emptyCount > 0 && `• ${emptyCount} Kosong`}
-                    </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs">
+                  <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Ruangan</div>
+                  <div className="text-xl font-black text-slate-900 mt-1 flex items-center gap-2">
+                    <span>🏢</span>
+                    <span>{config.rooms.length} Ruangan Ujian</span>
                   </div>
-
-                  <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-2xs">
-                    <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Peserta Terdistribusi</div>
-                    <div className="text-xl font-black text-emerald-700 mt-0.5 flex items-center gap-1.5">
-                      <span>👥</span>
-                      <span>{totalAssigned} Siswa</span>
-                    </div>
-                    <div className="text-[11px] text-slate-400 mt-0.5">
-                      Dari {activeStudents.length} total siswa
-                    </div>
-                  </div>
-
-                  <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-2xs">
-                    <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Belum Dapat Ruangan</div>
-                    <div className={`text-xl font-black mt-0.5 flex items-center gap-1.5 ${
-                      unassignedCount > 0 ? 'text-amber-600' : 'text-slate-400'
-                    }`}>
-                      <span>{unassignedCount > 0 ? '⚠️' : '✓'}</span>
-                      <span>{unassignedCount} Siswa</span>
-                    </div>
-                    <div className="text-[11px] text-slate-400 mt-0.5">
-                      {unassignedCount === 0 ? 'Semua peserta sudah terbagi' : 'Perlu dialokasikan ke ruangan'}
-                    </div>
-                  </div>
-
-                  <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-2xs">
-                    <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Rata-Rata per Ruang</div>
-                    <div className="text-xl font-black text-indigo-700 mt-0.5 flex items-center gap-1.5">
-                      <span>🪑</span>
-                      <span>{config.rooms.length > 0 ? Math.round(totalAssigned / config.rooms.length) : 0} Siswa</span>
-                    </div>
-                    <div className="text-[11px] text-slate-400 mt-0.5">
-                      Standar ~35 kursi per ruangan
-                    </div>
+                  <div className="text-[11px] text-slate-400 mt-1">
+                    Standar ~35 kursi per ruangan
                   </div>
                 </div>
 
-                {/* Banner Panduan jika semua ruangan masih bersih (0 Siswa) */}
-                {totalAssigned === 0 && (
-                  <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-amber-500/10 via-amber-50/50 to-orange-50 border border-amber-300 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                    <div className="flex items-start gap-3 min-w-0 flex-1">
-                      <div className="w-10 h-10 rounded-2xl bg-amber-500 text-slate-950 flex items-center justify-center text-xl shrink-0 font-bold shadow-xs">
-                        💡
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <h4 className="font-black text-slate-900 text-sm">
-                          Semua Ruangan Masih Bersih (0 Siswa / Siap Disusun)
-                        </h4>
-                        <p className="text-xs text-slate-600 mt-0.5">
-                          Ruangan saat ini kosong. Anda bisa langsung mengisi otomatis lewat tombol di samping, atau atur manual per ruangan.
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2 shrink-0">
-                      <button
-                        type="button"
-                        onClick={handleAutoCrossSplitAll}
-                        className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs transition shadow-md shadow-amber-500/20 flex items-center gap-1.5 cursor-pointer active:scale-95"
-                      >
-                        <span>⚡</span>
-                        <span>Isi Auto-Silang (12 Ruang)</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleFillPureRooms}
-                        className="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-800 font-bold text-xs border border-slate-200 transition flex items-center gap-1.5 cursor-pointer active:scale-95"
-                      >
-                        <span>🔄</span>
-                        <span>Isi Rombel Murni</span>
-                      </button>
-                    </div>
+                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs">
+                  <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Status Penempatan Siswa</div>
+                  <div className="text-xl font-black text-emerald-700 mt-1 flex items-center gap-2">
+                    <span>👥</span>
+                    <span>{totalAssigned} / {activeStudents.length} Siswa</span>
                   </div>
-                )}
+                  <div className="text-[11px] text-slate-400 mt-1">
+                    {unassignedCount === 0 ? '✓ Semua siswa telah terdistribusi ke ruangan' : `⚠️ ${unassignedCount} siswa belum dialokasikan`}
+                  </div>
+                </div>
+
+                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs">
+                  <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Format Pembagian</div>
+                  <div className="text-xl font-black text-indigo-700 mt-1 flex items-center gap-2">
+                    <span>🎯</span>
+                    <span>
+                      {totalAssigned === 0
+                        ? 'Ruangan Kosong (0 Siswa)'
+                        : crossCount > 0
+                        ? `${crossCount} Silang • ${pureCount} Murni`
+                        : `${pureCount} Rombel Murni`}
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-slate-400 mt-1">
+                    {totalAssigned === 0 ? 'Pilih salah satu tombol di atas untuk mengisi' : `${emptyCount > 0 ? `${emptyCount} ruang kosong` : 'Semua ruangan aktif terisi'}`}
+                  </div>
+                </div>
               </div>
             );
           })()}
