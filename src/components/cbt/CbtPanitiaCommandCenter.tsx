@@ -2564,7 +2564,10 @@ export default function CbtPanitiaCommandCenter({
           {/* MODAL: KELOLA & LIHAT PESERTA RUANG (FOCUSED & CLEAN - SPACIOUS SINGLE SCROLL) */}
           {managingRoomModal && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-950/70 backdrop-blur-md animate-fade-in">
-              <div className="bg-white rounded-3xl max-w-5xl xl:max-w-6xl w-full h-[92vh] max-h-[960px] p-4 sm:p-6 shadow-2xl border border-slate-200 flex flex-col overflow-hidden">
+              <div 
+                style={{ height: '90vh', maxHeight: '920px' }}
+                className="bg-white rounded-3xl max-w-5xl xl:max-w-6xl w-full h-[90vh] max-h-[920px] p-4 sm:p-6 shadow-2xl border border-slate-200 flex flex-col overflow-hidden"
+              >
                 {/* Modal Header */}
                 <div className="flex items-start justify-between pb-3.5 border-b border-slate-100 shrink-0">
                   <div className="space-y-1">
@@ -2815,113 +2818,115 @@ export default function CbtPanitiaCommandCenter({
 
                   {managingRoomTab === 'add' && (
                     <div className="flex-1 min-h-0 flex flex-col space-y-2.5 overflow-hidden">
-                      {/* Top Action Bar for Add */}
-                      <div className="shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-slate-50 p-3 rounded-2xl border border-slate-200">
-                        <div className="text-xs text-slate-600">
-                          Pilih siswa di bawah lalu klik tombol di kanan untuk menambahkan ke <strong>{managingRoomModal.name}</strong>.
-                        </div>
+                      {/* Sleek Unified Toolbar for Tab 2 */}
+                      <div className="shrink-0 bg-slate-50 p-2.5 sm:p-3 rounded-2xl border border-slate-200 space-y-2.5">
+                        {/* Row 1: Filters & Primary Action Button */}
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5">
+                          <div className="flex flex-wrap items-center gap-2 flex-1">
+                            {/* Filter Kelas */}
+                            <div className="w-40 sm:w-44">
+                              <select
+                                value={pickerClassFilter}
+                                onChange={(e) => {
+                                  setPickerClassFilter(e.target.value);
+                                  setSelectedStudentIdsToAdd([]);
+                                }}
+                                className="w-full px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:border-amber-500 cursor-pointer shadow-2xs"
+                              >
+                                <option value="all">Semua Kelas</option>
+                                {SCHOOL_CLASSES.map(c => (
+                                  <option key={c.id} value={c.id}>{c.name}</option>
+                                ))}
+                              </select>
+                            </div>
 
-                        <button
-                          type="button"
-                          onClick={handleAddSelectedStudentsToRoom}
-                          disabled={selectedStudentIdsToAdd.length === 0}
-                          className={`px-4 py-2 rounded-xl font-black text-xs transition shadow-md flex items-center gap-1.5 cursor-pointer ${
-                            selectedStudentIdsToAdd.length > 0
-                              ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20 active:scale-95'
-                              : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                          }`}
-                        >
-                          <span>+ Masukkan {selectedStudentIdsToAdd.length} Siswa Terpilih</span>
-                        </button>
-                      </div>
+                            {/* Filter Status */}
+                            <div className="w-48 sm:w-52">
+                              <select
+                                value={pickerStatusFilter}
+                                onChange={(e) => setPickerStatusFilter(e.target.value as any)}
+                                className="w-full px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-800 focus:outline-none focus:border-amber-500 cursor-pointer shadow-2xs"
+                              >
+                                <option value="all">Semua Siswa</option>
+                                <option value="unassigned">Hanya Belum Dapat Ruang</option>
+                                <option value="other_room">Dari Ruang Lain (Pindahkan)</option>
+                              </select>
+                            </div>
 
-                      {/* Filters */}
-                      <div className="shrink-0 grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                        <div>
-                          <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
-                            1. Filter Kelas Asal:
-                          </label>
-                          <select
-                            value={pickerClassFilter}
-                            onChange={(e) => {
-                              setPickerClassFilter(e.target.value);
-                              setSelectedStudentIdsToAdd([]);
-                            }}
-                            className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:border-amber-500 cursor-pointer"
-                          >
-                            <option value="all">Semua Kelas</option>
-                            {SCHOOL_CLASSES.map(c => (
-                              <option key={c.id} value={c.id}>{c.name}</option>
-                            ))}
-                          </select>
-                        </div>
+                            {/* Search Input */}
+                            <div className="flex-1 min-w-[160px] sm:min-w-[200px]">
+                              <FastSearchInput
+                                value={pickerSearchQuery}
+                                onSearchChange={setPickerSearchQuery}
+                                placeholder="Cari nama atau NISN..."
+                                className="w-full pl-8 pr-7 py-1.5 rounded-xl bg-white border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-amber-500 shadow-2xs"
+                              />
+                            </div>
+                          </div>
 
-                        <div>
-                          <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
-                            2. Status Ruangan:
-                          </label>
-                          <select
-                            value={pickerStatusFilter}
-                            onChange={(e) => setPickerStatusFilter(e.target.value as any)}
-                            className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-800 focus:outline-none focus:border-amber-500 cursor-pointer"
-                          >
-                            <option value="all">Semua Siswa</option>
-                            <option value="unassigned">Hanya yang Belum Dapat Ruang</option>
-                            <option value="other_room">Dari Ruangan Lain (Pindahkan)</option>
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
-                            3. Cari Siswa:
-                          </label>
-                          <FastSearchInput
-                            value={pickerSearchQuery}
-                            onSearchChange={setPickerSearchQuery}
-                            placeholder="Ketik nama atau NISN..."
-                            className="w-full pl-8 pr-7 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-amber-500"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Quick Select Buttons */}
-                      <div className="shrink-0 flex flex-wrap items-center gap-1.5 p-2 rounded-xl bg-amber-50/60 border border-amber-200/60 text-xs">
-                        <span className="text-[11px] font-bold text-amber-900 mr-1">
-                          ⚡ Pilih Cepat:
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => handleQuickSelectHalf('top')}
-                          className="px-2.5 py-1 rounded-lg bg-white border border-amber-300 hover:bg-amber-100 text-amber-950 font-bold text-[11px] transition cursor-pointer"
-                        >
-                          Pilih 50% Pertama (Atas)
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleQuickSelectHalf('bottom')}
-                          className="px-2.5 py-1 rounded-lg bg-white border border-amber-300 hover:bg-amber-100 text-amber-950 font-bold text-[11px] transition cursor-pointer"
-                        >
-                          Pilih 50% Kedua (Bawah)
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedStudentIdsToAdd(pickerCandidates.map(s => s.id))}
-                          className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 font-bold text-[11px] transition cursor-pointer"
-                        >
-                          Pilih Semua ({pickerCandidates.length})
-                        </button>
-                        {selectedStudentIdsToAdd.length > 0 && (
+                          {/* Primary Action Button */}
                           <button
                             type="button"
-                            onClick={() => setSelectedStudentIdsToAdd([])}
-                            className="px-2.5 py-1 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 font-bold text-[11px] transition cursor-pointer ml-auto"
+                            onClick={handleAddSelectedStudentsToRoom}
+                            disabled={selectedStudentIdsToAdd.length === 0}
+                            className={`shrink-0 px-4 py-2 rounded-xl font-black text-xs transition shadow-sm flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 ${
+                              selectedStudentIdsToAdd.length > 0
+                                ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20'
+                                : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                            }`}
                           >
-                            Batal Pilih (0)
+                            <span>➕ Masukkan Siswa Terpilih</span>
+                            {selectedStudentIdsToAdd.length > 0 && (
+                              <span className="px-1.5 py-0.5 rounded-lg bg-emerald-800 text-white text-[11px] font-mono">
+                                {selectedStudentIdsToAdd.length}
+                              </span>
+                            )}
                           </button>
-                        )}
+                        </div>
+
+                        {/* Row 2: Quick Selection Pills */}
+                        <div className="flex flex-wrap items-center justify-between gap-1.5 pt-2 border-t border-slate-200/60 text-xs">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="text-[11px] font-bold text-slate-600 mr-1 flex items-center gap-1">
+                              <span>⚡</span>
+                              <span>Pilih Cepat:</span>
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleQuickSelectHalf('top')}
+                              className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:border-amber-400 hover:bg-amber-50 text-slate-800 font-bold text-[11px] transition cursor-pointer shadow-2xs"
+                            >
+                              50% Atas (1–{Math.ceil(pickerCandidates.length / 2)})
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleQuickSelectHalf('bottom')}
+                              className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:border-amber-400 hover:bg-amber-50 text-slate-800 font-bold text-[11px] transition cursor-pointer shadow-2xs"
+                            >
+                              50% Bawah ({Math.ceil(pickerCandidates.length / 2) + 1}–{pickerCandidates.length})
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedStudentIdsToAdd(pickerCandidates.map(s => s.id))}
+                              className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 font-bold text-[11px] transition cursor-pointer shadow-2xs"
+                            >
+                              Pilih Semua ({pickerCandidates.length})
+                            </button>
+                          </div>
+
+                          {selectedStudentIdsToAdd.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setSelectedStudentIdsToAdd([])}
+                              className="px-2.5 py-1 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 font-bold text-[11px] transition cursor-pointer hover:bg-rose-100 shadow-2xs"
+                            >
+                              Batal Pilih ({selectedStudentIdsToAdd.length}) ✕
+                            </button>
+                          )}
+                        </div>
                       </div>
 
-                      {/* Candidate Table */}
+                      {/* Candidate Table - Takes all remaining height */}
                       <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-2xs">
                         <table className="w-full text-xs text-left">
                           <thead className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 sticky top-0 z-10">
@@ -2943,21 +2948,22 @@ export default function CbtPanitiaCommandCenter({
                                   className="rounded text-indigo-600 cursor-pointer"
                                 />
                               </th>
-                              <th className="py-2.5 px-4">Nama Siswa</th>
+                              <th className="py-2.5 px-3 w-16 text-center">No</th>
+                              <th className="py-2.5 px-4">Nama Lengkap Siswa</th>
                               <th className="py-2.5 px-3 w-36">NISN</th>
                               <th className="py-2.5 px-3 w-28 text-center">Kelas</th>
-                              <th className="py-2.5 px-4 w-44">Status Saat Ini</th>
+                              <th className="py-2.5 px-4 w-48">Status Saat Ini</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
                             {pickerCandidates.length === 0 ? (
                               <tr>
-                                <td colSpan={5} className="py-8 text-center text-slate-400">
+                                <td colSpan={6} className="py-12 text-center text-slate-400">
                                   Tidak ditemukan siswa dengan filter ini.
                                 </td>
                               </tr>
                             ) : (
-                              pickerCandidates.map(st => {
+                              pickerCandidates.map((st, idx) => {
                                 const isChecked = selectedStudentIdsToAddSet.has(st.id);
                                 const assignedRoom = studentRoomMap.get(st.id);
                                 const isAlreadyInCurrentRoom = assignedRoom?.id === managingRoomModal.id;
@@ -2972,11 +2978,11 @@ export default function CbtPanitiaCommandCenter({
                                         setSelectedStudentIdsToAdd([...selectedStudentIdsToAdd, st.id]);
                                       }
                                     }}
-                                    className={`cursor-pointer transition ${
+                                    className={`cursor-pointer transition select-none ${
                                       isChecked
-                                        ? 'bg-amber-50/70'
+                                        ? 'bg-amber-50/80 hover:bg-amber-100/80'
                                         : isAlreadyInCurrentRoom
-                                        ? 'bg-emerald-50/30 text-slate-500'
+                                        ? 'bg-emerald-50/20 text-slate-500 hover:bg-emerald-50/40'
                                         : 'hover:bg-slate-50'
                                     }`}
                                   >
@@ -2994,10 +3000,15 @@ export default function CbtPanitiaCommandCenter({
                                         className="rounded text-indigo-600 cursor-pointer"
                                       />
                                     </td>
-                                    <td className="py-2.5 px-4 font-bold text-slate-900">
+                                    <td className="py-2.5 px-3 text-center">
+                                      <span className="w-6 h-6 rounded-md bg-slate-100 text-slate-600 font-mono font-bold text-[11px] inline-flex items-center justify-center">
+                                        {String(idx + 1).padStart(2, '0')}
+                                      </span>
+                                    </td>
+                                    <td className="py-2.5 px-4 font-bold text-slate-900 text-xs sm:text-sm">
                                       {st.name}
                                     </td>
-                                    <td className="py-2.5 px-3 font-mono text-slate-600">
+                                    <td className="py-2.5 px-3 font-mono text-slate-600 text-xs">
                                       {st.nisn}
                                     </td>
                                     <td className="py-2.5 px-3 text-center">
