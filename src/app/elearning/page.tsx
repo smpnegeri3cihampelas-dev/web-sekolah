@@ -5449,7 +5449,7 @@ export default function ELearningPage() {
                                         type="button"
                                         onClick={() => {
                                           setCbtTokenModalExam(exam);
-                                          setCbtTokenInputValue(hasOngoing ? exam.token : '');
+                                          setCbtTokenInputValue('');
                                         }}
                                         className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs transition shadow-md shadow-amber-500/20 flex items-center justify-center gap-2 cursor-pointer active:scale-95"
                                       >
