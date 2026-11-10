@@ -18,8 +18,8 @@ export async function GET(req: Request) {
     }
 
     if (studentNisn) {
-      sql += ' AND student_nisn = ?';
-      params.push(studentNisn);
+      sql += ' AND (student_nisn = ? OR student_id = ?)';
+      params.push(studentNisn, studentNisn);
     }
 
     if (classId) {

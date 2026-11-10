@@ -59,7 +59,6 @@ import {
   getStoredCbtPackages,
   getStoredStudentCbtSessions,
   resetStoredStudentCbtSession,
-  unlockStoredStudentCbtSession,
   getStoredCbtPanitiaConfig,
   getRoomForStudent,
   markStudentCbtAttendancePresent,
@@ -1304,12 +1303,51 @@ export default function ELearningPage() {
   });
   const [piketViewTab, setPiketViewTab] = useState<'live' | 'laporan'>('live');
 
-  // CBT Active Exam Session for Student / Teacher Preview
-  const [activeCbtExamSession, setActiveCbtExamSession] = useState<{
+  // CBT Active Exam Session for Student / Teacher Preview (Persist across Mobile Refresh & Navigation)
+  const [activeCbtExamSession, setActiveCbtExamSessionState] = useState<{
     exam: CbtExamPackage;
     student: Student;
     roomName: string;
-  } | null>(null);
+  } | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const saved = sessionStorage.getItem('cbt_active_exam_session') || localStorage.getItem('cbt_active_exam_session');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed?.exam?.id && parsed?.student?.id) {
+          const latest = getStoredStudentCbtSessions();
+          const key = `${parsed.exam.id}_${parsed.student.id}`;
+          const existing = latest[key] || Object.values(latest).find(s => 
+            s.examId === parsed.exam.id && (s.studentId === parsed.student.id || (parsed.student?.nisn && s.studentNisn === parsed.student.nisn))
+          );
+          if (!existing || !existing.isSubmitted) {
+            return parsed;
+          }
+        }
+      }
+    } catch {}
+    return null;
+  });
+
+  const setActiveCbtExamSession = useCallback((session: {
+    exam: CbtExamPackage;
+    student: Student;
+    roomName: string;
+  } | null) => {
+    setActiveCbtExamSessionState(session);
+    if (typeof window !== 'undefined') {
+      try {
+        if (session) {
+          const raw = JSON.stringify(session);
+          sessionStorage.setItem('cbt_active_exam_session', raw);
+          localStorage.setItem('cbt_active_exam_session', raw);
+        } else {
+          sessionStorage.removeItem('cbt_active_exam_session');
+          localStorage.removeItem('cbt_active_exam_session');
+        }
+      } catch {}
+    }
+  }, []);
 
   // Realtime CBT Packages & Student Sessions
   const [cbtPackages, setCbtPackages] = useState<CbtExamPackage[]>(() => getStoredCbtPackages());
@@ -3020,6 +3058,12 @@ export default function ELearningPage() {
         onFinishExam={() => {
           if (typeof document !== 'undefined' && document.fullscreenElement) {
             document.exitFullscreen().catch(() => {});
+          }
+          if (typeof window !== 'undefined') {
+            try {
+              sessionStorage.removeItem('cbt_active_exam_session');
+              localStorage.removeItem('cbt_active_exam_session');
+            } catch {}
           }
           setCbtStudentSessions(getStoredStudentCbtSessions());
           showToast(`Ujian ${activeCbtExamSession.exam.title} berhasil dikumpulkan!`, 'success');
@@ -5438,13 +5482,31 @@ export default function ELearningPage() {
                                   </button>
                                 ) : (
                                   (() => {
-                                    const hasOngoing = Boolean(
-                                      cbtStudentSessions[`${exam.id}_${currentStudent.id}`] ||
+                                    const ongoingSession = cbtStudentSessions[`${exam.id}_${currentStudent.id}`] ||
                                       Object.values(cbtStudentSessions).find(s => 
                                         (s.studentId === currentStudent.id || s.studentNisn === currentStudent.nisn) &&
                                         s.examId === exam.id && !s.isSubmitted
-                                      )
-                                    );
+                                      );
+                                    const hasOngoing = Boolean(ongoingSession);
+                                    const isLocked = Boolean(ongoingSession?.violationCount && ongoingSession.violationCount >= 1);
+
+                                    if (isLocked) {
+                                      return (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setCbtTokenModalExam(exam);
+                                            setCbtTokenInputValue('');
+                                          }}
+                                          className="w-full py-2.5 px-4 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black text-xs transition shadow-md shadow-rose-600/30 flex items-center justify-center gap-2 cursor-pointer active:scale-95 animate-pulse"
+                                        >
+                                          <span>🔒</span>
+                                          <span>Ujian Terkunci (Buka Bersama Pengawas)</span>
+                                          <span>➔</span>
+                                        </button>
+                                      );
+                                    }
+
                                     return (
                                       <button
                                         type="button"
@@ -6102,19 +6164,10 @@ export default function ELearningPage() {
                     console.error('Fullscreen request error', e);
                   }
 
-                  // 2. Tandai kehadiran & pastikan pelanggaran ter-reset jika belum ada jawaban
+                  // 2. Tandai kehadiran peserta
                   const currentStudentObj = activeStudents.find(s => s.nisn === currentUser?.nipOrNisn) ||
                     activeStudents.find(s => s.name.toLowerCase() === currentUser?.name?.toLowerCase()) ||
                     activeStudents[0];
-
-                  try {
-                    unlockStoredStudentCbtSession(cbtTokenModalExam.id, currentStudentObj.id);
-                    if (currentStudentObj.nisn) {
-                      unlockStoredStudentCbtSession(cbtTokenModalExam.id, currentStudentObj.nisn);
-                    }
-                  } catch (e) {
-                    console.warn('Auto unlock prior session on start error', e);
-                  }
 
                   const assignedRoom = getRoomForStudent(currentStudentObj, getStoredCbtPanitiaConfig().rooms);
                   const targetRoom = assignedRoom?.name || `Ruang ${currentUser?.classId || '7-A'}`;

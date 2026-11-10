@@ -250,8 +250,21 @@ export default function CbtStudentExamRoom({
         console.warn('Gagal cek status remote ke server:', err);
       }
 
-      // 2. Jika di server status pelanggaran sudah 0 (sudah dibuka oleh pengawas) atau sesi baru bersih:
-      if (!serverAnswersFound || serverViolationCount === 0) {
+      // 2. Cek apakah status pelanggaran sudah di-reset oleh pengawas:
+      const localSessions = getStoredStudentCbtSessions();
+      const localKey = `${exam.id}_${student.id}`;
+      const localSess = localSessions[localKey] || Object.values(localSessions).find(s => 
+        (s.studentId === student.id || (student.nisn && (s.studentNisn === student.nisn || s.studentId === student.nisn))) &&
+        (!s.examId || s.examId === exam.id)
+      );
+
+      // Kunci HANYA boleh dibuka jika:
+      // - Server konfirmasi bahwa data ada dan violationCount === 0 (pengawas sudah klik Buka Kunci)
+      // - ATAU di data lokal supervisor sudah klik Buka Kunci (localSess && localSess.violationCount === 0)
+      const isUnlockedByServer = serverAnswersFound && Number(serverViolationCount) === 0;
+      const isUnlockedLocally = localSess && Number(localSess.violationCount) === 0;
+
+      if (isUnlockedByServer || isUnlockedLocally) {
         unlockStoredStudentCbtSession(exam.id, student.id);
         if (student.nisn) unlockStoredStudentCbtSession(exam.id, student.nisn);
 
@@ -267,13 +280,13 @@ export default function CbtStudentExamRoom({
         return;
       }
 
-      // 3. Jika di server memang masih tercatat pelanggaran (>= 1):
-      const count = Math.max(serverViolationCount, 1);
+      // 3. Jika belum dibuka di server maupun lokal: status tetap terkunci mati!
+      const count = Math.max(Number(serverViolationCount) || 0, localSess?.violationCount || 1, 1);
       setViolationCount(count);
       setIsLockedByViolation(true);
       isLockedRef.current = true;
       if (isManualClick) {
-        alert('ℹ️ Di Meja Pengawas, sesi ini masih berstatus terkunci.\n\nSilakan minta Guru Pengawas menekan tombol hijau "🔓 Buka Kunci" pada baris nama Anda di Meja Pengawas, atau masukkan PIN Pengawas SPENTIC2026 di bawah.');
+        alert('ℹ️ Status ujian Anda saat ini masih TERKUNCI.\n\nPengawas belum membuka kunci dari Meja Pengawas. Silakan angkat tangan dan lapor ke Pengawas Ruangan, atau minta Pengawas memasukkan PIN SPENTIC2026 langsung di layar Anda.');
       }
     } catch (e) {
       console.error('Remote unlock sync error', e);
@@ -515,6 +528,21 @@ export default function CbtStudentExamRoom({
       e.preventDefault();
     };
 
+    // Anti-Back Navigation (Android back button, iOS swipe-back, desktop Back button)
+    try {
+      window.history.pushState({ cbtRoom: true }, '', window.location.href);
+    } catch {}
+
+    const handlePopState = () => {
+      try {
+        window.history.pushState({ cbtRoom: true }, '', window.location.href);
+      } catch {}
+      if (!isExamCompleted && !isExamPaused) {
+        triggerViolation('Terdeteksi menekan tombol kembali (Back) di HP/Browser!');
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
     window.addEventListener('blur', handleWindowBlur);
     window.addEventListener('pagehide', handleVisibilityChange);
     document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -532,6 +560,7 @@ export default function CbtStudentExamRoom({
 
     return () => {
       clearInterval(focusHeartbeat);
+      window.removeEventListener('popstate', handlePopState);
       window.removeEventListener('blur', handleWindowBlur);
       window.removeEventListener('pagehide', handleVisibilityChange);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
