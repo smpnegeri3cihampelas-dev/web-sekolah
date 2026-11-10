@@ -204,6 +204,7 @@ export default function CbtStudentExamRoom({
   const [fontSizeClass, setFontSizeClass] = useState<'text-sm' | 'text-base' | 'text-lg'>('text-base');
   const [zoomImageUrl, setZoomImageUrl] = useState<string | null>(null);
   const [showSubmitModal, setShowSubmitModal] = useState<boolean>(false);
+  const [audioLimitNotice, setAudioLimitNotice] = useState<string | null>(null);
   const [isExamCompleted, setIsExamCompleted] = useState<boolean>(
     Boolean(initialSession?.isSubmitted)
   );
@@ -507,7 +508,7 @@ export default function CbtStudentExamRoom({
         e.preventDefault();
         triggerViolation('Terdeteksi menekan tombol Windows (Start Menu)!');
       }
-      if (e.altKey && (e.key === 'Tab' || e.key === 'Alt')) {
+      if (e.altKey && e.key === 'Tab') {
         triggerViolation('Anda terdeteksi melakukan Alt+Tab!');
       }
     };
@@ -668,7 +669,8 @@ export default function CbtStudentExamRoom({
     const maxPlays = currentQuestion.audioMaxPlays || 3;
 
     if (currentPlays >= maxPlays) {
-      alert(`Batas pemutaran audio untuk soal ini telah mencapai batas maksimal (${maxPlays} kali).`);
+      setAudioLimitNotice(`Batas pemutaran audio untuk soal ini telah maksimal (${maxPlays} kali).`);
+      setTimeout(() => setAudioLimitNotice(null), 4000);
       return;
     }
 
@@ -1116,6 +1118,11 @@ export default function CbtStudentExamRoom({
                     {isPlayingAudio ? 'Sedang memutar suara...' : 'Klik tombol untuk mendengarkan.'}
                   </span>
                 </div>
+                {audioLimitNotice && (
+                  <p className="text-xs text-rose-600 font-bold bg-rose-50 border border-rose-200 px-3 py-1.5 rounded-lg mt-1 inline-block">
+                    ⚠️ {audioLimitNotice}
+                  </p>
+                )}
               </div>
             )}
 
