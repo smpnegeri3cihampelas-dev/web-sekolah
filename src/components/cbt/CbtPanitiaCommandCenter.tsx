@@ -4636,9 +4636,19 @@ export default function CbtPanitiaCommandCenter({
                               {sess.isSubmitted ? '✓ Selesai' : '⏳ Mengerjakan'}
                             </span>
                             {sess.violationCount && sess.violationCount >= 1 ? (
-                              <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-rose-600 text-white animate-pulse">
-                                🔒 TERKUNCI (Terdeteksi Keluar)
-                              </span>
+                              <div className="flex flex-col items-start gap-0.5">
+                                <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-rose-600 text-white animate-pulse">
+                                  🔒 TERKUNCI
+                                </span>
+                                <span className="text-[10px] text-rose-700 font-extrabold max-w-[200px] leading-tight">
+                                  {sess.violationReason || 'Terdeteksi Keluar'}
+                                </span>
+                                {sess.violationTime && (
+                                  <span className="text-[9px] text-slate-500 font-mono font-semibold">
+                                    🕒 {sess.violationTime}
+                                  </span>
+                                )}
+                              </div>
                             ) : null}
                           </div>
                           <p className="text-[11px] text-slate-500 line-clamp-1">

@@ -1038,13 +1038,18 @@ export default function CbtSupervisorRoom({
                             ✓ Selesai ({session.score}/100)
                           </span>
                         ) : session?.violationCount && session.violationCount >= 1 ? (
-                          <div className="space-y-0.5">
+                          <div className="space-y-0.5 text-center">
                             <span className="inline-block px-2 py-0.5 rounded text-[10px] font-black bg-rose-600 text-white animate-pulse shadow-xs">
-                              🔒 TERKUNCI (Terdeteksi Keluar)
+                              🔒 TERKUNCI
                             </span>
-                            <div className="text-[9px] text-rose-600 font-semibold">
-                              Wajib Buka Kunci
+                            <div className="text-[10px] text-rose-700 font-extrabold max-w-[150px] mx-auto leading-tight" title={session.violationReason}>
+                              {session.violationReason || 'Terdeteksi Keluar'}
                             </div>
+                            {session.violationTime && (
+                              <div className="text-[9px] text-slate-500 font-mono font-semibold">
+                                🕒 {session.violationTime}
+                              </div>
+                            )}
                           </div>
                         ) : session ? (
                           <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 animate-pulse">

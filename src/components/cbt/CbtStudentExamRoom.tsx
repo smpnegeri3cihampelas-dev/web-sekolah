@@ -162,6 +162,12 @@ export default function CbtStudentExamRoom({
   const [violationCount, setViolationCount] = useState<number>(
     effectiveSession?.violationCount || 0
   );
+  const [violationReason, setViolationReason] = useState<string>(
+    effectiveSession?.violationReason || 'Terdeteksi meninggalkan lembar ujian CBT'
+  );
+  const [violationTime, setViolationTime] = useState<string>(
+    effectiveSession?.violationTime || ''
+  );
 
   // Model CBT: Zero-Tolerance (1x Keluar = Langsung Terkunci Mati Sesuai Permintaan Sekolah)
   const [isLockedByViolation, setIsLockedByViolation] = useState<boolean>(() => {
@@ -273,6 +279,8 @@ export default function CbtStudentExamRoom({
         isLockedRef.current = false;
         setIsLockedByViolation(false);
         setViolationCount(0);
+        setViolationReason('');
+        setViolationTime('');
         setUnlockError(null);
         enterFullscreen();
         if (isManualClick) {
@@ -389,9 +397,11 @@ export default function CbtStudentExamRoom({
     }
     lastViolationTimeRef.current = now;
 
-    // Zero-Tolerance: 1x keluar = LANGSUNG KUNCI MATI!
+    const timeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' WIB';
+    setViolationReason(reasonText);
+    setViolationTime(timeStr);
     setViolationCount(1);
-    persistSession(answers, doubtfuls, 1);
+    persistSession(answers, doubtfuls, 1, reasonText, timeStr);
 
     isLockedRef.current = true;
     setIsLockedByViolation(true);
@@ -417,11 +427,13 @@ export default function CbtStudentExamRoom({
       setTimeout(() => {
         setIsLockedByViolation(false);
         setViolationCount(0);
+        setViolationReason('');
+        setViolationTime('');
         setUnlockTokenInput('');
         setUnlockSuccess(null);
         unlockStoredStudentCbtSession(exam.id, student.id);
         if (student.nisn) unlockStoredStudentCbtSession(exam.id, student.nisn);
-        persistSession(answers, doubtfuls, 0);
+        persistSession(answers, doubtfuls, 0, '', '');
         lastViolationTimeRef.current = Date.now() + 1000;
         enterFullscreen();
       }, 500);
@@ -438,14 +450,18 @@ export default function CbtStudentExamRoom({
     const handleWindowBlur = () => {
       if (isExamCompleted || isExamPaused) return;
       if (Date.now() < lastViolationTimeRef.current) return;
-      triggerViolation('Anda terdeteksi berpindah ke aplikasi lain atau melakukan Alt+Tab!');
+      if (document.hidden) {
+        triggerViolation('Pindah Tab Browser (Terindikasi Searching / Tab Baru)');
+      } else {
+        triggerViolation('Jendela Kehilangan Fokus (Pop-up Notifikasi / Jendela Luar)');
+      }
     };
 
     // 2. Deteksi saat tab browser disembunyikan / berganti tab (INSTAN TANPA DELAY)
     const handleVisibilityChange = () => {
       if (isExamCompleted || isExamPaused) return;
       if (document.hidden) {
-        triggerViolation('Anda terdeteksi berpindah tab browser atau meminimalkan layar ujian.');
+        triggerViolation('Pindah Tab Browser (Terindikasi Searching / Tab Baru)');
       }
     };
 
@@ -455,9 +471,9 @@ export default function CbtStudentExamRoom({
       if (Date.now() < lastViolationTimeRef.current) return;
 
       if (document.hidden) {
-        triggerViolation('Anda terdeteksi berpindah tab browser atau meminimalkan layar ujian.');
+        triggerViolation('Pindah Tab Browser (Terindikasi Searching / Tab Baru)');
       } else if (!document.hasFocus()) {
-        triggerViolation('Terdeteksi keluar dari layar ujian CBT (membuka aplikasi lain di komputer/HP)!');
+        triggerViolation('Jendela Tidak Aktif (Membuka Aplikasi Lain di Depan Layar)');
       }
     }, 300);
 
@@ -471,7 +487,7 @@ export default function CbtStudentExamRoom({
       setIsFullscreen(active);
       if (Date.now() < lastViolationTimeRef.current) return;
       if (!active && !isExamCompleted && !isExamPaused) {
-        triggerViolation('Anda keluar dari Mode Layar Penuh (Fullscreen)!');
+        triggerViolation('Keluar dari Mode Layar Penuh (Menekan tombol Esc / Minimize)');
       }
     };
 
@@ -485,7 +501,7 @@ export default function CbtStudentExamRoom({
         // Abaikan jika sedang mengetik (ada input/textarea yang sedang fokus)
         const isTyping = ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName || '');
         if (!isTyping && screenH > 500 && window.innerHeight < screenH * 0.52) {
-          triggerViolation('Terdeteksi menggunakan Layar Belah (Split Screen / Multi-Window)!');
+          triggerViolation('Menggunakan Layar Belah (Split Screen / Multi-Window di HP)');
         }
       }
     };
@@ -506,10 +522,10 @@ export default function CbtStudentExamRoom({
       }
       if (e.key === 'Meta') {
         e.preventDefault();
-        triggerViolation('Terdeteksi menekan tombol Windows (Start Menu)!');
+        triggerViolation('Menekan Tombol Windows (Membuka Menu Laptop/Aplikasi Luar)');
       }
       if (e.altKey && e.key === 'Tab') {
-        triggerViolation('Anda terdeteksi melakukan Alt+Tab!');
+        triggerViolation('Melakukan Alt+Tab (Pindah ke Aplikasi Lain di Laptop)');
       }
     };
 
@@ -533,7 +549,7 @@ export default function CbtStudentExamRoom({
         window.history.pushState({ cbtRoom: true }, '', window.location.href);
       } catch {}
       if (!isExamCompleted && !isExamPaused) {
-        triggerViolation('Terdeteksi menekan tombol kembali (Back) di HP/Browser!');
+        triggerViolation('Menekan Tombol Kembali (Navigasi Mundur di HP/Browser)');
       }
     };
 
@@ -589,7 +605,9 @@ export default function CbtStudentExamRoom({
   const persistSession = (
     currentAnswers: Record<string, any>,
     currentDoubtfuls: Record<string, boolean>,
-    violations: number = violationCount
+    violations: number = violationCount,
+    reason: string = violationReason,
+    time: string = violationTime
   ) => {
     const sessionState: CbtStudentAnswerState = {
       examId: exam.id,
@@ -603,7 +621,9 @@ export default function CbtStudentExamRoom({
       audioPlayCount: audioPlays,
       startedAt: startedAtRef.current,
       isSubmitted: false,
-      violationCount: violations
+      violationCount: violations,
+      violationReason: reason,
+      violationTime: time
     };
     saveStoredStudentCbtSession(sessionState);
   };
@@ -1503,7 +1523,22 @@ export default function CbtStudentExamRoom({
                 Akses Ujian Dibekukan
               </h2>
               <p className="text-xs text-rose-300">
-                Terdeteksi meninggalkan lembar ujian CBT (Toleransi 1x).
+                Terdeteksi pelanggaran integritas ujian (Toleransi 1x).
+              </p>
+            </div>
+
+            {/* Bukti Forensik Pelanggaran */}
+            <div className="bg-slate-950/80 border border-rose-500/50 rounded-xl p-3 text-left space-y-1.5 text-xs shadow-inner">
+              <div className="text-[10px] font-bold uppercase text-amber-400 tracking-wider flex items-center justify-between">
+                <span>📋 Bukti Forensik Pelanggaran</span>
+                {violationTime && <span className="font-mono text-slate-400 font-semibold">{violationTime}</span>}
+              </div>
+              <p className="text-white font-bold text-xs flex items-start gap-1.5 leading-snug">
+                <span className="text-rose-400 shrink-0">⚠️</span>
+                <span>{violationReason || 'Terdeteksi meninggalkan lembar ujian CBT.'}</span>
+              </p>
+              <p className="text-[10px] text-slate-400 border-t border-slate-800/80 pt-1">
+                Catatan waktu dan jenis tindakan ini terekam otomatis di monitor Meja Pengawas.
               </p>
             </div>
 

@@ -99,6 +99,8 @@ export interface CbtStudentAnswerState {
   wrongCount?: number;
   isPassed?: boolean;
   violationCount?: number; // berapa kali terdeteksi pindah tab
+  violationReason?: string; // Catatan spesifik forensik pelanggaran (contoh: Pindah Tab / Alt+Tab / Notifikasi)
+  violationTime?: string; // Waktu pelanggaran (HH:MM:SS WIB)
 }
 
 export interface CbtRoomAttendance {
@@ -1199,7 +1201,9 @@ export function unlockStoredStudentCbtSession(examId: string, studentIdOrNisn: s
     if (all[directKey]) {
       all[directKey] = {
         ...all[directKey],
-        violationCount: 0
+        violationCount: 0,
+        violationReason: undefined,
+        violationTime: undefined
       };
       unlockedSession = all[directKey];
       modified = true;
@@ -1218,7 +1222,9 @@ export function unlockStoredStudentCbtSession(examId: string, studentIdOrNisn: s
       if (isStudentMatch && isExamMatch) {
         all[k] = {
           ...sess,
-          violationCount: 0
+          violationCount: 0,
+          violationReason: undefined,
+          violationTime: undefined
         };
         unlockedSession = all[k];
         modified = true;

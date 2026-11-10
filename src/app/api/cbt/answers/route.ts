@@ -36,26 +36,35 @@ export async function GET(req: Request) {
 
     const rows = await query<any[]>(sql, params);
 
-    const answers = rows.map(r => ({
-      examId: r.exam_id,
-      studentId: r.student_id,
-      studentNisn: r.student_nisn,
-      studentName: r.student_name,
-      classId: r.class_id,
-      roomName: r.room_name,
-      answers: r.answers ? JSON.parse(r.answers) : {},
-      doubtfuls: r.doubtfuls ? JSON.parse(r.doubtfuls) : {},
-      audioPlayCount: r.audio_play_count ? JSON.parse(r.audio_play_count) : {},
-      startedAt: r.started_at,
-      submittedAt: r.submitted_at,
-      isSubmitted: Boolean(r.is_submitted),
-      score: Number(r.score) || 0,
-      totalScore: Number(r.total_score) || 0,
-      correctCount: r.correct_count,
-      wrongCount: r.wrong_count,
-      isPassed: Boolean(r.is_passed),
-      violationCount: r.violation_count
-    }));
+    const answers = rows.map(r => {
+      let parsedAnswers: any = {};
+      try {
+        parsedAnswers = r.answers ? JSON.parse(r.answers) : {};
+      } catch {}
+
+      return {
+        examId: r.exam_id,
+        studentId: r.student_id,
+        studentNisn: r.student_nisn,
+        studentName: r.student_name,
+        classId: r.class_id,
+        roomName: r.room_name,
+        answers: parsedAnswers,
+        doubtfuls: r.doubtfuls ? JSON.parse(r.doubtfuls) : {},
+        audioPlayCount: r.audio_play_count ? JSON.parse(r.audio_play_count) : {},
+        startedAt: r.started_at,
+        submittedAt: r.submitted_at,
+        isSubmitted: Boolean(r.is_submitted),
+        score: Number(r.score) || 0,
+        totalScore: Number(r.total_score) || 0,
+        correctCount: r.correct_count,
+        wrongCount: r.wrong_count,
+        isPassed: Boolean(r.is_passed),
+        violationCount: r.violation_count,
+        violationReason: r.violation_reason || parsedAnswers?._violationReason,
+        violationTime: r.violation_time || parsedAnswers?._violationTime
+      };
+    });
 
     return NextResponse.json({ success: true, count: answers.length, data: answers });
   } catch (error: any) {
@@ -85,8 +94,16 @@ export async function POST(req: Request) {
       correctCount,
       wrongCount,
       isPassed,
-      violationCount
+      violationCount,
+      violationReason,
+      violationTime
     } = body;
+
+    const answersPayload = {
+      ...(answers || {}),
+      ...(violationReason ? { _violationReason: violationReason } : {}),
+      ...(violationTime ? { _violationTime: violationTime } : {})
+    };
 
     await query(`
       INSERT INTO cbt_student_answers (
@@ -113,7 +130,7 @@ export async function POST(req: Request) {
       studentName,
       classId,
       roomName || 'Ruang 01',
-      JSON.stringify(answers || {}),
+      JSON.stringify(answersPayload),
       JSON.stringify(doubtfuls || {}),
       JSON.stringify(audioPlayCount || {}),
       startedAt || new Date().toISOString(),
