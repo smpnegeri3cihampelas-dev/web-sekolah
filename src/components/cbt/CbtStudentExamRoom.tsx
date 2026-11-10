@@ -179,6 +179,7 @@ export default function CbtStudentExamRoom({
   useEffect(() => {
     isLockedRef.current = isLockedByViolation;
   }, [isLockedByViolation]);
+
   const [unlockTokenInput, setUnlockTokenInput] = useState<string>('');
   const [unlockError, setUnlockError] = useState<string | null>(null);
   const [unlockSuccess, setUnlockSuccess] = useState<string | null>(null);
@@ -234,11 +235,37 @@ export default function CbtStudentExamRoom({
 
   const isExamPaused = currentPackage.status === 'draft' || scheduleEval.scheduleState === 'emergency_paused';
 
+  // MUTABLE REFS (Mencegah Stale Closure pada Event Listener Anti-Curang)
+  const isExamCompletedRef = useRef<boolean>(isExamCompleted);
+  const isExamPausedRef = useRef<boolean>(isExamPaused);
+  const answersRef = useRef<Record<string, any>>(answers);
+  const doubtfulsRef = useRef<Record<string, boolean>>(doubtfuls);
+  const audioPlaysRef = useRef<Record<string, number>>(audioPlays);
+
+  useEffect(() => {
+    isExamCompletedRef.current = isExamCompleted;
+  }, [isExamCompleted]);
+
+  useEffect(() => {
+    isExamPausedRef.current = isExamPaused;
+  }, [isExamPaused]);
+
+  useEffect(() => {
+    answersRef.current = answers;
+  }, [answers]);
+
+  useEffect(() => {
+    doubtfulsRef.current = doubtfuls;
+  }, [doubtfuls]);
+
+  useEffect(() => {
+    audioPlaysRef.current = audioPlays;
+  }, [audioPlays]);
+
   // Real-time listener: jika Pengawas membuka kunci dari meja pengawas/panitia secara remote
   const handleRemoteUnlock = useCallback(async (isManualClick: boolean = false) => {
-    // PENTING: Hanya jalankan remote unlock jika siswa MEMANG SEDANG TERKUNCI atau mengklik tombol manual!
-    // Jangan pernah mereset jika siswa sedang aktif mengerjakan ujian agar sistem anti-curang tidak terhapus otomatis!
-    if (!isLockedRef.current && !isLockedByViolation && !isManualClick) {
+    // PENTING: Cek isLockedRef.current agar tidak kena stale closure dan tidak bentrok dengan unlock lokal
+    if (!isLockedRef.current && !isManualClick) {
       return;
     }
 
@@ -272,18 +299,20 @@ export default function CbtStudentExamRoom({
       const isUnlockedLocally = localSess && Number(localSess.violationCount) === 0;
 
       if (isUnlockedByServer || isUnlockedLocally) {
-        unlockStoredStudentCbtSession(exam.id, student.id);
-        if (student.nisn) unlockStoredStudentCbtSession(exam.id, student.nisn);
-
-        lastViolationTimeRef.current = Date.now() + 1000;
         isLockedRef.current = false;
+        if (!localSess || Number(localSess.violationCount) > 0) {
+          unlockStoredStudentCbtSession(exam.id, student.id);
+          if (student.nisn) unlockStoredStudentCbtSession(exam.id, student.nisn);
+        }
+
+        lastViolationTimeRef.current = Date.now() + 1500;
         setIsLockedByViolation(false);
         setViolationCount(0);
         setViolationReason('');
         setViolationTime('');
         setUnlockError(null);
-        enterFullscreen();
         if (isManualClick) {
+          enterFullscreen();
           alert('✅ Kunci ujian telah berhasil dibuka oleh Pengawas! Melanjutkan lembar ujian...');
         }
         return;
@@ -300,7 +329,7 @@ export default function CbtStudentExamRoom({
     } catch (e) {
       console.error('Remote unlock sync error', e);
     }
-  }, [exam.id, student.id, student.nisn, isLockedByViolation]);
+  }, [exam.id, student.id, student.nisn]);
 
   useEffect(() => {
     const handlePkgsUpdate = () => {
@@ -312,7 +341,7 @@ export default function CbtStudentExamRoom({
     };
 
     const handleSyncSession = () => {
-      if (isLockedRef.current || isLockedByViolation) {
+      if (isLockedRef.current) {
         handleRemoteUnlock(false);
       }
     };
@@ -326,7 +355,7 @@ export default function CbtStudentExamRoom({
       window.removeEventListener('cbtSessionsUpdated', handleSyncSession);
       window.removeEventListener('storage', handleSyncSession);
     };
-  }, [exam.id, handleRemoteUnlock, isLockedByViolation]);
+  }, [exam.id, handleRemoteUnlock]);
 
   // Audio playing ref
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -366,46 +395,83 @@ export default function CbtStudentExamRoom({
   const enterFullscreen = async () => {
     try {
       const docEl = document.documentElement as any;
-      if (docEl && !document.fullscreenElement && !docEl.webkitFullscreenElement) {
-        if (docEl.requestFullscreen) {
-          await docEl.requestFullscreen();
-        } else if (docEl.webkitRequestFullscreen) {
-          await docEl.webkitRequestFullscreen();
-        } else if (docEl.mozRequestFullScreen) {
-          await docEl.mozRequestFullScreen();
-        } else if (docEl.msRequestFullscreen) {
-          await docEl.msRequestFullscreen();
-        }
+      if (!docEl) return;
+      if (document.fullscreenElement || docEl.webkitFullscreenElement) {
         setIsFullscreen(true);
+        return;
       }
+      if (docEl.requestFullscreen) {
+        await docEl.requestFullscreen();
+      } else if (docEl.webkitRequestFullscreen) {
+        await docEl.webkitRequestFullscreen();
+      } else if (docEl.mozRequestFullScreen) {
+        await docEl.mozRequestFullScreen();
+      } else if (docEl.msRequestFullscreen) {
+        await docEl.msRequestFullscreen();
+      }
+      setIsFullscreen(true);
     } catch (err) {
+      setIsFullscreen(Boolean(document.fullscreenElement || (document as any).webkitFullscreenElement));
       console.warn('Fullscreen entry pending or requires direct user gesture', err);
     }
   };
 
+  // Helper: Persist session to localStorage
+  const persistSession = (
+    currentAnswers: Record<string, any>,
+    currentDoubtfuls: Record<string, boolean>,
+    violations: number = violationCount,
+    reason: string = violationReason,
+    time: string = violationTime
+  ) => {
+    const sessionState: CbtStudentAnswerState = {
+      examId: exam.id,
+      studentId: student.id,
+      studentNisn: student.nisn,
+      studentName: student.name,
+      classId: student.classId,
+      roomName: roomName,
+      answers: currentAnswers,
+      doubtfuls: currentDoubtfuls,
+      audioPlayCount: audioPlaysRef.current,
+      startedAt: startedAtRef.current,
+      isSubmitted: false,
+      violationCount: violations,
+      violationReason: reason,
+      violationTime: time
+    };
+    saveStoredStudentCbtSession(sessionState);
+  };
+
+  const persistSessionRef = useRef(persistSession);
+  persistSessionRef.current = persistSession;
+
   const lastViolationTimeRef = useRef<number>(Date.now() + 800);
 
   // Helper: Trigger Violation with ZERO-TOLERANCE (Sekali Keluar = Langsung Terkunci Mati!)
-  const triggerViolation = (reasonText: string) => {
-    // PENTING: Jika ujian sudah selesai, dijeda, atau SUDAH TERKUNCI, JANGAN tambahkan pelanggaran lagi!
-    if (isExamCompleted || isExamPaused || isLockedRef.current || isLockedByViolation) return;
+  // Menggunakan REF agar selalu membaca kondisi terkini dan kebal terhadap stale closure
+  const triggerViolation = useCallback((reasonText: string) => {
+    // PENTING: Cek melalui REF agar selalu membaca kondisi riil terkini
+    if (isExamCompletedRef.current || isExamPausedRef.current || isLockedRef.current) return;
 
     const now = Date.now();
-    // Abaikan jika masih dalam masa tenggang awal (800ms saat inisialisasi layar penuh)
+    // Abaikan jika masih dalam masa tenggang awal (setelah unlock atau saat inisialisasi fullscreen)
     if (now < lastViolationTimeRef.current) {
       return;
     }
     lastViolationTimeRef.current = now;
 
+    // Tandai langsung di REF secara sinkron agar panggilan serentak dalam ms yang sama tidak terdobel
+    isLockedRef.current = true;
+
     const timeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' WIB';
     setViolationReason(reasonText);
     setViolationTime(timeStr);
     setViolationCount(1);
-    persistSession(answers, doubtfuls, 1, reasonText, timeStr);
-
-    isLockedRef.current = true;
     setIsLockedByViolation(true);
-  };
+
+    persistSessionRef.current(answersRef.current, doubtfulsRef.current, 1, reasonText, timeStr);
+  }, []);
 
   // Helper: Supervisor Unlock Logic (PIN Pengawas Ruangan: SPENTIC2026)
   const handleUnlockExam = () => {
@@ -422,21 +488,48 @@ export default function CbtStudentExamRoom({
     }
 
     if (cleanInput === 'SPENTIC2026') {
+      // 1. Matikan kunci seketika secara sinkron di ref dan state
+      isLockedRef.current = false;
+      setIsLockedByViolation(false);
+      setViolationCount(0);
+      setViolationReason('');
+      setViolationTime('');
+      setUnlockTokenInput('');
       setUnlockError(null);
-      setUnlockSuccess('Kunci ujian berhasil dibuka oleh Pengawas!');
-      setTimeout(() => {
-        setIsLockedByViolation(false);
-        setViolationCount(0);
-        setViolationReason('');
-        setViolationTime('');
-        setUnlockTokenInput('');
-        setUnlockSuccess(null);
-        unlockStoredStudentCbtSession(exam.id, student.id);
-        if (student.nisn) unlockStoredStudentCbtSession(exam.id, student.nisn);
-        persistSession(answers, doubtfuls, 0, '', '');
-        lastViolationTimeRef.current = Date.now() + 1000;
-        enterFullscreen();
-      }, 500);
+      setUnlockSuccess(null);
+
+      // 2. Bersihkan status pelanggaran di localStorage
+      unlockStoredStudentCbtSession(exam.id, student.id);
+      if (student.nisn) unlockStoredStudentCbtSession(exam.id, student.nisn);
+      persistSession(answersRef.current, doubtfulsRef.current, 0, '', '');
+
+      // 3. Sinkronkan langsung ke database server MariaDB (Hostinger) agar sinkron ke pengawas
+      fetch('/api/cbt/answers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          examId: exam.id,
+          studentId: student.id,
+          studentNisn: student.nisn,
+          studentName: student.name,
+          classId: student.classId,
+          roomName: roomName,
+          answers: answersRef.current,
+          doubtfuls: doubtfulsRef.current,
+          audioPlayCount: audioPlaysRef.current,
+          startedAt: startedAtRef.current,
+          violationCount: 0,
+          violationReason: '',
+          violationTime: '',
+          isSubmitted: false
+        })
+      }).catch(() => {});
+
+      // 4. Beri tenggang waktu aman 1.5 detik agar event fullscreenchange tidak memicu false alarm
+      lastViolationTimeRef.current = Date.now() + 1500;
+
+      // 5. Masuk Layar Penuh secara SINKRON langsung dari user click gesture (tidak diblokir browser)
+      enterFullscreen();
     } else {
       setUnlockError('❌ PIN Pengawas salah! Hanya Guru Pengawas yang berhak membuka lembar ujian ini.');
     }
@@ -448,7 +541,7 @@ export default function CbtStudentExamRoom({
 
     // 1. Deteksi saat jendela browser kehilangan fokus (Alt+Tab, klik Word, klik WA, klik aplikasi lain)
     const handleWindowBlur = () => {
-      if (isExamCompleted || isExamPaused) return;
+      if (isExamCompletedRef.current || isExamPausedRef.current || isLockedRef.current) return;
       if (Date.now() < lastViolationTimeRef.current) return;
       if (document.hidden) {
         triggerViolation('Pindah Tab Browser (Terindikasi Searching / Tab Baru)');
@@ -459,7 +552,7 @@ export default function CbtStudentExamRoom({
 
     // 2. Deteksi saat tab browser disembunyikan / berganti tab (INSTAN TANPA DELAY)
     const handleVisibilityChange = () => {
-      if (isExamCompleted || isExamPaused) return;
+      if (isExamCompletedRef.current || isExamPausedRef.current || isLockedRef.current) return;
       if (document.hidden) {
         triggerViolation('Pindah Tab Browser (Terindikasi Searching / Tab Baru)');
       }
@@ -467,7 +560,7 @@ export default function CbtStudentExamRoom({
 
     // 3. Deteksi aktif berkala (Heartbeat Monitor Cepat - setiap 300ms)
     const focusHeartbeat = setInterval(() => {
-      if (isExamCompleted || isExamPaused) return;
+      if (isExamCompletedRef.current || isExamPausedRef.current || isLockedRef.current) return;
       if (Date.now() < lastViolationTimeRef.current) return;
 
       if (document.hidden) {
@@ -486,14 +579,14 @@ export default function CbtStudentExamRoom({
       );
       setIsFullscreen(active);
       if (Date.now() < lastViolationTimeRef.current) return;
-      if (!active && !isExamCompleted && !isExamPaused) {
+      if (!active && !isExamCompletedRef.current && !isExamPausedRef.current && !isLockedRef.current) {
         triggerViolation('Keluar dari Mode Layar Penuh (Menekan tombol Esc / Minimize)');
       }
     };
 
     // Deteksi Layar Belah (Split Screen / Multi-Window di HP Android / iOS)
     const handleResizeOrSplitScreen = () => {
-      if (isExamCompleted || isExamPaused) return;
+      if (isExamCompletedRef.current || isExamPausedRef.current || isLockedRef.current) return;
       if (typeof window !== 'undefined' && window.screen) {
         const screenH = window.screen.availHeight || window.screen.height;
         const screenW = window.screen.availWidth || window.screen.width;
@@ -519,6 +612,9 @@ export default function CbtStudentExamRoom({
       }
       if (e.ctrlKey && ['u', 'p', 's'].includes(e.key.toLowerCase())) {
         e.preventDefault();
+      }
+      if (e.key === 'Escape') {
+        triggerViolation('Menekan Tombol Esc (Keluar dari Mode Layar Penuh)');
       }
       if (e.key === 'Meta') {
         e.preventDefault();
@@ -548,7 +644,7 @@ export default function CbtStudentExamRoom({
       try {
         window.history.pushState({ cbtRoom: true }, '', window.location.href);
       } catch {}
-      if (!isExamCompleted && !isExamPaused) {
+      if (!isExamCompletedRef.current && !isExamPausedRef.current && !isLockedRef.current) {
         triggerViolation('Menekan Tombol Kembali (Navigasi Mundur di HP/Browser)');
       }
     };
@@ -587,7 +683,7 @@ export default function CbtStudentExamRoom({
       window.removeEventListener('selectstart', handleBlockClipboard);
       window.removeEventListener('dragstart', handleBlockClipboard);
     };
-  }, [isExamCompleted, isExamPaused, answers, doubtfuls]);
+  }, [isExamCompleted, triggerViolation]);
 
   // 3. Format timer: HH:MM:SS
   const formattedTime = useMemo(() => {
@@ -601,44 +697,18 @@ export default function CbtStudentExamRoom({
   const isLowTime = secondsRemaining <= 300; // < 5 mins
   const currentQuestion = exam.questions[currentIdx] || exam.questions[0];
 
-  // Helper: Persist session to localStorage
-  const persistSession = (
-    currentAnswers: Record<string, any>,
-    currentDoubtfuls: Record<string, boolean>,
-    violations: number = violationCount,
-    reason: string = violationReason,
-    time: string = violationTime
-  ) => {
-    const sessionState: CbtStudentAnswerState = {
-      examId: exam.id,
-      studentId: student.id,
-      studentNisn: student.nisn,
-      studentName: student.name,
-      classId: student.classId,
-      roomName: roomName,
-      answers: currentAnswers,
-      doubtfuls: currentDoubtfuls,
-      audioPlayCount: audioPlays,
-      startedAt: startedAtRef.current,
-      isSubmitted: false,
-      violationCount: violations,
-      violationReason: reason,
-      violationTime: time
-    };
-    saveStoredStudentCbtSession(sessionState);
-  };
-
   // Answer handler for PG (Single)
   const handleSelectPgOption = (optionIdx: number) => {
-    if (isLockedByViolation) return;
+    if (isLockedRef.current || isLockedByViolation) return;
     const newAnswers = { ...answers, [currentQuestion.id]: optionIdx };
     setAnswers(newAnswers);
+    answersRef.current = newAnswers;
     persistSession(newAnswers, doubtfuls);
   };
 
   // Answer handler for PG Kompleks (Multi Checkbox)
   const handleTogglePgKompleks = (optionIdx: number) => {
-    if (isLockedByViolation) return;
+    if (isLockedRef.current || isLockedByViolation) return;
     const currentList: number[] = Array.isArray(answers[currentQuestion.id])
       ? answers[currentQuestion.id]
       : [];
@@ -650,35 +720,39 @@ export default function CbtStudentExamRoom({
     }
     const newAnswers = { ...answers, [currentQuestion.id]: updatedList };
     setAnswers(newAnswers);
+    answersRef.current = newAnswers;
     persistSession(newAnswers, doubtfuls);
   };
 
   // Answer handler for Benar / Salah
   const handleSelectBenarSalah = (statementId: string, value: boolean) => {
-    if (isLockedByViolation) return;
+    if (isLockedRef.current || isLockedByViolation) return;
     const currentObj = answers[currentQuestion.id] || {};
     const updatedObj = { ...currentObj, [statementId]: value };
     const newAnswers = { ...answers, [currentQuestion.id]: updatedObj };
     setAnswers(newAnswers);
+    answersRef.current = newAnswers;
     persistSession(newAnswers, doubtfuls);
   };
 
   // Answer handler for Menjodohkan
   const handleSelectMenjodohkan = (matchingId: string, rightValue: string) => {
-    if (isLockedByViolation) return;
+    if (isLockedRef.current || isLockedByViolation) return;
     const currentObj = answers[currentQuestion.id] || {};
     const updatedObj = { ...currentObj, [matchingId]: rightValue };
     const newAnswers = { ...answers, [currentQuestion.id]: updatedObj };
     setAnswers(newAnswers);
+    answersRef.current = newAnswers;
     persistSession(newAnswers, doubtfuls);
   };
 
   // Toggle Ragu-Ragu
   const handleToggleDoubtful = () => {
-    if (isLockedByViolation) return;
+    if (isLockedRef.current || isLockedByViolation) return;
     const isCurrentlyDoubtful = Boolean(doubtfuls[currentQuestion.id]);
     const newDoubtfuls = { ...doubtfuls, [currentQuestion.id]: !isCurrentlyDoubtful };
     setDoubtfuls(newDoubtfuls);
+    doubtfulsRef.current = newDoubtfuls;
     persistSession(answers, newDoubtfuls);
   };
 
@@ -880,7 +954,16 @@ export default function CbtStudentExamRoom({
       className="min-h-screen bg-slate-100 flex flex-col font-sans select-none" 
       style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
       onClick={() => {
-        if (typeof document !== 'undefined' && !document.fullscreenElement && !isExamCompleted && !isExamPaused && roomName !== 'Ruang Pratinjau Guru') {
+        if (
+          typeof document !== 'undefined' &&
+          !document.fullscreenElement &&
+          !isExamCompletedRef.current &&
+          !isExamPausedRef.current &&
+          !isLockedRef.current &&
+          !isLockedByViolation &&
+          roomName !== 'Ruang Pratinjau Guru'
+        ) {
+          lastViolationTimeRef.current = Date.now() + 1500;
           enterFullscreen();
         }
       }}
@@ -1547,8 +1630,10 @@ export default function CbtStudentExamRoom({
                 </div>
                 <button
                   type="button"
-                  onClick={() => {
-                    lastViolationTimeRef.current = Date.now() + 1000;
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    isLockedRef.current = false;
+                    lastViolationTimeRef.current = Date.now() + 1500;
                     setIsLockedByViolation(false);
                     enterFullscreen();
                   }}
@@ -1625,12 +1710,16 @@ export default function CbtStudentExamRoom({
       {!isFullscreen && !isExamCompleted && !isExamPaused && roomName !== 'Ruang Pratinjau Guru' && !isLockedByViolation && (
         <div 
           className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md flex flex-col items-center justify-center p-4 text-center animate-fade-in select-none"
-          onClick={enterFullscreen}
+          onClick={() => {
+            lastViolationTimeRef.current = Date.now() + 1500;
+            enterFullscreen();
+          }}
         >
           <div 
             className="max-w-md w-full bg-slate-900 border border-amber-500/40 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-5"
             onClick={(e) => {
               e.stopPropagation();
+              lastViolationTimeRef.current = Date.now() + 1500;
               enterFullscreen();
             }}
           >
@@ -1665,6 +1754,7 @@ export default function CbtStudentExamRoom({
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
+                lastViolationTimeRef.current = Date.now() + 1500;
                 enterFullscreen();
               }}
               className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-sm transition shadow-lg shadow-amber-500/30 flex items-center justify-center gap-2 cursor-pointer active:scale-95"

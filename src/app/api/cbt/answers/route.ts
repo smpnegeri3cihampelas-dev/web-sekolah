@@ -42,6 +42,12 @@ export async function GET(req: Request) {
         parsedAnswers = r.answers ? JSON.parse(r.answers) : {};
       } catch {}
 
+      const vReason = r.violation_reason || parsedAnswers?._violationReason;
+      const vTime = r.violation_time || parsedAnswers?._violationTime;
+      const cleanAnswers = { ...(parsedAnswers || {}) };
+      delete cleanAnswers._violationReason;
+      delete cleanAnswers._violationTime;
+
       return {
         examId: r.exam_id,
         studentId: r.student_id,
@@ -49,7 +55,7 @@ export async function GET(req: Request) {
         studentName: r.student_name,
         classId: r.class_id,
         roomName: r.room_name,
-        answers: parsedAnswers,
+        answers: cleanAnswers,
         doubtfuls: r.doubtfuls ? JSON.parse(r.doubtfuls) : {},
         audioPlayCount: r.audio_play_count ? JSON.parse(r.audio_play_count) : {},
         startedAt: r.started_at,
@@ -61,8 +67,8 @@ export async function GET(req: Request) {
         wrongCount: r.wrong_count,
         isPassed: Boolean(r.is_passed),
         violationCount: r.violation_count,
-        violationReason: r.violation_reason || parsedAnswers?._violationReason,
-        violationTime: r.violation_time || parsedAnswers?._violationTime
+        violationReason: vReason,
+        violationTime: vTime
       };
     });
 
@@ -99,10 +105,15 @@ export async function POST(req: Request) {
       violationTime
     } = body;
 
+    const sanitizedAnswers = { ...(answers || {}) };
+    delete sanitizedAnswers._violationReason;
+    delete sanitizedAnswers._violationTime;
+
+    const hasActiveViolation = Number(violationCount || 0) > 0;
     const answersPayload = {
-      ...(answers || {}),
-      ...(violationReason ? { _violationReason: violationReason } : {}),
-      ...(violationTime ? { _violationTime: violationTime } : {})
+      ...sanitizedAnswers,
+      ...(hasActiveViolation && violationReason ? { _violationReason: violationReason } : {}),
+      ...(hasActiveViolation && violationTime ? { _violationTime: violationTime } : {})
     };
 
     await query(`
