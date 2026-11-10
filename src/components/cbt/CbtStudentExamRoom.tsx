@@ -1501,70 +1501,47 @@ export default function CbtStudentExamRoom({
         </div>
       )}
 
-      {/* MODAL LOCKDOWN RESMI CBT (ZERO TOLERANCE: 1X KELUAR = TERKUNCI MATI) */}
+      {/* MODAL LOCKDOWN RESMI CBT (COMPACT & NO-SCROLL) */}
       {isLockedByViolation && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/95 backdrop-blur-md select-none">
-          <div className="bg-slate-900 border border-rose-500/80 rounded-2xl sm:rounded-3xl p-5 sm:p-6 max-w-sm sm:max-w-md w-full text-center space-y-3.5 shadow-2xl shadow-rose-950/80 max-h-[92vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-slate-950/95 backdrop-blur-md select-none">
+          <div className="bg-slate-900 border border-rose-500/80 rounded-2xl sm:rounded-3xl p-4 sm:p-5 max-w-sm sm:max-w-md w-full text-center space-y-2.5 shadow-2xl shadow-rose-950/80 animate-in fade-in zoom-in-95 duration-150">
             
-            {/* Icon & Badge */}
-            <div className="flex flex-col items-center gap-2">
-              <div className="w-12 h-12 rounded-2xl bg-rose-500/20 text-rose-500 border border-rose-500/40 flex items-center justify-center text-2xl shadow-inner animate-pulse">
-                🔒
+            {/* Header: Badge & Title */}
+            <div className="space-y-1">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-rose-600 text-white text-[10px] font-black uppercase tracking-wider shadow-xs">
+                <span>🔒</span>
+                <span>UJIAN TERKUNCI (Toleransi 1x)</span>
               </div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-rose-500 text-white text-[10px] font-black uppercase tracking-wider">
-                <span>●</span>
-                <span>UJIAN TERKUNCI</span>
-              </div>
-            </div>
-
-            {/* Title & Short Reason */}
-            <div className="space-y-0.5">
               <h2 className="text-base sm:text-lg font-black text-white">
                 Akses Ujian Dibekukan
               </h2>
-              <p className="text-xs text-rose-300">
-                Terdeteksi pelanggaran integritas ujian (Toleransi 1x).
-              </p>
             </div>
 
-            {/* Bukti Forensik Pelanggaran */}
-            <div className="bg-slate-950/80 border border-rose-500/50 rounded-xl p-3 text-left space-y-1.5 text-xs shadow-inner">
-              <div className="text-[10px] font-bold uppercase text-amber-400 tracking-wider flex items-center justify-between">
-                <span>📋 Bukti Forensik Pelanggaran</span>
-                {violationTime && <span className="font-mono text-slate-400 font-semibold">{violationTime}</span>}
+            {/* Bukti Forensik Pelanggaran & Identitas (Ringkas & Terpadu) */}
+            <div className="bg-slate-950/80 border border-rose-500/50 rounded-xl p-2.5 text-left text-xs space-y-1.5 shadow-inner">
+              <div className="flex items-center justify-between text-[10px] font-bold text-amber-400">
+                <span>📋 BUKTI FORENSIK:</span>
+                {violationTime && <span className="font-mono text-slate-300">{violationTime}</span>}
               </div>
-              <p className="text-white font-bold text-xs flex items-start gap-1.5 leading-snug">
+              <div className="font-bold text-rose-300 text-xs flex items-start gap-1.5 leading-snug">
                 <span className="text-rose-400 shrink-0">⚠️</span>
                 <span>{violationReason || 'Terdeteksi meninggalkan lembar ujian CBT.'}</span>
-              </p>
-              <p className="text-[10px] text-slate-400 border-t border-slate-800/80 pt-1">
-                Catatan waktu dan jenis tindakan ini terekam otomatis di monitor Meja Pengawas.
-              </p>
-            </div>
-
-            {/* Compact Student Identity */}
-            <div className="bg-slate-800/80 border border-slate-700/80 rounded-xl p-3 text-xs text-slate-300 grid grid-cols-2 gap-2 text-left">
-              <div>
-                <span className="text-[10px] text-slate-400 block uppercase font-semibold tracking-wider">Peserta</span>
-                <span className="font-bold text-white truncate block">{student.name}</span>
-                <span className="text-[11px] text-slate-400 font-mono">{student.classId} • {student.nisn}</span>
               </div>
-              <div className="border-l border-slate-700/60 pl-2">
-                <span className="text-[10px] text-slate-400 block uppercase font-semibold tracking-wider">Ruangan</span>
-                <span className="font-semibold text-slate-200 block truncate">{roomName}</span>
-                <span className="text-[10px] text-rose-400 font-semibold block mt-0.5">🚨 Status: Terkunci</span>
+              <div className="pt-1.5 border-t border-slate-800/80 flex justify-between items-center text-[11px] text-slate-300">
+                <span className="font-semibold text-white truncate max-w-[170px]">{student.name} ({student.classId})</span>
+                <span className="text-slate-400 font-mono text-[10px]">{roomName}</span>
               </div>
             </div>
 
-            {/* Concise Instruction */}
-            <div className="p-3 rounded-xl bg-rose-950/40 border border-rose-500/30 text-xs text-rose-200 text-center leading-relaxed">
-              ✋ <strong>Angkat tangan</strong> dan lapor ke <strong>Pengawas Ruangan</strong> untuk membuka kunci ujian dari Meja Pengawas atau melalui PIN Pengawas.
+            {/* Petunjuk Singkat */}
+            <div className="px-3 py-1.5 rounded-lg bg-rose-950/40 border border-rose-500/30 text-[11px] text-rose-200 text-center leading-snug">
+              ✋ Angkat tangan dan lapor ke <strong>Pengawas Ruangan</strong> untuk membuka kunci ujian.
             </div>
 
-            {/* Real-time Status & Sync */}
+            {/* Status & Aksi Buka Kunci */}
             {violationCount === 0 ? (
-              <div className="space-y-2">
-                <div className="py-2.5 px-3 rounded-xl bg-emerald-950/70 border border-emerald-500/50 flex items-center justify-center gap-2 text-emerald-400 font-bold text-xs">
+              <div className="space-y-1.5 pt-0.5">
+                <div className="py-2 px-3 rounded-xl bg-emerald-950/70 border border-emerald-500/50 flex items-center justify-center gap-2 text-emerald-400 font-bold text-xs">
                   <span>✅</span>
                   <span>Kunci Telah Dibuka Pengawas!</span>
                 </div>
@@ -1575,74 +1552,67 @@ export default function CbtStudentExamRoom({
                     setIsLockedByViolation(false);
                     enterFullscreen();
                   }}
-                  className="w-full py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-black text-xs shadow-lg shadow-emerald-950 transition flex items-center justify-center gap-1.5 cursor-pointer"
+                  className="w-full py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-black text-xs shadow-lg shadow-emerald-950 transition flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <span>🚀 Lanjutkan Ujian Sekarang</span>
                   <span>➔</span>
                 </button>
               </div>
             ) : (
-              <div className="space-y-2.5">
-                <div className="py-2 px-3 rounded-xl bg-slate-950/70 border border-slate-800 flex items-center justify-center gap-2 text-amber-400 font-semibold text-xs">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
-                  </span>
-                  <span>Menunggu Buka Kunci Pengawas...</span>
-                </div>
-
-                {/* Tombol Sinkronisasi Remote dari Meja Pengawas */}
+              <div className="space-y-2 pt-0.5">
+                {/* 1. Tombol Sinkronisasi Remote dari Meja Pengawas */}
                 <button
                   type="button"
                   onClick={() => {
                     handleRemoteUnlock(true);
                   }}
-                  className="w-full py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 text-xs font-bold transition border border-amber-500/50 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 shadow-md"
-                  title="Klik untuk sinkronisasi jika pengawas sudah menekan 'Buka Kunci' di Meja Pengawas"
+                  className="w-full py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 hover:text-amber-200 text-xs font-bold transition border border-amber-500/40 flex items-center justify-center gap-2 cursor-pointer active:scale-95 shadow-xs"
+                  title="Klik untuk sinkronisasi jika pengawas sudah menekan Buka Kunci di Meja Pengawas"
                 >
-                  <span>🔄</span>
-                  <span>Cek Status Buka Kunci Pengawas</span>
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                  </span>
+                  <span>🔄 Cek Buka Kunci dari Meja Pengawas</span>
                 </button>
 
-                {/* Input PIN Pengawas Langsung (Untuk Pengawas yang sedang berkeliling) */}
-                <div className="pt-2 border-t border-slate-800/80">
-                  <div className="space-y-2 pt-1 text-left bg-slate-950/60 p-2.5 rounded-xl border border-slate-800">
-                    <label className="block text-[10px] font-bold text-amber-300 uppercase tracking-wider text-center">
-                      🔑 PIN Pengawas Ruangan:
-                    </label>
-                    <div className="flex gap-1.5">
-                      <input
-                        type="password"
-                        placeholder="Masukkan PIN Pengawas..."
-                        value={unlockTokenInput}
-                        onChange={(e) => setUnlockTokenInput(e.target.value.toUpperCase())}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            handleUnlockExam();
-                          }
-                        }}
-                        className="flex-1 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-amber-300 font-mono font-bold text-center text-xs focus:outline-none focus:border-amber-400"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleUnlockExam}
-                        className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition cursor-pointer active:scale-95 shadow-xs"
-                      >
-                        Buka 🔓
-                      </button>
-                    </div>
-                    {unlockError && (
-                      <p className="text-[11px] text-rose-400 text-center font-semibold mt-1">
-                        {unlockError}
-                      </p>
-                    )}
-                    {unlockSuccess && (
-                      <p className="text-[11px] text-emerald-400 text-center font-semibold mt-1">
-                        ✅ {unlockSuccess}
-                      </p>
-                    )}
+                {/* 2. Form Input PIN Pengawas (Di Tempat) */}
+                <div className="bg-slate-950/60 p-2 rounded-xl border border-slate-800 text-left space-y-1">
+                  <label className="block text-[10px] font-bold text-amber-300 uppercase tracking-wider text-center">
+                    🔑 Atau Ketik PIN Pengawas:
+                  </label>
+                  <div className="flex gap-1.5">
+                    <input
+                      type="password"
+                      placeholder="Masukkan PIN Pengawas..."
+                      value={unlockTokenInput}
+                      onChange={(e) => setUnlockTokenInput(e.target.value.toUpperCase())}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleUnlockExam();
+                        }
+                      }}
+                      className="flex-1 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-amber-300 font-mono font-bold text-center text-xs focus:outline-none focus:border-amber-400"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleUnlockExam}
+                      className="px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition cursor-pointer active:scale-95 shadow-xs"
+                    >
+                      Buka 🔓
+                    </button>
                   </div>
+                  {unlockError && (
+                    <p className="text-[10px] text-rose-400 text-center font-semibold mt-0.5">
+                      {unlockError}
+                    </p>
+                  )}
+                  {unlockSuccess && (
+                    <p className="text-[10px] text-emerald-400 text-center font-semibold mt-0.5">
+                      ✅ {unlockSuccess}
+                    </p>
+                  )}
                 </div>
               </div>
             )}
