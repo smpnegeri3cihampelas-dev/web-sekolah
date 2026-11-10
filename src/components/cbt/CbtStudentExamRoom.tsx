@@ -268,7 +268,7 @@ export default function CbtStudentExamRoom({
         unlockStoredStudentCbtSession(exam.id, student.id);
         if (student.nisn) unlockStoredStudentCbtSession(exam.id, student.nisn);
 
-        lastViolationTimeRef.current = Date.now() + 5000;
+        lastViolationTimeRef.current = Date.now() + 1000;
         isLockedRef.current = false;
         setIsLockedByViolation(false);
         setViolationCount(0);
@@ -374,7 +374,7 @@ export default function CbtStudentExamRoom({
     }
   };
 
-  const lastViolationTimeRef = useRef<number>(Date.now() + 5000);
+  const lastViolationTimeRef = useRef<number>(Date.now() + 800);
 
   // Helper: Trigger Violation with ZERO-TOLERANCE (Sekali Keluar = Langsung Terkunci Mati!)
   const triggerViolation = (reasonText: string) => {
@@ -382,7 +382,7 @@ export default function CbtStudentExamRoom({
     if (isExamCompleted || isExamPaused || isLockedRef.current || isLockedByViolation) return;
 
     const now = Date.now();
-    // Abaikan jika masih dalam masa tenggang awal (5 detik pertama saat masuk layar penuh)
+    // Abaikan jika masih dalam masa tenggang awal (800ms saat inisialisasi layar penuh)
     if (now < lastViolationTimeRef.current) {
       return;
     }
@@ -421,7 +421,7 @@ export default function CbtStudentExamRoom({
         unlockStoredStudentCbtSession(exam.id, student.id);
         if (student.nisn) unlockStoredStudentCbtSession(exam.id, student.nisn);
         persistSession(answers, doubtfuls, 0);
-        lastViolationTimeRef.current = Date.now() + 5000;
+        lastViolationTimeRef.current = Date.now() + 1000;
         enterFullscreen();
       }, 500);
     } else {
@@ -440,38 +440,25 @@ export default function CbtStudentExamRoom({
       triggerViolation('Anda terdeteksi berpindah ke aplikasi lain atau melakukan Alt+Tab!');
     };
 
-    // 2. Deteksi saat tab browser disembunyikan / berganti tab
+    // 2. Deteksi saat tab browser disembunyikan / berganti tab (INSTAN TANPA DELAY)
     const handleVisibilityChange = () => {
       if (isExamCompleted || isExamPaused) return;
-      if (Date.now() < lastViolationTimeRef.current) return;
       if (document.hidden) {
         triggerViolation('Anda terdeteksi berpindah tab browser atau meminimalkan layar ujian.');
       }
     };
 
-    // 3. Deteksi aktif berkala (Heartbeat Monitor): Menangkap jika user membuka aplikasi desktop lain di depan browser
-    let blurCounter = 0;
+    // 3. Deteksi aktif berkala (Heartbeat Monitor Cepat - setiap 300ms)
     const focusHeartbeat = setInterval(() => {
       if (isExamCompleted || isExamPaused) return;
-      if (Date.now() < lastViolationTimeRef.current) {
-        blurCounter = 0;
-        return;
-      }
+      if (Date.now() < lastViolationTimeRef.current) return;
 
       if (document.hidden) {
         triggerViolation('Anda terdeteksi berpindah tab browser atau meminimalkan layar ujian.');
-        blurCounter = 0;
       } else if (!document.hasFocus()) {
-        blurCounter++;
-        // Picu jika kehilangan fokus lebih dari 2 detik (mencegah false-positive saat animasi awal)
-        if (blurCounter >= 2) {
-          triggerViolation('Terdeteksi keluar dari layar ujian CBT (membuka aplikasi lain di komputer/HP)!');
-          blurCounter = 0;
-        }
-      } else {
-        blurCounter = 0;
+        triggerViolation('Terdeteksi keluar dari layar ujian CBT (membuka aplikasi lain di komputer/HP)!');
       }
-    }, 1000);
+    }, 300);
 
     const handleFullscreenChange = () => {
       const active = Boolean(
@@ -515,6 +502,13 @@ export default function CbtStudentExamRoom({
       }
       if (e.ctrlKey && ['u', 'p', 's'].includes(e.key.toLowerCase())) {
         e.preventDefault();
+      }
+      if (e.key === 'Meta') {
+        e.preventDefault();
+        triggerViolation('Terdeteksi menekan tombol Windows (Start Menu)!');
+      }
+      if (e.altKey && (e.key === 'Tab' || e.key === 'Alt')) {
+        triggerViolation('Anda terdeteksi melakukan Alt+Tab!');
       }
     };
 
@@ -1535,7 +1529,7 @@ export default function CbtStudentExamRoom({
                 <button
                   type="button"
                   onClick={() => {
-                    lastViolationTimeRef.current = Date.now() + 5000;
+                    lastViolationTimeRef.current = Date.now() + 1000;
                     setIsLockedByViolation(false);
                     enterFullscreen();
                   }}
