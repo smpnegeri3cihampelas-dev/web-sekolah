@@ -1685,44 +1685,153 @@ function escapeHtmlText(value: string | number | undefined | null): string {
 }
 
 function wrapOfficialBapHtmlDocument(docTitle: string, bodyHtml: string, landscape = false): string {
+  const pageSizeCss = landscape ? '29.7cm 21.0cm' : '21.0cm 29.7cm';
+  const pageMarginCss = landscape ? '1.2cm 1.5cm 1.2cm 1.5cm' : '1.6cm 1.8cm 1.6cm 1.8cm';
+  const maxWidthCss = landscape ? '26.7cm' : '17.4cm';
+
   return `<!DOCTYPE html>
-<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40" lang="id">
+<html xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns:m="http://schemas.microsoft.com/office/2004/12/omml" xmlns="http://www.w3.org/TR/REC-html40" lang="id">
 <head>
   <meta charset="utf-8" />
   <title>${escapeHtmlText(docTitle)}</title>
+  <!--[if gte mso 9]><xml>
+    <w:WordDocument>
+      <w:View>Print</w:View>
+      <w:Zoom>100</w:Zoom>
+      <w:TrackMoves>false</w:TrackMoves>
+      <w:TrackFormatting/>
+      <w:ValidateAgainstSchemas/>
+      <w:SaveIfXMLInvalid>false</w:SaveIfXMLInvalid>
+      <w:IgnoreMixedContent>false</w:IgnoreMixedContent>
+      <w:AlwaysShowPlaceholderText>false</w:AlwaysShowPlaceholderText>
+      <w:DoNotOptimizeForBrowser/>
+    </w:WordDocument>
+  </xml><![endif]-->
   <style>
-    @page { size: A4 ${landscape ? 'landscape' : 'portrait'}; margin: 1.6cm 1.8cm; }
+    @page { size: A4 ${landscape ? 'landscape' : 'portrait'}; margin: ${pageMarginCss}; }
+    @page WordSection1 {
+      size: ${pageSizeCss};
+      ${landscape ? 'mso-page-orientation: landscape;' : ''}
+      margin: ${pageMarginCss};
+      mso-header-margin: 1.0cm;
+      mso-footer-margin: 1.0cm;
+      mso-paper-source: 0;
+    }
+    div.WordSection1 {
+      page: WordSection1;
+      width: 100%;
+      max-width: ${maxWidthCss};
+      margin: 0 auto;
+    }
     * { box-sizing: border-box; }
-    body { font-family: 'Times New Roman', Georgia, serif; color: #0f172a; font-size: 11pt; line-height: 1.45; margin: 0; padding: 18px; background: #ffffff; }
-    .kop { text-align: center; border-bottom: 3px double #0f172a; padding-bottom: 10px; margin-bottom: 16px; }
-    .kop p { margin: 1px 0; font-size: 10pt; font-weight: bold; text-transform: uppercase; letter-spacing: 0.4px; }
-    .kop h1 { margin: 3px 0; font-size: 14pt; font-weight: bold; text-transform: uppercase; letter-spacing: 0.8px; }
-    .kop .alamat { font-size: 9pt; font-weight: normal; text-transform: none; color: #334155; letter-spacing: 0; }
-    .judul { text-align: center; margin-bottom: 14px; }
-    .judul h2 { margin: 0 0 3px; font-size: 12pt; text-transform: uppercase; text-decoration: underline; }
-    .judul p { margin: 0; font-size: 9.5pt; color: #475569; }
-    .narasi { text-align: justify; margin: 10px 0 12px; }
-    table.data { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 10pt; }
-    table.data th, table.data td { border: 1px solid #334155; padding: 6px 8px; vertical-align: top; }
-    table.data th { background: #f1f5f9; font-weight: bold; }
-    table.data td.label { width: 34%; background: #f8fafc; font-weight: bold; }
-    table.summary { width: 100%; border-collapse: collapse; margin: 8px 0 12px; font-size: 9.5pt; }
-    table.summary td { border: 1px solid #cbd5e1; background: #f8fafc; padding: 6px 8px; text-align: center; width: 25%; }
-    table.ttd { width: 100%; border-collapse: collapse; margin-top: 22px; font-size: 10.5pt; page-break-inside: avoid; }
-    table.ttd td { width: 50%; text-align: center; vertical-align: top; padding: 4px 12px; border: none; }
-    .space-ttd { height: 56px; }
-    .sub-ttd { font-size: 9pt; color: #475569; }
+    body {
+      font-family: 'Calibri', 'Segoe UI', Arial, sans-serif;
+      color: #0f172a;
+      font-size: 10pt;
+      line-height: 1.35;
+      margin: 0;
+      padding: 12px;
+      background: #ffffff;
+    }
+    p { margin: 0 0 3pt 0; line-height: 1.35; }
+    .kop {
+      text-align: center;
+      border-bottom: 2px solid #0f172a;
+      padding-bottom: 8pt;
+      margin-bottom: 12pt;
+    }
+    .kop p {
+      margin: 0 0 1pt 0;
+      font-size: 9.5pt;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      color: #334155;
+    }
+    .kop h1 {
+      margin: 2pt 0;
+      font-size: 13pt;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: #020617;
+    }
+    .kop .alamat {
+      font-size: 8.5pt;
+      font-weight: normal;
+      text-transform: none;
+      color: #475569;
+      letter-spacing: 0;
+    }
+    .judul { text-align: center; margin-bottom: 10pt; }
+    .judul h2 {
+      margin: 0 0 2pt 0;
+      font-size: 11.5pt;
+      font-weight: bold;
+      text-transform: uppercase;
+      text-decoration: underline;
+    }
+    .judul p { margin: 0; font-size: 9pt; color: #475569; }
+    .narasi { text-align: justify; margin: 6pt 0 10pt 0; font-size: 10pt; }
+    table.data {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 6pt 0 12pt 0;
+      font-size: 9.5pt;
+      mso-table-lspace: 0pt;
+      mso-table-rspace: 0pt;
+    }
+    table.data th, table.data td {
+      border: 1px solid #cbd5e1;
+      padding: 4.5pt 7pt;
+      mso-padding-alt: 4pt 7pt;
+      vertical-align: top;
+      line-height: 1.3;
+    }
+    table.data th { background: #f1f5f9; font-weight: bold; color: #0f172a; }
+    table.data td.label { width: 34%; background: #f8fafc; font-weight: bold; color: #0f172a; }
+    table.summary {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 6pt 0 10pt 0;
+      font-size: 9pt;
+    }
+    table.summary td {
+      border: 1px solid #e2e8f0;
+      background: #f8fafc;
+      padding: 5pt 6pt;
+      text-align: center;
+      width: 25%;
+    }
+    table.ttd {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 16pt;
+      font-size: 9.5pt;
+      page-break-inside: avoid;
+    }
+    table.ttd td {
+      width: 50%;
+      text-align: center;
+      vertical-align: top;
+      padding: 2pt 10pt;
+      border: none;
+    }
+    .space-ttd { height: 42pt; }
+    .sub-ttd { font-size: 8.5pt; color: #475569; }
     @media print { body { padding: 0; } }
   </style>
 </head>
 <body>
-  <div class="kop">
-    <p>Pemerintah Daerah Kabupaten Bandung Barat</p>
-    <p>Dinas Pendidikan</p>
-    <h1>SMP Negeri 3 Cihampelas</h1>
-    <p class="alamat">Jalan Babakan Caringin, Desa Cihampelas, Kec. Cihampelas, Kab. Bandung Barat 40562</p>
+  <div class="WordSection1">
+    <div class="kop">
+      <p>Pemerintah Daerah Kabupaten Bandung Barat</p>
+      <p>Dinas Pendidikan</p>
+      <h1>SMP Negeri 3 Cihampelas</h1>
+      <p class="alamat">Jalan Babakan Caringin, Desa Cihampelas, Kec. Cihampelas, Kab. Bandung Barat 40562</p>
+    </div>
+    ${bodyHtml}
   </div>
-  ${bodyHtml}
 </body>
 </html>`;
 }
@@ -1813,30 +1922,28 @@ function buildRoomBapOfficialHtml(params: RoomBapOfficialDocumentParams): string
       Pada hari ini <strong>${escapeHtmlText(weekdayDate)}</strong>, telah dilaksanakan Asesmen Berbasis Komputer (CBT)
       di SMP Negeri 3 Cihampelas dengan rincian pelaksanaan sebagai berikut:
     </p>
-    <table class="data">
+    <table class="data" border="1" cellspacing="0" cellpadding="6" style="width:100%;border-collapse:collapse;border:1px solid #cbd5e1;">
       <tbody>
-        <tr><td class="label">Ruang Ujian</td><td><strong>${escapeHtmlText(params.roomDisplay)}</strong></td></tr>
-        <tr><td class="label">Kelas Sasaran</td><td>${escapeHtmlText(params.classesText || '-')}</td></tr>
-        <tr><td class="label">Guru Pengawas Ruang</td><td><strong>${escapeHtmlText(params.supervisorName)}</strong></td></tr>
-        <tr><td class="label">Jumlah Peserta Terdaftar</td><td><strong>${params.totalStudents} Siswa</strong></td></tr>
-        <tr><td class="label">Jumlah Peserta Hadir</td><td><strong style="color:#047857;">${params.presentCount} Siswa</strong></td></tr>
-        <tr><td class="label">Jumlah Tidak Hadir</td><td>${escapeHtmlText(notPresentText)}</td></tr>
-        <tr><td class="label">Catatan Selama Ujian</td><td><em>${escapeHtmlText(notesText)}</em></td></tr>
+        <tr><td class="label" width="34%" style="width:34%;background:#f8fafc;font-weight:bold;border:1px solid #cbd5e1;padding:5pt 8pt;">Ruang Ujian</td><td width="66%" style="width:66%;border:1px solid #cbd5e1;padding:5pt 8pt;"><strong>${escapeHtmlText(params.roomDisplay)}</strong></td></tr>
+        <tr><td class="label" width="34%" style="width:34%;background:#f8fafc;font-weight:bold;border:1px solid #cbd5e1;padding:5pt 8pt;">Kelas Sasaran</td><td width="66%" style="width:66%;border:1px solid #cbd5e1;padding:5pt 8pt;">${escapeHtmlText(params.classesText || '-')}</td></tr>
+        <tr><td class="label" width="34%" style="width:34%;background:#f8fafc;font-weight:bold;border:1px solid #cbd5e1;padding:5pt 8pt;">Guru Pengawas Ruang</td><td width="66%" style="width:66%;border:1px solid #cbd5e1;padding:5pt 8pt;"><strong>${escapeHtmlText(params.supervisorName)}</strong></td></tr>
+        <tr><td class="label" width="34%" style="width:34%;background:#f8fafc;font-weight:bold;border:1px solid #cbd5e1;padding:5pt 8pt;">Jumlah Peserta Terdaftar</td><td width="66%" style="width:66%;border:1px solid #cbd5e1;padding:5pt 8pt;"><strong>${params.totalStudents} Siswa</strong></td></tr>
+        <tr><td class="label" width="34%" style="width:34%;background:#f8fafc;font-weight:bold;border:1px solid #cbd5e1;padding:5pt 8pt;">Jumlah Peserta Hadir</td><td width="66%" style="width:66%;border:1px solid #cbd5e1;padding:5pt 8pt;"><strong style="color:#047857;">${params.presentCount} Siswa</strong></td></tr>
+        <tr><td class="label" width="34%" style="width:34%;background:#f8fafc;font-weight:bold;border:1px solid #cbd5e1;padding:5pt 8pt;">Jumlah Tidak Hadir</td><td width="66%" style="width:66%;border:1px solid #cbd5e1;padding:5pt 8pt;">${escapeHtmlText(notPresentText)}</td></tr>
+        <tr><td class="label" width="34%" style="width:34%;background:#f8fafc;font-weight:bold;border:1px solid #cbd5e1;padding:5pt 8pt;">Catatan Selama Ujian</td><td width="66%" style="width:66%;border:1px solid #cbd5e1;padding:5pt 8pt;"><em>${escapeHtmlText(notesText)}</em></td></tr>
       </tbody>
     </table>
-    <table class="ttd">
+    <table class="ttd" border="0" cellspacing="0" cellpadding="4" style="width:100%;border-collapse:collapse;margin-top:16pt;">
       <tr>
-        <td>
-          <div>Mengetahui,<br/>Ketua Panitia CBT</div>
-          <div class="space-ttd"></div>
-          <div><u><strong>Panitia Asesmen SPENTIC</strong></u></div>
-          <div class="sub-ttd">NIP. 19850312 201101 1 004</div>
+        <td width="50%" style="width:50%;text-align:center;vertical-align:top;border:none;">
+          <p style="margin:0;">Mengetahui,<br/>Ketua Panitia CBT</p>
+          <p style="margin:0;line-height:42pt;">&nbsp;</p>
+          <p style="margin:0;"><u><strong>Panitia Asesmen SPENTIC</strong></u><br/><span class="sub-ttd">NIP. 19850312 201101 1 004</span></p>
         </td>
-        <td>
-          <div>Cihampelas, ${escapeHtmlText(dateOnly)}<br/>Guru Pengawas Ruang</div>
-          <div class="space-ttd"></div>
-          <div><u><strong>${escapeHtmlText(params.supervisorName)}</strong></u></div>
-          <div class="sub-ttd">Guru Pengawas CBT</div>
+        <td width="50%" style="width:50%;text-align:center;vertical-align:top;border:none;">
+          <p style="margin:0;">Cihampelas, ${escapeHtmlText(dateOnly)}<br/>Guru Pengawas Ruang</p>
+          <p style="margin:0;line-height:42pt;">&nbsp;</p>
+          <p style="margin:0;"><u><strong>${escapeHtmlText(params.supervisorName)}</strong></u><br/><span class="sub-ttd">Guru Pengawas CBT</span></p>
         </td>
       </tr>
     </table>`;
@@ -1955,19 +2062,17 @@ function buildSchoolRekapBapOfficialHtml(params: SchoolRekapBapOfficialDocumentP
         </tr>
       </tfoot>
     </table>
-    <table class="ttd">
+    <table class="ttd" border="0" cellspacing="0" cellpadding="4" style="width:100%;border-collapse:collapse;margin-top:16pt;">
       <tr>
-        <td>
-          <div>Mengetahui,<br/>Kepala SMP Negeri 3 Cihampelas</div>
-          <div class="space-ttd"></div>
-          <div><u><strong>H. Rustandi, S.Pd., M.Pd.</strong></u></div>
-          <div class="sub-ttd">NIP. 19700608 199802 1 001</div>
+        <td width="50%" style="width:50%;text-align:center;vertical-align:top;border:none;">
+          <p style="margin:0;">Mengetahui,<br/>Kepala SMP Negeri 3 Cihampelas</p>
+          <p style="margin:0;line-height:42pt;">&nbsp;</p>
+          <p style="margin:0;"><u><strong>H. Rustandi, S.Pd., M.Pd.</strong></u><br/><span class="sub-ttd">NIP. 19700608 199802 1 001</span></p>
         </td>
-        <td>
-          <div>Cihampelas, ${escapeHtmlText(dateOnly)}<br/>Ketua Panitia Asesmen CBT</div>
-          <div class="space-ttd"></div>
-          <div><u><strong>Panitia Asesmen SPENTIC</strong></u></div>
-          <div class="sub-ttd">NIP. 19850312 201101 1 004</div>
+        <td width="50%" style="width:50%;text-align:center;vertical-align:top;border:none;">
+          <p style="margin:0;">Cihampelas, ${escapeHtmlText(dateOnly)}<br/>Ketua Panitia Asesmen CBT</p>
+          <p style="margin:0;line-height:42pt;">&nbsp;</p>
+          <p style="margin:0;"><u><strong>Panitia Asesmen SPENTIC</strong></u><br/><span class="sub-ttd">NIP. 19850312 201101 1 004</span></p>
         </td>
       </tr>
     </table>`;
