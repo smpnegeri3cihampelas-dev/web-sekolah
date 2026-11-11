@@ -35,6 +35,38 @@ export function formatIndonesianDate(dateStr: string): string {
 }
 
 /**
+ * Dapatkan tanggal hari ini (YYYY-MM-DD) sesuai zona waktu WIB (Asia/Jakarta)
+ */
+export function getTodayWibDateStr(now: Date = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Jakarta',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(now);
+}
+
+/**
+ * Konversi ISO timestamp (UTC) menjadi jam WIB yang akurat (contoh: "21:28 WIB")
+ */
+export function formatWibTimeLabel(isoStr?: string): string {
+  if (!isoStr) return '-';
+  const trimmed = isoStr.trim();
+  if (!trimmed) return '-';
+  const parsed = new Date(trimmed);
+  if (!isNaN(parsed.getTime())) {
+    const hhmm = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Jakarta',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    }).format(parsed);
+    return `${hhmm} WIB`;
+  }
+  return trimmed.includes('WIB') ? trimmed : `${trimmed} WIB`;
+}
+
+/**
  * Sanitize filename to avoid invalid characters on OS
  */
 function sanitizeFileName(name: string): string {
@@ -184,7 +216,7 @@ export function exportSchoolDailyAttendanceToExcel(params: {
     ['Tahun Ajaran 2026/2027'],
     [],
     ['Tanggal', ':', formatIndonesianDate(date)],
-    ['Waktu Cetak', ':', new Date().toLocaleTimeString('id-ID') + ' WIB'],
+    ['Waktu Cetak', ':', new Date().toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' }) + ' WIB'],
     [],
     [
       'No.',
@@ -489,7 +521,7 @@ export function exportSchoolSemesterAttendanceToExcel(params: {
     ['Tahun Ajaran ' + academicYear + ' (' + semesterName + ')'],
     [],
     ['Petugas Rekap Piket', ':', piketOfficer],
-    ['Tanggal Cetak', ':', formatIndonesianDate(new Date().toISOString().split('T')[0])],
+    ['Tanggal Cetak', ':', formatIndonesianDate(getTodayWibDateStr())],
     ['Total Rombel', ':', `${classes.length} Kelas (7-A s/d 9-E)`],
     ['Total Peserta Didik', ':', `${students.length} Siswa Terdaftar`],
     [],
@@ -667,7 +699,7 @@ export function exportSchoolSemesterAttendanceToExcel(params: {
   // Signature Block on Sheet 1
   summaryRows.push([]);
   summaryRows.push([]);
-  const todayFormatted = formatIndonesianDate(new Date().toISOString().split('T')[0]);
+  const todayFormatted = formatIndonesianDate(getTodayWibDateStr());
   summaryRows.push(['', '', 'Mengetahui,', '', '', '', '', '', 'Cihampelas, ' + todayFormatted]);
   summaryRows.push(['', '', 'Kepala SMP Negeri 3 Cihampelas,', '', '', '', '', '', 'Petugas Meja Piket / Kesiswaan,']);
   summaryRows.push([]);
@@ -924,7 +956,7 @@ export function exportSemesterAttendanceToExcel(params: {
   rows.push([]);
 
   // Signature Block
-  const todayStr = formatIndonesianDate(new Date().toISOString().split('T')[0]);
+  const todayStr = formatIndonesianDate(getTodayWibDateStr());
   const emptyCols = Array.from({ length: Math.max(0, displayColsCount - 4) }, () => '');
   rows.push(['', '', '', 'Mengetahui,', ...emptyCols, '', '', '', '', '', 'Cihampelas, ' + todayStr]);
   rows.push(['', '', '', 'Kepala SMP Negeri 3 Cihampelas,', ...emptyCols, '', '', '', '', '', 'Guru Mata Pelajaran,']);
@@ -1106,7 +1138,7 @@ export function exportMonthlyAttendanceMatrixToExcel(params: {
   // Signatures
   rows.push([]);
   rows.push([]);
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getTodayWibDateStr();
   rows.push(['', '', '', 'Mengetahui,', ...new Array(Math.max(1, daysInMonth - 5)).fill(''), 'Cihampelas, ' + formatIndonesianDate(todayStr)]);
   rows.push(['', '', '', 'Kepala SMP Negeri 3 Cihampelas,', ...new Array(Math.max(1, daysInMonth - 5)).fill(''), 'Guru Mata Pelajaran,']);
   rows.push([]);
@@ -1177,7 +1209,7 @@ export function exportCbtScoreLegerToExcel(params: {
     results
   } = params;
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getTodayWibDateStr();
   const rows: any[][] = [];
 
   // Official School Header
@@ -1224,7 +1256,7 @@ export function exportCbtScoreLegerToExcel(params: {
       r.score,
       passingGrade,
       r.isPassed ? 'TUNTAS' : 'REMEDIAL',
-      r.submittedAt ? r.submittedAt.slice(11, 16) + ' WIB' : '-'
+      formatWibTimeLabel(r.submittedAt)
     ]);
   });
 
