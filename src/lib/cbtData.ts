@@ -101,6 +101,9 @@ export interface CbtStudentAnswerState {
   violationCount?: number; // berapa kali terdeteksi pindah tab
   violationReason?: string; // Catatan spesifik forensik pelanggaran (contoh: Pindah Tab / Alt+Tab / Notifikasi)
   violationTime?: string; // Waktu pelanggaran (HH:MM:SS WIB)
+  lockedAt?: number; // Epoch ms saat ujian terkunci karena pelanggaran
+  unlockedAt?: number; // Epoch ms saat kunci ujian dibuka oleh pengawas/PIN
+  violationSynced?: boolean; // Penanda apakah pelanggaran telah tersimpan di server database
 }
 
 export interface CbtRoomAttendance {
@@ -164,6 +167,7 @@ export interface CbtSupervisorSchedule {
   examDate: string;
   sessions?: CbtScheduleSessionSlot[]; // Daftar sesi dinamis: Jam 1, Jam 2, Jam 3, Jam 4, Jam 5, dst.
   entries: CbtSupervisorScheduleEntry[];
+  isUserEdited?: boolean; // Penanda bahwa panitia sudah mengatur/merotasi/menyimpan jadwal secara sadar
 }
 
 export const DEFAULT_SCHEDULE_SESSIONS: CbtScheduleSessionSlot[] = [
@@ -171,13 +175,18 @@ export const DEFAULT_SCHEDULE_SESSIONS: CbtScheduleSessionSlot[] = [
   { id: 's2', name: 'Jam Ke-2', startTime: '09:30', endTime: '11:00', subject: 'Bahasa Inggris' }
 ];
 
+function isPlaceholderSupervisor(name?: string): boolean {
+  if (!name) return true;
+  const trimmed = name.trim();
+  return trimmed === '' || trimmed === 'Guru Pengawas' || trimmed === 'Guru Pengawas Ruang';
+}
+
 export function getSupervisorForSlot(entry: CbtSupervisorScheduleEntry, slotId: string): string {
-  if (entry.supervisors && entry.supervisors[slotId]) {
-    return entry.supervisors[slotId];
-  }
-  if (slotId === 's1' && entry.session1Supervisor) return entry.session1Supervisor;
-  if (slotId === 's2' && entry.session2Supervisor) return entry.session2Supervisor;
-  return 'Guru Pengawas';
+  const fromMap = entry.supervisors?.[slotId];
+  if (!isPlaceholderSupervisor(fromMap)) return fromMap!;
+  if (slotId === 's1' && !isPlaceholderSupervisor(entry.session1Supervisor)) return entry.session1Supervisor!;
+  if (slotId === 's2' && !isPlaceholderSupervisor(entry.session2Supervisor)) return entry.session2Supervisor!;
+  return '';
 }
 
 /**
@@ -237,6 +246,32 @@ export function generateSessionsFromExamPackages(
 const CBT_SUPERVISOR_SCHEDULES_MAP_KEY = 'cbt_supervisor_schedules_map_v1';
 const CBT_SUPERVISOR_SCHEDULE_KEY = 'cbt_supervisor_schedule_v1';
 
+function isLegacyAutoFilledSchedule(parsed: any, sessions: CbtScheduleSessionSlot[]): boolean {
+  if (!parsed || parsed.isUserEdited) return false;
+  const entries = Array.isArray(parsed.entries) ? parsed.entries : [];
+  if (entries.length === 0 || sessions.length === 0) return false;
+  return entries.every((entry: any, idx: number) =>
+    sessions.every((slot, sIdx) => {
+      const assigned =
+        entry?.supervisors?.[slot.id] ??
+        (slot.id === 's1' ? entry?.session1Supervisor : slot.id === 's2' ? entry?.session2Supervisor : '');
+      const legacyDefault = REAL_SCHOOL_TEACHERS[(idx + sIdx * 4) % REAL_SCHOOL_TEACHERS.length];
+      return assigned === legacyDefault;
+    })
+  );
+}
+
+function buildEmptyScheduleEntries(rooms: CbtExamRoomConfig[]): CbtSupervisorScheduleEntry[] {
+  return rooms.map(r => ({
+    roomId: r.id,
+    roomName: r.name,
+    roomLabel: r.label,
+    session1Supervisor: '',
+    session2Supervisor: '',
+    supervisors: {}
+  }));
+}
+
 function normalizeSupervisorSchedule(parsed: any, targetDate: string): CbtSupervisorSchedule {
   const sessions: CbtScheduleSessionSlot[] = (Array.isArray(parsed.sessions) && parsed.sessions.length > 0)
     ? parsed.sessions
@@ -245,22 +280,40 @@ function normalizeSupervisorSchedule(parsed: any, targetDate: string): CbtSuperv
         { id: 's2', name: 'Jam Ke-2', startTime: '09:30', endTime: '11:00', subject: 'Bahasa Inggris' }
       ];
 
+  // Bersihkan jadwal bawaan lama yang masih 100% auto-seed (belum pernah diatur/dirotasi panitia)
+  const wipeLegacyAuto = isLegacyAutoFilledSchedule(parsed, sessions);
+
   const entries: CbtSupervisorScheduleEntry[] = (parsed.entries || []).map((entry: any) => {
-    const sups = { ...(entry.supervisors || {}) };
-    if (!sups['s1'] && entry.session1Supervisor) sups['s1'] = entry.session1Supervisor;
-    if (!sups['s2'] && entry.session2Supervisor) sups['s2'] = entry.session2Supervisor;
+    if (wipeLegacyAuto) {
+      return {
+        ...entry,
+        session1Supervisor: '',
+        session2Supervisor: '',
+        supervisors: {}
+      };
+    }
+    const rawSups = { ...(entry.supervisors || {}) };
+    if (!rawSups['s1'] && entry.session1Supervisor) rawSups['s1'] = entry.session1Supervisor;
+    if (!rawSups['s2'] && entry.session2Supervisor) rawSups['s2'] = entry.session2Supervisor;
+
+    const cleanSups: Record<string, string> = {};
+    for (const [k, v] of Object.entries(rawSups)) {
+      cleanSups[k] = isPlaceholderSupervisor(String(v || '')) ? '' : String(v);
+    }
+
     return {
       ...entry,
-      session1Supervisor: sups['s1'] || entry.session1Supervisor || 'Guru Pengawas',
-      session2Supervisor: sups['s2'] || entry.session2Supervisor || 'Guru Pengawas',
-      supervisors: sups
+      session1Supervisor: cleanSups['s1'] || '',
+      session2Supervisor: cleanSups['s2'] || '',
+      supervisors: cleanSups
     };
   });
 
   return {
     examDate: parsed.examDate || targetDate,
     sessions,
-    entries
+    entries,
+    isUserEdited: Boolean(parsed.isUserEdited) && !wipeLegacyAuto
   };
 }
 
@@ -297,34 +350,18 @@ export const REAL_SCHOOL_TEACHERS = [
 
 export function getDefaultSupervisorSchedule(targetDate?: string): CbtSupervisorSchedule {
   const rooms = getDefaultSchoolRooms();
-  const defaultTeachers = REAL_SCHOOL_TEACHERS;
-
   const dateToUse = targetDate || new Date().toISOString().split('T')[0];
   const sessions: CbtScheduleSessionSlot[] = [
     { id: 's1', name: 'Jam Ke-1', startTime: '07:30', endTime: '09:00', subject: 'Informatika' },
     { id: 's2', name: 'Jam Ke-2', startTime: '09:30', endTime: '11:00', subject: 'Bahasa Inggris' }
   ];
 
-  const entries: CbtSupervisorScheduleEntry[] = rooms.map((r, idx) => {
-    const s1Teacher = defaultTeachers[idx % defaultTeachers.length];
-    const s2Teacher = defaultTeachers[(idx + 4) % defaultTeachers.length];
-    return {
-      roomId: r.id,
-      roomName: r.name,
-      roomLabel: r.label,
-      session1Supervisor: s1Teacher,
-      session2Supervisor: s2Teacher,
-      supervisors: {
-        s1: s1Teacher,
-        s2: s2Teacher
-      }
-    };
-  });
-
+  // Default awal kosong bersih agar panitia bebas menyusun manual atau klik Rotasi Otomatis
   return {
     examDate: dateToUse,
     sessions,
-    entries
+    entries: buildEmptyScheduleEntries(rooms),
+    isUserEdited: false
   };
 }
 
@@ -353,43 +390,24 @@ export function getStoredSupervisorSchedule(targetDate?: string): CbtSupervisorS
       }
     }
 
-    // 3. Jika belum pernah disimpan untuk tanggal ini, periksa apakah guru sudah menerbitkan paket di tanggal ini!
+    // 3. Jika belum pernah disimpan untuk tanggal ini, deteksi paket guru namun tetap biarkan pengawas KOSONG
     const pkgs = getStoredCbtPackages();
     const pkgsOnDate = pkgs.filter(p => !p.examDate || p.examDate === dateToUse);
     if (pkgsOnDate.length > 0) {
       const autoSessions = generateSessionsFromExamPackages(pkgs, dateToUse);
       const rooms = getDefaultSchoolRooms();
-      const defaultTeachers = REAL_SCHOOL_TEACHERS;
-      const entries: CbtSupervisorScheduleEntry[] = rooms.map((r, idx) => {
-        const sups: Record<string, string> = {};
-        autoSessions.forEach((slot, sIdx) => {
-          sups[slot.id] = defaultTeachers[(idx + sIdx * 4) % defaultTeachers.length];
-        });
-        return {
-          roomId: r.id,
-          roomName: r.name,
-          roomLabel: r.label,
-          session1Supervisor: sups['s1'],
-          session2Supervisor: sups['s2'],
-          supervisors: sups
-        };
-      });
-
-      const autoSchedule: CbtSupervisorSchedule = {
+      return {
         examDate: dateToUse,
         sessions: autoSessions,
-        entries
+        entries: buildEmptyScheduleEntries(rooms),
+        isUserEdited: false
       };
-      saveStoredSupervisorSchedule(autoSchedule);
-      return autoSchedule;
     }
   } catch (e) {
     console.error('Failed parsing supervisor schedule', e);
   }
 
-  const def = getDefaultSupervisorSchedule(dateToUse);
-  saveStoredSupervisorSchedule(def);
-  return def;
+  return getDefaultSupervisorSchedule(dateToUse);
 }
 
 export function saveStoredSupervisorSchedule(schedule: CbtSupervisorSchedule) {
@@ -525,26 +543,78 @@ export function getStoredCbtPanitiaConfig(): CbtPanitiaConfig {
     console.error('Failed to parse cbt_panitia_config', e);
   }
 
-  const initial: CbtPanitiaConfig = {
+  // Kembalikan state awal di memori saja TANPA menimpa cloud/database
+  // agar browser baru/Incognito tidak menghapus pembagian ruangan yang sudah disusun Panitia
+  return {
     rooms: getDefaultSchoolRooms(),
     examSessionName: 'Sesi 1 (Pagi)',
     academicYear: '2026/2027',
     semester: 'PTS / STS Ganjil'
   };
-  saveStoredCbtPanitiaConfig(initial);
-  return initial;
 }
 
-export function saveStoredCbtPanitiaConfig(config: CbtPanitiaConfig) {
+let pendingRoomsPushCount = 0;
+let lastRoomsMutationAt = 0;
+let roomsSyncPendingUpload = false;
+let lastRoomsForceEmpty = false;
+
+export function isRoomsCloudSyncSafeToApply(): boolean {
+  if (pendingRoomsPushCount > 0 || roomsSyncPendingUpload) return false;
+  if (Date.now() - lastRoomsMutationAt < 8000) return false;
+  return true;
+}
+
+export function isRoomsUploadPending(): boolean {
+  return roomsSyncPendingUpload;
+}
+
+export function getLastRoomsForceEmpty(): boolean {
+  return lastRoomsForceEmpty;
+}
+
+export function saveStoredCbtPanitiaConfig(
+  config: CbtPanitiaConfig,
+  options?: { skipCloudPush?: boolean; forceEmpty?: boolean }
+) {
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(CBT_PANITIA_CONFIG_KEY, JSON.stringify(config));
     window.dispatchEvent(new CustomEvent('cbtPanitiaConfigUpdated', { detail: config }));
-    // Asynchronous background cloud sync to Hostinger MySQL
-    if (config.rooms && Array.isArray(config.rooms)) {
-      try {
-        import('./cloudSync').then(m => m.pushCbtRoomsToCloud(config.rooms)).catch(() => {});
-      } catch {}
+    // Kirim langsung ke /api/cbt/rooms (tanpa jeda dynamic import + keepalive) agar tidak kalah race oleh focus sync
+    if (!options?.skipCloudPush && config.rooms && Array.isArray(config.rooms)) {
+      lastRoomsMutationAt = Date.now();
+      pendingRoomsPushCount += 1;
+      roomsSyncPendingUpload = true;
+      lastRoomsForceEmpty = Boolean(options?.forceEmpty);
+      window.dispatchEvent(new CustomEvent('cbtRoomsSyncStatus', { detail: { status: 'syncing' } }));
+
+      const payload = JSON.stringify({
+        rooms: config.rooms,
+        forceEmpty: Boolean(options?.forceEmpty)
+      });
+
+      fetch('/api/cbt/rooms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: payload,
+        keepalive: payload.length < 60000
+      })
+        .then(res => {
+          if (res.ok) {
+            roomsSyncPendingUpload = false;
+            window.dispatchEvent(new CustomEvent('cbtRoomsSyncStatus', { detail: { status: 'synced' } }));
+          } else {
+            roomsSyncPendingUpload = true;
+            window.dispatchEvent(new CustomEvent('cbtRoomsSyncStatus', { detail: { status: 'error' } }));
+          }
+        })
+        .catch(() => {
+          roomsSyncPendingUpload = true;
+          window.dispatchEvent(new CustomEvent('cbtRoomsSyncStatus', { detail: { status: 'error' } }));
+        })
+        .finally(() => {
+          pendingRoomsPushCount = Math.max(0, pendingRoomsPushCount - 1);
+        });
     }
   } catch (e) {
     console.error('Failed to save cbt_panitia_config', e);
@@ -1117,6 +1187,15 @@ export function toggleCbtEmergencyPause(isPaused: boolean, reason?: string) {
   return updated;
 }
 
+const pendingViolationLocks = new Map<string, number>();
+
+export function isViolationSyncPending(examId: string, studentId?: string, studentNisn?: string): boolean {
+  if (!examId) return false;
+  if (studentId && pendingViolationLocks.has(`${examId}_${studentId}`)) return true;
+  if (studentNisn && pendingViolationLocks.has(`${examId}_${studentNisn}`)) return true;
+  return false;
+}
+
 export function getStoredStudentCbtSessions(): Record<string, CbtStudentAnswerState> {
   if (typeof window === 'undefined') return {};
   try {
@@ -1127,20 +1206,91 @@ export function getStoredStudentCbtSessions(): Record<string, CbtStudentAnswerSt
   }
 }
 
-export function saveStoredStudentCbtSession(session: CbtStudentAnswerState) {
+export interface SaveStudentCbtSessionOptions {
+  source?: 'student_room' | 'student_violation' | 'supervisor_unlock' | 'cloud_sync' | 'local';
+  keepalive?: boolean;
+  skipCloudPush?: boolean;
+  onSyncDone?: (ok: boolean) => void;
+}
+
+export function saveStoredStudentCbtSession(
+  session: CbtStudentAnswerState,
+  options?: SaveStudentCbtSessionOptions
+) {
   if (typeof window === 'undefined') return;
   try {
     const all = getStoredStudentCbtSessions();
     const key = `${session.examId}_${session.studentId}`;
-    all[key] = session;
+    const hasViolation = Number(session.violationCount || 0) >= 1;
+    const lockTs = hasViolation ? (session.lockedAt || Date.now()) : session.lockedAt;
+
+    const sessionToSave: CbtStudentAnswerState = {
+      ...session,
+      lockedAt: lockTs,
+      violationSynced: hasViolation ? Boolean(session.violationSynced) : false
+    };
+
+    if (hasViolation && lockTs && !options?.skipCloudPush) {
+      pendingViolationLocks.set(key, lockTs);
+      if (session.studentNisn) {
+        pendingViolationLocks.set(`${session.examId}_${session.studentNisn}`, lockTs);
+      }
+    }
+
+    all[key] = sessionToSave;
     localStorage.setItem(CBT_STUDENT_SESSIONS_KEY, JSON.stringify(all));
-    window.dispatchEvent(new Event('cbtSessionsUpdated'));
-    // Asynchronous background cloud sync to Hostinger MySQL
-    try {
-      import('./cloudSync').then(m => m.pushCbtStudentAnswerToCloud(session)).catch(() => {});
-    } catch {}
+    window.dispatchEvent(
+      new CustomEvent('cbtSessionsUpdated', {
+        detail: {
+          source: options?.source || 'local',
+          examId: session.examId,
+          studentId: session.studentId
+        }
+      })
+    );
+
+    // Asynchronous background cloud sync to Hostinger MySQL (direct fetch for 0ms latency & keepalive support)
+    if (!options?.skipCloudPush) {
+      fetch('/api/cbt/answers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sessionToSave),
+        keepalive: Boolean(options?.keepalive)
+      })
+        .then(res => {
+          const ok = res.ok;
+          if (ok && hasViolation && lockTs) {
+            try {
+              const latest = getStoredStudentCbtSessions();
+              const cur = latest[key];
+              if (cur && Number(cur.violationCount || 0) >= 1 && cur.lockedAt === lockTs) {
+                latest[key] = { ...cur, violationSynced: true };
+                localStorage.setItem(CBT_STUDENT_SESSIONS_KEY, JSON.stringify(latest));
+              }
+            } catch {}
+          }
+          options?.onSyncDone?.(ok);
+        })
+        .catch(() => {
+          options?.onSyncDone?.(false);
+        })
+        .finally(() => {
+          if (hasViolation && lockTs) {
+            if (pendingViolationLocks.get(key) === lockTs) {
+              pendingViolationLocks.delete(key);
+            }
+            if (session.studentNisn) {
+              const nisnKey = `${session.examId}_${session.studentNisn}`;
+              if (pendingViolationLocks.get(nisnKey) === lockTs) {
+                pendingViolationLocks.delete(nisnKey);
+              }
+            }
+          }
+        });
+    }
   } catch (e) {
     console.error('Failed saving student CBT session', e);
+    options?.onSyncDone?.(false);
   }
 }
 
@@ -1148,13 +1298,12 @@ export function resetStoredStudentCbtSession(examId: string, studentIdOrNisn: st
   if (typeof window === 'undefined') return;
   try {
     const all = getStoredStudentCbtSessions();
-    let modified = false;
+    pendingViolationLocks.delete(`${examId}_${studentIdOrNisn}`);
 
     // 1. Direct delete by composite key
     const directKey = `${examId}_${studentIdOrNisn}`;
     if (all[directKey]) {
       delete all[directKey];
-      modified = true;
     }
 
     // 2. Comprehensive scan across all session objects
@@ -1168,14 +1317,15 @@ export function resetStoredStudentCbtSession(examId: string, studentIdOrNisn: st
       const isExamMatch = !examId || sess.examId === examId || k.startsWith(examId);
 
       if (isStudentMatch && isExamMatch) {
+        pendingViolationLocks.delete(`${sess.examId}_${sess.studentId}`);
+        if (sess.studentNisn) pendingViolationLocks.delete(`${sess.examId}_${sess.studentNisn}`);
         delete all[k];
-        modified = true;
       }
     }
 
     // Always persist and notify listeners
     localStorage.setItem(CBT_STUDENT_SESSIONS_KEY, JSON.stringify(all));
-    window.dispatchEvent(new Event('cbtSessionsUpdated'));
+    window.dispatchEvent(new CustomEvent('cbtSessionsUpdated', { detail: { source: 'supervisor_reset', examId } }));
     window.dispatchEvent(new Event('storage'));
 
     // Sync deletion to cloud database
@@ -1189,12 +1339,18 @@ export function resetStoredStudentCbtSession(examId: string, studentIdOrNisn: st
   }
 }
 
-export function unlockStoredStudentCbtSession(examId: string, studentIdOrNisn: string) {
+export function unlockStoredStudentCbtSession(
+  examId: string,
+  studentIdOrNisn: string,
+  options?: { skipCloudPush?: boolean }
+) {
   if (typeof window === 'undefined') return;
   try {
     const all = getStoredStudentCbtSessions();
-    let modified = false;
     let unlockedSession: CbtStudentAnswerState | null = null;
+    const unlockTs = Date.now();
+
+    pendingViolationLocks.delete(`${examId}_${studentIdOrNisn}`);
 
     // 1. Direct key update if exists
     const directKey = `${examId}_${studentIdOrNisn}`;
@@ -1203,10 +1359,11 @@ export function unlockStoredStudentCbtSession(examId: string, studentIdOrNisn: s
         ...all[directKey],
         violationCount: 0,
         violationReason: undefined,
-        violationTime: undefined
+        violationTime: undefined,
+        unlockedAt: unlockTs,
+        violationSynced: false
       };
       unlockedSession = all[directKey];
-      modified = true;
     }
 
     // 2. Comprehensive scan across all session objects
@@ -1220,27 +1377,32 @@ export function unlockStoredStudentCbtSession(examId: string, studentIdOrNisn: s
       const isExamMatch = !examId || sess.examId === examId || k.startsWith(examId);
 
       if (isStudentMatch && isExamMatch) {
+        pendingViolationLocks.delete(`${sess.examId}_${sess.studentId}`);
+        if (sess.studentNisn) pendingViolationLocks.delete(`${sess.examId}_${sess.studentNisn}`);
         all[k] = {
           ...sess,
           violationCount: 0,
           violationReason: undefined,
-          violationTime: undefined
+          violationTime: undefined,
+          unlockedAt: unlockTs,
+          violationSynced: false
         };
         unlockedSession = all[k];
-        modified = true;
       }
     }
 
     // Always persist and notify listeners
     localStorage.setItem(CBT_STUDENT_SESSIONS_KEY, JSON.stringify(all));
-    window.dispatchEvent(new Event('cbtSessionsUpdated'));
+    window.dispatchEvent(new CustomEvent('cbtSessionsUpdated', { detail: { source: 'supervisor_unlock', examId } }));
     window.dispatchEvent(new Event('storage'));
 
-    // Sync unlocked session to cloud database
-    if (unlockedSession) {
-      try {
-        import('./cloudSync').then(m => m.pushCbtStudentAnswerToCloud(unlockedSession!)).catch(() => {});
-      } catch {}
+    // Sync unlocked session to cloud database immediately
+    if (unlockedSession && !options?.skipCloudPush) {
+      fetch('/api/cbt/answers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(unlockedSession)
+      }).catch(() => {});
     }
   } catch (e) {
     console.error('Failed unlocking student CBT session', e);
@@ -1293,25 +1455,36 @@ export function checkInRoomSupervisor(params: {
   }
 
   try {
-    // 1. Update di CbtPanitiaConfig agar nama pengawas langsung tampil di semua monitoring ruangan
-    const currentConfig = getStoredCbtPanitiaConfig();
-    let configUpdated = false;
-    const updatedRooms = currentConfig.rooms.map(r => {
-      const matchName = r.name.toLowerCase().trim() === roomName.toLowerCase().trim();
-      const matchLabel = r.label && r.label.toLowerCase().includes(roomName.toLowerCase().trim());
-      if (matchName || matchLabel) {
-        configUpdated = true;
-        return {
-          ...r,
-          supervisorName: cleanSup
-        };
-      }
-      return r;
-    });
+    // 1. Update di CbtPanitiaConfig lokal hanya jika cache lokal memang sudah ada, lalu kirim PATCH nama pengawas saja ke server
+    const hasLocalConfig = Boolean(localStorage.getItem(CBT_PANITIA_CONFIG_KEY));
+    let matchedRoomId: string | undefined;
+    if (hasLocalConfig) {
+      const currentConfig = getStoredCbtPanitiaConfig();
+      let configUpdated = false;
+      const updatedRooms = currentConfig.rooms.map(r => {
+        const matchName = r.name.toLowerCase().trim() === roomName.toLowerCase().trim();
+        const matchLabel = r.label && r.label.toLowerCase().includes(roomName.toLowerCase().trim());
+        if (matchName || matchLabel) {
+          configUpdated = true;
+          matchedRoomId = r.id;
+          return {
+            ...r,
+            supervisorName: cleanSup
+          };
+        }
+        return r;
+      });
 
-    if (configUpdated) {
-      saveStoredCbtPanitiaConfig({ ...currentConfig, rooms: updatedRooms });
+      if (configUpdated) {
+        saveStoredCbtPanitiaConfig({ ...currentConfig, rooms: updatedRooms }, { skipCloudPush: true });
+      }
     }
+
+    try {
+      import('./cloudSync')
+        .then(m => m.pushCbtRoomSupervisorToCloud({ roomId: matchedRoomId, roomName, supervisorName: cleanSup }))
+        .catch(() => {});
+    } catch {}
 
     // 2. Jika examId diberikan, update atau buat presensi aktif di CBT_ROOM_ATTENDANCE_KEY
     if (examId) {

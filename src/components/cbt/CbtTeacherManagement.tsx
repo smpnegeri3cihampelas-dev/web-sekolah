@@ -336,7 +336,12 @@ export default function CbtTeacherManagement({
 
     return targetStudents.map(student => {
       const sessionKey = `${pkgId}_${student.id}`;
-      const session = allSessions[sessionKey];
+      const session = allSessions[sessionKey] || Object.values(allSessions).find(s =>
+        s.examId === pkgId && (
+          s.studentId === student.id ||
+          (student.nisn && (s.studentNisn === student.nisn || s.studentId === student.nisn))
+        )
+      );
 
       const score = session?.score ?? 0;
       const isPassed = session?.isPassed ?? false;
@@ -901,7 +906,13 @@ export default function CbtTeacherManagement({
                           )}
                         </td>
                         <td className="px-3 py-2.5 text-center font-mono text-slate-500 text-[11px]">
-                          {res.submittedAt ? res.submittedAt.slice(11, 16) + ' WIB' : '-'}
+                          {res.submittedAt
+                            ? new Date(res.submittedAt).toLocaleTimeString('id-ID', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                timeZone: 'Asia/Jakarta'
+                              }) + ' WIB'
+                            : '-'}
                         </td>
                         <td className="px-3 py-2.5 text-center">
                           {res.hasSubmitted ? (

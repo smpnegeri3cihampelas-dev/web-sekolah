@@ -466,13 +466,20 @@ export default function CbtSupervisorRoom({
     // Synchronize supervisor name to room configuration in panitia config
     if (finalSupervisor && finalSupervisor !== 'Guru Pengawas Ruang') {
       const currentConfig = getStoredCbtPanitiaConfig();
+      let matchedRoomId: string | undefined;
       const updatedRooms = currentConfig.rooms.map(r => {
         if (r.name === selectedRoom || r.label === selectedRoom) {
+          matchedRoomId = r.id;
           return { ...r, supervisorName: finalSupervisor };
         }
         return r;
       });
-      saveStoredCbtPanitiaConfig({ ...currentConfig, rooms: updatedRooms });
+      saveStoredCbtPanitiaConfig({ ...currentConfig, rooms: updatedRooms }, { skipCloudPush: true });
+      try {
+        import('@/lib/cloudSync')
+          .then(m => m.pushCbtRoomSupervisorToCloud({ roomId: matchedRoomId, roomName: selectedRoom, supervisorName: finalSupervisor }))
+          .catch(() => {});
+      } catch {}
     }
 
     setIsBapSaved(true);
@@ -518,10 +525,12 @@ export default function CbtSupervisorRoom({
       gender: emGender
     });
 
-    // Jika ruangan ini memiliki konfigurasi assignedStudentIds khusus, masukkan juga ID siswa baru
-    if (currentRoomObj && currentRoomObj.assignedStudentIds && currentRoomObj.assignedStudentIds.length > 0) {
-      const updatedRooms = panitiaConfig.rooms.map(r => {
-        if (r.id === currentRoomObj.id) {
+    // Jika ruangan ini memiliki konfigurasi assignedStudentIds khusus, masukkan juga ID siswa baru menggunakan data config terbaru
+    const latestConfig = getStoredCbtPanitiaConfig();
+    const targetRoomLatest = latestConfig.rooms.find(r => r.id === currentRoomObj?.id) || currentRoomObj;
+    if (targetRoomLatest && targetRoomLatest.assignedStudentIds && targetRoomLatest.assignedStudentIds.length > 0) {
+      const updatedRooms = latestConfig.rooms.map(r => {
+        if (r.id === targetRoomLatest.id) {
           const currentIds = r.assignedStudentIds || [];
           if (!currentIds.includes(newStudent.id)) {
             return {
@@ -532,7 +541,7 @@ export default function CbtSupervisorRoom({
         }
         return r;
       });
-      saveStoredCbtPanitiaConfig({ ...panitiaConfig, rooms: updatedRooms });
+      saveStoredCbtPanitiaConfig({ ...latestConfig, rooms: updatedRooms });
     }
 
     // Mark as Hadir
@@ -690,7 +699,11 @@ export default function CbtSupervisorRoom({
                   🚪 {assignedScheduleEntry ? assignedScheduleEntry.roomName : selectedRoom}
                 </span>
                 <span className="text-xs text-slate-500 font-semibold truncate max-w-[200px]" title={currentRoomObj?.label}>
-                  ({currentRoomObj?.classes ? `Kelas ${currentRoomObj.classes.join(', ')}` : currentRoomObj?.label})
+                  (
+                  {currentRoomObj?.classes && currentRoomObj.classes.length > 0
+                    ? `Kelas ${currentRoomObj.classes.join(', ')}`
+                    : currentRoomObj?.label || 'Belum ada rombel'}
+                  )
                 </span>
               </div>
               <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md shrink-0">

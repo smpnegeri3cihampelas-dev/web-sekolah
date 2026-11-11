@@ -15,6 +15,10 @@ import {
   getStoredCbtPackages, 
   getStoredStudentCbtSessions,
   getStoredCbtPanitiaConfig,
+  isViolationSyncPending,
+  isRoomsCloudSyncSafeToApply,
+  isRoomsUploadPending,
+  getLastRoomsForceEmpty,
   toLocalDateString
 } from './cbtData';
 
@@ -225,15 +229,22 @@ export async function syncCbtWithCloud(): Promise<void> {
   }
 
   try {
-    // 2. Sync CBT 17 Exam Rooms
-    const roomRes = await fetch('/api/cbt/rooms', { cache: 'no-store' });
-    if (roomRes.ok) {
-      const { data } = await roomRes.json();
-      if (Array.isArray(data) && data.length > 0) {
-        const currentConfig = getStoredCbtPanitiaConfig();
-        const updatedConfig = { ...currentConfig, rooms: data };
-        localStorage.setItem(CBT_PANITIA_CONFIG_KEY, JSON.stringify(updatedConfig));
-        window.dispatchEvent(new CustomEvent('cbtPanitiaConfigUpdated', { detail: updatedConfig }));
+    // 2. Sync CBT 17 Exam Rooms (Lindungi perubahan Panitia lokal yang baru dibuat atau masih tertunda)
+    if (!isRoomsCloudSyncSafeToApply()) {
+      if (isRoomsUploadPending()) {
+        const localCfg = getStoredCbtPanitiaConfig();
+        await pushCbtRoomsToCloud(localCfg.rooms, { forceEmpty: getLastRoomsForceEmpty() });
+      }
+    } else {
+      const roomRes = await fetch('/api/cbt/rooms', { cache: 'no-store' });
+      if (roomRes.ok) {
+        const { data } = await roomRes.json();
+        if (Array.isArray(data) && data.length > 0 && isRoomsCloudSyncSafeToApply()) {
+          const currentConfig = getStoredCbtPanitiaConfig();
+          const updatedConfig = { ...currentConfig, rooms: data };
+          localStorage.setItem(CBT_PANITIA_CONFIG_KEY, JSON.stringify(updatedConfig));
+          window.dispatchEvent(new CustomEvent('cbtPanitiaConfigUpdated', { detail: updatedConfig }));
+        }
       }
     }
   } catch (err) {
@@ -241,18 +252,116 @@ export async function syncCbtWithCloud(): Promise<void> {
   }
 
   try {
-    // 3. Sync CBT Student Results / Answers
+    // 3. Sync CBT Student Results / Answers (Race-Safe & Violation-Safe Merge)
     const ansRes = await fetch('/api/cbt/answers', { cache: 'no-store' });
     if (ansRes.ok) {
       const { data } = await ansRes.json();
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         const local = getStoredStudentCbtSessions();
+        const matchedLocalKeys = new Set<string>();
+
         data.forEach((cloudAns: CbtStudentAnswerState) => {
-          const key = `${cloudAns.examId}_${cloudAns.studentId || cloudAns.studentNisn}`;
-          local[key] = cloudAns;
+          const defaultKey = `${cloudAns.examId}_${cloudAns.studentId || cloudAns.studentNisn}`;
+          const matchedKey = local[defaultKey]
+            ? defaultKey
+            : Object.keys(local).find(k => {
+                const s = local[k];
+                return s.examId === cloudAns.examId && (
+                  s.studentId === cloudAns.studentId ||
+                  (cloudAns.studentNisn && (s.studentNisn === cloudAns.studentNisn || s.studentId === cloudAns.studentNisn))
+                );
+              }) || defaultKey;
+          matchedLocalKeys.add(matchedKey);
+
+          const existingLocal = local[matchedKey];
+          if (!existingLocal) {
+            local[matchedKey] = {
+              ...cloudAns,
+              violationSynced: Number(cloudAns.violationCount || 0) >= 1
+            };
+            return;
+          }
+
+          const localLocked = Number(existingLocal.violationCount || 0) >= 1;
+          const cloudLocked = Number(cloudAns.violationCount || 0) >= 1;
+          const hasPending = isViolationSyncPending(
+            existingLocal.examId,
+            existingLocal.studentId,
+            existingLocal.studentNisn
+          );
+
+          // 1. Lindungi status TERKUNCI lokal agar tidak tertimpa data server yang belum tersinkron (race condition)
+          if (localLocked && !cloudLocked) {
+            const cloudIsGenuineUnlock =
+              (cloudAns.unlockedAt && existingLocal.lockedAt && Number(cloudAns.unlockedAt) >= Number(existingLocal.lockedAt)) ||
+              (existingLocal.violationSynced === true && !hasPending);
+
+            if (!cloudIsGenuineUnlock) {
+              if (!hasPending && !existingLocal.violationSynced) {
+                pushCbtStudentAnswerToCloud(existingLocal);
+              }
+              return;
+            }
+          }
+
+          // 2. Lindungi status BUKA KUNCI lokal yang baru dilakukan agar tidak terkunci lagi oleh data lama server
+          if (!localLocked && cloudLocked) {
+            if (existingLocal.unlockedAt && (!cloudAns.lockedAt || Number(existingLocal.unlockedAt) >= Number(cloudAns.lockedAt))) {
+              pushCbtStudentAnswerToCloud(existingLocal);
+              return;
+            }
+          }
+
+          // 3. Lindungi status SUDAH DIKUMPULKAN lokal agar tidak tertimpa oleh data server yang belum tersinkron
+          if (existingLocal.isSubmitted && !cloudAns.isSubmitted) {
+            pushCbtStudentAnswerToCloud(existingLocal);
+            return;
+          }
+
+          // 4. Lindungi jawaban terbaru siswa jika lebih banyak daripada server saat ujian masih berlangsung
+          if (!existingLocal.isSubmitted && !cloudAns.isSubmitted) {
+            const localAnswerCount = Object.keys(existingLocal.answers || {}).length;
+            const cloudAnswerCount = Object.keys(cloudAns.answers || {}).length;
+            if (localAnswerCount > cloudAnswerCount) {
+              local[matchedKey] = {
+                ...cloudAns,
+                answers: existingLocal.answers,
+                doubtfuls: existingLocal.doubtfuls,
+                audioPlayCount: existingLocal.audioPlayCount,
+                violationCount: cloudLocked ? cloudAns.violationCount : existingLocal.violationCount,
+                violationReason: cloudLocked ? cloudAns.violationReason : existingLocal.violationReason,
+                violationTime: cloudLocked ? cloudAns.violationTime : existingLocal.violationTime,
+                lockedAt: cloudLocked ? cloudAns.lockedAt : existingLocal.lockedAt,
+                unlockedAt: existingLocal.unlockedAt || cloudAns.unlockedAt,
+                violationSynced: cloudLocked ? true : existingLocal.violationSynced
+              };
+              return;
+            }
+          }
+
+          local[matchedKey] = {
+            ...cloudAns,
+            violationSynced: cloudLocked
+          };
         });
+
+        // Bersihkan sesi "Mengerjakan" lama atau yatim yang sudah di-reset/dihapus dari database server
+        const activePkgIds = new Set(getStoredCbtPackages().map(p => p.id));
+        const nowMs = Date.now();
+        for (const [k, localSess] of Object.entries(local)) {
+          if (matchedLocalKeys.has(k)) continue;
+          const pendingLock = isViolationSyncPending(localSess.examId, localSess.studentId, localSess.studentNisn);
+          if (pendingLock) continue;
+          const isOrphanedPkg = activePkgIds.size > 0 && !activePkgIds.has(localSess.examId);
+          const startedMs = localSess.startedAt ? Date.parse(localSess.startedAt) : 0;
+          const isStaleUnfinished = !localSess.isSubmitted && (isNaN(startedMs) || nowMs - startedMs > 10000);
+          if (isOrphanedPkg || isStaleUnfinished) {
+            delete local[k];
+          }
+        }
+
         localStorage.setItem(CBT_STUDENT_SESSIONS_KEY, JSON.stringify(local));
-        window.dispatchEvent(new Event('cbtSessionsUpdated'));
+        window.dispatchEvent(new CustomEvent('cbtSessionsUpdated', { detail: { source: 'cloud_sync' } }));
       }
     }
   } catch (err) {
@@ -313,22 +422,60 @@ export function pushCbtPackageToCloud(pkg: CbtExamPackage): void {
   }).catch(err => console.warn('Background CBT package upload queued:', err));
 }
 
-export function pushCbtStudentAnswerToCloud(answerState: CbtStudentAnswerState): void {
-  if (typeof window === 'undefined') return;
-  fetch('/api/cbt/answers', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(answerState)
-  }).catch(err => console.warn('Background CBT answer upload queued:', err));
+export async function pushCbtStudentAnswerToCloud(
+  answerState: CbtStudentAnswerState,
+  options?: { keepalive?: boolean }
+): Promise<boolean> {
+  if (typeof window === 'undefined') return false;
+  try {
+    const res = await fetch('/api/cbt/answers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(answerState),
+      keepalive: Boolean(options?.keepalive)
+    });
+    return res.ok;
+  } catch (err) {
+    console.warn('Background CBT answer upload queued:', err);
+    return false;
+  }
 }
 
-export function pushCbtRoomsToCloud(rooms: CbtExamRoomConfig[]): void {
+export async function pushCbtRoomsToCloud(
+  rooms: CbtExamRoomConfig[],
+  options?: { forceEmpty?: boolean }
+): Promise<boolean> {
+  if (typeof window === 'undefined') return false;
+  try {
+    const payload = JSON.stringify({ rooms, forceEmpty: Boolean(options?.forceEmpty) });
+    const res = await fetch('/api/cbt/rooms', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload,
+      keepalive: payload.length < 60000
+    });
+    window.dispatchEvent(
+      new CustomEvent('cbtRoomsSyncStatus', { detail: { status: res.ok ? 'synced' : 'error' } })
+    );
+    return res.ok;
+  } catch (err) {
+    console.warn('Background CBT rooms upload queued:', err);
+    window.dispatchEvent(new CustomEvent('cbtRoomsSyncStatus', { detail: { status: 'error' } }));
+    return false;
+  }
+}
+
+export function pushCbtRoomSupervisorToCloud(params: {
+  roomId?: string;
+  roomName?: string;
+  supervisorName: string;
+}): void {
   if (typeof window === 'undefined') return;
   fetch('/api/cbt/rooms', {
-    method: 'POST',
+    method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ rooms })
-  }).catch(err => console.warn('Background CBT rooms upload queued:', err));
+    body: JSON.stringify(params)
+  }).catch(err => console.warn('Background CBT room supervisor update queued:', err));
 }
 
 export function deleteCbtPackageFromCloud(id: string): void {

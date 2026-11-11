@@ -1243,6 +1243,27 @@ export default function ELearningPage() {
           if (parsed.classId) {
             setSelectedClassId(parsed.classId);
           }
+          // Pulihkan sesi ruang ujian CBT secara aman setelah hydration agar cocok 100% dengan SSR
+          try {
+            const savedExam = sessionStorage.getItem('cbt_active_exam_session') || localStorage.getItem('cbt_active_exam_session');
+            if (savedExam) {
+              const parsedExam = JSON.parse(savedExam);
+              if (parsedExam?.exam?.id && parsedExam?.student?.id) {
+                const latest = getStoredStudentCbtSessions();
+                const key = `${parsedExam.exam.id}_${parsedExam.student.id}`;
+                const existing = latest[key] || Object.values(latest).find(s =>
+                  s.examId === parsedExam.exam.id &&
+                  (s.studentId === parsedExam.student.id || (parsedExam.student?.nisn && s.studentNisn === parsedExam.student.nisn))
+                );
+                if (!existing || !existing.isSubmitted) {
+                  setActiveCbtExamSessionState(parsedExam);
+                } else {
+                  sessionStorage.removeItem('cbt_active_exam_session');
+                  localStorage.removeItem('cbt_active_exam_session');
+                }
+              }
+            }
+          } catch {}
         } else if (parsed && parsed.role === 'panitia') {
           localStorage.removeItem('spentic_elearning_session_v2');
           setCurrentUser(null);
@@ -1303,31 +1324,12 @@ export default function ELearningPage() {
   });
   const [piketViewTab, setPiketViewTab] = useState<'live' | 'laporan'>('live');
 
-  // CBT Active Exam Session for Student / Teacher Preview (Persist across Mobile Refresh & Navigation)
+  // CBT Active Exam Session for Student / Teacher Preview (Restored post-hydration on mount)
   const [activeCbtExamSession, setActiveCbtExamSessionState] = useState<{
     exam: CbtExamPackage;
     student: Student;
     roomName: string;
-  } | null>(() => {
-    if (typeof window === 'undefined') return null;
-    try {
-      const saved = sessionStorage.getItem('cbt_active_exam_session') || localStorage.getItem('cbt_active_exam_session');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed?.exam?.id && parsed?.student?.id) {
-          const latest = getStoredStudentCbtSessions();
-          const key = `${parsed.exam.id}_${parsed.student.id}`;
-          const existing = latest[key] || Object.values(latest).find(s => 
-            s.examId === parsed.exam.id && (s.studentId === parsed.student.id || (parsed.student?.nisn && s.studentNisn === parsed.student.nisn))
-          );
-          if (!existing || !existing.isSubmitted) {
-            return parsed;
-          }
-        }
-      }
-    } catch {}
-    return null;
-  });
+  } | null>(null);
 
   const setActiveCbtExamSession = useCallback((session: {
     exam: CbtExamPackage;
@@ -1396,6 +1398,7 @@ export default function ELearningPage() {
   // Student CBT Token Entry Modal State (Enables true instantaneous Fullscreen without prompt() blockage)
   const [cbtTokenModalExam, setCbtTokenModalExam] = useState<CbtExamPackage | null>(null);
   const [cbtTokenInputValue, setCbtTokenInputValue] = useState<string>('');
+  const [cbtTokenError, setCbtTokenError] = useState<string | null>(null);
 
   // Fullscreen Detection State
   const [isBrowserFullscreen, setIsBrowserFullscreen] = useState<boolean>(false);
@@ -1708,9 +1711,12 @@ export default function ELearningPage() {
     setLoginIdentifier('');
     setLoginPassword('');
     setShowPassword(false);
+    setActiveCbtExamSession(null);
     try {
       localStorage.removeItem('spentic_elearning_session_v2');
       sessionStorage.removeItem('spentic_cbt_panitia_session');
+      sessionStorage.removeItem('cbt_active_exam_session');
+      localStorage.removeItem('cbt_active_exam_session');
     } catch (e) {
       console.error(e);
     }
@@ -3038,6 +3044,18 @@ export default function ELearningPage() {
     notes: mySubjectSession.notes
   } : null;
 
+  // Tunggu sesi & pemulihan ruang CBT selesai agar tidak berkedip ke portal login saat F5/Refresh
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6">
+        <div className="flex flex-col items-center gap-3 text-slate-300">
+          <div className="w-8 h-8 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
+          <p className="text-xs font-semibold tracking-wide">Memuat ruang belajar &amp; sesi ujian...</p>
+        </div>
+      </div>
+    );
+  }
+
   // JIKA SISWA / GURU SEDANG DI DALAM RUANG UJIAN CBT (FOCUS MODE)
   if (activeCbtExamSession) {
     const latestSessions = getStoredStudentCbtSessions();
@@ -3048,10 +3066,11 @@ export default function ELearningPage() {
         (activeCbtExamSession.student.nisn && (s.studentNisn === activeCbtExamSession.student.nisn || s.studentId === activeCbtExamSession.student.nisn))
       )
     );
+    const liveExamPackage = cbtPackages.find(p => p.id === activeCbtExamSession.exam.id) || activeCbtExamSession.exam;
 
     return (
       <CbtStudentExamRoom
-        exam={activeCbtExamSession.exam}
+        exam={liveExamPackage}
         student={activeCbtExamSession.student}
         roomName={activeCbtExamSession.roomName}
         initialSession={myCurrentSession}
@@ -3066,7 +3085,7 @@ export default function ELearningPage() {
             } catch {}
           }
           setCbtStudentSessions(getStoredStudentCbtSessions());
-          showToast(`Ujian ${activeCbtExamSession.exam.title} berhasil dikumpulkan!`, 'success');
+          showToast(`Ujian ${liveExamPackage.title} berhasil dikumpulkan!`, 'success');
         }}
         onExitRoom={() => {
           if (typeof document !== 'undefined' && document.fullscreenElement) {
@@ -5497,6 +5516,7 @@ export default function ELearningPage() {
                                           onClick={() => {
                                             setCbtTokenModalExam(exam);
                                             setCbtTokenInputValue('');
+                                            setCbtTokenError(null);
                                           }}
                                           className="w-full py-2.5 px-4 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black text-xs transition shadow-md shadow-rose-600/30 flex items-center justify-center gap-2 cursor-pointer active:scale-95 animate-pulse"
                                         >
@@ -5513,6 +5533,7 @@ export default function ELearningPage() {
                                         onClick={() => {
                                           setCbtTokenModalExam(exam);
                                           setCbtTokenInputValue('');
+                                          setCbtTokenError(null);
                                         }}
                                         className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs transition shadow-md shadow-amber-500/20 flex items-center justify-center gap-2 cursor-pointer active:scale-95"
                                       >
@@ -6140,13 +6161,21 @@ export default function ELearningPage() {
                 const handleStartExamDirect = () => {
                   const cleanInput = cbtTokenInputValue.trim().toUpperCase();
                   if (!cleanInput) {
-                    alert('Harap masukkan token ujian!');
+                    setCbtTokenError('Harap masukkan token ujian dari Pengawas!');
                     return;
                   }
-                  if (cleanInput !== cbtTokenModalExam.token.trim().toUpperCase()) {
-                    alert(`⚠️ Token Ujian Salah!\n\nToken "${cleanInput}" tidak valid.`);
+                  const latestPkg = cbtPackages.find(p => p.id === cbtTokenModalExam.id) || cbtTokenModalExam;
+                  const schedCheck = evaluateCbtPackageSchedule(latestPkg);
+                  if (!schedCheck.canEnter) {
+                    setCbtTokenError(schedCheck.message || 'Jadwal sesi ujian saat ini sedang tidak aktif atau dijeda.');
                     return;
                   }
+                  if (cleanInput !== latestPkg.token.trim().toUpperCase()) {
+                    setCbtTokenError(`Token "${cleanInput}" tidak valid. Periksa kembali token dari papan tulis.`);
+                    return;
+                  }
+
+                  setCbtTokenError(null);
 
                   // 1. AKTIFKAN FULLSCREEN LANGSUNG DI GESTURE ASLI (100% DIDUKUNG BROWSER)
                   try {
@@ -6174,21 +6203,22 @@ export default function ELearningPage() {
 
                   markStudentCbtAttendancePresent({
                     roomName: targetRoom,
-                    examId: cbtTokenModalExam.id,
+                    examId: latestPkg.id,
                     studentId: currentStudentObj.id,
-                    examTitle: cbtTokenModalExam.title,
-                    token: cbtTokenModalExam.token
+                    examTitle: latestPkg.title,
+                    token: latestPkg.token
                   });
 
                   // 3. Masuk ruang ujian
                   setActiveCbtExamSession({
-                    exam: cbtTokenModalExam,
+                    exam: latestPkg,
                     student: currentStudentObj,
                     roomName: targetRoom
                   });
 
                   setCbtTokenModalExam(null);
                   setCbtTokenInputValue('');
+                  setCbtTokenError(null);
                 };
 
                 return (
@@ -6196,9 +6226,19 @@ export default function ELearningPage() {
                     <div className="space-y-2">
                       <input
                         type="text"
+                        name="cbt_exam_token_entry"
+                        autoComplete="off"
+                        autoCorrect="off"
+                        autoCapitalize="characters"
+                        spellCheck={false}
+                        data-lpignore="true"
+                        data-form-type="other"
                         placeholder="TOKEN UJIAN (cth: INF7SM)"
                         value={cbtTokenInputValue}
-                        onChange={e => setCbtTokenInputValue(e.target.value.toUpperCase())}
+                        onChange={e => {
+                          setCbtTokenInputValue(e.target.value.toUpperCase());
+                          if (cbtTokenError) setCbtTokenError(null);
+                        }}
                         onKeyDown={e => {
                           if (e.key === 'Enter') {
                             handleStartExamDirect();
@@ -6207,6 +6247,11 @@ export default function ELearningPage() {
                         className="w-full text-center tracking-widest font-mono font-black text-lg py-3 px-4 rounded-xl bg-slate-800 border border-slate-700 text-amber-300 placeholder-slate-600 focus:outline-hidden focus:border-amber-400 uppercase shadow-inner"
                         autoFocus
                       />
+                      {cbtTokenError && (
+                        <div className="p-2.5 rounded-xl bg-rose-950/70 border border-rose-500/50 text-rose-300 text-xs font-semibold text-center leading-snug">
+                          ⚠️ {cbtTokenError}
+                        </div>
+                      )}
                       <div className="text-[11px] text-slate-400 text-center flex items-center justify-center gap-1.5 font-medium">
                         <span>🛡️</span>
                         <span>Layar akan otomatis terkunci ke Mode Penuh</span>
@@ -6219,6 +6264,7 @@ export default function ELearningPage() {
                         onClick={() => {
                           setCbtTokenModalExam(null);
                           setCbtTokenInputValue('');
+                          setCbtTokenError(null);
                         }}
                         className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition cursor-pointer"
                       >

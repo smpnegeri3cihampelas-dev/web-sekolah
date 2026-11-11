@@ -234,6 +234,30 @@ select, option {
   height: 0 !important;
 }
 
+/* ========================================================================= */
+/* CBT SUPERVISOR PIN MASKING (Cegah popup "Save password?" Google Chrome)    */
+/* ========================================================================= */
+.cbt-pin-mask {
+  -webkit-text-security: disc;
+}
+.cbt-pin-mask-fallback {
+  display: none;
+}
+@supports not (-webkit-text-security: disc) {
+  .cbt-pin-mask {
+    color: transparent !important;
+    caret-color: #fcd34d;
+    text-align: left !important;
+  }
+  .cbt-pin-mask::placeholder {
+    color: #64748b !important;
+    text-align: center;
+  }
+  .cbt-pin-mask-fallback {
+    display: flex;
+  }
+}
+
 
 
 

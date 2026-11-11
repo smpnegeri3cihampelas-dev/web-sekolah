@@ -44,9 +44,13 @@ export async function GET(req: Request) {
 
       const vReason = r.violation_reason || parsedAnswers?._violationReason;
       const vTime = r.violation_time || parsedAnswers?._violationTime;
+      const lockedAt = parsedAnswers?._lockedAt ? Number(parsedAnswers._lockedAt) : undefined;
+      const unlockedAt = parsedAnswers?._unlockedAt ? Number(parsedAnswers._unlockedAt) : undefined;
       const cleanAnswers = { ...(parsedAnswers || {}) };
       delete cleanAnswers._violationReason;
       delete cleanAnswers._violationTime;
+      delete cleanAnswers._lockedAt;
+      delete cleanAnswers._unlockedAt;
 
       return {
         examId: r.exam_id,
@@ -66,9 +70,11 @@ export async function GET(req: Request) {
         correctCount: r.correct_count,
         wrongCount: r.wrong_count,
         isPassed: Boolean(r.is_passed),
-        violationCount: r.violation_count,
+        violationCount: Number(r.violation_count) || 0,
         violationReason: vReason,
-        violationTime: vTime
+        violationTime: vTime,
+        lockedAt,
+        unlockedAt
       };
     });
 
@@ -102,18 +108,28 @@ export async function POST(req: Request) {
       isPassed,
       violationCount,
       violationReason,
-      violationTime
+      violationTime,
+      lockedAt,
+      unlockedAt
     } = body;
+
+    if (!examId || (!studentId && !studentNisn)) {
+      return NextResponse.json({ success: false, error: 'examId and student identifier are required' }, { status: 400 });
+    }
 
     const sanitizedAnswers = { ...(answers || {}) };
     delete sanitizedAnswers._violationReason;
     delete sanitizedAnswers._violationTime;
+    delete sanitizedAnswers._lockedAt;
+    delete sanitizedAnswers._unlockedAt;
 
     const hasActiveViolation = Number(violationCount || 0) > 0;
     const answersPayload = {
       ...sanitizedAnswers,
       ...(hasActiveViolation && violationReason ? { _violationReason: violationReason } : {}),
-      ...(hasActiveViolation && violationTime ? { _violationTime: violationTime } : {})
+      ...(hasActiveViolation && violationTime ? { _violationTime: violationTime } : {}),
+      ...(hasActiveViolation && lockedAt ? { _lockedAt: Number(lockedAt) } : {}),
+      ...(!hasActiveViolation && unlockedAt ? { _unlockedAt: Number(unlockedAt) } : {})
     };
 
     await query(`
@@ -123,6 +139,9 @@ export async function POST(req: Request) {
         is_submitted, score, total_score, correct_count, wrong_count, is_passed, violation_count
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON DUPLICATE KEY UPDATE
+        student_name=VALUES(student_name),
+        class_id=VALUES(class_id),
+        room_name=VALUES(room_name),
         answers=VALUES(answers),
         doubtfuls=VALUES(doubtfuls),
         audio_play_count=VALUES(audio_play_count),
@@ -137,9 +156,9 @@ export async function POST(req: Request) {
     `, [
       examId,
       studentId || studentNisn,
-      studentNisn,
-      studentName,
-      classId,
+      studentNisn || studentId,
+      studentName || 'Siswa',
+      classId || '-',
       roomName || 'Ruang 01',
       JSON.stringify(answersPayload),
       JSON.stringify(doubtfuls || {}),
@@ -152,7 +171,7 @@ export async function POST(req: Request) {
       correctCount || 0,
       wrongCount || 0,
       isPassed ? 1 : 0,
-      violationCount || 0
+      Number(violationCount) || 0
     ]);
 
     return NextResponse.json({
