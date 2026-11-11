@@ -39,7 +39,18 @@ import {
   generateSessionsFromExamPackages
 } from '@/lib/cbtData';
 import { Student, SCHOOL_CLASSES, DEMO_TEACHERS } from '@/lib/elearningData';
-import { exportCbtSchoolRekapBapToExcel, exportCbtRoomBapToExcel, exportCbtSusulanListToExcel } from '@/lib/elearningExport';
+import {
+  exportCbtSchoolRekapBapToExcel,
+  exportCbtRoomBapToExcel,
+  exportCbtSusulanListToExcel,
+  getTodayWibDateStr,
+  formatCleanRoomDisplay,
+  formatWibLongDate,
+  exportCbtRoomBapToWord,
+  printCbtRoomBapDocument,
+  exportCbtSchoolRekapBapToWord,
+  printCbtSchoolRekapBapDocument
+} from '@/lib/elearningExport';
 
 interface FastSearchInputProps {
   value: string;
@@ -167,13 +178,15 @@ export default function CbtPanitiaCommandCenter({
   const [previewMonitoringRoom, setPreviewMonitoringRoom] = useState<CbtExamRoomConfig | null>(null);
   const [previewBapRoom, setPreviewBapRoom] = useState<CbtExamRoomConfig | null>(null);
   const [showRekapPrintModal, setShowRekapPrintModal] = useState<boolean>(false);
+  const [bapSearchQuery, setBapSearchQuery] = useState<string>('');
+  const [bapStatusFilter, setBapStatusFilter] = useState<'all' | 'submitted' | 'pending'>('all');
   const [susulanFilterStatus, setSusulanFilterStatus] = useState<'all' | 'S' | 'I'>('all');
   const [susulanFilterQuery, setSusulanFilterQuery] = useState<string>('');
 
   // Modal Atur Jam & Tanggal Jadwal Sesi CBT
   const [showScheduleModal, setShowScheduleModal] = useState<boolean>(false);
   const [selectedSchedPackageId, setSelectedSchedPackageId] = useState<string>('all');
-  const [schedDate, setSchedDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
+  const [schedDate, setSchedDate] = useState<string>(() => getTodayWibDateStr());
   const [schedStartTime, setSchedStartTime] = useState<string>('07:30');
   const [schedEndTime, setSchedEndTime] = useState<string>('09:00');
   const [schedDuration, setSchedDuration] = useState<number>(60);
@@ -665,7 +678,7 @@ export default function CbtPanitiaCommandCenter({
     return Array.from(keys);
   }, []);
 
-  // Pre-indexed attendances by roomName and its aliases (O(1) instant lookup)
+  // Pre-indexed attendances by roomName and its aliases (O(1) instant lookup, sorted & deduplicated)
   const attendancesByRoomMap = useMemo(() => {
     const map = new Map<string, CbtRoomAttendance[]>();
     const list = Object.values(roomAttendances);
@@ -679,11 +692,27 @@ export default function CbtPanitiaCommandCenter({
             arr = [];
             map.set(k, arr);
           }
-          if (!arr.includes(a)) {
+          const isDup = arr.some(
+            ex =>
+              ex === a ||
+              (ex.examId === a.examId && ex.date === a.date && Boolean(ex.isBapSubmitted) === Boolean(a.isBapSubmitted))
+          );
+          if (!isDup) {
             arr.push(a);
           }
         }
       }
+    }
+    // Prioritaskan BAP yang sudah resmi diserahkan dan waktu submit terbaru di index 0
+    for (const arr of map.values()) {
+      arr.sort((a, b) => {
+        const subDiff = Number(Boolean(b.isBapSubmitted)) - Number(Boolean(a.isBapSubmitted));
+        if (subDiff !== 0) return subDiff;
+        const timeA = a.submittedAt ? new Date(a.submittedAt).getTime() : 0;
+        const timeB = b.submittedAt ? new Date(b.submittedAt).getTime() : 0;
+        if (timeB !== timeA) return timeB - timeA;
+        return (b.date || '').localeCompare(a.date || '');
+      });
     }
     return map;
   }, [roomAttendances, getRoomLookupKeys]);
@@ -750,15 +779,91 @@ export default function CbtPanitiaCommandCenter({
     });
   }, [config.rooms]);
 
+  // Unified Rekap BAP Data (Sumber kebenaran tunggal untuk Tab 6, Modal Dokumen, Export Excel/Word/PDF)
+  const roomBapSummaryData = useMemo(() => {
+    let totalStudentsAll = 0;
+    let totalPresentAll = 0;
+    let totalSickAll = 0;
+    let totalPermitAll = 0;
+    let totalAbsentAll = 0;
+    let submittedCount = 0;
+
+    const rows = uniqueSchoolRooms.map((room, idx) => {
+      const attendances = getRoomAttendances(room);
+      const latestAttendance = attendances[0];
+      const isSubmitted = attendances.some((a: CbtRoomAttendance) => a.isBapSubmitted);
+      if (isSubmitted) submittedCount++;
+
+      const roomStudents = roomStudentsMap.get(room.id) || [];
+      const uniqueClasses = Array.from(new Set(roomStudents.map(s => s.classId))).sort();
+      const targetClasses = uniqueClasses.length > 0 ? uniqueClasses : room.classes;
+
+      let presentCount = 0;
+      let sickCount = 0;
+      let permitCount = 0;
+      let absentCount = 0;
+
+      roomStudents.forEach(st => {
+        const status = latestAttendance?.records?.[st.id] || 'H';
+        if (status === 'H') presentCount++;
+        else if (status === 'S') sickCount++;
+        else if (status === 'I') permitCount++;
+        else if (status === 'A') absentCount++;
+      });
+
+      totalStudentsAll += roomStudents.length;
+      if (isSubmitted) {
+        totalPresentAll += presentCount;
+        totalSickAll += sickCount;
+        totalPermitAll += permitCount;
+        totalAbsentAll += absentCount;
+      }
+
+      const cleanRoom = formatCleanRoomDisplay(room.name, room.label);
+      const supervisor =
+        latestAttendance?.supervisorName && latestAttendance.supervisorName !== 'Guru Pengawas Ruang'
+          ? latestAttendance.supervisorName
+          : (room.supervisorName || 'Guru Pengawas');
+
+      return {
+        no: idx + 1,
+        room,
+        roomDisplay: cleanRoom.combined,
+        roomSubtitle: cleanRoom.subtitle,
+        targetClasses,
+        classesText: targetClasses.join(', '),
+        supervisor,
+        hasAssignedSupervisor: Boolean(supervisor && supervisor !== 'Guru Pengawas' && supervisor !== 'Guru Pengawas Ruang'),
+        students: roomStudents,
+        totalStudents: roomStudents.length,
+        presentCount,
+        sickCount,
+        permitCount,
+        absentCount,
+        isSubmitted,
+        notes: latestAttendance?.notes?.trim() || '',
+        latestAttendance
+      };
+    });
+
+    const byRoomId = new Map(rows.map(item => [item.room.id, item]));
+
+    return {
+      rows,
+      byRoomId,
+      submittedCount,
+      pendingCount: Math.max(0, rows.length - submittedCount),
+      totalRooms: rows.length,
+      totalStudentsAll,
+      totalPresentAll,
+      totalSickAll,
+      totalPermitAll,
+      totalAbsentAll
+    };
+  }, [uniqueSchoolRooms, getRoomAttendances, roomStudentsMap]);
+
   // Total BAP Submitted Count (reactive across tabs)
-  const totalBapSubmittedCount = useMemo(() => {
-    let count = 0;
-    for (let i = 0; i < uniqueSchoolRooms.length; i++) {
-      const atts = getRoomAttendances(uniqueSchoolRooms[i]);
-      if (atts.some((a: CbtRoomAttendance) => a.isBapSubmitted)) count++;
-    }
-    return count;
-  }, [uniqueSchoolRooms, getRoomAttendances]);
+  const totalBapSubmittedCount = roomBapSummaryData.submittedCount;
 
   // Batched Filter & Tab Handlers (prevents cascading re-renders)
   const handleTabSwitch = (tab: 'monitoring' | 'schedule' | 'arrangement' | 'search' | 'susulan' | 'bap') => {
@@ -1073,67 +1178,85 @@ export default function CbtPanitiaCommandCenter({
     showAlert('💾 JADWAL BERHASIL DISIMPAN & DISINKRONKAN!\n\nSeluruh penugasan pengawas ruangan telah tersimpan di sistem dan langsung aktif ke aplikasi guru pengawas di masing-masing ruangan.');
   };
 
+  const buildSchoolRekapDocPayload = () => ({
+    academicYear: config.academicYear || '2026/2027',
+    semester: config.semester || 'PTS / STS Ganjil',
+    totalRooms: roomBapSummaryData.totalRooms,
+    totalStudentsAll: roomBapSummaryData.totalStudentsAll,
+    totalPresentAll: roomBapSummaryData.totalPresentAll,
+    totalSickAll: roomBapSummaryData.totalSickAll,
+    totalPermitAll: roomBapSummaryData.totalPermitAll,
+    totalAbsentAll: roomBapSummaryData.totalAbsentAll,
+    totalBapSubmitted: roomBapSummaryData.submittedCount,
+    rooms: roomBapSummaryData.rows.map(item => ({
+      no: item.no,
+      roomName: item.room.name,
+      classes: item.classesText,
+      supervisor: item.supervisor,
+      total: item.totalStudents,
+      present: item.isSubmitted ? item.presentCount : 0,
+      sick: item.isSubmitted ? item.sickCount : 0,
+      permit: item.isSubmitted ? item.permitCount : 0,
+      absent: item.isSubmitted ? item.absentCount : 0,
+      isSubmitted: item.isSubmitted,
+      notes: item.notes || '-'
+    }))
+  });
+
   const handleExportSchoolBapExcel = () => {
-    const todayStr = new Date().toISOString().split('T')[0];
-    const roomRows = uniqueSchoolRooms.map((room, idx) => {
-      const attendances = getRoomAttendances(room);
-      const latestAttendance = attendances[0];
-      const isSubmitted = attendances.some((a: CbtRoomAttendance) => a.isBapSubmitted);
-      const roomStudents = roomStudentsMap.get(room.id) || [];
-      const uniqueClasses = Array.from(new Set(roomStudents.map(s => s.classId))).sort();
-
-      let presentCount = 0;
-      let sickCount = 0;
-      let permitCount = 0;
-      let absentCount = 0;
-
-      roomStudents.forEach(st => {
-        const status = latestAttendance?.records?.[st.id] || 'H';
-        if (status === 'H') presentCount++;
-        else if (status === 'S') sickCount++;
-        else if (status === 'I') permitCount++;
-        else if (status === 'A') absentCount++;
-      });
-
-      return {
-        no: idx + 1,
-        roomName: room.name,
-        classes: uniqueClasses.length > 0 ? uniqueClasses.join(', ') : room.classes.join(', '),
-        supervisor: (latestAttendance?.supervisorName && latestAttendance.supervisorName !== 'Guru Pengawas Ruang')
-          ? latestAttendance.supervisorName
-          : (room.supervisorName || 'Guru Pengawas'),
-        total: roomStudents.length,
-        present: presentCount,
-        sick: sickCount,
-        permit: permitCount,
-        absent: absentCount,
-        isSubmitted,
-        notes: latestAttendance?.notes || '-'
-      };
-    });
-
+    const todayStr = getTodayWibDateStr();
+    const payload = buildSchoolRekapDocPayload();
     exportCbtSchoolRekapBapToExcel({
-      academicYear: config.academicYear || '2026/2027',
-      semester: config.semester || 'PTS / STS Ganjil',
+      academicYear: payload.academicYear,
+      semester: payload.semester,
       date: todayStr,
-      rooms: roomRows
+      rooms: payload.rooms
     });
   };
 
-  const handleExportSingleRoomBap = (targetRoom: CbtExamRoomConfig) => {
-    const attendances = getRoomAttendances(targetRoom);
+  const handleExportSchoolBapWord = () => {
+    exportCbtSchoolRekapBapToWord(buildSchoolRekapDocPayload());
+  };
+
+  const handlePrintSchoolBapDocument = () => {
+    printCbtSchoolRekapBapDocument(buildSchoolRekapDocPayload());
+  };
+
+  const buildSingleRoomDocPayload = (targetRoom: CbtExamRoomConfig) => {
+    const summary = roomBapSummaryData.byRoomId.get(targetRoom.id);
+    const cleanRoom = formatCleanRoomDisplay(targetRoom.name, targetRoom.label);
+    const attendances = summary ? (summary.latestAttendance ? [summary.latestAttendance] : []) : getRoomAttendances(targetRoom);
     const latestAttendance = attendances[0];
-    const roomStudents = roomStudentsMap.get(targetRoom.id) || [];
-    const todayStr = new Date().toISOString().split('T')[0];
+    const roomStudents = summary?.students || roomStudentsMap.get(targetRoom.id) || [];
+    const classesText = summary?.classesText || targetRoom.classes.join(', ');
+    const supervisorName = summary?.supervisor || targetRoom.supervisorName || 'Guru Pengawas';
+
+    return {
+      academicYear: config.academicYear || '2026/2027',
+      roomDisplay: cleanRoom.combined,
+      classesText,
+      supervisorName,
+      totalStudents: summary ? summary.totalStudents : roomStudents.length,
+      presentCount: summary ? summary.presentCount : roomStudents.length,
+      sickCount: summary ? summary.sickCount : 0,
+      permitCount: summary ? summary.permitCount : 0,
+      absentCount: summary ? summary.absentCount : 0,
+      notes: summary?.notes || latestAttendance?.notes
+    };
+  };
+
+  const handleExportSingleRoomBap = (targetRoom: CbtExamRoomConfig) => {
+    const summary = roomBapSummaryData.byRoomId.get(targetRoom.id);
+    const latestAttendance = summary?.latestAttendance || getRoomAttendances(targetRoom)[0];
+    const roomStudents = summary?.students || roomStudentsMap.get(targetRoom.id) || [];
+    const todayStr = getTodayWibDateStr();
     const activeExam = packages[0] || {
       id: 'exam-cbt',
       title: 'Asesmen Sumatif Tengah Semester (STS)',
       subject: 'Asesmen Berbasis Komputer (CBT)',
       token: 'SPENTIC'
     };
-    const effectiveSupervisor = (latestAttendance?.supervisorName && latestAttendance.supervisorName !== 'Guru Pengawas Ruang')
-      ? latestAttendance.supervisorName
-      : (targetRoom.supervisorName || 'Guru Pengawas Ruang');
+    const effectiveSupervisor = summary?.supervisor || targetRoom.supervisorName || 'Guru Pengawas Ruang';
 
     exportCbtRoomBapToExcel({
       examTitle: latestAttendance?.examTitle || activeExam.title,
@@ -1147,9 +1270,17 @@ export default function CbtPanitiaCommandCenter({
         nisn: st.nisn,
         name: st.name,
         classId: st.classId,
-        status: (latestAttendance?.records?.[st.id] as any) || 'H'
+        status: (latestAttendance?.records?.[st.id] as 'H' | 'S' | 'I' | 'A') || 'H'
       }))
     });
+  };
+
+  const handleExportSingleRoomBapWord = (targetRoom: CbtExamRoomConfig) => {
+    exportCbtRoomBapToWord(buildSingleRoomDocPayload(targetRoom));
+  };
+
+  const handlePrintSingleRoomBap = (targetRoom: CbtExamRoomConfig) => {
+    printCbtRoomBapDocument(buildSingleRoomDocPayload(targetRoom));
   };
 
   // Search Tab KPI Stats (O(1) lookups per student)
@@ -3840,15 +3971,25 @@ export default function CbtPanitiaCommandCenter({
 
       {/* 5. TAB CONTENT: REKAPITULASI BAP SEKOLAH */}
       {activeTab === 'bap' && (() => {
-        let bapSubmittedCount = 0;
-        uniqueSchoolRooms.forEach(room => {
-          const attendances = attendancesByRoomMap.get(room.name) || [];
-          if (attendances.some(a => a.isBapSubmitted)) bapSubmittedCount++;
+        const bapQ = bapSearchQuery.trim().toLowerCase();
+        const filteredBapRows = roomBapSummaryData.rows.filter(item => {
+          if (bapStatusFilter === 'submitted' && !item.isSubmitted) return false;
+          if (bapStatusFilter === 'pending' && item.isSubmitted) return false;
+          if (bapQ) {
+            return (
+              item.room.name.toLowerCase().includes(bapQ) ||
+              item.roomSubtitle.toLowerCase().includes(bapQ) ||
+              item.classesText.toLowerCase().includes(bapQ) ||
+              item.supervisor.toLowerCase().includes(bapQ) ||
+              item.notes.toLowerCase().includes(bapQ)
+            );
+          }
+          return true;
         });
 
         return (
           <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 space-y-4 shadow-2xs">
-            {/* Header & KPI Summary */}
+            {/* Header & Global Document Exports */}
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center text-base shadow-xs shrink-0">
@@ -3859,25 +4000,25 @@ export default function CbtPanitiaCommandCenter({
                     Rekapitulasi Berita Acara Pelaksanaan (BAP)
                   </h2>
                   <p className="text-[11px] text-slate-500 mt-0.5">
-                    Pantau kelengkapan BAP dan catatan kejadian khusus seluruh ruangan pengawas.
+                    {roomBapSummaryData.totalRooms} Ruang Ujian • {roomBapSummaryData.submittedCount} BAP Terkirim • {roomBapSummaryData.pendingCount} Menunggu Pengawas
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-1.5 flex-wrap shrink-0">
-                <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 font-bold text-xs border border-slate-200">
-                  🏢 {uniqueSchoolRooms.length} Ruang
-                </span>
-                <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 font-bold text-xs border border-emerald-200">
-                  ✓ {bapSubmittedCount} Terkirim
-                </span>
-                <span className="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-800 font-bold text-xs border border-amber-200">
-                  ⏳ {Math.max(0, uniqueSchoolRooms.length - bapSubmittedCount)} Menunggu
-                </span>
+              <div className="flex items-center gap-2 flex-wrap shrink-0">
+                <button
+                  type="button"
+                  onClick={handleExportSchoolBapWord}
+                  className="px-3 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs transition cursor-pointer flex items-center gap-1.5 shadow-xs active:scale-95"
+                  title="Unduh Dokumen Resmi Rekapitulasi BAP Sekolah (.doc / Word)"
+                >
+                  <span>📝</span>
+                  <span>Download Word</span>
+                </button>
                 <button
                   type="button"
                   onClick={handleExportSchoolBapExcel}
-                  className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition cursor-pointer flex items-center gap-1 shadow-xs active:scale-95"
+                  className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition cursor-pointer flex items-center gap-1.5 shadow-xs active:scale-95"
                   title="Unduh seluruh rekapitulasi BAP sekolah ke Excel (.xlsx)"
                 >
                   <span>📥</span>
@@ -3886,12 +4027,57 @@ export default function CbtPanitiaCommandCenter({
                 <button
                   type="button"
                   onClick={() => setShowRekapPrintModal(true)}
-                  className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition cursor-pointer flex items-center gap-1 shadow-xs active:scale-95"
-                  title="Cetak seluruh rekapitulasi BAP sekolah"
+                  className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition cursor-pointer flex items-center gap-1.5 shadow-xs active:scale-95"
+                  title="Pratinjau & Cetak / Simpan PDF Rekapitulasi BAP"
                 >
                   <span>🖨️</span>
-                  <span>Cetak Rekap</span>
+                  <span>Cetak / PDF Rekap</span>
                 </button>
+              </div>
+            </div>
+
+            {/* Search & Status Filter Toolbar */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+              <div className="relative flex-1 max-w-sm">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">🔍</span>
+                <input
+                  type="text"
+                  value={bapSearchQuery}
+                  onChange={e => setBapSearchQuery(e.target.value)}
+                  placeholder="Cari ruang, kelas, pengawas, atau catatan..."
+                  className="w-full pl-8 pr-7 py-1.5 rounded-xl border border-slate-200 bg-slate-50/70 focus:bg-white focus:border-indigo-400 focus:outline-none text-xs text-slate-800"
+                />
+                {bapSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setBapSearchQuery('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 text-xs cursor-pointer"
+                    title="Hapus pencarian"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              <div className="inline-flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200/70 text-[11px] self-start sm:self-auto">
+                {[
+                  { id: 'all' as const, label: `Semua (${roomBapSummaryData.totalRooms})` },
+                  { id: 'submitted' as const, label: `Terkirim (${roomBapSummaryData.submittedCount})` },
+                  { id: 'pending' as const, label: `Menunggu (${roomBapSummaryData.pendingCount})` }
+                ].map(opt => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setBapStatusFilter(opt.id)}
+                    className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer ${
+                      bapStatusFilter === opt.id
+                        ? 'bg-white text-slate-900 shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -3900,127 +4086,138 @@ export default function CbtPanitiaCommandCenter({
                 <thead className="bg-slate-50 text-slate-700 font-bold border-b border-slate-200">
                   <tr>
                     <th className="py-3 px-4">Ruang Ujian</th>
-                    <th className="py-3 px-4">Kelas Sasaran</th>
+                    <th className="py-3 px-3">Kelas</th>
                     <th className="py-3 px-4">Pengawas Ruang</th>
-                    <th className="py-3 px-4">Kehadiran Peserta</th>
-                    <th className="py-3 px-4">Status BAP</th>
-                    <th className="py-3 px-4">Catatan Kejadian Khusus</th>
-                    <th className="py-3 px-4 text-right">Aksi Dokumen</th>
+                    <th className="py-3 px-3">Kehadiran</th>
+                    <th className="py-3 px-3">Status BAP</th>
+                    <th className="py-3 px-4">Catatan Kejadian</th>
+                    <th className="py-3 px-4 text-right">Unduh &amp; Dokumen</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {uniqueSchoolRooms.map(room => {
-                    const attendances = attendancesByRoomMap.get(room.name) || [];
-                    const latestAttendance = attendances[0];
-                    const isSubmitted = attendances.some(a => a.isBapSubmitted);
-                    const latestNote = latestAttendance?.notes || '-';
-                    const roomStudents = roomStudentsMap.get(room.id) || [];
-                    const uniqueClasses = Array.from(new Set(roomStudents.map(s => s.classId))).sort();
-
-                    // Calculate attendance breakdown strictly for registered room students
-                    let presentCount = 0;
-                    let sickCount = 0;
-                    let permitCount = 0;
-                    let absentCount = 0;
-
-                    roomStudents.forEach(st => {
-                      const status = latestAttendance?.records?.[st.id] || 'H';
-                      if (status === 'H') presentCount++;
-                      else if (status === 'S') sickCount++;
-                      else if (status === 'I') permitCount++;
-                      else if (status === 'A') absentCount++;
-                    });
-
-                    return (
-                      <tr key={room.id} className="hover:bg-slate-50 transition">
-                        <td className="py-3 px-4 font-bold text-slate-900">
-                          {room.name}
-                          <span className="block text-[10px] text-slate-400 font-normal">
-                            {roomStudents.length} Peserta Terdaftar
-                          </span>
-                        </td>
-                        <td className="py-3 px-4">
-                          <span className="font-semibold text-slate-700">
-                            {uniqueClasses.length > 0 ? uniqueClasses.join(', ') : room.classes.join(', ')}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4">
-                          {isSubmitted ? (
-                            <div className="flex items-center gap-1.5">
-                              <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-[10px] font-bold shrink-0">
-                                ✓
-                              </span>
-                              <span className="font-bold text-slate-900">
-                                {(latestAttendance?.supervisorName && latestAttendance.supervisorName !== 'Guru Pengawas Ruang')
-                                  ? latestAttendance.supervisorName
-                                  : (room.supervisorName || 'Guru Pengawas')}
-                              </span>
-                            </div>
-                          ) : (
-                            <span className="text-slate-500 font-medium">
-                              {room.supervisorName || 'Guru Pengawas'}
+                  {filteredBapRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-8 text-center text-slate-400 text-xs">
+                        Tidak ada data BAP ruangan yang cocok dengan filter saat ini.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredBapRows.map(item => (
+                      <tr key={item.room.id} className="hover:bg-slate-50/80 transition">
+                        <td className="py-2.5 px-4 whitespace-nowrap">
+                          <span className="font-bold text-slate-900">{item.room.name}</span>
+                          {item.roomSubtitle && (
+                            <span className="block text-[10px] text-slate-500 font-medium mt-0.5">
+                              {item.roomSubtitle}
                             </span>
                           )}
                         </td>
-                        <td className="py-3 px-4">
-                          {isSubmitted ? (
-                            <div className="flex items-center gap-1.5 text-[10px]">
+                        <td className="py-2.5 px-3">
+                          {item.targetClasses.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {item.targetClasses.map(cls => (
+                                <span
+                                  key={cls}
+                                  className="px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-700 font-semibold text-[10px] border border-slate-200/80 whitespace-nowrap"
+                                >
+                                  {cls}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 italic text-[11px]">Kosong</span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-4">
+                          <span
+                            className={
+                              item.hasAssignedSupervisor
+                                ? 'font-semibold text-slate-900'
+                                : 'text-slate-400 italic'
+                            }
+                          >
+                            {item.hasAssignedSupervisor ? item.supervisor : 'Belum diatur'}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 whitespace-nowrap">
+                          {item.isSubmitted ? (
+                            <div className="flex items-center gap-1 text-[10px]">
                               <span className="font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
-                                H: {presentCount}
+                                Hadir {item.presentCount}/{item.totalStudents}
                               </span>
-                              {(sickCount > 0 || permitCount > 0 || absentCount > 0) && (
+                              {(item.sickCount > 0 || item.permitCount > 0 || item.absentCount > 0) && (
                                 <span className="text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 font-medium">
-                                  {sickCount > 0 ? `S:${sickCount} ` : ''}
-                                  {permitCount > 0 ? `I:${permitCount} ` : ''}
-                                  {absentCount > 0 ? `A:${absentCount}` : ''}
+                                  {[
+                                    item.sickCount > 0 ? `S:${item.sickCount}` : '',
+                                    item.permitCount > 0 ? `I:${item.permitCount}` : '',
+                                    item.absentCount > 0 ? `A:${item.absentCount}` : ''
+                                  ]
+                                    .filter(Boolean)
+                                    .join(' ')}
                                 </span>
                               )}
                             </div>
                           ) : (
-                            <span className="text-slate-400 text-[10px]">
-                              Total: {roomStudents.length} Siswa
+                            <span className="text-slate-400 text-[11px]">
+                              {item.totalStudents > 0 ? `— (${item.totalStudents} peserta)` : '—'}
                             </span>
                           )}
                         </td>
-                        <td className="py-3 px-4">
-                          {isSubmitted ? (
+                        <td className="py-2.5 px-3 whitespace-nowrap">
+                          {item.isSubmitted ? (
                             <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                              ✓ BAP Terkirim
+                              ✓ Terkirim
                             </span>
                           ) : (
                             <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
-                              ⏳ Belum Diserahkan
+                              ⏳ Menunggu
                             </span>
                           )}
                         </td>
-                        <td className="py-3 px-4 text-slate-500 italic max-w-xs truncate">
-                          {latestNote}
+                        <td className="py-2.5 px-4 max-w-xs">
+                          <span
+                            className={`block truncate text-[11px] ${
+                              item.notes ? 'text-slate-700' : 'text-slate-400'
+                            }`}
+                            title={item.notes || undefined}
+                          >
+                            {item.notes || '—'}
+                          </span>
                         </td>
-                        <td className="py-3 px-4 text-right">
+                        <td className="py-2.5 px-4 text-right whitespace-nowrap">
                           <div className="inline-flex items-center gap-1.5 justify-end">
                             <button
                               type="button"
-                              onClick={() => handleExportSingleRoomBap(room)}
-                              className="px-2.5 py-1 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 font-bold text-xs transition cursor-pointer active:scale-95 inline-flex items-center gap-1 shadow-2xs"
-                              title={`Download Berita Acara & Daftar Hadir ${room.name} ke Excel (.xlsx)`}
+                              onClick={() => handleExportSingleRoomBap(item.room)}
+                              className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 font-bold text-[11px] transition cursor-pointer active:scale-95 inline-flex items-center gap-1"
+                              title={`Download Daftar Hadir & Rekap ${item.room.name} ke Excel (.xlsx)`}
                             >
                               <span>📥</span>
                               <span>Excel</span>
                             </button>
                             <button
                               type="button"
-                              onClick={() => setPreviewBapRoom(room)}
-                              className="px-2.5 py-1 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 font-bold text-xs transition cursor-pointer active:scale-95 inline-flex items-center gap-1 shadow-2xs"
-                              title={`Buka dokumen Berita Acara ${room.name}`}
+                              onClick={() => handleExportSingleRoomBapWord(item.room)}
+                              className="px-2.5 py-1 rounded-lg bg-sky-50 hover:bg-sky-100 border border-sky-200 text-sky-800 font-bold text-[11px] transition cursor-pointer active:scale-95 inline-flex items-center gap-1"
+                              title={`Download Surat Berita Acara ${item.room.name} ke Word (.doc)`}
+                            >
+                              <span>📝</span>
+                              <span>Word</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setPreviewBapRoom(item.room)}
+                              className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 font-bold text-[11px] transition cursor-pointer active:scale-95 inline-flex items-center gap-1"
+                              title={`Pratinjau & Cetak Dokumen Resmi ${item.room.name}`}
                             >
                               <span>📄</span>
-                              <span>Buka Dokumen</span>
+                              <span>Dokumen</span>
                             </button>
                           </div>
                         </td>
                       </tr>
-                    );
-                  })}
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -5030,36 +5227,14 @@ export default function CbtPanitiaCommandCenter({
       {/* 6F. MODAL PRATINJAU DOKUMEN RESMI BERITA ACARA PELAKSANAAN (BAP) */}
       {previewBapRoom && (() => {
         const room = previewBapRoom;
-        const attendances = attendancesByRoomMap.get(room.name) || [];
-        const latestAttendance = attendances[0];
-        const roomStudents = roomStudentsMap.get(room.id) || [];
-        const uniqueClasses = Array.from(new Set(roomStudents.map(s => s.classId))).sort();
-
-        let presentCount = 0;
-        let sickCount = 0;
-        let permitCount = 0;
-        let absentCount = 0;
-
-        roomStudents.forEach(st => {
-          const status = latestAttendance?.records?.[st.id] || 'H';
-          if (status === 'H') presentCount++;
-          else if (status === 'S') sickCount++;
-          else if (status === 'I') permitCount++;
-          else if (status === 'A') absentCount++;
-        });
-
-        const currentDateStr = new Date().toLocaleDateString('id-ID', {
-          weekday: 'long',
-          day: 'numeric',
-          month: 'long',
-          year: 'numeric'
-        });
+        const payload = buildSingleRoomDocPayload(room);
+        const { weekdayDate, dateOnly } = formatWibLongDate();
 
         return (
           <div className="fixed inset-0 z-50 flex items-start justify-center p-3 sm:p-6 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
             <div className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl border border-slate-200 space-y-6 animate-scaleUp my-4 sm:my-8 relative">
               {/* Sticky Modal Control Bar */}
-              <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs flex items-center justify-between pb-3 border-b border-slate-100 print:hidden -mx-6 sm:-mx-8 px-6 sm:px-8 pt-1">
+              <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs flex items-center justify-between pb-3 border-b border-slate-100 print:hidden -mx-6 sm:-mx-8 px-6 sm:px-8 pt-1 gap-2 flex-wrap">
                 <div className="flex items-center gap-2">
                   <span className="text-xl">📄</span>
                   <span className="font-bold text-slate-900 text-sm">Dokumen Resmi Berita Acara</span>
@@ -5067,20 +5242,30 @@ export default function CbtPanitiaCommandCenter({
                 <div className="flex items-center gap-2 flex-wrap justify-end">
                   <button
                     type="button"
-                    onClick={() => handleExportSingleRoomBap(room)}
-                    className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition cursor-pointer flex items-center gap-1 shadow-xs active:scale-95"
-                    title="Unduh format spreadsheet Excel (.xlsx)"
+                    onClick={() => handleExportSingleRoomBapWord(room)}
+                    className="px-3 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs transition cursor-pointer flex items-center gap-1 shadow-xs active:scale-95"
+                    title="Unduh surat resmi Berita Acara sebagai dokumen Word (.doc)"
                   >
-                    <span>📥</span>
-                    <span>Download Excel</span>
+                    <span>📝</span>
+                    <span>Download Word</span>
                   </button>
                   <button
                     type="button"
-                    onClick={() => window.print()}
-                    className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition cursor-pointer flex items-center gap-1 shadow-xs active:scale-95"
+                    onClick={() => handleExportSingleRoomBap(room)}
+                    className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition cursor-pointer flex items-center gap-1 shadow-xs active:scale-95"
+                    title="Unduh Daftar Hadir peserta ke Excel (.xlsx)"
+                  >
+                    <span>📥</span>
+                    <span>Excel Absen</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handlePrintSingleRoomBap(room)}
+                    className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition cursor-pointer flex items-center gap-1 shadow-xs active:scale-95"
+                    title="Cetak atau Simpan sebagai PDF ukuran A4"
                   >
                     <span>🖨️</span>
-                    <span>Cetak Lembar BAP</span>
+                    <span>Cetak / PDF</span>
                   </button>
                   <button
                     type="button"
@@ -5093,7 +5278,7 @@ export default function CbtPanitiaCommandCenter({
                 </div>
               </div>
 
-              {/* AUTHENTIC OFFICIAL BAP SHEET (PRINTABLE) */}
+              {/* AUTHENTIC OFFICIAL BAP SHEET */}
               <div className="border border-slate-300 rounded-2xl p-6 sm:p-8 bg-white text-slate-900 space-y-5 text-xs shadow-inner">
                 {/* Official Letterhead (Kop Surat Sekolah) */}
                 <div className="text-center border-b-2 border-slate-900 pb-3 space-y-0.5">
@@ -5117,13 +5302,13 @@ export default function CbtPanitiaCommandCenter({
                     Berita Acara Pelaksanaan Asesmen Sumatif (CBT)
                   </h3>
                   <p className="text-[11px] font-mono font-medium text-slate-600">
-                    Tahun Ajaran {config.academicYear || '2026/2027'} • Posko Panitia Asesmen CBT
+                    Tahun Ajaran {payload.academicYear} • Posko Panitia Asesmen CBT
                   </p>
                 </div>
 
                 {/* Body Paragraph */}
                 <p className="text-justify leading-relaxed">
-                  Pada hari ini <strong>{currentDateStr}</strong>, telah dilaksanakan Asesmen Berbasis Komputer (CBT) di SMP Negeri 3 Cihampelas dengan rincian pelaksanaan sebagai berikut:
+                  Pada hari ini <strong>{weekdayDate}</strong>, telah dilaksanakan Asesmen Berbasis Komputer (CBT) di SMP Negeri 3 Cihampelas dengan rincian pelaksanaan sebagai berikut:
                 </p>
 
                 {/* Metadata Table */}
@@ -5131,33 +5316,29 @@ export default function CbtPanitiaCommandCenter({
                   <tbody>
                     <tr className="border-b border-slate-200">
                       <td className="py-1.5 px-3 bg-slate-50 font-bold w-44">Ruang Ujian</td>
-                      <td className="py-1.5 px-3 font-semibold">{room.name} ({room.label || 'Reguler'})</td>
+                      <td className="py-1.5 px-3 font-semibold">{payload.roomDisplay}</td>
                     </tr>
                     <tr className="border-b border-slate-200">
                       <td className="py-1.5 px-3 bg-slate-50 font-bold">Kelas Sasaran</td>
-                      <td className="py-1.5 px-3">{uniqueClasses.join(', ') || room.classes.join(', ')}</td>
+                      <td className="py-1.5 px-3">{payload.classesText || '-'}</td>
                     </tr>
                     <tr className="border-b border-slate-200">
                       <td className="py-1.5 px-3 bg-slate-50 font-bold">Guru Pengawas Ruang</td>
-                      <td className="py-1.5 px-3 font-semibold">
-                        {(latestAttendance?.supervisorName && latestAttendance.supervisorName !== 'Guru Pengawas Ruang')
-                          ? latestAttendance.supervisorName
-                          : (room.supervisorName || 'Guru Pengawas')}
-                      </td>
+                      <td className="py-1.5 px-3 font-semibold">{payload.supervisorName}</td>
                     </tr>
                     <tr className="border-b border-slate-200">
                       <td className="py-1.5 px-3 bg-slate-50 font-bold">Jumlah Peserta Terdaftar</td>
-                      <td className="py-1.5 px-3 font-bold">{roomStudents.length} Siswa</td>
+                      <td className="py-1.5 px-3 font-bold">{payload.totalStudents} Siswa</td>
                     </tr>
                     <tr className="border-b border-slate-200">
                       <td className="py-1.5 px-3 bg-slate-50 font-bold">Jumlah Peserta Hadir</td>
-                      <td className="py-1.5 px-3 font-bold text-emerald-700">{presentCount} Siswa</td>
+                      <td className="py-1.5 px-3 font-bold text-emerald-700">{payload.presentCount} Siswa</td>
                     </tr>
                     <tr className="border-b border-slate-200">
                       <td className="py-1.5 px-3 bg-slate-50 font-bold">Jumlah Tidak Hadir</td>
                       <td className="py-1.5 px-3">
-                        {sickCount + permitCount + absentCount > 0 ? (
-                          <span>{sickCount + permitCount + absentCount} Siswa (Sakit: {sickCount}, Izin: {permitCount}, Alpa: {absentCount})</span>
+                        {payload.sickCount + payload.permitCount + payload.absentCount > 0 ? (
+                          <span>{payload.sickCount + payload.permitCount + payload.absentCount} Siswa (Sakit: {payload.sickCount}, Izin: {payload.permitCount}, Alpa: {payload.absentCount})</span>
                         ) : (
                           <span className="text-emerald-700 font-bold">Nihil (Hadir Lengkap 100%)</span>
                         )}
@@ -5165,7 +5346,7 @@ export default function CbtPanitiaCommandCenter({
                     </tr>
                     <tr>
                       <td className="py-2 px-3 bg-slate-50 font-bold align-top">Catatan Selama Ujian</td>
-                      <td className="py-2 px-3 italic">{latestAttendance?.notes || 'Ujian berlangsung dengan tertib, aman, dan lancar tanpa kendala teknis.'}</td>
+                      <td className="py-2 px-3 italic">{payload.notes || 'Ujian berlangsung dengan tertib, aman, dan lancar tanpa kendala teknis.'}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -5177,11 +5358,9 @@ export default function CbtPanitiaCommandCenter({
                     <p className="font-bold underline">Panitia Asesmen SPENTIC<br /><span className="font-normal text-[10px] text-slate-500">NIP. 19850312 201101 1 004</span></p>
                   </div>
                   <div className="space-y-12">
-                    <p>Cihampelas, {new Date().toLocaleDateString('id-ID')}<br />Guru Pengawas Ruang</p>
+                    <p>Cihampelas, {dateOnly}<br />Guru Pengawas Ruang</p>
                     <p className="font-bold underline">
-                      {(latestAttendance?.supervisorName && latestAttendance.supervisorName !== 'Guru Pengawas Ruang')
-                        ? latestAttendance.supervisorName
-                        : (room.supervisorName || 'Guru Pengawas')}
+                      {payload.supervisorName}
                       <br /><span className="font-normal text-[10px] text-slate-500">Guru Pengawas CBT</span>
                     </p>
                   </div>
@@ -5208,103 +5387,58 @@ export default function CbtPanitiaCommandCenter({
 
       {/* 6G. MODAL PRATINJAU & CETAK REKAPITULASI BAP SEKOLAH (OFFICIAL SCHOOL SUMMARY) */}
       {showRekapPrintModal && (() => {
-        let totalStudentsAll = 0;
-        let totalPresentAll = 0;
-        let totalSickAll = 0;
-        let totalPermitAll = 0;
-        let totalAbsentAll = 0;
-        let totalBapSubmitted = 0;
-
-        const roomRows = uniqueSchoolRooms.map((room, idx) => {
-          const attendances = attendancesByRoomMap.get(room.name) || [];
-          const latestAttendance = attendances[0];
-          const isSubmitted = attendances.some(a => a.isBapSubmitted);
-          if (isSubmitted) totalBapSubmitted++;
-
-          const roomStudents = roomStudentsMap.get(room.id) || [];
-          const uniqueClasses = Array.from(new Set(roomStudents.map(s => s.classId))).sort();
-          totalStudentsAll += roomStudents.length;
-
-          let presentCount = 0;
-          let sickCount = 0;
-          let permitCount = 0;
-          let absentCount = 0;
-
-          roomStudents.forEach(st => {
-            const status = latestAttendance?.records?.[st.id] || 'H';
-            if (status === 'H') presentCount++;
-            else if (status === 'S') sickCount++;
-            else if (status === 'I') permitCount++;
-            else if (status === 'A') absentCount++;
-          });
-
-          totalPresentAll += presentCount;
-          totalSickAll += sickCount;
-          totalPermitAll += permitCount;
-          totalAbsentAll += absentCount;
-
-          return {
-            no: idx + 1,
-            roomName: room.name,
-            classes: uniqueClasses.length > 0 ? uniqueClasses.join(', ') : room.classes.join(', '),
-            supervisor: (latestAttendance?.supervisorName && latestAttendance.supervisorName !== 'Guru Pengawas Ruang')
-              ? latestAttendance.supervisorName
-              : (room.supervisorName || 'Guru Pengawas'),
-            total: roomStudents.length,
-            present: presentCount,
-            sick: sickCount,
-            permit: permitCount,
-            absent: absentCount,
-            isSubmitted,
-            notes: latestAttendance?.notes || '-'
-          };
-        });
-
-        const currentDateStr = new Date().toLocaleDateString('id-ID', {
-          weekday: 'long',
-          day: 'numeric',
-          month: 'long',
-          year: 'numeric'
-        });
+        const rekapDoc = buildSchoolRekapDocPayload();
+        const { weekdayDate, dateOnly } = formatWibLongDate();
 
         return (
           <div className="fixed inset-0 z-50 flex items-start justify-center p-3 sm:p-6 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
             <div className="bg-white rounded-3xl max-w-4xl w-full p-6 sm:p-8 shadow-2xl border border-slate-200 space-y-6 animate-scaleUp my-4 sm:my-8 relative">
               {/* Sticky Modal Control Bar */}
-              <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs flex items-center justify-between pb-3 border-b border-slate-100 print:hidden -mx-6 sm:-mx-8 px-6 sm:px-8 pt-1">
+              <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs flex items-center justify-between pb-3 border-b border-slate-100 print:hidden -mx-6 sm:-mx-8 px-6 sm:px-8 pt-1 gap-2 flex-wrap">
                 <div className="flex items-center gap-2">
                   <span className="text-xl">📋</span>
-                  <span className="font-bold text-slate-900 text-sm">Dokumen Rekapitulasi BAP Pelaksanaan Asesmen Sekolah</span>
+                  <span className="font-bold text-slate-900 text-sm">Dokumen Rekapitulasi BAP Sekolah</span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap justify-end">
                   <button
                     type="button"
-                    onClick={handleExportSchoolBapExcel}
-                    className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition cursor-pointer flex items-center gap-1 shadow-xs active:scale-95"
-                    title="Unduh format spreadsheet Excel (.xlsx)"
+                    onClick={handleExportSchoolBapWord}
+                    className="px-3 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs transition cursor-pointer flex items-center gap-1 shadow-xs active:scale-95"
+                    title="Unduh dokumen resmi Rekapitulasi BAP ke Word (.doc)"
                   >
-                    <span>📥</span>
-                    <span>Download Excel (.xlsx)</span>
+                    <span>📝</span>
+                    <span>Download Word</span>
                   </button>
                   <button
                     type="button"
-                    onClick={() => window.print()}
-                    className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition cursor-pointer flex items-center gap-1 shadow-xs active:scale-95"
+                    onClick={handleExportSchoolBapExcel}
+                    className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition cursor-pointer flex items-center gap-1 shadow-xs active:scale-95"
+                    title="Unduh format spreadsheet Excel (.xlsx)"
+                  >
+                    <span>📥</span>
+                    <span>Download Excel</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handlePrintSchoolBapDocument}
+                    className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition cursor-pointer flex items-center gap-1 shadow-xs active:scale-95"
+                    title="Cetak atau Simpan sebagai PDF A4 Landscape"
                   >
                     <span>🖨️</span>
-                    <span>Cetak Lembar Rekapitulasi (PDF / Cetak)</span>
+                    <span>Cetak / PDF</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setShowRekapPrintModal(false)}
                     className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center font-bold cursor-pointer transition text-sm"
+                    title="Tutup Pratinjau"
                   >
                     ✕
                   </button>
                 </div>
               </div>
 
-              {/* AUTHENTIC OFFICIAL REKAPITULASI SHEET (PRINTABLE) */}
+              {/* AUTHENTIC OFFICIAL REKAPITULASI SHEET */}
               <div className="border border-slate-300 rounded-2xl p-6 sm:p-8 bg-white text-slate-900 space-y-5 text-xs shadow-inner">
                 {/* Kop Surat Sekolah */}
                 <div className="text-center border-b-2 border-slate-900 pb-3 space-y-0.5">
@@ -5328,7 +5462,7 @@ export default function CbtPanitiaCommandCenter({
                     Rekapitulasi Berita Acara Pelaksanaan Asesmen Sumatif (CBT)
                   </h3>
                   <p className="text-[11px] font-mono font-medium text-slate-600">
-                    Tahun Ajaran {config.academicYear || '2026/2027'} • {config.semester || 'PTS / STS Ganjil'} • Posko Panitia Asesmen CBT
+                    Tahun Ajaran {rekapDoc.academicYear} • {rekapDoc.semester} • Posko Panitia Asesmen CBT
                   </p>
                 </div>
 
@@ -5336,23 +5470,23 @@ export default function CbtPanitiaCommandCenter({
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center py-2.5 bg-slate-50 rounded-xl border border-slate-200 text-[11px]">
                   <div>
                     <span className="text-slate-500 block text-[10px]">Hari / Tanggal</span>
-                    <strong className="text-slate-800">{currentDateStr}</strong>
+                    <strong className="text-slate-800">{weekdayDate}</strong>
                   </div>
                   <div>
                     <span className="text-slate-500 block text-[10px]">Total Ruangan</span>
-                    <strong className="text-slate-800">{config.rooms.length} Ruang Ujian</strong>
+                    <strong className="text-slate-800">{rekapDoc.totalRooms} Ruang Ujian</strong>
                   </div>
                   <div>
                     <span className="text-slate-500 block text-[10px]">Total Peserta Sekolah</span>
-                    <strong className="text-slate-800">{totalStudentsAll} Siswa Terdaftar</strong>
+                    <strong className="text-slate-800">{rekapDoc.totalStudentsAll} Siswa Terdaftar</strong>
                   </div>
                   <div>
                     <span className="text-slate-500 block text-[10px]">Kelengkapan BAP</span>
-                    <strong className="text-emerald-700">{totalBapSubmitted} / {config.rooms.length} Terkirim</strong>
+                    <strong className="text-emerald-700">{rekapDoc.totalBapSubmitted} / {rekapDoc.totalRooms} Terkirim</strong>
                   </div>
                 </div>
 
-                {/* Table of all 17 Rooms */}
+                {/* Table of all unique rooms */}
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse border border-slate-300 text-[11px]">
                     <thead className="bg-slate-100 text-slate-900 font-bold border-b border-slate-300">
@@ -5371,14 +5505,14 @@ export default function CbtPanitiaCommandCenter({
                       </tr>
                     </thead>
                     <tbody>
-                      {roomRows.map(r => (
+                      {rekapDoc.rooms.map(r => (
                         <tr key={r.no} className="border-b border-slate-200">
                           <td className="py-1 px-2 border border-slate-300 text-center font-bold">{r.no}</td>
                           <td className="py-1 px-3 border border-slate-300 font-semibold">{r.roomName}</td>
-                          <td className="py-1 px-2 border border-slate-300">{r.classes}</td>
+                          <td className="py-1 px-2 border border-slate-300">{r.classes || '-'}</td>
                           <td className="py-1 px-3 border border-slate-300">{r.supervisor}</td>
                           <td className="py-1 px-2 border border-slate-300 text-center font-bold">{r.total}</td>
-                          <td className="py-1 px-2 border border-slate-300 text-center font-bold text-emerald-700">{r.present}</td>
+                          <td className="py-1 px-2 border border-slate-300 text-center font-bold text-emerald-700">{r.isSubmitted ? r.present : '-'}</td>
                           <td className="py-1 px-2 border border-slate-300 text-center">{r.sick || '-'}</td>
                           <td className="py-1 px-2 border border-slate-300 text-center">{r.permit || '-'}</td>
                           <td className="py-1 px-2 border border-slate-300 text-center font-bold text-rose-700">{r.absent || '-'}</td>
@@ -5386,7 +5520,7 @@ export default function CbtPanitiaCommandCenter({
                             {r.isSubmitted ? (
                               <span className="font-bold text-emerald-700">✓ Lengkap</span>
                             ) : (
-                              <span className="text-amber-700">⏳ Belum</span>
+                              <span className="text-amber-700">⏳ Menunggu</span>
                             )}
                           </td>
                           <td className="py-1 px-3 border border-slate-300 text-slate-600 text-[10px] max-w-xs truncate">{r.notes}</td>
@@ -5396,14 +5530,14 @@ export default function CbtPanitiaCommandCenter({
                     <tfoot className="bg-slate-100 font-bold border-t-2 border-slate-900">
                       <tr>
                         <td colSpan={4} className="py-2 px-3 border border-slate-300 text-right uppercase">Total Akumulasi Sekolah:</td>
-                        <td className="py-2 px-2 border border-slate-300 text-center font-bold">{totalStudentsAll}</td>
-                        <td className="py-2 px-2 border border-slate-300 text-center font-bold text-emerald-700">{totalPresentAll}</td>
-                        <td className="py-2 px-2 border border-slate-300 text-center font-bold text-amber-700">{totalSickAll}</td>
-                        <td className="py-2 px-2 border border-slate-300 text-center font-bold text-amber-700">{totalPermitAll}</td>
-                        <td className="py-2 px-2 border border-slate-300 text-center font-bold text-rose-700">{totalAbsentAll}</td>
-                        <td className="py-2 px-2 border border-slate-300 text-center font-bold text-emerald-800">{totalBapSubmitted}/{config.rooms.length}</td>
+                        <td className="py-2 px-2 border border-slate-300 text-center font-bold">{rekapDoc.totalStudentsAll}</td>
+                        <td className="py-2 px-2 border border-slate-300 text-center font-bold text-emerald-700">{rekapDoc.totalPresentAll}</td>
+                        <td className="py-2 px-2 border border-slate-300 text-center font-bold text-amber-700">{rekapDoc.totalSickAll}</td>
+                        <td className="py-2 px-2 border border-slate-300 text-center font-bold text-amber-700">{rekapDoc.totalPermitAll}</td>
+                        <td className="py-2 px-2 border border-slate-300 text-center font-bold text-rose-700">{rekapDoc.totalAbsentAll}</td>
+                        <td className="py-2 px-2 border border-slate-300 text-center font-bold text-emerald-800">{rekapDoc.totalBapSubmitted}/{rekapDoc.totalRooms}</td>
                         <td className="py-2 px-3 border border-slate-300 text-slate-700 text-[10px]">
-                          Tingkat Kehadiran: {totalStudentsAll > 0 ? ((totalPresentAll / totalStudentsAll) * 100).toFixed(1) : 0}%
+                          Tingkat Kehadiran: {rekapDoc.totalStudentsAll > 0 ? ((rekapDoc.totalPresentAll / rekapDoc.totalStudentsAll) * 100).toFixed(1) : 0}%
                         </td>
                       </tr>
                     </tfoot>
@@ -5417,7 +5551,7 @@ export default function CbtPanitiaCommandCenter({
                     <p className="font-bold underline">H. Rustandi, S.Pd., M.Pd.<br /><span className="font-normal text-[10px] text-slate-500">NIP. 19700608 199802 1 001</span></p>
                   </div>
                   <div className="space-y-12">
-                    <p>Cihampelas, {new Date().toLocaleDateString('id-ID')}<br />Ketua Panitia Asesmen CBT</p>
+                    <p>Cihampelas, {dateOnly}<br />Ketua Panitia Asesmen CBT</p>
                     <p className="font-bold underline">Panitia Asesmen SPENTIC<br /><span className="font-normal text-[10px] text-slate-500">NIP. 19850312 201101 1 004</span></p>
                   </div>
                 </div>

@@ -1611,5 +1611,377 @@ export function exportCbtSusulanListToExcel(params: {
   XLSX.writeFile(workbook, fileName);
 }
 
+/**
+ * Hilangkan pengulangan nama ruang di dalam label (mis. "Ruang 01 (Silang 7-A & 8-A)" -> subtitle "Silang 7-A & 8-A")
+ */
+export function formatCleanRoomDisplay(roomName: string, roomLabel?: string): {
+  title: string;
+  subtitle: string;
+  combined: string;
+} {
+  const cleanName = (roomName || '').trim();
+  const rawLabel = (roomLabel || '').trim();
+  if (!rawLabel || rawLabel.toLowerCase() === cleanName.toLowerCase()) {
+    return { title: cleanName, subtitle: '', combined: cleanName };
+  }
+
+  let sub = rawLabel;
+  if (cleanName && sub.toLowerCase().startsWith(cleanName.toLowerCase())) {
+    sub = sub.slice(cleanName.length).trim();
+  }
+  // Lepas kurung luar bila sisa berpola "(Silang 7-A & 8-A)"
+  if (sub.startsWith('(') && sub.endsWith(')')) {
+    sub = sub.slice(1, -1).trim();
+  }
+  if (!sub || sub.toLowerCase() === cleanName.toLowerCase()) {
+    return { title: cleanName, subtitle: '', combined: cleanName };
+  }
+
+  return {
+    title: cleanName,
+    subtitle: sub,
+    combined: `${cleanName} (${sub})`
+  };
+}
+
+/**
+ * Format tanggal resmi Indonesia sesuai zona WIB (Asia/Jakarta)
+ */
+export function formatWibLongDate(date: Date = new Date()): {
+  weekdayDate: string;
+  dateOnly: string;
+} {
+  return {
+    weekdayDate: date.toLocaleDateString('id-ID', {
+      timeZone: 'Asia/Jakarta',
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    }),
+    dateOnly: date.toLocaleDateString('id-ID', {
+      timeZone: 'Asia/Jakarta',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    })
+  };
+}
+
+function escapeHtmlText(value: string | number | undefined | null): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function wrapOfficialBapHtmlDocument(docTitle: string, bodyHtml: string, landscape = false): string {
+  return `<!DOCTYPE html>
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40" lang="id">
+<head>
+  <meta charset="utf-8" />
+  <title>${escapeHtmlText(docTitle)}</title>
+  <style>
+    @page { size: A4 ${landscape ? 'landscape' : 'portrait'}; margin: 1.6cm 1.8cm; }
+    * { box-sizing: border-box; }
+    body { font-family: 'Times New Roman', Georgia, serif; color: #0f172a; font-size: 11pt; line-height: 1.45; margin: 0; padding: 18px; background: #ffffff; }
+    .kop { text-align: center; border-bottom: 3px double #0f172a; padding-bottom: 10px; margin-bottom: 16px; }
+    .kop p { margin: 1px 0; font-size: 10pt; font-weight: bold; text-transform: uppercase; letter-spacing: 0.4px; }
+    .kop h1 { margin: 3px 0; font-size: 14pt; font-weight: bold; text-transform: uppercase; letter-spacing: 0.8px; }
+    .kop .alamat { font-size: 9pt; font-weight: normal; text-transform: none; color: #334155; letter-spacing: 0; }
+    .judul { text-align: center; margin-bottom: 14px; }
+    .judul h2 { margin: 0 0 3px; font-size: 12pt; text-transform: uppercase; text-decoration: underline; }
+    .judul p { margin: 0; font-size: 9.5pt; color: #475569; }
+    .narasi { text-align: justify; margin: 10px 0 12px; }
+    table.data { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 10pt; }
+    table.data th, table.data td { border: 1px solid #334155; padding: 6px 8px; vertical-align: top; }
+    table.data th { background: #f1f5f9; font-weight: bold; }
+    table.data td.label { width: 34%; background: #f8fafc; font-weight: bold; }
+    table.summary { width: 100%; border-collapse: collapse; margin: 8px 0 12px; font-size: 9.5pt; }
+    table.summary td { border: 1px solid #cbd5e1; background: #f8fafc; padding: 6px 8px; text-align: center; width: 25%; }
+    table.ttd { width: 100%; border-collapse: collapse; margin-top: 22px; font-size: 10.5pt; page-break-inside: avoid; }
+    table.ttd td { width: 50%; text-align: center; vertical-align: top; padding: 4px 12px; border: none; }
+    .space-ttd { height: 56px; }
+    .sub-ttd { font-size: 9pt; color: #475569; }
+    @media print { body { padding: 0; } }
+  </style>
+</head>
+<body>
+  <div class="kop">
+    <p>Pemerintah Daerah Kabupaten Bandung Barat</p>
+    <p>Dinas Pendidikan</p>
+    <h1>SMP Negeri 3 Cihampelas</h1>
+    <p class="alamat">Jalan Babakan Caringin, Desa Cihampelas, Kec. Cihampelas, Kab. Bandung Barat 40562</p>
+  </div>
+  ${bodyHtml}
+</body>
+</html>`;
+}
+
+function downloadOfficialWordHtml(fileName: string, fullHtml: string) {
+  const blob = new Blob(['\ufeff' + fullHtml], { type: 'application/msword;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = sanitizeFileName(fileName);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function printOfficialHtmlInIframe(fullHtml: string) {
+  if (typeof document === 'undefined') return;
+  const iframe = document.createElement('iframe');
+  iframe.style.position = 'fixed';
+  iframe.style.right = '0';
+  iframe.style.bottom = '0';
+  iframe.style.width = '0';
+  iframe.style.height = '0';
+  iframe.style.border = '0';
+  iframe.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(iframe);
+
+  const doc = iframe.contentWindow?.document;
+  if (!doc || !iframe.contentWindow) {
+    document.body.removeChild(iframe);
+    window.print();
+    return;
+  }
+
+  doc.open();
+  doc.write(fullHtml);
+  doc.close();
+
+  const cleanup = () => {
+    setTimeout(() => {
+      if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+    }, 800);
+  };
+
+  setTimeout(() => {
+    try {
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
+    } catch {
+      window.print();
+    } finally {
+      cleanup();
+    }
+  }, 150);
+}
+
+export interface RoomBapOfficialDocumentParams {
+  academicYear: string;
+  roomDisplay: string;
+  classesText: string;
+  supervisorName: string;
+  totalStudents: number;
+  presentCount: number;
+  sickCount: number;
+  permitCount: number;
+  absentCount: number;
+  notes?: string;
+}
+
+function buildRoomBapOfficialHtml(params: RoomBapOfficialDocumentParams): string {
+  const { weekdayDate, dateOnly } = formatWibLongDate();
+  const notPresentTotal = params.sickCount + params.permitCount + params.absentCount;
+  const notPresentText =
+    notPresentTotal > 0
+      ? `${notPresentTotal} Siswa (Sakit: ${params.sickCount}, Izin: ${params.permitCount}, Alpa: ${params.absentCount})`
+      : 'Nihil (Hadir Lengkap 100%)';
+  const notesText =
+    params.notes?.trim() || 'Ujian berlangsung dengan tertib, aman, dan lancar tanpa kendala teknis.';
+
+  const bodyHtml = `
+    <div class="judul">
+      <h2>Berita Acara Pelaksanaan Asesmen Sumatif (CBT)</h2>
+      <p>Tahun Ajaran ${escapeHtmlText(params.academicYear || '2026/2027')} &bull; Posko Panitia Asesmen CBT</p>
+    </div>
+    <p class="narasi">
+      Pada hari ini <strong>${escapeHtmlText(weekdayDate)}</strong>, telah dilaksanakan Asesmen Berbasis Komputer (CBT)
+      di SMP Negeri 3 Cihampelas dengan rincian pelaksanaan sebagai berikut:
+    </p>
+    <table class="data">
+      <tbody>
+        <tr><td class="label">Ruang Ujian</td><td><strong>${escapeHtmlText(params.roomDisplay)}</strong></td></tr>
+        <tr><td class="label">Kelas Sasaran</td><td>${escapeHtmlText(params.classesText || '-')}</td></tr>
+        <tr><td class="label">Guru Pengawas Ruang</td><td><strong>${escapeHtmlText(params.supervisorName)}</strong></td></tr>
+        <tr><td class="label">Jumlah Peserta Terdaftar</td><td><strong>${params.totalStudents} Siswa</strong></td></tr>
+        <tr><td class="label">Jumlah Peserta Hadir</td><td><strong style="color:#047857;">${params.presentCount} Siswa</strong></td></tr>
+        <tr><td class="label">Jumlah Tidak Hadir</td><td>${escapeHtmlText(notPresentText)}</td></tr>
+        <tr><td class="label">Catatan Selama Ujian</td><td><em>${escapeHtmlText(notesText)}</em></td></tr>
+      </tbody>
+    </table>
+    <table class="ttd">
+      <tr>
+        <td>
+          <div>Mengetahui,<br/>Ketua Panitia CBT</div>
+          <div class="space-ttd"></div>
+          <div><u><strong>Panitia Asesmen SPENTIC</strong></u></div>
+          <div class="sub-ttd">NIP. 19850312 201101 1 004</div>
+        </td>
+        <td>
+          <div>Cihampelas, ${escapeHtmlText(dateOnly)}<br/>Guru Pengawas Ruang</div>
+          <div class="space-ttd"></div>
+          <div><u><strong>${escapeHtmlText(params.supervisorName)}</strong></u></div>
+          <div class="sub-ttd">Guru Pengawas CBT</div>
+        </td>
+      </tr>
+    </table>`;
+
+  return wrapOfficialBapHtmlDocument(`Berita Acara ${params.roomDisplay}`, bodyHtml, false);
+}
+
+/**
+ * Unduh Dokumen Resmi Berita Acara (BAP) Per Ruangan sebagai file Word (.doc)
+ */
+export function exportCbtRoomBapToWord(params: RoomBapOfficialDocumentParams) {
+  const html = buildRoomBapOfficialHtml(params);
+  const dateStr = getTodayWibDateStr();
+  downloadOfficialWordHtml(`Berita_Acara_${params.roomDisplay}_${dateStr}.doc`, html);
+}
+
+/**
+ * Cetak / Simpan PDF Dokumen Resmi Berita Acara (BAP) Per Ruangan tanpa backdrop web
+ */
+export function printCbtRoomBapDocument(params: RoomBapOfficialDocumentParams) {
+  const html = buildRoomBapOfficialHtml(params);
+  printOfficialHtmlInIframe(html);
+}
+
+export interface SchoolRekapBapOfficialDocumentParams {
+  academicYear: string;
+  semester: string;
+  totalRooms: number;
+  totalStudentsAll: number;
+  totalPresentAll: number;
+  totalSickAll: number;
+  totalPermitAll: number;
+  totalAbsentAll: number;
+  totalBapSubmitted: number;
+  rooms: Array<{
+    no: number;
+    roomName: string;
+    classes: string;
+    supervisor: string;
+    total: number;
+    present: number;
+    sick: number;
+    permit: number;
+    absent: number;
+    isSubmitted: boolean;
+    notes: string;
+  }>;
+}
+
+function buildSchoolRekapBapOfficialHtml(params: SchoolRekapBapOfficialDocumentParams): string {
+  const { weekdayDate, dateOnly } = formatWibLongDate();
+  const pct =
+    params.totalStudentsAll > 0
+      ? ((params.totalPresentAll / params.totalStudentsAll) * 100).toFixed(1)
+      : '0';
+
+  const rowHtml = params.rooms
+    .map(
+      (r) => `
+      <tr>
+        <td style="text-align:center;font-weight:bold;">${r.no}</td>
+        <td><strong>${escapeHtmlText(r.roomName)}</strong></td>
+        <td>${escapeHtmlText(r.classes || '-')}</td>
+        <td>${escapeHtmlText(r.supervisor)}</td>
+        <td style="text-align:center;font-weight:bold;">${r.total}</td>
+        <td style="text-align:center;font-weight:bold;color:#047857;">${r.present}</td>
+        <td style="text-align:center;">${r.sick || '-'}</td>
+        <td style="text-align:center;">${r.permit || '-'}</td>
+        <td style="text-align:center;">${r.absent || '-'}</td>
+        <td style="text-align:center;">${r.isSubmitted ? 'Terkirim' : 'Menunggu'}</td>
+        <td>${escapeHtmlText(r.notes || '-')}</td>
+      </tr>`
+    )
+    .join('');
+
+  const bodyHtml = `
+    <div class="judul">
+      <h2>Rekapitulasi Berita Acara Pelaksanaan Asesmen Sumatif (CBT)</h2>
+      <p>Tahun Ajaran ${escapeHtmlText(params.academicYear || '2026/2027')} &bull; ${escapeHtmlText(params.semester || 'PTS / STS Ganjil')} &bull; Posko Panitia Asesmen CBT</p>
+    </div>
+    <table class="summary">
+      <tr>
+        <td><span style="font-size:8.5pt;color:#64748b;display:block;">Hari / Tanggal</span><strong>${escapeHtmlText(weekdayDate)}</strong></td>
+        <td><span style="font-size:8.5pt;color:#64748b;display:block;">Total Ruangan</span><strong>${params.totalRooms} Ruang Ujian</strong></td>
+        <td><span style="font-size:8.5pt;color:#64748b;display:block;">Total Peserta Sekolah</span><strong>${params.totalStudentsAll} Siswa</strong></td>
+        <td><span style="font-size:8.5pt;color:#64748b;display:block;">Kelengkapan BAP</span><strong>${params.totalBapSubmitted} / ${params.totalRooms} Terkirim</strong></td>
+      </tr>
+    </table>
+    <table class="data" style="font-size:9pt;">
+      <thead>
+        <tr>
+          <th style="width:28px;text-align:center;">No</th>
+          <th>Ruang</th>
+          <th>Kelas</th>
+          <th>Pengawas Ruang</th>
+          <th style="text-align:center;">Jml</th>
+          <th style="text-align:center;">H</th>
+          <th style="text-align:center;">S</th>
+          <th style="text-align:center;">I</th>
+          <th style="text-align:center;">A</th>
+          <th style="text-align:center;">Status BAP</th>
+          <th>Catatan Khusus</th>
+        </tr>
+      </thead>
+      <tbody>${rowHtml}</tbody>
+      <tfoot>
+        <tr style="background:#f1f5f9;font-weight:bold;">
+          <td colspan="4" style="text-align:right;">TOTAL AKUMULASI SEKOLAH:</td>
+          <td style="text-align:center;">${params.totalStudentsAll}</td>
+          <td style="text-align:center;color:#047857;">${params.totalPresentAll}</td>
+          <td style="text-align:center;">${params.totalSickAll}</td>
+          <td style="text-align:center;">${params.totalPermitAll}</td>
+          <td style="text-align:center;">${params.totalAbsentAll}</td>
+          <td style="text-align:center;">${params.totalBapSubmitted}/${params.totalRooms}</td>
+          <td>Kehadiran: ${pct}%</td>
+        </tr>
+      </tfoot>
+    </table>
+    <table class="ttd">
+      <tr>
+        <td>
+          <div>Mengetahui,<br/>Kepala SMP Negeri 3 Cihampelas</div>
+          <div class="space-ttd"></div>
+          <div><u><strong>H. Rustandi, S.Pd., M.Pd.</strong></u></div>
+          <div class="sub-ttd">NIP. 19700608 199802 1 001</div>
+        </td>
+        <td>
+          <div>Cihampelas, ${escapeHtmlText(dateOnly)}<br/>Ketua Panitia Asesmen CBT</div>
+          <div class="space-ttd"></div>
+          <div><u><strong>Panitia Asesmen SPENTIC</strong></u></div>
+          <div class="sub-ttd">NIP. 19850312 201101 1 004</div>
+        </td>
+      </tr>
+    </table>`;
+
+  return wrapOfficialBapHtmlDocument('Rekapitulasi BAP Sekolah', bodyHtml, true);
+}
+
+/**
+ * Unduh Rekapitulasi BAP Sekolah sebagai dokumen resmi Word (.doc)
+ */
+export function exportCbtSchoolRekapBapToWord(params: SchoolRekapBapOfficialDocumentParams) {
+  const html = buildSchoolRekapBapOfficialHtml(params);
+  const dateStr = getTodayWibDateStr();
+  downloadOfficialWordHtml(`Rekapitulasi_BAP_Sekolah_${dateStr}.doc`, html);
+}
+
+/**
+ * Cetak / Simpan PDF Rekapitulasi BAP Sekolah terisolasi rapi A4 Landscape
+ */
+export function printCbtSchoolRekapBapDocument(params: SchoolRekapBapOfficialDocumentParams) {
+  const html = buildSchoolRekapBapOfficialHtml(params);
+  printOfficialHtmlInIframe(html);
+}
+
 
 
