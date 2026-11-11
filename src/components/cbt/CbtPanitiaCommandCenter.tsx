@@ -819,17 +819,23 @@ export default function CbtPanitiaCommandCenter({
         totalAbsentAll += absentCount;
       }
 
-      const cleanRoom = formatCleanRoomDisplay(room.name, room.label);
+      const cleanRoom = formatCleanRoomDisplay(room.name, room.label, targetClasses.length);
       const supervisor =
         latestAttendance?.supervisorName && latestAttendance.supervisorName !== 'Guru Pengawas Ruang'
           ? latestAttendance.supervisorName
           : (room.supervisorName || 'Guru Pengawas');
+      const rawNote = latestAttendance?.notes?.trim() || '';
+      const isDefaultBapNote =
+        rawNote === 'Ujian berlangsung tertib, aman, dan lancar tanpa kendala teknis.' ||
+        rawNote === 'Ujian berlangsung dengan tertib, aman, dan lancar tanpa kendala teknis.';
+      // Hanya tampilkan catatan di rekap jika BAP sudah diserahkan atau ada catatan khusus pengawas
+      const effectiveNote = isSubmitted ? rawNote : (isDefaultBapNote ? '' : rawNote);
 
       return {
         no: idx + 1,
         room,
         roomDisplay: cleanRoom.combined,
-        roomSubtitle: cleanRoom.subtitle,
+        roomSubtitle: cleanRoom.modeLabel,
         targetClasses,
         classesText: targetClasses.join(', '),
         supervisor,
@@ -841,7 +847,8 @@ export default function CbtPanitiaCommandCenter({
         permitCount,
         absentCount,
         isSubmitted,
-        notes: latestAttendance?.notes?.trim() || '',
+        notes: effectiveNote,
+        isDefaultBapNote,
         latestAttendance
       };
     });
@@ -1224,15 +1231,17 @@ export default function CbtPanitiaCommandCenter({
 
   const buildSingleRoomDocPayload = (targetRoom: CbtExamRoomConfig) => {
     const summary = roomBapSummaryData.byRoomId.get(targetRoom.id);
-    const cleanRoom = formatCleanRoomDisplay(targetRoom.name, targetRoom.label);
     const attendances = summary ? (summary.latestAttendance ? [summary.latestAttendance] : []) : getRoomAttendances(targetRoom);
     const latestAttendance = attendances[0];
     const roomStudents = summary?.students || roomStudentsMap.get(targetRoom.id) || [];
-    const classesText = summary?.classesText || targetRoom.classes.join(', ');
+    const targetClasses = summary?.targetClasses || targetRoom.classes;
+    const cleanRoom = formatCleanRoomDisplay(targetRoom.name, targetRoom.label, targetClasses.length);
+    const classesText = summary?.classesText || targetClasses.join(', ');
     const supervisorName = summary?.supervisor || targetRoom.supervisorName || 'Guru Pengawas';
 
     return {
       academicYear: config.academicYear || '2026/2027',
+      roomName: targetRoom.name,
       roomDisplay: cleanRoom.combined,
       classesText,
       supervisorName,
@@ -4000,7 +4009,7 @@ export default function CbtPanitiaCommandCenter({
                     Rekapitulasi Berita Acara Pelaksanaan (BAP)
                   </h2>
                   <p className="text-[11px] text-slate-500 mt-0.5">
-                    {roomBapSummaryData.totalRooms} Ruang Ujian • {roomBapSummaryData.submittedCount} BAP Terkirim • {roomBapSummaryData.pendingCount} Menunggu Pengawas
+                    Pantau status berita acara pengawas dan unduh dokumen resmi per ruangan maupun rekap sekolah.
                   </p>
                 </div>
               </div>
@@ -4013,7 +4022,7 @@ export default function CbtPanitiaCommandCenter({
                   title="Unduh Dokumen Resmi Rekapitulasi BAP Sekolah (.doc / Word)"
                 >
                   <span>📝</span>
-                  <span>Download Word</span>
+                  <span>Word Rekap</span>
                 </button>
                 <button
                   type="button"
@@ -4022,7 +4031,7 @@ export default function CbtPanitiaCommandCenter({
                   title="Unduh seluruh rekapitulasi BAP sekolah ke Excel (.xlsx)"
                 >
                   <span>📥</span>
-                  <span>Export Excel</span>
+                  <span>Excel Rekap</span>
                 </button>
                 <button
                   type="button"
@@ -4031,7 +4040,7 @@ export default function CbtPanitiaCommandCenter({
                   title="Pratinjau & Cetak / Simpan PDF Rekapitulasi BAP"
                 >
                   <span>🖨️</span>
-                  <span>Cetak / PDF Rekap</span>
+                  <span>Cetak / PDF</span>
                 </button>
               </div>
             </div>
@@ -4175,45 +4184,29 @@ export default function CbtPanitiaCommandCenter({
                           )}
                         </td>
                         <td className="py-2.5 px-4 max-w-xs">
-                          <span
-                            className={`block truncate text-[11px] ${
-                              item.notes ? 'text-slate-700' : 'text-slate-400'
-                            }`}
-                            title={item.notes || undefined}
-                          >
-                            {item.notes || '—'}
-                          </span>
+                          {item.isSubmitted ? (
+                            <span
+                              className="block truncate text-[11px] text-slate-700"
+                              title={item.notes || undefined}
+                            >
+                              {item.isDefaultBapNote ? 'Tertib & lancar' : (item.notes || '—')}
+                            </span>
+                          ) : (
+                            <span className="text-[11px] text-slate-400">
+                              {item.notes || '—'}
+                            </span>
+                          )}
                         </td>
                         <td className="py-2.5 px-4 text-right whitespace-nowrap">
-                          <div className="inline-flex items-center gap-1.5 justify-end">
-                            <button
-                              type="button"
-                              onClick={() => handleExportSingleRoomBap(item.room)}
-                              className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 font-bold text-[11px] transition cursor-pointer active:scale-95 inline-flex items-center gap-1"
-                              title={`Download Daftar Hadir & Rekap ${item.room.name} ke Excel (.xlsx)`}
-                            >
-                              <span>📥</span>
-                              <span>Excel</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleExportSingleRoomBapWord(item.room)}
-                              className="px-2.5 py-1 rounded-lg bg-sky-50 hover:bg-sky-100 border border-sky-200 text-sky-800 font-bold text-[11px] transition cursor-pointer active:scale-95 inline-flex items-center gap-1"
-                              title={`Download Surat Berita Acara ${item.room.name} ke Word (.doc)`}
-                            >
-                              <span>📝</span>
-                              <span>Word</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setPreviewBapRoom(item.room)}
-                              className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 font-bold text-[11px] transition cursor-pointer active:scale-95 inline-flex items-center gap-1"
-                              title={`Pratinjau & Cetak Dokumen Resmi ${item.room.name}`}
-                            >
-                              <span>📄</span>
-                              <span>Dokumen</span>
-                            </button>
-                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setPreviewBapRoom(item.room)}
+                            className="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 font-bold text-[11px] transition cursor-pointer active:scale-95 inline-flex items-center gap-1.5"
+                            title={`Buka surat resmi BAP, Download Word (.doc), Excel (.xlsx), atau Cetak PDF ${item.room.name}`}
+                          >
+                            <span>📄</span>
+                            <span>Buka Dokumen</span>
+                          </button>
                         </td>
                       </tr>
                     ))

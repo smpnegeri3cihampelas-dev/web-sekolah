@@ -1612,35 +1612,43 @@ export function exportCbtSusulanListToExcel(params: {
 }
 
 /**
- * Hilangkan pengulangan nama ruang di dalam label (mis. "Ruang 01 (Silang 7-A & 8-A)" -> subtitle "Silang 7-A & 8-A")
+ * Hilangkan pengulangan nama ruang & kelas di dalam label (mis. "Ruang 01 (Silang 7-A & 8-A)" -> title "Ruang 01", modeLabel "Format Silang")
  */
-export function formatCleanRoomDisplay(roomName: string, roomLabel?: string): {
+export function formatCleanRoomDisplay(
+  roomName: string,
+  roomLabel?: string,
+  classCount = 0
+): {
   title: string;
   subtitle: string;
+  modeLabel: string;
   combined: string;
 } {
   const cleanName = (roomName || '').trim();
   const rawLabel = (roomLabel || '').trim();
+  const isCross = classCount > 1 || /silang/i.test(rawLabel);
+  const modeLabel = isCross ? 'Format Silang' : classCount === 1 ? 'Rombel Murni' : '';
+
   if (!rawLabel || rawLabel.toLowerCase() === cleanName.toLowerCase()) {
-    return { title: cleanName, subtitle: '', combined: cleanName };
+    return { title: cleanName, subtitle: '', modeLabel, combined: cleanName };
   }
 
   let sub = rawLabel;
   if (cleanName && sub.toLowerCase().startsWith(cleanName.toLowerCase())) {
     sub = sub.slice(cleanName.length).trim();
   }
-  // Lepas kurung luar bila sisa berpola "(Silang 7-A & 8-A)"
   if (sub.startsWith('(') && sub.endsWith(')')) {
     sub = sub.slice(1, -1).trim();
   }
   if (!sub || sub.toLowerCase() === cleanName.toLowerCase()) {
-    return { title: cleanName, subtitle: '', combined: cleanName };
+    return { title: cleanName, subtitle: '', modeLabel, combined: cleanName };
   }
 
   return {
     title: cleanName,
     subtitle: sub,
-    combined: `${cleanName} (${sub})`
+    modeLabel,
+    combined: modeLabel ? `${cleanName} (${modeLabel})` : cleanName
   };
 }
 
@@ -1774,6 +1782,7 @@ function printOfficialHtmlInIframe(fullHtml: string) {
 
 export interface RoomBapOfficialDocumentParams {
   academicYear: string;
+  roomName: string;
   roomDisplay: string;
   classesText: string;
   supervisorName: string;
@@ -1832,7 +1841,7 @@ function buildRoomBapOfficialHtml(params: RoomBapOfficialDocumentParams): string
       </tr>
     </table>`;
 
-  return wrapOfficialBapHtmlDocument(`Berita Acara ${params.roomDisplay}`, bodyHtml, false);
+  return wrapOfficialBapHtmlDocument(`Berita Acara ${params.roomName}`, bodyHtml, false);
 }
 
 /**
@@ -1841,7 +1850,7 @@ function buildRoomBapOfficialHtml(params: RoomBapOfficialDocumentParams): string
 export function exportCbtRoomBapToWord(params: RoomBapOfficialDocumentParams) {
   const html = buildRoomBapOfficialHtml(params);
   const dateStr = getTodayWibDateStr();
-  downloadOfficialWordHtml(`Berita_Acara_${params.roomDisplay}_${dateStr}.doc`, html);
+  downloadOfficialWordHtml(`Berita_Acara_${params.roomName}_${dateStr}.doc`, html);
 }
 
 /**
