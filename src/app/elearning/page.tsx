@@ -231,8 +231,82 @@ const DailyReportTable = React.memo(function DailyReportTable({
         </div>
       </div>
 
-      {/* Table Content */}
-      <div className="overflow-x-auto relative will-change-scroll [transform:translateZ(0)]">
+      {/* Mobile Card List (Zero Horizontal Scroll on Phone) */}
+      <div className="block sm:hidden divide-y divide-slate-100">
+        {students.map((student, idx) => {
+          const status = dailyReportData.hasDailyData ? (dailyReportData.dailyRecords[student.id] || 'H') : '-';
+          const note = dailyReportData.dailyNotes[student.id] || '-';
+
+          return (
+            <div key={student.id} className="p-3.5 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="w-5 shrink-0 text-slate-400 font-mono font-bold text-xs">{idx + 1}.</span>
+                  <div className="min-w-0">
+                    <div className="font-semibold text-slate-900 text-xs truncate">{student.name}</div>
+                    <div className="text-[10px] text-slate-400 font-mono">NISN: {student.nisn}</div>
+                  </div>
+                </div>
+
+                <div className="shrink-0">
+                  {status === 'H' && (
+                    <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-extrabold text-[11px] border border-emerald-300">
+                      Hadir (H)
+                    </span>
+                  )}
+                  {status === 'S' && (
+                    <span className="px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 font-extrabold text-[11px] border border-blue-300">
+                      Sakit (S)
+                    </span>
+                  )}
+                  {status === 'I' && (
+                    <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 font-extrabold text-[11px] border border-amber-300">
+                      Izin (I)
+                    </span>
+                  )}
+                  {status === 'A' && (
+                    <span className="px-2 py-0.5 rounded-md bg-rose-100 text-rose-800 font-extrabold text-[11px] border border-rose-300">
+                      Alpa (A)
+                    </span>
+                  )}
+                  {status === 'T' && (
+                    <span className="px-2 py-0.5 rounded-md bg-orange-100 text-orange-800 font-extrabold text-[11px] border border-orange-300">
+                      Telat (T)
+                    </span>
+                  )}
+                  {status === '-' && (
+                    <span className="text-slate-400 italic text-[11px]">Belum diisi</span>
+                  )}
+                </div>
+              </div>
+
+              {note && note !== '-' && (
+                <div className="px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200 text-slate-700 text-[11px] font-medium">
+                  💬 {note}
+                </div>
+              )}
+            </div>
+          );
+        })}
+
+        {/* Mobile Footer Summary */}
+        <div className="p-3.5 bg-slate-50 border-t border-slate-200 space-y-1.5 text-xs">
+          <div className="flex items-center justify-between font-bold text-slate-700">
+            <span>Rekapitulasi Kehadiran:</span>
+            <span className="text-emerald-700 font-black">{dailyReportData.dayPresentPercent}% Hadir</span>
+          </div>
+          <div className="grid grid-cols-5 gap-1.5 text-center font-mono text-[11px]">
+            <span className="py-1 rounded bg-emerald-100 text-emerald-900 font-bold">H: {dailyReportData.dayH}</span>
+            <span className="py-1 rounded bg-blue-100 text-blue-900 font-bold">S: {dailyReportData.dayS}</span>
+            <span className="py-1 rounded bg-amber-100 text-amber-900 font-bold">I: {dailyReportData.dayI}</span>
+            <span className="py-1 rounded bg-rose-100 text-rose-900 font-bold">A: {dailyReportData.dayA}</span>
+            <span className="py-1 rounded bg-orange-100 text-orange-900 font-bold">T: {dailyReportData.dayT}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Table Content (Desktop & Tablet) */}
+      <div className="hidden sm:block overflow-x-auto relative will-change-scroll [transform:translateZ(0)]">
         <table className="w-full text-xs text-left border-collapse table-fixed min-w-[720px]">
           <colgroup>
             <col className="w-12" />
@@ -384,6 +458,8 @@ const MonthlyReportTable = React.memo(function MonthlyReportTable({
   daysInfoList,
   monthlyReportData,
 }: MonthlyReportTableProps) {
+  const [mobileViewMode, setMobileViewMode] = useState<'cards' | 'table'>('cards');
+
   // Pre-associate session with day once for the whole table (prevents 1,000+ Map lookups in JSX)
   const daysWithSession = useMemo(() => {
     return daysInfoList.map(info => {
@@ -399,7 +475,7 @@ const MonthlyReportTable = React.memo(function MonthlyReportTable({
   return (
     <div className="bg-white border border-indigo-100 rounded-2xl shadow-sm overflow-hidden">
       {/* Table Banner Header */}
-      <div className="p-4 bg-slate-50 border-b border-indigo-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+      <div className="p-3.5 sm:p-4 bg-slate-50 border-b border-indigo-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h3 className="text-sm font-extrabold text-slate-900 tracking-wide uppercase">
             LAPORAN ABSENSI - KELAS {reportClassId} ({monthName.toUpperCase()} {reportYear})
@@ -408,40 +484,137 @@ const MonthlyReportTable = React.memo(function MonthlyReportTable({
             Mata Pelajaran: <span className="text-indigo-700 font-bold">{currentTeacher.subject}</span> • Guru: <span className="font-semibold text-slate-800">{currentTeacher.name}</span>
           </p>
         </div>
-        <div className="flex items-center gap-2 text-xs">
+        <div className="flex items-center gap-2 text-xs flex-wrap">
+          {/* Mobile View Mode Switcher */}
+          <div className="inline-flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 text-xs sm:hidden shadow-xs">
+            <button
+              type="button"
+              onClick={() => setMobileViewMode('cards')}
+              className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer text-[11px] ${
+                mobileViewMode === 'cards' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              📱 Rangkuman
+            </button>
+            <button
+              type="button"
+              onClick={() => setMobileViewMode('table')}
+              className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer text-[11px] ${
+                mobileViewMode === 'table' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              📅 Matriks
+            </button>
+          </div>
+
           <span className="px-3 py-1 rounded-lg bg-indigo-50 text-indigo-800 font-bold border border-indigo-200 text-xs">
             {monthlyReportData.monthSessions.length} Pertemuan Terlaksana
           </span>
         </div>
       </div>
 
-      {/* Scrollable Matrix Table with GPU Compositing & Fixed Layout */}
-      <div className="overflow-x-auto relative will-change-scroll [transform:translateZ(0)]">
-        <table className="w-full text-xs text-left border-collapse table-fixed min-w-[1550px]">
+      {/* 1. Mobile Cards View (Zero Horizontal Scroll on Phone) */}
+      <div className={`${mobileViewMode === 'cards' ? 'block' : 'hidden'} sm:hidden divide-y divide-indigo-50`}>
+        {students.map((student, idx) => {
+          const stats = monthlyReportData.studentMonthlyStats[student.id] || { H: 0, S: 0, I: 0, A: 0, T: 0, meetings: 0, pct: 100 };
+
+          return (
+            <div key={student.id} className="p-3.5 space-y-2 hover:bg-slate-50/50 transition">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="w-6 shrink-0 font-mono text-xs font-bold text-slate-400">{idx + 1}.</span>
+                  <div className="min-w-0">
+                    <div className="font-bold text-slate-900 text-xs truncate">{student.name}</div>
+                    <div className="text-[10px] text-slate-400 font-mono">NISN: {student.nisn}</div>
+                  </div>
+                </div>
+                <span className={`px-2 py-0.5 rounded-lg text-xs font-black shrink-0 ${
+                  stats.pct >= 90 ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' :
+                  stats.pct >= 75 ? 'bg-amber-100 text-amber-800 border border-amber-200' :
+                  'bg-rose-100 text-rose-800 border border-rose-200'
+                }`}>
+                  {stats.pct}%
+                </span>
+              </div>
+
+              {/* Tally Pill Badges */}
+              <div className="grid grid-cols-5 gap-1.5 pt-1 text-center font-mono text-[11px]">
+                <div className="bg-emerald-50 text-emerald-800 border border-emerald-200/80 py-1 rounded-lg">
+                  <span className="text-[9px] text-emerald-600 block font-sans font-bold">Hadir</span>
+                  <span className="font-black text-xs">{stats.H}</span>
+                </div>
+                <div className="bg-blue-50 text-blue-800 border border-blue-200/80 py-1 rounded-lg">
+                  <span className="text-[9px] text-blue-600 block font-sans font-bold">Sakit</span>
+                  <span className="font-black text-xs">{stats.S}</span>
+                </div>
+                <div className="bg-amber-50 text-amber-800 border border-amber-200/80 py-1 rounded-lg">
+                  <span className="text-[9px] text-amber-600 block font-sans font-bold">Izin</span>
+                  <span className="font-black text-xs">{stats.I}</span>
+                </div>
+                <div className="bg-rose-50 text-rose-800 border border-rose-200/80 py-1 rounded-lg">
+                  <span className="text-[9px] text-rose-600 block font-sans font-bold">Alpa</span>
+                  <span className="font-black text-xs">{stats.A}</span>
+                </div>
+                <div className="bg-orange-50 text-orange-800 border border-orange-200/80 py-1 rounded-lg">
+                  <span className="text-[9px] text-orange-600 block font-sans font-bold">Telat</span>
+                  <span className="font-black text-xs">{stats.T}</span>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+
+        {/* Mobile Summary Footer */}
+        <div className="p-3.5 bg-slate-50 border-t border-slate-200 space-y-2 text-xs">
+          <div className="flex items-center justify-between font-bold text-slate-800">
+            <span>Total Kehadiran Kelas:</span>
+            <span className="text-indigo-700 font-black text-sm">{monthlyReportData.overallPercent}%</span>
+          </div>
+          <div className="grid grid-cols-5 gap-1.5 text-center font-mono text-[11px]">
+            <div className="bg-emerald-100/70 text-emerald-900 py-1 rounded-lg font-bold">H: {monthlyReportData.totalH}</div>
+            <div className="bg-blue-100/70 text-blue-900 py-1 rounded-lg font-bold">S: {monthlyReportData.totalS}</div>
+            <div className="bg-amber-100/70 text-amber-900 py-1 rounded-lg font-bold">I: {monthlyReportData.totalI}</div>
+            <div className="bg-rose-100/70 text-rose-900 py-1 rounded-lg font-bold">A: {monthlyReportData.totalA}</div>
+            <div className="bg-orange-100/70 text-orange-900 py-1 rounded-lg font-bold">T: {monthlyReportData.totalT}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. Scrollable Matrix Table (Mobile Table Mode & Desktop Default) */}
+      <div className={`${mobileViewMode === 'table' ? 'block' : 'hidden sm:block'} overflow-x-auto relative will-change-scroll [transform:translateZ(0)]`}>
+        {/* Mobile Swipe Hint */}
+        <div className="sm:hidden px-3.5 py-2 bg-indigo-50/90 border-b border-indigo-100 flex items-center justify-between text-[11px] text-indigo-800 font-medium">
+          <span>👉 Geser ke kanan untuk melihat tanggal 1 - 31</span>
+          <span className="font-mono text-[10px] bg-white px-2 py-0.5 rounded border border-indigo-200 font-bold">
+            1 - {daysWithSession.length}
+          </span>
+        </div>
+
+        <table className="w-full text-xs text-left border-collapse table-fixed min-w-[1100px] sm:min-w-[1550px]">
           <colgroup>
-            <col className="w-10" />
-            <col className="w-28" />
-            <col className="w-48" />
+            <col className="w-8 sm:w-10" />
+            <col className="hidden sm:table-column sm:w-28" />
+            <col className="w-28 sm:w-48" />
             {daysWithSession.map(info => (
               <col key={info.day} className="w-8" />
             ))}
-            <col className="w-9" />
-            <col className="w-9" />
-            <col className="w-9" />
-            <col className="w-9" />
-            <col className="w-9" />
-            <col className="w-14" />
+            <col className="w-8 sm:w-9" />
+            <col className="w-8 sm:w-9" />
+            <col className="w-8 sm:w-9" />
+            <col className="w-8 sm:w-9" />
+            <col className="w-8 sm:w-9" />
+            <col className="w-12 sm:w-14" />
           </colgroup>
 
           <thead className="bg-slate-100 text-slate-700 font-bold sticky top-0 z-20 shadow-xs">
             <tr>
-              <th className="px-2 py-2.5 text-center w-10 border-b border-r border-slate-200 sticky left-0 bg-slate-100 z-30">
+              <th className="px-2 py-2.5 text-center w-8 sm:w-10 border-b border-r border-slate-200 sticky left-0 bg-slate-100 z-30 font-mono text-[11px]">
                 No
               </th>
-              <th className="px-3 py-2.5 w-28 border-b border-r border-slate-200 sticky left-10 bg-slate-100 z-30 font-mono text-[11px]">
+              <th className="hidden sm:table-cell px-3 py-2.5 w-28 border-b border-r border-slate-200 sticky left-10 bg-slate-100 z-30 font-mono text-[11px]">
                 NISN
               </th>
-              <th className="px-3 py-2.5 w-48 border-b border-r-2 border-slate-200 sticky left-[152px] bg-slate-100 z-30">
+              <th className="px-2.5 sm:px-3 py-2.5 w-28 sm:w-48 border-b border-r-2 border-indigo-200 sticky left-8 sm:left-[152px] bg-slate-100 z-30 text-xs shadow-[2px_0_5px_rgba(0,0,0,0.06)]">
                 Nama Siswa
               </th>
               
@@ -468,22 +641,22 @@ const MonthlyReportTable = React.memo(function MonthlyReportTable({
               ))}
 
               {/* Summary Columns */}
-              <th className="px-2 py-2.5 text-center w-9 border-b border-r border-slate-200 bg-emerald-50 text-emerald-800" title="Total Hadir">
+              <th className="px-1.5 py-2.5 text-center w-8 sm:w-9 border-b border-r border-slate-200 bg-emerald-50 text-emerald-800" title="Total Hadir">
                 H
               </th>
-              <th className="px-2 py-2.5 text-center w-9 border-b border-r border-slate-200 bg-blue-50 text-blue-800" title="Total Sakit">
+              <th className="px-1.5 py-2.5 text-center w-8 sm:w-9 border-b border-r border-slate-200 bg-blue-50 text-blue-800" title="Total Sakit">
                 S
               </th>
-              <th className="px-2 py-2.5 text-center w-9 border-b border-r border-slate-200 bg-amber-50 text-amber-800" title="Total Izin">
+              <th className="px-1.5 py-2.5 text-center w-8 sm:w-9 border-b border-r border-slate-200 bg-amber-50 text-amber-800" title="Total Izin">
                 I
               </th>
-              <th className="px-2 py-2.5 text-center w-9 border-b border-r border-slate-200 bg-rose-50 text-rose-800" title="Total Alpa">
+              <th className="px-1.5 py-2.5 text-center w-8 sm:w-9 border-b border-r border-slate-200 bg-rose-50 text-rose-800" title="Total Alpa">
                 A
               </th>
-              <th className="px-2 py-2.5 text-center w-9 border-b border-r border-slate-200 bg-orange-50 text-orange-800" title="Total Terlambat">
+              <th className="px-1.5 py-2.5 text-center w-8 sm:w-9 border-b border-r border-slate-200 bg-orange-50 text-orange-800" title="Total Terlambat">
                 T
               </th>
-              <th className="px-2 py-2.5 text-center w-14 border-b border-slate-200 bg-indigo-50 text-indigo-900" title="Persentase Kehadiran">
+              <th className="px-1.5 py-2.5 text-center w-12 sm:w-14 border-b border-slate-200 bg-indigo-50 text-indigo-900" title="Persentase Kehadiran">
                 %
               </th>
             </tr>
@@ -495,15 +668,18 @@ const MonthlyReportTable = React.memo(function MonthlyReportTable({
 
               return (
                 <tr key={student.id} className="hover:bg-indigo-50/30">
-                  {/* Sticky Columns */}
+                  {/* Sticky Columns: Only 144px wide on mobile (instead of 344px!) */}
                   <td className="px-2 py-2 text-center border-r border-slate-100 sticky left-0 bg-white z-10 font-mono text-[11px] text-slate-500">
                     {idx + 1}
                   </td>
-                  <td className="px-3 py-2 border-r border-slate-100 sticky left-10 bg-white z-10 font-mono text-[11px] text-slate-600">
+                  <td className="hidden sm:table-cell px-3 py-2 border-r border-slate-100 sticky left-10 bg-white z-10 font-mono text-[11px] text-slate-600">
                     {student.nisn}
                   </td>
-                  <td className="px-3 py-2 border-r-2 border-slate-200 sticky left-[152px] bg-white z-10 font-semibold text-slate-900 truncate max-w-[192px]">
-                    {student.name}
+                  <td className="px-2.5 sm:px-3 py-2 border-r-2 border-indigo-200 sticky left-8 sm:left-[152px] bg-white z-10 font-semibold text-slate-900 truncate max-w-[112px] sm:max-w-[192px] shadow-[2px_0_5px_rgba(0,0,0,0.06)]">
+                    <div className="truncate">{student.name}</div>
+                    <div className="sm:hidden text-[9px] text-slate-400 font-mono font-normal truncate">
+                      {student.nisn}
+                    </div>
                   </td>
 
                   {/* Date Columns */}
@@ -570,7 +746,10 @@ const MonthlyReportTable = React.memo(function MonthlyReportTable({
           {/* Footer: Jumlah Siswa Hadir per Hari */}
           <tfoot className="bg-slate-100 text-slate-900 font-extrabold sticky bottom-0 z-20 border-t-2 border-slate-300 shadow-md">
             <tr>
-              <td colSpan={3} className="px-3 py-2.5 text-right border-r-2 border-slate-300 sticky left-0 bg-slate-100 z-30 uppercase text-xs tracking-wider">
+              <td colSpan={2} className="sm:hidden px-2.5 py-2.5 text-right border-r-2 border-indigo-200 sticky left-0 bg-slate-100 z-30 uppercase text-[11px] font-black tracking-wider shadow-[2px_0_5px_rgba(0,0,0,0.06)]">
+                Hadir:
+              </td>
+              <td colSpan={3} className="hidden sm:table-cell px-3 py-2.5 text-right border-r-2 border-slate-300 sticky left-0 bg-slate-100 z-30 uppercase text-xs tracking-wider">
                 Jumlah Siswa Hadir:
               </td>
 
@@ -642,9 +821,11 @@ const SemesterReportTable = React.memo(function SemesterReportTable({
   semesterReportData,
   semesterName,
 }: SemesterReportTableProps) {
+  const [mobileViewMode, setMobileViewMode] = useState<'cards' | 'table'>('cards');
+
   return (
     <div className="bg-white border border-indigo-100 rounded-2xl shadow-sm overflow-hidden">
-      <div className="p-4 bg-slate-50 border-b border-indigo-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+      <div className="p-3.5 sm:p-4 bg-slate-50 border-b border-indigo-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h3 className="text-sm font-extrabold text-slate-900 tracking-wide uppercase">
             REKAPITULASI PRESENSI {semesterName ? semesterName.toUpperCase() : 'SEMESTER GANJIL TP. 2026/2027'}
@@ -653,35 +834,124 @@ const SemesterReportTable = React.memo(function SemesterReportTable({
             Mata Pelajaran: <span className="text-indigo-700 font-bold">{currentTeacher.subject}</span> • Kelas {reportClassId} • Guru: {currentTeacher.name}
           </p>
         </div>
-        <span className="text-xs px-2.5 py-1 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold">
-          {semesterReportData.semesterSessionsSorted.length} Pertemuan Tercatat
-        </span>
+
+        <div className="flex items-center gap-2 text-xs flex-wrap">
+          {/* Mobile View Mode Switcher */}
+          <div className="inline-flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 text-xs sm:hidden shadow-xs">
+            <button
+              type="button"
+              onClick={() => setMobileViewMode('cards')}
+              className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer text-[11px] ${
+                mobileViewMode === 'cards' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              📱 Rangkuman
+            </button>
+            <button
+              type="button"
+              onClick={() => setMobileViewMode('table')}
+              className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer text-[11px] ${
+                mobileViewMode === 'table' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              📅 Matriks
+            </button>
+          </div>
+
+          <span className="text-xs px-2.5 py-1 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold">
+            {semesterReportData.semesterSessionsSorted.length} Pertemuan Tercatat
+          </span>
+        </div>
       </div>
 
-      <div className="overflow-x-auto relative will-change-scroll [transform:translateZ(0)]">
-        <table className="w-full text-xs text-left border-collapse table-fixed min-w-[950px]">
+      {/* 1. Mobile Cards View (Zero Horizontal Scroll on Phone) */}
+      <div className={`${mobileViewMode === 'cards' ? 'block' : 'hidden'} sm:hidden divide-y divide-indigo-50`}>
+        {students.map((student, idx) => {
+          const sStats = semesterReportData.semesterStudentStats[student.id] || { sH: 0, sS: 0, sI: 0, sA: 0, sT: 0, sPct: 100 };
+
+          return (
+            <div key={student.id} className="p-3.5 space-y-2 hover:bg-slate-50/50 transition">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="w-6 shrink-0 font-mono text-xs font-bold text-slate-400">{idx + 1}.</span>
+                  <div className="min-w-0">
+                    <div className="font-bold text-slate-900 text-xs truncate">{student.name}</div>
+                    <div className="text-[10px] text-slate-400 font-mono">NISN: {student.nisn}</div>
+                  </div>
+                </div>
+                <span className={`px-2 py-0.5 rounded-lg text-xs font-black shrink-0 ${
+                  sStats.sPct >= 90 ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' :
+                  sStats.sPct >= 75 ? 'bg-amber-100 text-amber-800 border border-amber-200' :
+                  'bg-rose-100 text-rose-800 border border-rose-200'
+                }`}>
+                  {sStats.sPct}%
+                </span>
+              </div>
+
+              {/* Tally Pill Badges */}
+              <div className="grid grid-cols-5 gap-1.5 pt-1 text-center font-mono text-[11px]">
+                <div className="bg-emerald-50 text-emerald-800 border border-emerald-200/80 py-1 rounded-lg">
+                  <span className="text-[9px] text-emerald-600 block font-sans font-bold">Hadir</span>
+                  <span className="font-black text-xs">{sStats.sH}</span>
+                </div>
+                <div className="bg-blue-50 text-blue-800 border border-blue-200/80 py-1 rounded-lg">
+                  <span className="text-[9px] text-blue-600 block font-sans font-bold">Sakit</span>
+                  <span className="font-black text-xs">{sStats.sS}</span>
+                </div>
+                <div className="bg-amber-50 text-amber-800 border border-amber-200/80 py-1 rounded-lg">
+                  <span className="text-[9px] text-amber-600 block font-sans font-bold">Izin</span>
+                  <span className="font-black text-xs">{sStats.sI}</span>
+                </div>
+                <div className="bg-rose-50 text-rose-800 border border-rose-200/80 py-1 rounded-lg">
+                  <span className="text-[9px] text-rose-600 block font-sans font-bold">Alpa</span>
+                  <span className="font-black text-xs">{sStats.sA}</span>
+                </div>
+                <div className="bg-orange-50 text-orange-800 border border-orange-200/80 py-1 rounded-lg">
+                  <span className="text-[9px] text-orange-600 block font-sans font-bold">Telat</span>
+                  <span className="font-black text-xs">{sStats.sT}</span>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* 2. Scrollable Matrix Table (Mobile Table Mode & Desktop Default) */}
+      <div className={`${mobileViewMode === 'table' ? 'block' : 'hidden sm:block'} overflow-x-auto relative will-change-scroll [transform:translateZ(0)]`}>
+        {/* Mobile Swipe Hint */}
+        <div className="sm:hidden px-3.5 py-2 bg-indigo-50/90 border-b border-indigo-100 flex items-center justify-between text-[11px] text-indigo-800 font-medium">
+          <span>👉 Geser ke kanan untuk melihat pertemuan P1 - P16</span>
+        </div>
+
+        <table className="w-full text-xs text-left border-collapse table-fixed min-w-[750px] sm:min-w-[950px]">
           <colgroup>
-            <col className="w-10" />
-            <col className="w-28" />
-            <col className="w-48" />
+            <col className="w-8 sm:w-10" />
+            <col className="hidden sm:table-column sm:w-28" />
+            <col className="w-28 sm:w-48" />
             {(semesterReportData.semesterSessionsSorted.length > 0 
               ? semesterReportData.semesterSessionsSorted 
               : Array.from({ length: 16 })
             ).map((_, i) => (
               <col key={i} className="w-12" />
             ))}
-            <col className="w-10" />
-            <col className="w-10" />
-            <col className="w-10" />
-            <col className="w-10" />
-            <col className="w-10" />
-            <col className="w-14" />
+            <col className="w-8 sm:w-10" />
+            <col className="w-8 sm:w-10" />
+            <col className="w-8 sm:w-10" />
+            <col className="w-8 sm:w-10" />
+            <col className="w-8 sm:w-10" />
+            <col className="w-12 sm:w-14" />
           </colgroup>
           <thead className="bg-slate-100 text-slate-700 font-bold sticky top-0 z-10">
             <tr>
-              <th className="px-2 py-2.5 text-center w-10 border-b border-r border-slate-200">No</th>
-              <th className="px-3 py-2.5 w-28 border-b border-r border-slate-200 font-mono text-[11px]">NISN</th>
-              <th className="px-3 py-2.5 w-48 border-b border-r border-slate-200">Nama Siswa</th>
+              <th className="px-2 py-2.5 text-center w-8 sm:w-10 border-b border-r border-slate-200 sticky left-0 bg-slate-100 z-30 font-mono text-[11px]">
+                No
+              </th>
+              <th className="hidden sm:table-cell px-3 py-2.5 w-28 border-b border-r border-slate-200 sticky left-10 bg-slate-100 z-30 font-mono text-[11px]">
+                NISN
+              </th>
+              <th className="px-2.5 sm:px-3 py-2.5 w-28 sm:w-48 border-b border-r-2 border-indigo-200 sticky left-8 sm:left-[152px] bg-slate-100 z-30 text-xs shadow-[2px_0_5px_rgba(0,0,0,0.06)]">
+                Nama Siswa
+              </th>
               
               {semesterReportData.semesterSessionsSorted.length > 0 ? (
                 semesterReportData.semesterSessionsSorted.map((sess, sIdx) => {
@@ -702,12 +972,12 @@ const SemesterReportTable = React.memo(function SemesterReportTable({
                 ))
               )}
 
-              <th className="px-2 py-2.5 text-center w-10 border-b border-r border-slate-200 bg-emerald-50 text-emerald-800">H</th>
-              <th className="px-2 py-2.5 text-center w-10 border-b border-r border-slate-200 bg-blue-50 text-blue-800">S</th>
-              <th className="px-2 py-2.5 text-center w-10 border-b border-r border-slate-200 bg-amber-50 text-amber-800">I</th>
-              <th className="px-2 py-2.5 text-center w-10 border-b border-slate-200 bg-rose-50 text-rose-800">A</th>
-              <th className="px-2 py-2.5 text-center w-10 border-b border-slate-200 bg-orange-50 text-orange-800">T</th>
-              <th className="px-2 py-2.5 text-center w-14 border-b border-slate-200 bg-indigo-50 text-indigo-900">%</th>
+              <th className="px-1.5 py-2.5 text-center w-8 sm:w-10 border-b border-r border-slate-200 bg-emerald-50 text-emerald-800">H</th>
+              <th className="px-1.5 py-2.5 text-center w-8 sm:w-10 border-b border-r border-slate-200 bg-blue-50 text-blue-800">S</th>
+              <th className="px-1.5 py-2.5 text-center w-8 sm:w-10 border-b border-r border-slate-200 bg-amber-50 text-amber-800">I</th>
+              <th className="px-1.5 py-2.5 text-center w-8 sm:w-10 border-b border-slate-200 bg-rose-50 text-rose-800">A</th>
+              <th className="px-1.5 py-2.5 text-center w-8 sm:w-10 border-b border-slate-200 bg-orange-50 text-orange-800">T</th>
+              <th className="px-1.5 py-2.5 text-center w-12 sm:w-14 border-b border-slate-200 bg-indigo-50 text-indigo-900">%</th>
             </tr>
           </thead>
 
@@ -717,9 +987,18 @@ const SemesterReportTable = React.memo(function SemesterReportTable({
 
               return (
                 <tr key={student.id} className="hover:bg-slate-50">
-                  <td className="px-2 py-2 text-center border-r border-slate-100 font-mono text-[11px] text-slate-500">{idx + 1}</td>
-                  <td className="px-3 py-2 border-r border-slate-100 font-mono text-[11px] text-slate-600">{student.nisn}</td>
-                  <td className="px-3 py-2 border-r border-slate-100 font-semibold text-slate-900">{student.name}</td>
+                  <td className="px-2 py-2 text-center border-r border-slate-100 sticky left-0 bg-white z-10 font-mono text-[11px] text-slate-500">
+                    {idx + 1}
+                  </td>
+                  <td className="hidden sm:table-cell px-3 py-2 border-r border-slate-100 sticky left-10 bg-white z-10 font-mono text-[11px] text-slate-600">
+                    {student.nisn}
+                  </td>
+                  <td className="px-2.5 sm:px-3 py-2 border-r-2 border-indigo-200 sticky left-8 sm:left-[152px] bg-white z-10 font-semibold text-slate-900 truncate max-w-[112px] sm:max-w-[192px] shadow-[2px_0_5px_rgba(0,0,0,0.06)]">
+                    <div className="truncate">{student.name}</div>
+                    <div className="sm:hidden text-[9px] text-slate-400 font-mono font-normal truncate">
+                      {student.nisn}
+                    </div>
+                  </td>
 
                   {semesterReportData.semesterSessionsSorted.length > 0 ? (
                     semesterReportData.semesterSessionsSorted.map(sess => {
@@ -793,6 +1072,7 @@ const PiketMonthlyReportSection = React.memo(function PiketMonthlyReportSection(
   const [selectedClassId, setSelectedClassId] = useState<string>(initialClassId);
   const [selectedMonth, setSelectedMonth] = useState<number>(() => initialMonth || (new Date().getMonth() + 1));
   const [selectedYear, setSelectedYear] = useState<number>(() => initialYear || new Date().getFullYear());
+  const [mobileViewMode, setMobileViewMode] = useState<'cards' | 'table'>('cards');
 
   // Memoize all monthly matrix data and statistics
   const piketMatrixData = useMemo(() => {
@@ -1067,41 +1347,143 @@ const PiketMonthlyReportSection = React.memo(function PiketMonthlyReportSection(
 
       {/* Table Matriks Bulanan Meja Piket */}
       <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
-        <div className="px-4 py-3 bg-slate-50 border-b border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
-          <span className="font-bold text-slate-900">
-            Presensi Kelas {selectedClassId} — {monthName} {selectedYear} ({studentsInReport.length} Siswa)
-          </span>
-          <span className="text-slate-500">
-            Petugas: <strong className="text-slate-800">{piketDutyTeacher}</strong>
-          </span>
+        <div className="px-3.5 sm:px-4 py-3 bg-slate-50 border-b border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs">
+          <div>
+            <div className="font-bold text-slate-900">
+              Presensi Kelas {selectedClassId} — {monthName} {selectedYear} ({studentsInReport.length} Siswa)
+            </div>
+            <div className="text-slate-500 text-[11px] mt-0.5">
+              Petugas: <strong className="text-slate-800">{piketDutyTeacher}</strong>
+            </div>
+          </div>
+
+          {/* Mobile View Mode Switcher */}
+          <div className="flex items-center gap-2">
+            <div className="inline-flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 text-xs sm:hidden shadow-xs">
+              <button
+                type="button"
+                onClick={() => setMobileViewMode('cards')}
+                className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer text-[11px] ${
+                  mobileViewMode === 'cards' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                📱 Rangkuman
+              </button>
+              <button
+                type="button"
+                onClick={() => setMobileViewMode('table')}
+                className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer text-[11px] ${
+                  mobileViewMode === 'table' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                📅 Matriks
+              </button>
+            </div>
+          </div>
         </div>
 
-        <div className="overflow-x-auto relative will-change-scroll [transform:translateZ(0)]">
-          <table className="w-full text-xs text-left border-collapse table-fixed min-w-[1550px]">
+        {/* 1. Mobile Cards View (Zero Horizontal Scroll on Phone) */}
+        <div className={`${mobileViewMode === 'cards' ? 'block' : 'hidden'} sm:hidden divide-y divide-slate-100`}>
+          {studentsInReport.map((student, idx) => {
+            const stats = studentStats[student.id] || { H: 0, S: 0, I: 0, A: 0, T: 0, pct: 100 };
+
+            return (
+              <div key={student.id} className="p-3.5 space-y-2 hover:bg-slate-50/50 transition">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="w-6 shrink-0 font-mono text-xs font-bold text-slate-400">{idx + 1}.</span>
+                    <div className="min-w-0">
+                      <div className="font-bold text-slate-900 text-xs truncate">{student.name}</div>
+                      <div className="text-[10px] text-slate-400 font-mono">NISN: {student.nisn}</div>
+                    </div>
+                  </div>
+                  <span className={`px-2 py-0.5 rounded-lg text-xs font-black shrink-0 ${
+                    stats.pct >= 90 ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' :
+                    stats.pct >= 75 ? 'bg-amber-100 text-amber-800 border border-amber-200' :
+                    'bg-rose-100 text-rose-800 border border-rose-200'
+                  }`}>
+                    {stats.pct}%
+                  </span>
+                </div>
+
+                {/* Tally Pill Badges */}
+                <div className="grid grid-cols-5 gap-1.5 pt-1 text-center font-mono text-[11px]">
+                  <div className="bg-emerald-50 text-emerald-800 border border-emerald-200/80 py-1 rounded-lg">
+                    <span className="text-[9px] text-emerald-600 block font-sans font-bold">Hadir</span>
+                    <span className="font-black text-xs">{stats.H}</span>
+                  </div>
+                  <div className="bg-blue-50 text-blue-800 border border-blue-200/80 py-1 rounded-lg">
+                    <span className="text-[9px] text-blue-600 block font-sans font-bold">Sakit</span>
+                    <span className="font-black text-xs">{stats.S}</span>
+                  </div>
+                  <div className="bg-amber-50 text-amber-800 border border-amber-200/80 py-1 rounded-lg">
+                    <span className="text-[9px] text-amber-600 block font-sans font-bold">Izin</span>
+                    <span className="font-black text-xs">{stats.I}</span>
+                  </div>
+                  <div className="bg-rose-50 text-rose-800 border border-rose-200/80 py-1 rounded-lg">
+                    <span className="text-[9px] text-rose-600 block font-sans font-bold">Alpa</span>
+                    <span className="font-black text-xs">{stats.A}</span>
+                  </div>
+                  <div className="bg-orange-50 text-orange-800 border border-orange-200/80 py-1 rounded-lg">
+                    <span className="text-[9px] text-orange-600 block font-sans font-bold">Telat</span>
+                    <span className="font-black text-xs">{stats.T}</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Mobile Summary Footer */}
+          <div className="p-3.5 bg-slate-50 border-t border-slate-200 space-y-2 text-xs">
+            <div className="flex items-center justify-between font-bold text-slate-800">
+              <span>Total Kehadiran Kelas:</span>
+              <span className="text-emerald-700 font-black text-sm">{overallPercent}%</span>
+            </div>
+            <div className="grid grid-cols-5 gap-1.5 text-center font-mono text-[11px]">
+              <div className="bg-emerald-100/70 text-emerald-900 py-1 rounded-lg font-bold">H: {totalH}</div>
+              <div className="bg-blue-100/70 text-blue-900 py-1 rounded-lg font-bold">S: {totalS}</div>
+              <div className="bg-amber-100/70 text-amber-900 py-1 rounded-lg font-bold">I: {totalI}</div>
+              <div className="bg-rose-100/70 text-rose-900 py-1 rounded-lg font-bold">A: {totalA}</div>
+              <div className="bg-orange-100/70 text-orange-900 py-1 rounded-lg font-bold">T: {totalT}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* 2. Scrollable Matrix Table (Mobile Table Mode & Desktop Default) */}
+        <div className={`${mobileViewMode === 'table' ? 'block' : 'hidden sm:block'} overflow-x-auto relative will-change-scroll [transform:translateZ(0)]`}>
+          {/* Mobile Swipe Hint */}
+          <div className="sm:hidden px-3.5 py-2 bg-indigo-50/90 border-b border-indigo-100 flex items-center justify-between text-[11px] text-indigo-800 font-medium">
+            <span>👉 Geser ke kanan untuk melihat tanggal 1 - 31</span>
+            <span className="font-mono text-[10px] bg-white px-2 py-0.5 rounded border border-indigo-200 font-bold">
+              1 - {daysWithSession.length}
+            </span>
+          </div>
+
+          <table className="w-full text-xs text-left border-collapse table-fixed min-w-[1100px] sm:min-w-[1550px]">
             <colgroup>
-              <col className="w-10" />
-              <col className="w-28" />
-              <col className="w-48" />
+              <col className="w-8 sm:w-10" />
+              <col className="hidden sm:table-column sm:w-28" />
+              <col className="w-28 sm:w-48" />
               {daysWithSession.map(info => (
                 <col key={info.day} className="w-8" />
               ))}
-              <col className="w-9" />
-              <col className="w-9" />
-              <col className="w-9" />
-              <col className="w-9" />
-              <col className="w-9" />
-              <col className="w-14" />
+              <col className="w-8 sm:w-9" />
+              <col className="w-8 sm:w-9" />
+              <col className="w-8 sm:w-9" />
+              <col className="w-8 sm:w-9" />
+              <col className="w-8 sm:w-9" />
+              <col className="w-12 sm:w-14" />
             </colgroup>
 
             <thead className="bg-slate-100 text-slate-700 font-bold sticky top-0 z-20 shadow-xs">
               <tr>
-                <th className="px-2 py-2.5 text-center w-10 border-b border-r border-slate-200 sticky left-0 bg-slate-100 z-30">
+                <th className="px-2 py-2.5 text-center w-8 sm:w-10 border-b border-r border-slate-200 sticky left-0 bg-slate-100 z-30 font-mono text-[11px]">
                   No
                 </th>
-                <th className="px-3 py-2.5 w-28 border-b border-r border-slate-200 sticky left-10 bg-slate-100 z-30 font-mono text-[11px]">
+                <th className="hidden sm:table-cell px-3 py-2.5 w-28 border-b border-r border-slate-200 sticky left-10 bg-slate-100 z-30 font-mono text-[11px]">
                   NISN
                 </th>
-                <th className="px-3 py-2.5 w-48 border-b border-r border-slate-200 sticky left-[152px] bg-slate-100 z-30 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
+                <th className="px-2.5 sm:px-3 py-2.5 w-28 sm:w-48 border-b border-r-2 border-slate-300 sticky left-8 sm:left-[152px] bg-slate-100 z-30 text-xs shadow-[2px_0_5px_rgba(0,0,0,0.06)]">
                   Nama Siswa
                 </th>
 
@@ -1126,12 +1508,12 @@ const PiketMonthlyReportSection = React.memo(function PiketMonthlyReportSection(
                   </th>
                 ))}
 
-                <th className="px-2 py-2.5 text-center w-9 border-b border-r border-slate-200 bg-emerald-50 text-emerald-800">H</th>
-                <th className="px-2 py-2.5 text-center w-9 border-b border-r border-slate-200 bg-blue-50 text-blue-800">S</th>
-                <th className="px-2 py-2.5 text-center w-9 border-b border-r border-slate-200 bg-amber-50 text-amber-800">I</th>
-                <th className="px-2 py-2.5 text-center w-9 border-b border-r border-slate-200 bg-rose-50 text-rose-800">A</th>
-                <th className="px-2 py-2.5 text-center w-9 border-b border-r border-slate-200 bg-orange-50 text-orange-800">T</th>
-                <th className="px-2 py-2.5 text-center w-14 border-b border-slate-200 bg-indigo-50 text-indigo-900">%</th>
+                <th className="px-1.5 py-2.5 text-center w-8 sm:w-9 border-b border-r border-slate-200 bg-emerald-50 text-emerald-800">H</th>
+                <th className="px-1.5 py-2.5 text-center w-8 sm:w-9 border-b border-r border-slate-200 bg-blue-50 text-blue-800">S</th>
+                <th className="px-1.5 py-2.5 text-center w-8 sm:w-9 border-b border-r border-slate-200 bg-amber-50 text-amber-800">I</th>
+                <th className="px-1.5 py-2.5 text-center w-8 sm:w-9 border-b border-r border-slate-200 bg-rose-50 text-rose-800">A</th>
+                <th className="px-1.5 py-2.5 text-center w-8 sm:w-9 border-b border-r border-slate-200 bg-orange-50 text-orange-800">T</th>
+                <th className="px-1.5 py-2.5 text-center w-12 sm:w-14 border-b border-slate-200 bg-indigo-50 text-indigo-900">%</th>
               </tr>
             </thead>
 
@@ -1144,11 +1526,14 @@ const PiketMonthlyReportSection = React.memo(function PiketMonthlyReportSection(
                     <td className="px-2 py-2 text-center border-r border-slate-100 sticky left-0 bg-white z-10 font-mono text-[11px] text-slate-500">
                       {idx + 1}
                     </td>
-                    <td className="px-3 py-2 border-r border-slate-100 sticky left-10 bg-white z-10 font-mono text-[11px] text-slate-600">
+                    <td className="hidden sm:table-cell px-3 py-2 border-r border-slate-100 sticky left-10 bg-white z-10 font-mono text-[11px] text-slate-600">
                       {student.nisn}
                     </td>
-                    <td className="px-3 py-2 border-r border-slate-100 sticky left-[152px] bg-white z-10 font-semibold text-slate-900 truncate max-w-[192px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
-                      {student.name}
+                    <td className="px-2.5 sm:px-3 py-2 border-r-2 border-slate-300 sticky left-8 sm:left-[152px] bg-white z-10 font-semibold text-slate-900 truncate max-w-[112px] sm:max-w-[192px] shadow-[2px_0_5px_rgba(0,0,0,0.06)]">
+                      <div className="truncate">{student.name}</div>
+                      <div className="sm:hidden text-[9px] text-slate-400 font-mono font-normal truncate">
+                        {student.nisn}
+                      </div>
                     </td>
 
                     {daysWithSession.map(info => {
@@ -1197,7 +1582,10 @@ const PiketMonthlyReportSection = React.memo(function PiketMonthlyReportSection(
 
             <tfoot className="bg-slate-100 text-slate-900 font-extrabold sticky bottom-0 z-20 border-t-2 border-slate-300 shadow-md">
               <tr>
-                <td colSpan={3} className="px-3 py-2.5 text-right border-r border-slate-200 sticky left-0 bg-slate-100 z-30 uppercase text-xs tracking-wider">
+                <td colSpan={2} className="sm:hidden px-2.5 py-2.5 text-right border-r-2 border-slate-300 sticky left-0 bg-slate-100 z-30 uppercase text-[11px] font-black tracking-wider shadow-[2px_0_5px_rgba(0,0,0,0.06)]">
+                  Hadir:
+                </td>
+                <td colSpan={3} className="hidden sm:table-cell px-3 py-2.5 text-right border-r-2 border-slate-300 sticky left-0 bg-slate-100 z-30 uppercase text-xs tracking-wider">
                   Jumlah Siswa Hadir:
                 </td>
 
@@ -3614,11 +4002,11 @@ export default function ELearningPage() {
               </div>
 
               {/* Clean Sub-tabs: Presensi / Laporan / Materi & Tugas / CBT / Pengawas */}
-              <div className="inline-flex items-center gap-1 bg-slate-100/90 p-1 rounded-xl border border-slate-200/80 text-xs overflow-x-auto no-scrollbar max-w-full">
+              <div className="grid grid-cols-2 sm:flex sm:items-center gap-1 bg-slate-100/90 p-1 rounded-xl border border-slate-200/80 text-xs w-full sm:w-auto">
                 <button
                   type="button"
                   onClick={() => setActiveMenu('presensi')}
-                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+                  className={`px-3 py-2 sm:py-1.5 rounded-lg transition-all cursor-pointer text-center sm:whitespace-nowrap ${
                     activeMenu === 'presensi' 
                       ? 'bg-white text-indigo-700 font-bold shadow-xs border border-indigo-100/60' 
                       : 'text-slate-600 hover:text-slate-900 hover:bg-white/60 font-medium'
@@ -3629,7 +4017,7 @@ export default function ELearningPage() {
                 <button
                   type="button"
                   onClick={() => setActiveMenu('laporan')}
-                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+                  className={`px-3 py-2 sm:py-1.5 rounded-lg transition-all cursor-pointer text-center sm:whitespace-nowrap ${
                     activeMenu === 'laporan' 
                       ? 'bg-white text-indigo-700 font-bold shadow-xs border border-indigo-100/60' 
                       : 'text-slate-600 hover:text-slate-900 hover:bg-white/60 font-medium'
@@ -3640,7 +4028,7 @@ export default function ELearningPage() {
                 <button
                   type="button"
                   onClick={() => setActiveMenu('tugas')}
-                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+                  className={`px-3 py-2 sm:py-1.5 rounded-lg transition-all cursor-pointer text-center sm:whitespace-nowrap ${
                     activeMenu === 'tugas' 
                       ? 'bg-white text-indigo-700 font-bold shadow-xs border border-indigo-100/60' 
                       : 'text-slate-600 hover:text-slate-900 hover:bg-white/60 font-medium'
@@ -3651,7 +4039,7 @@ export default function ELearningPage() {
                 <button
                   type="button"
                   onClick={() => setActiveMenu('cbt')}
-                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+                  className={`px-3 py-2 sm:py-1.5 rounded-lg transition-all cursor-pointer text-center sm:whitespace-nowrap ${
                     activeMenu === 'cbt' 
                       ? 'bg-white text-indigo-700 font-bold shadow-xs border border-indigo-100/60' 
                       : 'text-slate-600 hover:text-slate-900 hover:bg-white/60 font-medium'
@@ -3662,7 +4050,7 @@ export default function ELearningPage() {
                 <button
                   type="button"
                   onClick={() => setActiveMenu('pengawas')}
-                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+                  className={`col-span-2 sm:col-span-1 px-3 py-2 sm:py-1.5 rounded-lg transition-all cursor-pointer text-center sm:whitespace-nowrap ${
                     activeMenu === 'pengawas' 
                       ? 'bg-white text-indigo-700 font-bold shadow-xs border border-indigo-100/60' 
                       : 'text-slate-600 hover:text-slate-900 hover:bg-white/60 font-medium'
@@ -3740,12 +4128,12 @@ export default function ELearningPage() {
 
                 {/* Table Container */}
                 <div className="bg-white border border-indigo-100 rounded-2xl overflow-hidden shadow-sm">
-                  <div className="px-4 py-3 bg-slate-50 border-b border-indigo-50 flex items-center justify-between text-xs text-slate-500">
-                    <span className="font-bold text-slate-900">
+                  <div className="px-3.5 sm:px-4 py-3 bg-slate-50 border-b border-indigo-50 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-xs text-slate-500">
+                    <span className="font-bold text-slate-900 text-xs sm:text-sm">
                       Daftar Siswa {selectedClassId} ({currentClassStudents.length})
                     </span>
-                    <span className="hidden sm:inline font-mono text-[11px] text-slate-500 font-medium">
-                      <span className="text-emerald-700 font-bold">H: Hadir</span> · <span className="text-blue-700 font-bold">S: Sakit</span> · <span className="text-amber-700 font-bold">I: Izin</span> · <span className="text-rose-700 font-bold">A: Alpa</span> · <span className="text-purple-700 font-bold">K: Keluar</span>
+                    <span className="font-mono text-[10px] sm:text-[11px] text-slate-500 font-medium flex items-center gap-1.5 flex-wrap">
+                      <span className="text-emerald-700 font-bold">H: Hadir</span> · <span className="text-blue-700 font-bold">S: Sakit</span> · <span className="text-amber-700 font-bold">I: Izin</span> · <span className="text-rose-700 font-bold">A: Alpa</span> · <span className="text-orange-700 font-bold">T: Telat</span>
                     </span>
                   </div>
 
@@ -3758,7 +4146,7 @@ export default function ELearningPage() {
                       return (
                         <div 
                           key={student.id} 
-                          className={`px-4 py-2.5 sm:py-3 flex items-center justify-between gap-3 transition ${
+                          className={`p-3.5 sm:px-4 sm:py-3 transition flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 sm:gap-3 ${
                             isExit
                               ? 'bg-rose-50/20 border-l-4 border-rose-400'
                               : currentStatus !== 'H' 
@@ -3766,151 +4154,187 @@ export default function ELearningPage() {
                                 : 'hover:bg-indigo-50/30'
                           }`}
                         >
-                          {/* Student Identity: flex-1 min-w-0 absorbs name length differences */}
-                          <div className="flex items-center gap-3 min-w-0 flex-1 pr-2">
-                            <span className="w-6 shrink-0 font-mono text-xs text-slate-400 text-center font-semibold">{idx + 1}</span>
-                            <div className="min-w-0">
-                              <div className="text-xs sm:text-sm font-semibold flex items-center gap-1.5 truncate">
-                                <span className={`truncate ${isExit ? 'line-through text-slate-500 font-medium' : 'text-slate-900'}`}>
-                                  {student.name}
+                          {/* Student Identity: Full name & info with mobile status pill */}
+                          <div className="flex items-center justify-between sm:justify-start gap-2.5 sm:gap-3 min-w-0 sm:flex-1">
+                            <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
+                              <span className="w-6 shrink-0 font-mono text-xs text-slate-400 text-center font-bold">
+                                {idx + 1}
+                              </span>
+                              <div className="min-w-0 flex-1">
+                                <div className="text-xs sm:text-sm font-semibold flex items-center gap-1.5 flex-wrap sm:flex-nowrap">
+                                  <span className={`${isExit ? 'line-through text-slate-500 font-medium' : 'text-slate-900'} break-words`}>
+                                    {student.name}
+                                  </span>
+                                  {student.gender && student.gender !== '-' && (
+                                    <span className="text-[10px] text-slate-400 font-mono shrink-0">({student.gender})</span>
+                                  )}
+                                  {isExit && (
+                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300 shrink-0">
+                                      🚪 KELUAR SEKOLAH
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[10px] text-slate-400 font-mono flex items-center gap-1.5 mt-0.5">
+                                  <span>NISN: {student.nisn}</span>
+                                  {isExit && student.exitReason && (
+                                    <span className="text-rose-600 font-medium truncate">
+                                      • Alasan: {student.exitReason} {student.exitDate ? `(${student.exitDate})` : ''}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Mobile-only status badge pill */}
+                            <div className="sm:hidden shrink-0">
+                              {isExit ? (
+                                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
+                                  Keluar
                                 </span>
-                                {student.gender && student.gender !== '-' && (
-                                  <span className="text-[10px] text-slate-400 font-mono shrink-0">({student.gender})</span>
-                                )}
-                                {isExit && (
-                                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300 shrink-0">
-                                    🚪 KELUAR SEKOLAH
-                                  </span>
-                                )}
-                              </div>
-                              <div className="text-[10px] text-slate-400 font-mono">
-                                NISN: {student.nisn}
-                                {isExit && student.exitReason && (
-                                  <span className="text-rose-600 font-medium ml-1.5">
-                                    • Alasan: {student.exitReason} {student.exitDate ? `(${student.exitDate})` : ''}
-                                  </span>
-                                )}
-                              </div>
+                              ) : currentStatus === 'H' ? (
+                                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  Hadir
+                                </span>
+                              ) : currentStatus === 'S' ? (
+                                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                  Sakit
+                                </span>
+                              ) : currentStatus === 'I' ? (
+                                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                  Izin
+                                </span>
+                              ) : currentStatus === 'A' ? (
+                                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                  Alpa
+                                </span>
+                              ) : currentStatus === 'T' ? (
+                                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-orange-50 text-orange-700 border border-orange-200">
+                                  Telat
+                                </span>
+                              ) : null}
                             </div>
                           </div>
 
-                          {/* Status / Buttons: exactly w-[190px] shrink-0 across ALL rows */}
-                          <div className="w-[190px] shrink-0 flex items-center justify-center gap-1">
-                            {isExit ? (
-                              <div className="flex items-center gap-1.5">
-                                <span className="px-2.5 py-1 rounded-lg bg-rose-100 border border-rose-200 text-rose-800 text-[11px] font-black shadow-2xs flex items-center gap-1">
-                                  <span>🚪</span>
-                                  <span>KELUAR (K)</span>
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => setRestoreModalStudent(student)}
-                                  className="px-2 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 text-[10px] font-bold transition cursor-pointer"
-                                  title="Aktifkan kembali siswa ini"
-                                >
-                                  🔄 Pulihkan
-                                </button>
-                              </div>
-                            ) : (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={() => handleSetStudentStatus(student.id, 'H')}
-                                  className={`w-7 sm:w-8 h-8 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer ${
-                                    currentStatus === 'H'
-                                      ? 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-400 font-bold'
-                                      : 'bg-slate-100 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 font-medium'
-                                  }`}
-                                  title="Hadir"
-                                >
-                                  H
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleSetStudentStatus(student.id, 'S')}
-                                  className={`w-7 sm:w-8 h-8 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer ${
-                                    currentStatus === 'S'
-                                      ? 'bg-blue-600 text-white shadow-sm ring-2 ring-blue-400 font-bold'
-                                      : 'bg-slate-100 text-slate-600 hover:bg-blue-50 hover:text-blue-700 font-medium'
-                                  }`}
-                                  title="Sakit"
-                                >
-                                  S
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleSetStudentStatus(student.id, 'I')}
-                                  className={`w-7 sm:w-8 h-8 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer ${
-                                    currentStatus === 'I'
-                                      ? 'bg-amber-500 text-white shadow-sm ring-2 ring-amber-400 font-bold'
-                                      : 'bg-slate-100 text-slate-600 hover:bg-amber-50 hover:text-amber-700 font-medium'
-                                  }`}
-                                  title="Izin"
-                                >
-                                  I
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleSetStudentStatus(student.id, 'A')}
-                                  className={`w-7 sm:w-8 h-8 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer ${
-                                    currentStatus === 'A'
-                                      ? 'bg-rose-600 text-white shadow-sm ring-2 ring-rose-400 font-bold'
-                                      : 'bg-slate-100 text-slate-600 hover:bg-rose-50 hover:text-rose-700 font-medium'
-                                  }`}
-                                  title="Alpa"
-                                >
-                                  A
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleSetStudentStatus(student.id, 'T')}
-                                  className={`w-7 sm:w-8 h-8 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer ${
-                                    currentStatus === 'T'
-                                      ? 'bg-orange-500 text-white shadow-sm ring-2 ring-orange-400 font-bold'
-                                      : 'bg-slate-100 text-slate-600 hover:bg-orange-50 hover:text-orange-700 font-medium'
-                                  }`}
-                                  title="Terlambat"
-                                >
-                                  T
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenMarkExitModal(student)}
-                                  className="w-7 sm:w-8 h-8 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer bg-slate-100 text-slate-400 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200"
-                                  title="Tandai Siswa Keluar Sekolah (Pindah / Tidak Bersekolah Lagi)"
-                                >
-                                  🚪
-                                </button>
-                              </>
-                            )}
-                          </div>
+                          {/* Status Buttons & Note Input */}
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
+                            {/* Status Buttons: Grid 6 cols on mobile, flex on desktop */}
+                            <div className="w-full sm:w-[190px] shrink-0 grid grid-cols-6 sm:flex sm:items-center sm:justify-center gap-1 sm:gap-1">
+                              {isExit ? (
+                                <div className="col-span-6 flex items-center justify-between sm:justify-center gap-1.5">
+                                  <span className="px-2.5 py-1 rounded-lg bg-rose-100 border border-rose-200 text-rose-800 text-[11px] font-black shadow-2xs flex items-center gap-1">
+                                    <span>🚪</span>
+                                    <span>KELUAR (K)</span>
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setRestoreModalStudent(student)}
+                                    className="px-2 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 text-[10px] font-bold transition cursor-pointer"
+                                    title="Aktifkan kembali siswa ini"
+                                  >
+                                    🔄 Pulihkan
+                                  </button>
+                                </div>
+                              ) : (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSetStudentStatus(student.id, 'H')}
+                                    className={`h-8 sm:w-8 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer ${
+                                      currentStatus === 'H'
+                                        ? 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-400 font-bold'
+                                        : 'bg-slate-100 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 font-medium'
+                                    }`}
+                                    title="Hadir"
+                                  >
+                                    H
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSetStudentStatus(student.id, 'S')}
+                                    className={`h-8 sm:w-8 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer ${
+                                      currentStatus === 'S'
+                                        ? 'bg-blue-600 text-white shadow-sm ring-2 ring-blue-400 font-bold'
+                                        : 'bg-slate-100 text-slate-600 hover:bg-blue-50 hover:text-blue-700 font-medium'
+                                    }`}
+                                    title="Sakit"
+                                  >
+                                    S
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSetStudentStatus(student.id, 'I')}
+                                    className={`h-8 sm:w-8 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer ${
+                                      currentStatus === 'I'
+                                        ? 'bg-amber-500 text-white shadow-sm ring-2 ring-amber-400 font-bold'
+                                        : 'bg-slate-100 text-slate-600 hover:bg-amber-50 hover:text-amber-700 font-medium'
+                                    }`}
+                                    title="Izin"
+                                  >
+                                    I
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSetStudentStatus(student.id, 'A')}
+                                    className={`h-8 sm:w-8 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer ${
+                                      currentStatus === 'A'
+                                        ? 'bg-rose-600 text-white shadow-sm ring-2 ring-rose-400 font-bold'
+                                        : 'bg-slate-100 text-slate-600 hover:bg-rose-50 hover:text-rose-700 font-medium'
+                                    }`}
+                                    title="Alpa"
+                                  >
+                                    A
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSetStudentStatus(student.id, 'T')}
+                                    className={`h-8 sm:w-8 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer ${
+                                      currentStatus === 'T'
+                                        ? 'bg-orange-500 text-white shadow-sm ring-2 ring-orange-400 font-bold'
+                                        : 'bg-slate-100 text-slate-600 hover:bg-orange-50 hover:text-orange-700 font-medium'
+                                    }`}
+                                    title="Terlambat"
+                                  >
+                                    T
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenMarkExitModal(student)}
+                                    className="h-8 sm:w-8 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer bg-slate-100 text-slate-400 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200"
+                                    title="Tandai Siswa Keluar Sekolah (Pindah / Tidak Bersekolah Lagi)"
+                                  >
+                                    🚪
+                                  </button>
+                                </>
+                              )}
+                            </div>
 
-                          {/* Note input ONLY when status is NOT Hadir and not Keluar */}
-                          <div className="w-44 sm:w-52 shrink-0 text-right">
-                            {isExit ? (
-                              <div className="text-right pr-2">
-                                <span className="text-[11px] text-rose-700 font-semibold">Tidak Sekolah Lagi</span>
-                              </div>
-                            ) : currentStatus !== 'H' ? (
-                              <AttendanceNoteInput
-                                value={currentNote}
-                                onCommit={(val) => handleSetStudentNote(student.id, val)}
-                                onInstantChange={(val) => {
-                                  workingNotesRef.current[student.id] = val;
-                                }}
-                                placeholder={
-                                  currentStatus === 'S' ? 'Alasan sakit...' :
-                                  currentStatus === 'I' ? 'Alasan izin...' :
-                                  currentStatus === 'T' ? 'Alasan terlambat...' :
-                                  'Keterangan...'
-                                }
-                                className="w-full px-2.5 py-1 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-indigo-500 focus:bg-white placeholder:text-slate-400"
-                              />
-                            ) : (
-                              <div className="text-right pr-2">
-                                <span className="text-[11px] text-emerald-600 font-semibold">Hadir</span>
-                              </div>
-                            )}
+                            {/* Note input on Mobile (full width when needed) vs Desktop (fixed width) */}
+                            <div className={`w-full sm:w-44 lg:sm:w-52 shrink-0 ${currentStatus === 'H' && !isExit ? 'hidden sm:block' : 'block'}`}>
+                              {isExit ? (
+                                <div className="text-left sm:text-right sm:pr-2">
+                                  <span className="text-[11px] text-rose-700 font-semibold">Tidak Sekolah Lagi</span>
+                                </div>
+                              ) : currentStatus !== 'H' ? (
+                                <AttendanceNoteInput
+                                  value={currentNote}
+                                  onCommit={(val) => handleSetStudentNote(student.id, val)}
+                                  onInstantChange={(val) => {
+                                    workingNotesRef.current[student.id] = val;
+                                  }}
+                                  placeholder={
+                                    currentStatus === 'S' ? 'Alasan sakit...' :
+                                    currentStatus === 'I' ? 'Alasan izin...' :
+                                    currentStatus === 'T' ? 'Alasan terlambat...' :
+                                    'Keterangan...'
+                                  }
+                                  className="w-full px-2.5 py-1 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-indigo-500 focus:bg-white placeholder:text-slate-400"
+                                />
+                              ) : (
+                                <div className="hidden sm:block text-right pr-2">
+                                  <span className="text-[11px] text-emerald-600 font-semibold">Hadir</span>
+                                </div>
+                              )}
+                            </div>
                           </div>
 
                         </div>
@@ -4525,11 +4949,11 @@ export default function ELearningPage() {
               {/* Navigation Tabs & Actions Bar */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-1">
                 {/* Tab Switcher: Live Hari Ini vs Matriks Bulanan */}
-                <div className="inline-flex items-center gap-1 bg-slate-100/90 p-1 rounded-xl border border-slate-200/80 text-xs">
+                <div className="grid grid-cols-2 sm:inline-flex items-center gap-1 bg-slate-100/90 p-1 rounded-xl border border-slate-200/80 text-xs w-full sm:w-auto">
                   <button
                     type="button"
                     onClick={() => setPiketViewTab('live')}
-                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap text-center ${
                       piketViewTab === 'live'
                         ? 'bg-white text-emerald-700 font-bold shadow-xs border border-emerald-100/60'
                         : 'text-slate-600 hover:text-slate-900 hover:bg-white/60 font-medium'
@@ -4540,7 +4964,7 @@ export default function ELearningPage() {
                   <button
                     type="button"
                     onClick={() => setPiketViewTab('laporan')}
-                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap text-center ${
                       piketViewTab === 'laporan'
                         ? 'bg-white text-emerald-700 font-bold shadow-xs border border-emerald-100/60'
                         : 'text-slate-600 hover:text-slate-900 hover:bg-white/60 font-medium'
@@ -5036,7 +5460,7 @@ export default function ELearningPage() {
                     data-lenis-prevent-touch="true"
                     onWheel={(e) => e.stopPropagation()}
                     onTouchMove={(e) => e.stopPropagation()}
-                    className="p-5 overflow-y-auto overscroll-contain flex-1 min-h-0 space-y-3 divide-y divide-slate-100 text-xs select-text [scrollbar-width:thin]"
+                    className="p-4 sm:p-5 overflow-y-auto overscroll-contain flex-1 min-h-0 space-y-3 divide-y divide-slate-100 text-xs select-text [scrollbar-width:thin]"
                   >
                     {activeStudents.filter(s => s.classId === detailModalClassId).map((student, idx) => {
                       const isExit = student.status === 'Keluar';
@@ -5044,161 +5468,196 @@ export default function ELearningPage() {
                       const currentNote = piketModalNotes[student.id] || (isExit ? (student.exitReason || 'Sudah Keluar Sekolah') : '');
 
                       return (
-                        <div key={student.id} className={`pt-3 first:pt-0 flex items-center justify-between gap-3 ${isExit ? 'opacity-85' : ''}`}>
-                          {/* Nama Siswa: flex-1 min-w-0 absorbs name length */}
-                          <div className="flex items-center gap-2.5 min-w-0 flex-1 pr-2">
-                            <span className="w-5 shrink-0 text-slate-400 font-mono font-semibold">{idx + 1}.</span>
-                            <div className="min-w-0">
-                              <div className="font-semibold text-slate-900 flex items-center gap-1.5 truncate">
-                                <span className={`truncate ${isExit ? 'line-through text-slate-500 font-medium' : 'text-slate-900'}`}>{student.name}</span>
-                                {student.gender && student.gender !== '-' && (
-                                  <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono shrink-0 ${
-                                    student.gender === 'L' ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-pink-50 text-pink-700 border border-pink-200'
-                                  }`}>
-                                    {student.gender}
-                                  </span>
-                                )}
-                                {isExit && (
-                                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300 shrink-0">
-                                    🚪 KELUAR SEKOLAH
-                                  </span>
-                                )}
+                        <div 
+                          key={student.id} 
+                          className={`pt-3 first:pt-0 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 sm:gap-3 ${isExit ? 'opacity-85' : ''}`}
+                        >
+                          {/* Nama Siswa & Mobile Status Badge */}
+                          <div className="flex items-center justify-between sm:justify-start gap-2.5 sm:gap-3 min-w-0 sm:flex-1">
+                            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                              <span className="w-5 shrink-0 text-slate-400 font-mono font-semibold">{idx + 1}.</span>
+                              <div className="min-w-0 flex-1">
+                                <div className="font-semibold text-slate-900 flex items-center gap-1.5 flex-wrap sm:flex-nowrap">
+                                  <span className={`${isExit ? 'line-through text-slate-500 font-medium' : 'text-slate-900'} break-words`}>{student.name}</span>
+                                  {student.gender && student.gender !== '-' && (
+                                    <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono shrink-0 ${
+                                      student.gender === 'L' ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-pink-50 text-pink-700 border border-pink-200'
+                                    }`}>
+                                      {student.gender}
+                                    </span>
+                                  )}
+                                  {isExit && (
+                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300 shrink-0">
+                                      🚪 KELUAR SEKOLAH
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="text-slate-400 text-[10px] font-mono block mt-0.5">
+                                  NISN: {student.nisn} {student.nis ? `• NIS: ${student.nis}` : ''}
+                                  {isExit && student.exitReason && (
+                                    <span className="text-rose-600 font-medium ml-1.5">
+                                      • Alasan: {student.exitReason} {student.exitDate ? `(${student.exitDate})` : ''}
+                                    </span>
+                                  )}
+                                </span>
                               </div>
-                              <span className="text-slate-400 text-[10px] font-mono">
-                                NISN: {student.nisn} {student.nis ? `• NIS: ${student.nis}` : ''}
-                                {isExit && student.exitReason && (
-                                  <span className="text-rose-600 font-medium ml-1.5">
-                                    • Alasan: {student.exitReason} {student.exitDate ? `(${student.exitDate})` : ''}
-                                  </span>
-                                )}
-                              </span>
+                            </div>
+
+                            {/* Mobile-only status badge pill */}
+                            <div className="sm:hidden shrink-0">
+                              {isExit ? (
+                                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
+                                  Keluar
+                                </span>
+                              ) : currentStatus === 'H' ? (
+                                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  Hadir
+                                </span>
+                              ) : currentStatus === 'S' ? (
+                                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                  Sakit
+                                </span>
+                              ) : currentStatus === 'I' ? (
+                                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                  Izin
+                                </span>
+                              ) : currentStatus === 'A' ? (
+                                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                  Alpa
+                                </span>
+                              ) : currentStatus === 'T' ? (
+                                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-orange-50 text-orange-700 border border-orange-200">
+                                  Telat
+                                </span>
+                              ) : null}
                             </div>
                           </div>
 
-                          {/* Tombol Status Interaktif untuk Piket: exactly w-[190px] shrink-0 */}
-                          <div className="w-[190px] shrink-0 flex items-center justify-center gap-1">
-                            {isExit ? (
-                              <div className="flex items-center gap-1.5">
-                                <span className="px-2.5 py-1 rounded-lg bg-rose-100 border border-rose-200 text-rose-800 text-[11px] font-black shadow-2xs flex items-center gap-1">
-                                  <span>🚪</span>
-                                  <span>KELUAR (K)</span>
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => setRestoreModalStudent(student)}
-                                  className="px-2 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 text-[10px] font-bold transition cursor-pointer"
-                                  title="Aktifkan kembali siswa ini"
-                                >
-                                  🔄 Pulihkan
-                                </button>
-                              </div>
-                            ) : (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={() => handleSetPiketStudentStatus(student.id, 'H')}
-                                  className={`w-7 sm:w-8 h-8 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer ${
-                                    currentStatus === 'H'
-                                      ? 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-400 font-bold'
-                                      : 'bg-slate-100 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 font-medium'
-                                  }`}
-                                  title="Hadir"
-                                >
-                                  H
-                                </button>
+                          {/* Tombol Status Interaktif untuk Piket */}
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
+                            <div className="w-full sm:w-[190px] shrink-0 grid grid-cols-6 sm:flex sm:items-center sm:justify-center gap-1 sm:gap-1">
+                              {isExit ? (
+                                <div className="col-span-6 flex items-center justify-between sm:justify-center gap-1.5">
+                                  <span className="px-2.5 py-1 rounded-lg bg-rose-100 border border-rose-200 text-rose-800 text-[11px] font-black shadow-2xs flex items-center gap-1">
+                                    <span>🚪</span>
+                                    <span>KELUAR (K)</span>
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setRestoreModalStudent(student)}
+                                    className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 text-[10px] font-bold transition cursor-pointer"
+                                    title="Aktifkan kembali siswa ini"
+                                  >
+                                    🔄 Pulihkan
+                                  </button>
+                                </div>
+                              ) : (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSetPiketStudentStatus(student.id, 'H')}
+                                    className={`h-8 sm:w-8 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer ${
+                                      currentStatus === 'H'
+                                        ? 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-400 font-bold'
+                                        : 'bg-slate-100 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 font-medium'
+                                    }`}
+                                    title="Hadir"
+                                  >
+                                    H
+                                  </button>
 
-                                <button
-                                  type="button"
-                                  onClick={() => handleSetPiketStudentStatus(student.id, 'S')}
-                                  className={`w-7 sm:w-8 h-8 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer ${
-                                    currentStatus === 'S'
-                                      ? 'bg-blue-600 text-white shadow-sm ring-2 ring-blue-400 font-bold'
-                                      : 'bg-slate-100 text-slate-600 hover:bg-blue-50 hover:text-blue-700 font-medium'
-                                  }`}
-                                  title="Sakit"
-                                >
-                                  S
-                                </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSetPiketStudentStatus(student.id, 'S')}
+                                    className={`h-8 sm:w-8 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer ${
+                                      currentStatus === 'S'
+                                        ? 'bg-blue-600 text-white shadow-sm ring-2 ring-blue-400 font-bold'
+                                        : 'bg-slate-100 text-slate-600 hover:bg-blue-50 hover:text-blue-700 font-medium'
+                                    }`}
+                                    title="Sakit"
+                                  >
+                                    S
+                                  </button>
 
-                                <button
-                                  type="button"
-                                  onClick={() => handleSetPiketStudentStatus(student.id, 'I')}
-                                  className={`w-7 sm:w-8 h-8 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer ${
-                                    currentStatus === 'I'
-                                      ? 'bg-amber-500 text-white shadow-sm ring-2 ring-amber-400 font-bold'
-                                      : 'bg-slate-100 text-slate-600 hover:bg-amber-50 hover:text-amber-700 font-medium'
-                                  }`}
-                                  title="Izin"
-                                >
-                                  I
-                                </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSetPiketStudentStatus(student.id, 'I')}
+                                    className={`h-8 sm:w-8 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer ${
+                                      currentStatus === 'I'
+                                        ? 'bg-amber-500 text-white shadow-sm ring-2 ring-amber-400 font-bold'
+                                        : 'bg-slate-100 text-slate-600 hover:bg-amber-50 hover:text-amber-700 font-medium'
+                                    }`}
+                                    title="Izin"
+                                  >
+                                    I
+                                  </button>
 
-                                <button
-                                  type="button"
-                                  onClick={() => handleSetPiketStudentStatus(student.id, 'A')}
-                                  className={`w-7 sm:w-8 h-8 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer ${
-                                    currentStatus === 'A'
-                                      ? 'bg-rose-600 text-white shadow-sm ring-2 ring-rose-400 font-bold'
-                                      : 'bg-slate-100 text-slate-600 hover:bg-rose-50 hover:text-rose-700 font-medium'
-                                  }`}
-                                  title="Alpa"
-                                >
-                                  A
-                                </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSetPiketStudentStatus(student.id, 'A')}
+                                    className={`h-8 sm:w-8 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer ${
+                                      currentStatus === 'A'
+                                        ? 'bg-rose-600 text-white shadow-sm ring-2 ring-rose-400 font-bold'
+                                        : 'bg-slate-100 text-slate-600 hover:bg-rose-50 hover:text-rose-700 font-medium'
+                                    }`}
+                                    title="Alpa"
+                                  >
+                                    A
+                                  </button>
 
-                                <button
-                                  type="button"
-                                  onClick={() => handleSetPiketStudentStatus(student.id, 'T')}
-                                  className={`w-7 sm:w-8 h-8 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer ${
-                                    currentStatus === 'T'
-                                      ? 'bg-orange-500 text-white shadow-sm ring-2 ring-orange-400 font-bold'
-                                      : 'bg-slate-100 text-slate-600 hover:bg-orange-50 hover:text-orange-700 font-medium'
-                                  }`}
-                                  title="Terlambat"
-                                >
-                                  T
-                                </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSetPiketStudentStatus(student.id, 'T')}
+                                    className={`h-8 sm:w-8 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer ${
+                                      currentStatus === 'T'
+                                        ? 'bg-orange-500 text-white shadow-sm ring-2 ring-orange-400 font-bold'
+                                        : 'bg-slate-100 text-slate-600 hover:bg-orange-50 hover:text-orange-700 font-medium'
+                                    }`}
+                                    title="Terlambat"
+                                  >
+                                    T
+                                  </button>
 
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenMarkExitModal(student)}
-                                  className="w-7 sm:w-8 h-8 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer bg-slate-100 text-slate-400 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200"
-                                  title="Tandai Siswa Keluar Sekolah (Pindah / Tidak Bersekolah Lagi)"
-                                >
-                                  🚪
-                                </button>
-                              </>
-                            )}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenMarkExitModal(student)}
+                                    className="h-8 sm:w-8 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer bg-slate-100 text-slate-400 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200"
+                                    title="Tandai Siswa Keluar Sekolah (Pindah / Tidak Bersekolah Lagi)"
+                                  >
+                                    🚪
+                                  </button>
+                                </>
+                              )}
+                            </div>
+
+                            {/* Kolom Catatan Piket */}
+                            <div className={`w-full sm:w-44 lg:sm:w-52 shrink-0 ${currentStatus === 'H' && !isExit ? 'hidden sm:block' : 'block'}`}>
+                              {isExit ? (
+                                <div className="text-left sm:text-right sm:pr-2">
+                                  <span className="text-[11px] text-rose-700 font-semibold">Tidak Sekolah Lagi</span>
+                                </div>
+                              ) : currentStatus !== 'H' ? (
+                                <AttendanceNoteInput
+                                  value={currentNote}
+                                  onCommit={(val) => handleSetPiketStudentNote(student.id, val)}
+                                  onInstantChange={(val) => {
+                                    piketModalNotesRef.current[student.id] = val;
+                                  }}
+                                  placeholder={
+                                    currentStatus === 'S' ? 'Catatan sakit...' :
+                                    currentStatus === 'I' ? 'Catatan izin...' :
+                                    currentStatus === 'T' ? 'Alasan telat...' :
+                                    'Keterangan...'
+                                  }
+                                  className="w-full px-2.5 py-1 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white placeholder:text-slate-400"
+                                />
+                              ) : (
+                                <div className="hidden sm:block text-right pr-2">
+                                  <span className="text-[11px] text-emerald-700 font-semibold">Hadir</span>
+                                </div>
+                              )}
+                            </div>
                           </div>
-
-                          {/* Kolom Catatan Piket: exactly w-44 sm:w-52 shrink-0 across ALL rows */}
-                          <div className="w-44 sm:w-52 shrink-0 text-right">
-                            {isExit ? (
-                              <div className="text-right pr-2">
-                                <span className="text-[11px] text-rose-700 font-semibold">Tidak Sekolah Lagi</span>
-                              </div>
-                            ) : currentStatus !== 'H' ? (
-                              <AttendanceNoteInput
-                                value={currentNote}
-                                onCommit={(val) => handleSetPiketStudentNote(student.id, val)}
-                                onInstantChange={(val) => {
-                                  piketModalNotesRef.current[student.id] = val;
-                                }}
-                                placeholder={
-                                  currentStatus === 'S' ? 'Catatan sakit...' :
-                                  currentStatus === 'I' ? 'Catatan izin...' :
-                                  currentStatus === 'T' ? 'Alasan telat...' :
-                                  'Keterangan...'
-                                }
-                                className="w-full px-2.5 py-1 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white placeholder:text-slate-400"
-                              />
-                            ) : (
-                              <div className="text-right pr-2">
-                                <span className="text-[11px] text-emerald-700 font-semibold">Hadir</span>
-                              </div>
-                            )}
-                          </div>
-
                         </div>
                       );
                     })}
