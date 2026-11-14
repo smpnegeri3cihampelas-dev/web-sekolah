@@ -4079,7 +4079,7 @@ export default function ELearningPage() {
                     >
                       {SCHOOL_CLASSES.map(cls => (
                         <option key={cls.id} value={cls.id} className="bg-white text-slate-900">
-                          {cls.name} ({cls.totalStudents} Siswa)
+                          {cls.name} ({classStudentCounts[cls.id] || 0} Siswa)
                         </option>
                       ))}
                     </select>
@@ -5124,7 +5124,7 @@ export default function ELearningPage() {
                             </div>
 
                             <div className="text-[11px] text-slate-500 mb-2.5">
-                              Total: <span className="text-slate-800 font-semibold">{cls.totalStudents} Siswa</span>
+                              Total: <span className="text-slate-800 font-semibold">{classStudentCounts[cls.id] || students.length} Siswa</span>
                             </div>
 
                             {/* Summary Numbers inside Class Card */}
@@ -5219,7 +5219,7 @@ export default function ELearningPage() {
                             className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-indigo-500 focus:bg-white transition"
                           >
                             {SCHOOL_CLASSES.map(c => (
-                              <option key={c.id} value={c.id}>{c.name} ({c.totalStudents} Siswa)</option>
+                              <option key={c.id} value={c.id}>{c.name} ({classStudentCounts[c.id] || 0} Siswa)</option>
                             ))}
                           </select>
                         </div>

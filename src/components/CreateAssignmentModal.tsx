@@ -335,7 +335,7 @@ export default function CreateAssignmentModal({
               className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:border-indigo-600 text-xs cursor-pointer bg-white font-semibold"
             >
               {SCHOOL_CLASSES.map((c) => (
-                <option key={c.id} value={c.id}>{c.name} ({c.totalStudents} Siswa)</option>
+                <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
           </div>
