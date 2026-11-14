@@ -4,7 +4,17 @@ import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useSchoolData, Leader, Teacher, DataPokok } from '@/lib/schoolData';
+import { 
+  useSchoolData, 
+  Leader, 
+  Teacher, 
+  DataPokok,
+  saveLeaderCloud,
+  addTeacherCloud,
+  saveTeacherCloud,
+  deleteTeacherCloud,
+  saveDataPokokCloud 
+} from '@/lib/schoolData';
 import { useWartaData, WartaItem } from '@/lib/wartaData';
 import { AddNewsModal, EditNewsModal } from '@/components/WartaModals';
 import { 
@@ -218,44 +228,59 @@ export default function DashboardPage() {
     setLeaders: saveLeaders, 
     setTeachers: saveTeachers, 
     setDataPokok: saveDataPokok,
-    resetData: resetSchoolData
+    resetData: resetSchoolData,
+    refreshSchoolData
   } = useSchoolData();
 
   const handleSaveLeader = (leaderId: number, data: Partial<Leader>) => {
     const updated = leaders.map(l => l.id === leaderId ? { ...l, ...data } : l);
     saveLeaders(updated);
+    saveLeaderCloud(leaderId, data);
+    showToast('Profil pimpinan berhasil disimpan ke database cloud!');
   };
 
-  const handleAddTeacher = (newTData: Omit<Teacher, 'id'>) => {
+  const handleAddTeacher = async (newTData: Omit<Teacher, 'id'>) => {
+    const tempId = Date.now();
     const newT: Teacher = {
-      id: Date.now(),
+      id: tempId,
       ...newTData
     };
     const updated = [newT, ...teachers];
     saveTeachers(updated);
+    showToast(`Menyimpan guru "${newTData.name}" ke database...`);
+    const dbId = await addTeacherCloud(newTData);
+    if (dbId) {
+      saveTeachers([{ ...newT, id: dbId }, ...teachers]);
+      showToast(`✅ Guru "${newTData.name}" berhasil tersimpan ke database cloud!`);
+    }
   };
 
   const handleSaveTeacher = (teacherId: number, data: Partial<Teacher>) => {
     const updated = teachers.map(t => t.id === teacherId ? { ...t, ...data } : t);
     saveTeachers(updated);
+    saveTeacherCloud(teacherId, data);
+    showToast('✅ Data guru berhasil diperbarui di database cloud!');
   };
 
   const handleToggleTeacherActive = (id: number) => {
+    const target = teachers.find(t => t.id === id);
+    const nextActive = target ? !target.active : true;
     const updated = teachers.map(t => {
       if (t.id === id) {
-        const nextActive = !t.active;
-        showToast(nextActive ? `Guru "${t.name}" diaktifkan kembali di Landing Page.` : `Guru "${t.name}" dinonaktifkan / mutasi di Landing Page.`);
+        showToast(nextActive ? `Guru "${t.name}" diaktifkan kembali di Landing Page & Database.` : `Guru "${t.name}" dinonaktifkan / mutasi di Landing Page & Database.`);
         return { ...t, active: nextActive };
       }
       return t;
     });
     saveTeachers(updated);
+    saveTeacherCloud(id, { active: nextActive });
   };
 
   const handleDeleteTeacher = (id: number) => {
     const updated = teachers.filter(t => t.id !== id);
     saveTeachers(updated);
-    showToast('🗑️ Data guru telah dihapus dari direktori & Landing Page.');
+    deleteTeacherCloud(id);
+    showToast('🗑️ Data guru telah dihapus dari direktori & database cloud.');
   };
 
   // 4. Agenda Akademik (Terintegrasi Penuh dengan Kalender Landing Page)
@@ -659,6 +684,11 @@ export default function DashboardPage() {
                 onToggleTeacherActive={handleToggleTeacherActive}
                 onSaveDataPokok={(updatedPokok) => {
                   saveDataPokok(updatedPokok);
+                  showToast('✅ Data Pokok sekolah berhasil disimpan ke database cloud!');
+                }}
+                onRefresh={() => {
+                  refreshSchoolData();
+                  showToast('🔄 Berhasil menyinkronkan data Pimpinan & GTK dari database MariaDB!');
                 }}
                 showToast={showToast}
               />

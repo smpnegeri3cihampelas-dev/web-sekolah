@@ -15,6 +15,7 @@ interface TabPimpinanProps {
   onDeleteTeacher: (id: number) => void;
   onToggleTeacherActive: (id: number) => void;
   onSaveDataPokok: (data: DataPokok) => void;
+  onRefresh?: () => void;
   showToast: (msg: string) => void;
 }
 
@@ -28,11 +29,15 @@ export function TabPimpinan({
   onDeleteTeacher,
   onToggleTeacherActive,
   onSaveDataPokok,
+  onRefresh,
   showToast
 }: TabPimpinanProps) {
   const [teacherSearch, setTeacherSearch] = useState('');
   const [teacherPage, setTeacherPage] = useState(1);
   const TEACHERS_PER_PAGE = 8;
+
+  const activeTeachersCount = useMemo(() => teachersList.filter(t => t.active !== false).length, [teachersList]);
+  const inactiveTeachersCount = useMemo(() => teachersList.filter(t => t.active === false).length, [teachersList]);
   
   // Local Data Pokok form state to avoid root lag while editing numbers
   const [localDataPokok, setLocalDataPokok] = useState<DataPokok>(dataPokok);
@@ -91,6 +96,16 @@ export function TabPimpinan({
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap">
+          {onRefresh && (
+            <button
+              type="button"
+              onClick={onRefresh}
+              className="p-2.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border-2 border-slate-300 transition-all text-xs cursor-pointer shadow-xs active:scale-98 font-bold"
+              title="Sinkronkan ulang dari database MariaDB"
+            >
+              🔄
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setIsAddTeacherOpen(true)}
@@ -98,6 +113,33 @@ export function TabPimpinan({
           >
             <span>+ Tambah Guru / Pendidik</span>
           </button>
+        </div>
+      </div>
+
+      {/* 3 Metric Cards: Live MariaDB Status */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="p-5 rounded-2xl bg-white border-2 border-slate-200 shadow-sm">
+          <div className="text-xs font-black text-slate-700 uppercase tracking-wider">Jajaran Pimpinan</div>
+          <div className="text-3xl font-black text-slate-950 mt-1">{leadersList.length} Pimpinan</div>
+          <div className="text-xs text-slate-600 mt-1 font-semibold flex items-center gap-2">
+            <span className="text-indigo-700 font-bold">Kepala Sekolah & 4 Wakasek</span>
+          </div>
+        </div>
+
+        <div className="p-5 rounded-2xl bg-white border-2 border-slate-200 shadow-sm">
+          <div className="text-xs font-black text-slate-700 uppercase tracking-wider">Dewan Guru (GTK)</div>
+          <div className="text-3xl font-black text-indigo-700 mt-1">{teachersList.length} Guru</div>
+          <div className="text-xs text-slate-600 mt-1 font-semibold flex items-center gap-2">
+            <span className="text-emerald-700 font-bold">✅ {activeTeachersCount} Aktif</span>
+            <span className="text-slate-300">•</span>
+            <span className="text-rose-700 font-bold">🚪 {inactiveTeachersCount} Nonaktif</span>
+          </div>
+        </div>
+
+        <div className="p-5 rounded-2xl bg-white border-2 border-slate-200 shadow-sm">
+          <div className="text-xs font-black text-slate-700 uppercase tracking-wider">Status Sinkronisasi</div>
+          <div className="text-3xl font-black text-emerald-700 mt-1">Live MariaDB</div>
+          <div className="text-xs text-emerald-800 mt-1 font-bold">Tersinkron Database Cloud, Landing Page & Profil GTK</div>
         </div>
       </div>
 

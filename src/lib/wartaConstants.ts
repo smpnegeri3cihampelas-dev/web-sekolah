@@ -83,3 +83,4 @@ export const DEFAULT_WARTA: WartaItem[] = [
     excerpt: 'Unjuk bakat dan kreasi peserta didik dalam mengimplementasikan nilai luhur Pancasila melalui karya seni dan wirausaha muda.'
   }
 ];
+
