@@ -237,7 +237,38 @@ export async function PUT(req: Request) {
 export async function DELETE(req: Request) {
   try {
     const body = await req.json();
-    const { studentId, id, nisn } = body;
+    const { studentId, id, nisn, action } = body;
+
+    // Reset action: restore students table back to official 535 initial students
+    if (action === 'reset') {
+      const fs = await import('fs/promises');
+      const path = await import('path');
+      const filePath = path.join(process.cwd(), 'scripts', 'parsed_students.json');
+      const fileContent = await fs.readFile(filePath, 'utf-8');
+      const parsed = JSON.parse(fileContent);
+      const officialList = parsed.students || [];
+      const officialNisns = new Set(officialList.map((s: any) => String(s.nisn).trim()));
+
+      // Fetch all current students in DB
+      const currentRows = await query<any[]>(`SELECT id, student_id, nisn FROM students`);
+      const extraIds = currentRows.filter(r => !officialNisns.has(String(r.nisn).trim())).map(r => r.id);
+
+      if (extraIds.length > 0) {
+        for (const extraId of extraIds) {
+          await query(`DELETE FROM students WHERE id = ?`, [extraId]);
+        }
+      }
+
+      // Reset all remaining students to 'Aktif'
+      await query(`UPDATE students SET status = 'Aktif', exit_reason = NULL, exit_date = NULL, exit_marked_by = NULL`);
+
+      return NextResponse.json({
+        success: true,
+        count: officialList.length,
+        deletedExtraCount: extraIds.length,
+        message: `Database berhasil direset ke ${officialList.length} siswa awal. ${extraIds.length} siswa uji coba / tambahan telah dihapus.`
+      });
+    }
 
     if (!studentId && !id && !nisn) {
       return NextResponse.json({ success: false, error: 'ID atau NISN diperlukan' }, { status: 400 });

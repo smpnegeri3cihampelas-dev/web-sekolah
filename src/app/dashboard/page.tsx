@@ -168,11 +168,28 @@ export default function DashboardPage() {
     }
   };
 
-  const handleResetStudents = () => {
+  const handleResetStudents = async () => {
     if (!confirm('Yakin ingin mereset seluruh data kembali ke daftar 535 siswa awal 2026/2027?')) return;
     saveStoredStudents(INITIAL_STUDENTS);
     setStudentsList(INITIAL_STUDENTS);
-    showToast('Data siswa berhasil direset ke 535 siswa awal!');
+    showToast('⏳ Memproses reset data siswa di database...');
+
+    try {
+      const res = await fetch('/api/students', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reset' })
+      });
+      const json = await res.json();
+      if (json.success) {
+        showToast('✅ Seluruh data siswa berhasil direset ke 535 siswa awal (Database, Guru, & Piket tersinkron)!');
+      } else {
+        showToast('Data siswa lokal berhasil direset.');
+      }
+    } catch (e) {
+      console.warn('Background sync student reset failed:', e);
+      showToast('Data siswa lokal berhasil direset.');
+    }
   };
 
   // 2. Warta (Berita & Informasi Bento Grid)
