@@ -3724,10 +3724,10 @@ export default function ELearningPage() {
 
                 {/* Title & Description */}
                 <h1 className="text-2xl sm:text-[1.65rem] font-bold tracking-tight text-slate-900 text-center mb-1.5 font-display">
-                  Masuk ke Portal
+                  Masuk ke E-Learning
                 </h1>
-                <p className="text-xs text-slate-500 font-normal text-center leading-relaxed max-w-[280px] mb-5">
-                  Akses sistem informasi akademik, nilai, dan pembelajaran digital SMPN 3 Cihampelas.
+                <p className="text-xs text-slate-500 font-normal text-center leading-relaxed max-w-[290px] mb-5">
+                  Akses portal pembelajaran digital, ujian CBT, dan presensi harian SMPN 3 Cihampelas.
                 </p>
 
                 {/* 4-Role Clean Switcher */}
@@ -3844,19 +3844,27 @@ export default function ELearningPage() {
                     {/* Tombol Lihat/Sembunyikan Password */}
                     <button
                       type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 transition-colors focus:outline-none cursor-pointer"
-                      aria-label={showPassword ? 'Sembunyikan password' : 'Lihat password'}
+                      tabIndex={-1}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setShowPassword(prev => !prev);
+                      }}
+                      className="absolute right-0 top-0 h-full w-11 flex items-center justify-center text-slate-400 hover:text-slate-700 transition-colors focus:outline-none cursor-pointer z-20"
+                      title={showPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
+                      aria-label={showPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
                     >
                       {showPassword ? (
-                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
-                          <line x1="1" y1="1" x2="23" y2="23" />
-                        </svg>
-                      ) : (
-                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        /* Sandi sedang terlihat -> ikon mata terbuka */
+                        <svg className="w-4 h-4 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                           <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z" />
                           <circle cx="12" cy="12" r="3" />
+                        </svg>
+                      ) : (
+                        /* Sandi tersembunyi (titik-titik) -> ikon mata dicoret */
+                        <svg className="w-4 h-4 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                          <line x1="1" y1="1" x2="23" y2="23" />
                         </svg>
                       )}
                     </button>
