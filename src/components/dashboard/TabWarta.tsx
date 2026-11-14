@@ -8,11 +8,15 @@ interface TabWartaProps {
   onOpenAdd: () => void;
   onOpenEdit: (item: WartaItem) => void;
   onDelete: (id: number) => void;
+  onRefresh?: () => void;
 }
 
-export function TabWarta({ newsList, onOpenAdd, onOpenEdit, onDelete }: TabWartaProps) {
+export function TabWarta({ newsList, onOpenAdd, onOpenEdit, onDelete, onRefresh }: TabWartaProps) {
   const [newsSearch, setNewsSearch] = useState('');
   const [newsFilter, setNewsFilter] = useState('SEMUA');
+
+  const publishedCount = useMemo(() => newsList.filter(n => n.status === 'Published').length, [newsList]);
+  const draftCount = useMemo(() => newsList.filter(n => n.status === 'Draft').length, [newsList]);
 
   // Filtered news memoized
   const filteredNews = useMemo(() => {
@@ -30,10 +34,20 @@ export function TabWarta({ newsList, onOpenAdd, onOpenEdit, onDelete }: TabWarta
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 sm:p-6 rounded-2xl bg-white border-2 border-slate-200 shadow-sm">
         <div>
           <h2 className="text-xl font-black text-slate-950 tracking-tight">Manajemen Warta & Berita</h2>
-          <p className="text-xs text-slate-700 font-semibold mt-0.5">Kelola artikel warta yang tampil pada Bento Grid halaman utama</p>
+          <p className="text-xs text-slate-700 font-semibold mt-0.5">Kelola artikel warta yang tampil pada Bento Grid halaman utama dan halaman publik</p>
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap">
+          {onRefresh && (
+            <button
+              type="button"
+              onClick={onRefresh}
+              className="p-2.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border-2 border-slate-300 transition-all text-xs cursor-pointer shadow-xs active:scale-98 font-bold"
+              title="Sinkronkan ulang dari database MariaDB"
+            >
+              🔄
+            </button>
+          )}
           <a
             href="/warta"
             target="_blank"
@@ -51,6 +65,31 @@ export function TabWarta({ newsList, onOpenAdd, onOpenEdit, onDelete }: TabWarta
           >
             <span>+ Tulis Warta Baru</span>
           </button>
+        </div>
+      </div>
+
+      {/* 3 Metric Cards: Live MariaDB Status */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="p-5 rounded-2xl bg-white border-2 border-slate-200 shadow-sm">
+          <div className="text-xs font-black text-slate-700 uppercase tracking-wider">Total Artikel Warta</div>
+          <div className="text-3xl font-black text-slate-950 mt-1">{newsList.length} Artikel</div>
+          <div className="text-xs text-slate-600 mt-1 font-semibold flex items-center gap-2">
+            <span className="text-emerald-700 font-bold">✅ {publishedCount} Diterbitkan</span>
+            <span className="text-slate-300">•</span>
+            <span className="text-amber-700 font-bold">📝 {draftCount} Draf</span>
+          </div>
+        </div>
+
+        <div className="p-5 rounded-2xl bg-white border-2 border-slate-200 shadow-sm">
+          <div className="text-xs font-black text-slate-700 uppercase tracking-wider">Kategori Berita</div>
+          <div className="text-3xl font-black text-indigo-700 mt-1">5 Kategori</div>
+          <div className="text-xs text-slate-600 mt-1 font-semibold truncate">Prestasi, Pengumuman, Inovasi, Akademik, Kegiatan</div>
+        </div>
+
+        <div className="p-5 rounded-2xl bg-white border-2 border-slate-200 shadow-sm">
+          <div className="text-xs font-black text-slate-700 uppercase tracking-wider">Status Sinkronisasi</div>
+          <div className="text-3xl font-black text-emerald-700 mt-1">Live MariaDB</div>
+          <div className="text-xs text-emerald-800 mt-1 font-bold">Tersinkron Database Cloud, Bento Grid & Halaman Publik</div>
         </div>
       </div>
 

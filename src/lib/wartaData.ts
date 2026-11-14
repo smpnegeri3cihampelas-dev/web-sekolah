@@ -1,92 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { WartaItem, DEFAULT_WARTA } from './wartaConstants';
 
-export interface WartaItem {
-  id: number;
-  title: string;
-  category: 'Prestasi' | 'Pengumuman' | 'Inovasi' | 'Akademik' | 'Kegiatan' | string;
-  date: string;
-  views?: string;
-  status: 'Published' | 'Draft';
-  src: string;
-  excerpt?: string;
-  content?: string;
-  author?: string;
-}
-
-export const DEFAULT_WARTA: WartaItem[] = [
-  {
-    id: 1,
-    title: 'Siswa SMPN 3 Cihampelas Sabet Juara 1 Porseni Basket KBB 2026',
-    category: 'Prestasi',
-    date: '22 Sep 2026',
-    views: '1.4k',
-    status: 'Published',
-    src: '/gallery_2.jpg',
-    excerpt: 'Prestasi membanggakan kembali ditorehkan oleh tim basket putra SMPN 3 Cihampelas dalam kompetisi bergengsi tingkat Kabupaten Bandung Barat.'
-  },
-  {
-    id: 2,
-    title: 'Pembukaan Jalur Zonasi & Afirmasi PPDB Tahun Ajaran 2026/2027',
-    category: 'Pengumuman',
-    date: '18 Sep 2026',
-    views: '3.2k',
-    status: 'Published',
-    src: '/slide1.jpeg',
-    excerpt: 'Pendaftaran Penerimaan Peserta Didik Baru (PPDB) resmi dibuka dengan sistem verifikasi berkas terpadu dan transparan.'
-  },
-  {
-    id: 3,
-    title: 'Upacara Bendera Khidmat & Pembinaan Karakter Profil Pelajar Pancasila',
-    category: 'Kegiatan',
-    date: '14 Sep 2026',
-    views: '920',
-    status: 'Published',
-    src: '/slide4.jpeg',
-    excerpt: 'Kegiatan upacara bendera hari Senin yang dirangkaikan dengan penguatan disiplin dan nilai integritas peserta didik.'
-  },
-  {
-    id: 4,
-    title: 'Pelaksanaan Asesmen Sumatif Tengah Semester (CBT Berbasis Digital)',
-    category: 'Akademik',
-    date: '10 Sep 2026',
-    views: '2.1k',
-    status: 'Published',
-    src: '/gallery_1.jpg',
-    excerpt: 'Pemanfaatan sistem asesmen digital terintegrasi untuk mengukur capaian kompetensi belajar siswa secara akurat dan objektif.'
-  },
-  {
-    id: 5,
-    title: 'Sosialisasi & Simulasi Mitigasi Bencana Sekolah Tangguh Bencana BPBD',
-    category: 'Kegiatan',
-    date: '06 Sep 2026',
-    views: '1.8k',
-    status: 'Published',
-    src: '/slide5.jpeg',
-    excerpt: 'Peningkatan kesiapsiagaan seluruh warga sekolah menghadapi potensi bencana alam bersama tim BPBD Kabupaten Bandung Barat.'
-  },
-  {
-    id: 6,
-    title: 'Peluncuran Ekosistem E-Learning & Laboratorium Komputer Terpadu',
-    category: 'Inovasi',
-    date: '02 Sep 2026',
-    views: '2.5k',
-    status: 'Published',
-    src: '/slide6.jpeg',
-    excerpt: 'Modernisasi sarana penunjang pembelajaran digital demi terwujudnya sekolah rujukan berbasis smart campus di wilayah Cihampelas.'
-  },
-  {
-    id: 7,
-    title: 'Gelar Karya P5: Pameran Inovasi dan Kearifan Lokal Budaya Sunda',
-    category: 'Prestasi',
-    date: '28 Agu 2026',
-    views: '1.6k',
-    status: 'Published',
-    src: '/slide2.jpeg',
-    excerpt: 'Unjuk bakat dan kreasi peserta didik dalam mengimplementasikan nilai luhur Pancasila melalui karya seni dan wirausaha muda.'
-  }
-];
+export type { WartaItem };
+export { DEFAULT_WARTA };
 
 const STORAGE_KEY = 'smpn3_warta_data_v1';
 const EVENT_NAME = 'wartaDataUpdated';
@@ -122,43 +40,123 @@ export function saveStoredWarta(items: WartaItem[]): WartaItem[] {
   }
 }
 
+/**
+ * Sync warta data with MariaDB cloud database.
+ * If fetch succeeds, cloud database serves as the authoritative source of truth.
+ */
+export async function syncWartaWithCloud(): Promise<WartaItem[]> {
+  if (typeof window === 'undefined') return DEFAULT_WARTA;
+  try {
+    const res = await fetch('/api/warta');
+    if (!res.ok) return getStoredWarta();
+    const json = await res.json();
+    if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+      const cloudItems: WartaItem[] = json.data;
+      saveStoredWarta(cloudItems);
+      return cloudItems;
+    }
+  } catch (e) {
+    console.warn('Could not sync warta from cloud API:', e);
+  }
+  return getStoredWarta();
+}
+
 export function addStoredWarta(item: Omit<WartaItem, 'id'>): WartaItem[] {
   const current = getStoredWarta();
+  const tempId = Date.now();
   const newItem: WartaItem = {
     ...item,
-    id: Date.now(),
+    id: tempId,
     views: item.views || '1',
     status: item.status || 'Published'
   };
   const updated = [newItem, ...current];
-  return saveStoredWarta(updated);
+  saveStoredWarta(updated);
+
+  // Background push to database
+  if (typeof window !== 'undefined') {
+    fetch('/api/warta', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newItem)
+    })
+      .then(res => res.json())
+      .then(json => {
+        if (json.success && json.insertId) {
+          const fresh = getStoredWarta().map(it => it.id === tempId ? { ...it, id: json.insertId } : it);
+          saveStoredWarta(fresh);
+        }
+      })
+      .catch(err => console.warn('Background sync add warta to cloud failed:', err));
+  }
+
+  return updated;
 }
 
 export function updateStoredWarta(id: number, patch: Partial<WartaItem>): WartaItem[] {
   const current = getStoredWarta();
   const updated = current.map(item => item.id === id ? { ...item, ...patch } : item);
-  return saveStoredWarta(updated);
+  saveStoredWarta(updated);
+
+  // Background update to database
+  if (typeof window !== 'undefined') {
+    fetch('/api/warta', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, ...patch })
+    }).catch(err => console.warn('Background sync update warta to cloud failed:', err));
+  }
+
+  return updated;
 }
 
 export function deleteStoredWarta(id: number): WartaItem[] {
   const current = getStoredWarta();
   const updated = current.filter(item => item.id !== id);
-  return saveStoredWarta(updated);
+  saveStoredWarta(updated);
+
+  // Background delete from database
+  if (typeof window !== 'undefined') {
+    fetch('/api/warta', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id })
+    }).catch(err => console.warn('Background sync delete warta to cloud failed:', err));
+  }
+
+  return updated;
 }
 
 export function resetStoredWarta(): WartaItem[] {
   if (typeof window !== 'undefined') {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_WARTA));
-    window.dispatchEvent(new Event(EVENT_NAME));
+    saveStoredWarta(DEFAULT_WARTA);
+    fetch('/api/warta', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'reset' })
+    }).catch(err => console.warn('Background sync reset warta to cloud failed:', err));
   }
   return DEFAULT_WARTA;
 }
 
 export function useWartaData() {
-  const [wartaList, setWartaList] = useState<WartaItem[]>(DEFAULT_WARTA);
+  const [wartaList, setWartaList] = useState<WartaItem[]>(() => {
+    if (typeof window !== 'undefined') {
+      return getStoredWarta();
+    }
+    return DEFAULT_WARTA;
+  });
 
   useEffect(() => {
+    // 1. Initial read from local cache for instant zero-lag render
     setWartaList(getStoredWarta());
+
+    // 2. Immediate cloud synchronization with MariaDB database
+    syncWartaWithCloud().then(cloudList => {
+      if (cloudList && cloudList.length > 0) {
+        setWartaList(cloudList);
+      }
+    });
 
     const handleUpdate = () => {
       setWartaList(getStoredWarta());
@@ -178,6 +176,7 @@ export function useWartaData() {
     addWarta: (item: Omit<WartaItem, 'id'>) => addStoredWarta(item),
     updateWarta: (id: number, patch: Partial<WartaItem>) => updateStoredWarta(id, patch),
     deleteWarta: (id: number) => deleteStoredWarta(id),
-    resetWarta: () => resetStoredWarta()
+    resetWarta: () => resetStoredWarta(),
+    refreshWarta: () => syncWartaWithCloud()
   };
 }

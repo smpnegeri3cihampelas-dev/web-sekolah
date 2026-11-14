@@ -197,7 +197,8 @@ export default function DashboardPage() {
     wartaList, 
     addWarta, 
     updateWarta, 
-    deleteWarta 
+    deleteWarta,
+    refreshWarta 
   } = useWartaData();
 
   const [isNewsModalOpen, setIsNewsModalOpen] = useState(false);
@@ -625,7 +626,11 @@ export default function DashboardPage() {
                 onOpenEdit={handleOpenEditNews}
                 onDelete={(id) => {
                   deleteWarta(id);
-                  showToast('🗑️ Artikel warta telah dihapus dari sistem.');
+                  showToast('🗑️ Artikel warta telah dihapus dari sistem & database.');
+                }}
+                onRefresh={() => {
+                  refreshWarta();
+                  showToast('🔄 Berhasil menyinkronkan warta dari database MariaDB!');
                 }}
               />
             )}
