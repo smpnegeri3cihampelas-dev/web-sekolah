@@ -1055,6 +1055,7 @@ interface PiketMonthlyReportSectionProps {
   activeStudents: Student[];
   sessions: SubjectSession[];
   classStudentCounts: Record<string, number>;
+  classStudentExitCounts?: Record<string, number>;
   piketDutyTeacher: string;
   onExportExcel: (classId: string, month: number, year: number) => void;
 }
@@ -1066,6 +1067,7 @@ const PiketMonthlyReportSection = React.memo(function PiketMonthlyReportSection(
   activeStudents,
   sessions,
   classStudentCounts,
+  classStudentExitCounts,
   piketDutyTeacher,
   onExportExcel,
 }: PiketMonthlyReportSectionProps) {
@@ -1254,7 +1256,7 @@ const PiketMonthlyReportSection = React.memo(function PiketMonthlyReportSection(
             >
               {SCHOOL_CLASSES.map(cls => (
                 <option key={cls.id} value={cls.id}>
-                  {cls.name} ({classStudentCounts[cls.id] || 0} Siswa)
+                  {cls.name} ({classStudentCounts[cls.id] || 0} Siswa Aktif{(classStudentExitCounts?.[cls.id] || 0) > 0 ? ` · ${classStudentExitCounts?.[cls.id]} Mutasi` : ''})
                 </option>
               ))}
             </select>
@@ -1900,10 +1902,24 @@ export default function ELearningPage() {
 
   const activeStudents = allStudents.length > 0 ? allStudents : INITIAL_STUDENTS;
   
+  // Dynamic student counts: active students (excluding Keluar / Mutasi)
   const classStudentCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     activeStudents.forEach(s => {
-      counts[s.classId] = (counts[s.classId] || 0) + 1;
+      if (s.status !== 'Keluar') {
+        counts[s.classId] = (counts[s.classId] || 0) + 1;
+      }
+    });
+    return counts;
+  }, [activeStudents]);
+
+  // Dynamic exited / mutated student counts per class
+  const classStudentExitCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    activeStudents.forEach(s => {
+      if (s.status === 'Keluar') {
+        counts[s.classId] = (counts[s.classId] || 0) + 1;
+      }
     });
     return counts;
   }, [activeStudents]);
@@ -4079,7 +4095,7 @@ export default function ELearningPage() {
                     >
                       {SCHOOL_CLASSES.map(cls => (
                         <option key={cls.id} value={cls.id} className="bg-white text-slate-900">
-                          {cls.name} ({classStudentCounts[cls.id] || 0} Siswa)
+                          {cls.name} ({classStudentCounts[cls.id] || 0} Siswa Aktif{(classStudentExitCounts[cls.id] || 0) > 0 ? ` · ${classStudentExitCounts[cls.id]} Mutasi` : ''})
                         </option>
                       ))}
                     </select>
@@ -4133,7 +4149,7 @@ export default function ELearningPage() {
                 <div className="bg-white border border-indigo-100 rounded-2xl overflow-hidden shadow-sm">
                   <div className="px-3.5 sm:px-4 py-3 bg-slate-50 border-b border-indigo-50 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-xs text-slate-500">
                     <span className="font-bold text-slate-900 text-xs sm:text-sm">
-                      Daftar Siswa {selectedClassId} ({currentClassStudents.length})
+                      Daftar Siswa {selectedClassId} ({classStudentCounts[selectedClassId] || 0} Siswa Aktif{(classStudentExitCounts[selectedClassId] || 0) > 0 ? ` · ${classStudentExitCounts[selectedClassId]} Mutasi` : ''})
                     </span>
                     <span className="font-mono text-[10px] sm:text-[11px] text-slate-500 font-medium flex items-center gap-1.5 flex-wrap">
                       <span className="text-emerald-700 font-bold">H: Hadir</span> · <span className="text-blue-700 font-bold">S: Sakit</span> · <span className="text-amber-700 font-bold">I: Izin</span> · <span className="text-rose-700 font-bold">A: Alpa</span> · <span className="text-orange-700 font-bold">T: Telat</span>
@@ -4478,7 +4494,7 @@ export default function ELearningPage() {
                       >
                         {SCHOOL_CLASSES.map(cls => (
                           <option key={cls.id} value={cls.id}>
-                            {cls.name} ({classStudentCounts[cls.id] || 0} Siswa)
+                            {cls.name} ({classStudentCounts[cls.id] || 0} Siswa Aktif{(classStudentExitCounts[cls.id] || 0) > 0 ? ` · ${classStudentExitCounts[cls.id]} Mutasi` : ''})
                           </option>
                         ))}
                       </select>
@@ -5012,8 +5028,8 @@ export default function ELearningPage() {
                 {/* TOP STATS CARDS */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5">
                   <div className="p-3 rounded-xl bg-white border border-slate-200/80 shadow-xs">
-                    <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total Siswa</div>
-                    <div className="text-xl font-bold text-slate-900 mt-0.5">{activeStudents.length}</div>
+                    <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Siswa Aktif</div>
+                    <div className="text-xl font-bold text-slate-900 mt-0.5">{activeStudents.filter(s => s.status !== 'Keluar').length}</div>
                   </div>
 
                   <div className="p-3 rounded-xl bg-white border border-slate-200/80 shadow-xs">
@@ -5123,8 +5139,13 @@ export default function ELearningPage() {
                               )}
                             </div>
 
-                            <div className="text-[11px] text-slate-500 mb-2.5">
-                              Total: <span className="text-slate-800 font-semibold">{classStudentCounts[cls.id] || students.length} Siswa</span>
+                            <div className="text-[11px] text-slate-500 mb-2.5 flex items-center justify-between">
+                              <span>Total: <strong className="text-slate-900">{classStudentCounts[cls.id] || 0} Siswa Aktif</strong></span>
+                              {(classStudentExitCounts[cls.id] || 0) > 0 && (
+                                <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200" title="Siswa Keluar / Mutasi">
+                                  {classStudentExitCounts[cls.id]} Mutasi
+                                </span>
+                              )}
                             </div>
 
                             {/* Summary Numbers inside Class Card */}
@@ -5213,13 +5234,15 @@ export default function ELearningPage() {
                             value={piketSelectedClass}
                             onChange={(e) => {
                               setPiketSelectedClass(e.target.value);
-                              const firstStudent = activeStudents.find(s => s.classId === e.target.value);
+                              const firstStudent = activeStudents.find(s => s.classId === e.target.value && s.status !== 'Keluar') || activeStudents.find(s => s.classId === e.target.value);
                               if (firstStudent) setPiketSelectedStudentId(firstStudent.id);
                             }}
                             className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-indigo-500 focus:bg-white transition"
                           >
                             {SCHOOL_CLASSES.map(c => (
-                              <option key={c.id} value={c.id}>{c.name} ({classStudentCounts[c.id] || 0} Siswa)</option>
+                              <option key={c.id} value={c.id}>
+                                {c.name} ({classStudentCounts[c.id] || 0} Siswa Aktif{(classStudentExitCounts[c.id] || 0) > 0 ? ` · ${classStudentExitCounts[c.id]} Mutasi` : ''})
+                              </option>
                             ))}
                           </select>
                         </div>
@@ -5369,6 +5392,7 @@ export default function ELearningPage() {
                 activeStudents={activeStudents}
                 sessions={sessions}
                 classStudentCounts={classStudentCounts}
+                classStudentExitCounts={classStudentExitCounts}
                 piketDutyTeacher={piketDutyTeacher}
                 onExportExcel={handleExportPiketMonthlyMatrixExcel}
               />
@@ -5417,7 +5441,12 @@ export default function ELearningPage() {
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-slate-600 pt-1">
                       <div>
                         <p>
-                          Total: <span className="font-semibold text-slate-900">{activeStudents.filter(s => s.classId === detailModalClassId).length} Siswa</span>
+                          Total: <span className="font-semibold text-slate-900">{classStudentCounts[detailModalClassId] || 0} Siswa Aktif</span>
+                          {(classStudentExitCounts[detailModalClassId] || 0) > 0 && (
+                            <span className="ml-1.5 px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
+                              {classStudentExitCounts[detailModalClassId]} Mutasi
+                            </span>
+                          )}
                           {attendanceData[detailModalClassId]?.teacherName && (
                             <span> • Sesi: <span className="text-indigo-700 font-semibold">{attendanceData[detailModalClassId]?.teacherName} ({attendanceData[detailModalClassId]?.subject})</span></span>
                           )}
@@ -5446,7 +5475,9 @@ export default function ELearningPage() {
 
                   {/* Legenda Status */}
                   <div className="px-4 py-2 bg-slate-50/60 border-b border-slate-100 flex items-center justify-between text-xs text-slate-500">
-                    <span className="font-medium text-slate-700">Daftar Siswa ({activeStudents.filter(s => s.classId === detailModalClassId).length})</span>
+                    <span className="font-medium text-slate-700">
+                      Daftar Siswa ({classStudentCounts[detailModalClassId] || 0} Siswa Aktif{(classStudentExitCounts[detailModalClassId] || 0) > 0 ? ` · ${classStudentExitCounts[detailModalClassId]} Mutasi` : ''})
+                    </span>
                     <div className="flex items-center gap-1.5 font-bold text-[11px]">
                       <span className="text-emerald-700">H: Hadir</span> •
                       <span className="text-blue-700">S: Sakit</span> •

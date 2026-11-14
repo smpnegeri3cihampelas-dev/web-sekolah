@@ -326,12 +326,19 @@ export function TabSiswa({
               onChange={(e) => setStudentClassFilter(e.target.value)}
               className="px-3.5 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-slate-950 text-xs font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 cursor-pointer shadow-xs"
             >
-              <option value="ALL">Semua Kelas ({studentsList.length} Siswa)</option>
-              {SCHOOL_CLASSES.map(cls => (
-                <option key={cls.id} value={cls.id}>
-                  {cls.name} ({studentsList.filter(s => s.classId === cls.id).length} Siswa)
-                </option>
-              ))}
+              <option value="ALL">
+                Semua Kelas ({aktifCount} Aktif{keluarCount > 0 ? ` · ${keluarCount} Keluar` : ''})
+              </option>
+              {SCHOOL_CLASSES.map(cls => {
+                const cList = studentsList.filter(s => s.classId === cls.id);
+                const cAktif = cList.filter(s => s.status !== 'Keluar').length;
+                const cKeluar = cList.filter(s => s.status === 'Keluar').length;
+                return (
+                  <option key={cls.id} value={cls.id}>
+                    {cls.name} ({cAktif} Aktif{cKeluar > 0 ? ` · ${cKeluar} Keluar` : ''})
+                  </option>
+                );
+              })}
             </select>
           </div>
 
