@@ -3710,7 +3710,7 @@ export default function ELearningPage() {
                   E-Learning
                 </h1>
                 <p className="text-xs text-slate-500 mt-1">
-                  SMP Negeri 3 Cihampelas
+                  Portal Pembelajaran & Presensi
                 </p>
               </div>
 
@@ -3779,7 +3779,6 @@ export default function ELearningPage() {
                         value={loginIdentifier}
                         onChange={(e) => setLoginIdentifier(e.target.value)}
                         className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition lowercase"
-                        placeholder="User ID"
                         autoComplete="off"
                         required
                       />
@@ -3795,7 +3794,6 @@ export default function ELearningPage() {
                           value={loginPassword}
                           onChange={(e) => setLoginPassword(e.target.value)}
                           className="w-full px-3.5 py-2.5 pr-10 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition"
-                          placeholder="Kata Sandi"
                           autoComplete="new-password"
                           required
                         />
@@ -3830,7 +3828,6 @@ export default function ELearningPage() {
                         value={loginIdentifier}
                         onChange={(e) => setLoginIdentifier(e.target.value)}
                         className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition font-mono lowercase"
-                        placeholder="User ID"
                         autoComplete="off"
                         required
                       />
@@ -3846,7 +3843,6 @@ export default function ELearningPage() {
                           value={loginPassword}
                           onChange={(e) => setLoginPassword(e.target.value)}
                           className="w-full px-3.5 py-2.5 pr-10 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition"
-                          placeholder="Kata Sandi"
                           autoComplete="new-password"
                           required
                         />
@@ -3881,7 +3877,6 @@ export default function ELearningPage() {
                         value={loginIdentifier}
                         onChange={(e) => setLoginIdentifier(e.target.value)}
                         className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-amber-500 focus:bg-white focus:ring-2 focus:ring-amber-500/20 transition font-mono lowercase"
-                        placeholder="User ID"
                         autoComplete="off"
                         required
                       />
@@ -3897,7 +3892,6 @@ export default function ELearningPage() {
                           value={loginPassword}
                           onChange={(e) => setLoginPassword(e.target.value)}
                           className="w-full px-3.5 py-2.5 pr-10 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-amber-500 focus:bg-white focus:ring-2 focus:ring-amber-500/20 transition"
-                          placeholder="Kata Sandi"
                           autoComplete="current-password"
                           required
                         />
@@ -3932,7 +3926,6 @@ export default function ELearningPage() {
                         value={loginIdentifier}
                         onChange={(e) => setLoginIdentifier(e.target.value)}
                         className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-purple-500 focus:bg-white focus:ring-2 focus:ring-purple-500/20 transition font-mono"
-                        placeholder="NISN"
                         maxLength={10}
                         autoComplete="off"
                         required
@@ -3949,7 +3942,6 @@ export default function ELearningPage() {
                           value={loginPassword}
                           onChange={(e) => setLoginPassword(e.target.value)}
                           className="w-full px-3.5 py-2.5 pr-10 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-purple-500 focus:bg-white focus:ring-2 focus:ring-purple-500/20 transition"
-                          placeholder="Kata Sandi"
                           autoComplete="new-password"
                           required
                         />
