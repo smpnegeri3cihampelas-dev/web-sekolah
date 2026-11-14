@@ -22,6 +22,11 @@ export default function LoginPage() {
       return;
     }
 
+    if (username.trim().toLowerCase() !== 'admin') {
+      setErrorMessage('User ID salah! Masukkan User ID resmi: admin');
+      return;
+    }
+
     if (!password) {
       setErrorMessage('Password tidak boleh kosong!');
       return;
@@ -162,7 +167,7 @@ export default function LoginPage() {
                     setUsername(e.target.value);
                     if (errorMessage) setErrorMessage('');
                   }}
-                  placeholder="Username / NISN"
+                  placeholder="User ID (admin)"
                   className="w-full pl-10 pr-4 py-2.5 sm:py-3 rounded-xl bg-slate-50 hover:bg-slate-100/70 focus:bg-white text-xs sm:text-sm text-slate-800 placeholder-slate-400 border border-slate-200/90 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
                   autoComplete="username"
                 />

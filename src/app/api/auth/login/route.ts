@@ -22,11 +22,12 @@ export async function POST(req: Request) {
     const users = await query<any[]>(sql, params);
 
     if (!users || users.length === 0) {
-      // Cek apakah siswa (by NISN) di tabel students
+      // Cek apakah siswa (hanya by 10-digit NISN) di tabel students
       if (role === 'siswa') {
+        const cleanNisn = username.trim().replace(/\D/g, '');
         const students = await query<any[]>(
-          'SELECT * FROM students WHERE nisn = ? OR nis = ? OR LOWER(name) = ?',
-          [username.trim(), username.trim(), cleanUsername]
+          'SELECT * FROM students WHERE nisn = ?',
+          [cleanNisn]
         );
 
         if (students && students.length > 0) {
@@ -44,6 +45,34 @@ export async function POST(req: Request) {
                 identifier: s.nisn,
                 classId: s.class_id,
                 gender: s.gender
+              }
+            });
+          }
+        }
+      }
+
+      // Cek apakah guru (hanya by username tanpa gelar) di tabel teachers
+      if (role === 'guru' || role === 'guru_mapel') {
+        const cleanNameId = cleanUsername.replace(/[^a-z0-9]/g, '');
+        const teachers = await query<any[]>(
+          'SELECT * FROM teachers WHERE username = ?',
+          [cleanNameId]
+        );
+
+        if (teachers && teachers.length > 0) {
+          const t = teachers[0];
+          const customPass = t.password && t.password !== 'guru123' ? t.password : null;
+          const isValidPass = customPass ? password === customPass : password === 'guru123';
+          if (isValidPass) {
+            return NextResponse.json({
+              success: true,
+              user: {
+                id: t.id,
+                username: t.username,
+                name: t.name,
+                role: 'guru_mapel',
+                identifier: t.nip,
+                subject: t.subject
               }
             });
           }

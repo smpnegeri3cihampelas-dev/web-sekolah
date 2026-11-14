@@ -2,6 +2,14 @@ import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { DEFAULT_LEADERS, DEFAULT_TEACHERS, DEFAULT_DATA_POKOK, Leader, Teacher, DataPokok } from '@/lib/schoolConstants';
 
+function cleanTeacherUsername(name: string): string {
+  const rawName = name || '';
+  const base = rawName.split(',')[0].trim();
+  const withoutPrefix = base.replace(/^(H\.|Hj\.|Drs\.|Dra\.|Dr\.|Prof\.|Ir\.|H\b|Hj\b)\s*/gi, '');
+  const clean = withoutPrefix.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+  return clean || 'guru';
+}
+
 export async function GET() {
   try {
     // Ensure column definitions support compressed images and longer quotes
@@ -33,7 +41,7 @@ export async function GET() {
     const teachers: Teacher[] = teachersRows.map(r => ({
       id: Number(r.id),
       name: r.name,
-      username: r.username || '',
+      username: cleanTeacherUsername(r.name),
       phone: r.phone || '',
       role: r.role || 'Guru Mata Pelajaran',
       subject: r.subject || 'Mata Pelajaran',
@@ -90,7 +98,7 @@ export async function POST(req: Request) {
       const photo = t.photo || '/teachers/default_avatar.svg';
       const quote = t.quote || '';
       const phone = t.phone || '';
-      const username = t.username || cleanName.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const username = cleanTeacherUsername(cleanName);
       const active = t.active !== false ? 1 : 0;
       const password = t.password || 'guru123';
 
@@ -149,7 +157,23 @@ export async function POST(req: Request) {
 export async function PUT(req: Request) {
   try {
     const body = await req.json();
-    const { type, id, leader, teacher, dataPokok } = body;
+    const { type, id, leader, teacher, dataPokok, action } = body;
+
+    // Standardize all teacher usernames without title and combined, plus default passwords to guru123
+    if (action === 'standardize_usernames' || action === 'standardize_all') {
+      const rows = await query<any[]>('SELECT id, name FROM teachers');
+      for (const row of rows) {
+        const clean = cleanTeacherUsername(row.name);
+        await query(
+          'UPDATE teachers SET username = ?, password = IF(password = "spentic123" OR password IS NULL OR password = "", "guru123", password) WHERE id = ?',
+          [clean, row.id]
+        );
+      }
+      return NextResponse.json({
+        success: true,
+        message: 'Username dan password seluruh guru berhasil distandarisasi tanpa gelar dan disatukan di database MariaDB'
+      });
+    }
 
     // 1. Update Leader
     if (type === 'leader') {

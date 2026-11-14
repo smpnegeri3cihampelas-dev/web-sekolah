@@ -2158,30 +2158,19 @@ export default function ELearningPage() {
     if (loginRole === 'guru') {
       const inputRaw = loginIdentifier.trim();
       if (!inputRaw) {
-        showToast('⚠️ Masukkan username atau NIP akun guru Anda.', 'warn');
+        showToast('⚠️ Masukkan User ID guru Anda (nama tanpa gelar, contoh: ichsanularifin).', 'warn');
         return;
       }
+      // User ID guru: nama tanpa gelar, disatukan (contoh: ichsanularifin)
       const inputClean = inputRaw.toLowerCase().replace(/[^a-z0-9]/g, '');
-      const inputNipClean = inputRaw.replace(/\s+/g, '');
 
       const teacher = activeTeachers.find(t => {
         const tUsername = getTeacherUsername(t);
-        const tUsernameClean = tUsername.replace(/[^a-z0-9]/g, '');
-        const tNipClean = (t.nip || '').replace(/\s+/g, '');
-        const tNameLower = t.name.toLowerCase();
-        const tNameClean = tNameLower.replace(/[^a-z0-9]/g, '');
-
-        return (
-          tUsername === inputRaw.toLowerCase() ||
-          tUsernameClean === inputClean ||
-          (tNipClean && tNipClean !== '-' && tNipClean === inputNipClean) ||
-          tNameLower === inputRaw.toLowerCase() ||
-          (inputClean.length >= 3 && tNameClean.includes(inputClean))
-        );
+        return tUsername === inputClean;
       });
 
       if (!teacher) {
-        showToast('⚠️ Username akun guru tidak terdaftar! Periksa kembali username Anda.', 'warn');
+        showToast('⚠️ User ID guru tidak ditemukan! Masukkan nama tanpa gelar dan disatukan (contoh: ichsanularifin).', 'warn');
         return;
       }
 
@@ -2195,7 +2184,7 @@ export default function ELearningPage() {
           const raw = localStorage.getItem('smpn3_teacher_passwords');
           if (raw) {
             const map = JSON.parse(raw);
-            const fromStorage = map[teacherUsername] || (tNipClean ? map[tNipClean] : '') || map[teacher.name] || map[inputNipClean] || '';
+            const fromStorage = map[teacherUsername] || (tNipClean ? map[tNipClean] : '') || map[teacher.name] || '';
             if (fromStorage) customPassword = fromStorage;
           }
         } catch {}
@@ -2220,7 +2209,13 @@ export default function ELearningPage() {
       });
     } else if (loginRole === 'piket') {
       const inputId = loginIdentifier.trim();
+      const inputClean = inputId.toLowerCase().replace(/[^a-z0-9]/g, '');
       const trimmedPass = loginPassword.trim();
+
+      if (inputClean !== 'piket') {
+        showToast('⚠️ User ID stasiun piket salah! Masukkan: piket', 'warn');
+        return;
+      }
 
       if (!trimmedPass) {
         showToast('⚠️ Silakan masukkan kata sandi stasiun meja piket.', 'warn');
@@ -2246,15 +2241,16 @@ export default function ELearningPage() {
       handleLogin({
         role: 'guru_piket',
         name: 'Stasiun Meja Piket Utama',
-        nipOrNisn: inputId || 'POSKO-PIKET',
+        nipOrNisn: 'POSKO-PIKET',
         subject: 'Pusat Monitoring Rombel'
       });
     } else if (loginRole === 'panitia') {
-      const inputId = loginIdentifier.trim().toLowerCase();
+      const inputId = loginIdentifier.trim();
+      const inputClean = inputId.toLowerCase().replace(/[^a-z0-9]/g, '');
       const trimmedPass = loginPassword.trim();
 
-      if (!inputId) {
-        showToast('⚠️ Silakan masukkan username panitia ujian CBT.', 'warn');
+      if (inputClean !== 'panitia') {
+        showToast('⚠️ User ID panitia salah! Masukkan: panitia', 'warn');
         return;
       }
 
@@ -2270,13 +2266,12 @@ export default function ELearningPage() {
         } catch {}
       }
 
-      const isValidUsername = inputId === 'panitia' || inputId === 'panitia_cbt' || inputId === 'poskocbt' || inputId === 'panitiacbt';
       const isValidPass = customPanitiaPass
         ? (trimmedPass === customPanitiaPass)
         : (trimmedPass === 'panitia123');
 
-      if (!isValidUsername || !isValidPass) {
-        showToast('⚠️ Username atau kata sandi panitia salah! Default: panitia123.', 'warn');
+      if (!isValidPass) {
+        showToast('⚠️ Kata sandi panitia salah! Default: panitia123.', 'warn');
         return;
       }
 
@@ -2291,15 +2286,13 @@ export default function ELearningPage() {
       const cleanInput = loginIdentifier.trim();
       const cleanNisn = cleanInput.replace(/\D/g, '');
 
-      if (!cleanInput) {
-        showToast('⚠️ Silakan masukkan NISN peserta didik Anda.', 'warn');
+      if (!cleanNisn || cleanNisn.length < 8) {
+        showToast('⚠️ Silakan masukkan 10 digit NISN resmi peserta didik Anda.', 'warn');
         return;
       }
 
       const student = activeStudents.find(s => 
-        (cleanNisn.length >= 8 && s.nisn.replace(/\D/g, '') === cleanNisn) ||
-        s.nisn.toLowerCase() === cleanInput.toLowerCase() ||
-        s.name.toLowerCase() === cleanInput.toLowerCase()
+        s.nisn.replace(/\D/g, '') === cleanNisn
       );
 
       if (!student) {
@@ -3767,14 +3760,14 @@ export default function ELearningPage() {
                   <>
                     <div>
                       <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                        Username
+                        User ID Guru (Nama Tanpa Gelar)
                       </label>
                       <input
                         type="text"
                         value={loginIdentifier}
                         onChange={(e) => setLoginIdentifier(e.target.value)}
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition"
-                        placeholder="Username atau NIP"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition lowercase"
+                        placeholder="contoh: ichsanularifin"
                         autoComplete="off"
                         required
                       />
@@ -3818,14 +3811,14 @@ export default function ELearningPage() {
                   <>
                     <div>
                       <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                        ID Stasiun
+                        User ID Meja Piket
                       </label>
                       <input
                         type="text"
                         value={loginIdentifier}
                         onChange={(e) => setLoginIdentifier(e.target.value)}
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition font-mono"
-                        placeholder="ID stasiun piket"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition font-mono lowercase"
+                        placeholder="piket"
                         autoComplete="off"
                         required
                       />
@@ -3879,14 +3872,14 @@ export default function ELearningPage() {
 
                     <div>
                       <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                        Username Panitia
+                        User ID Panitia CBT
                       </label>
                       <input
                         type="text"
                         value={loginIdentifier}
                         onChange={(e) => setLoginIdentifier(e.target.value)}
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-amber-500 focus:bg-white focus:ring-2 focus:ring-amber-500/20 transition font-mono"
-                        placeholder="Username panitia (misal: panitia)"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-amber-500 focus:bg-white focus:ring-2 focus:ring-amber-500/20 transition font-mono lowercase"
+                        placeholder="panitia"
                         autoComplete="off"
                         required
                       />
@@ -3930,14 +3923,14 @@ export default function ELearningPage() {
                   <>
                     <div>
                       <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                        NISN
+                        NISN Peserta Didik (10 Digit)
                       </label>
                       <input
                         type="text"
                         value={loginIdentifier}
                         onChange={(e) => setLoginIdentifier(e.target.value)}
                         className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-purple-500 focus:bg-white focus:ring-2 focus:ring-purple-500/20 transition font-mono"
-                        placeholder="10 digit NISN"
+                        placeholder="10 digit NISN (contoh: 0133138158)"
                         maxLength={12}
                         autoComplete="off"
                         required

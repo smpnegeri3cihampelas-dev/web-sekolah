@@ -62,19 +62,17 @@ export const MONTH_NAMES = [
 ];
 
 export function getTeacherUsername(teacher: { name: string; username?: string }): string {
-  if (teacher.username) return teacher.username.toLowerCase().trim();
-  const clean = teacher.name
-    .replace(/\b(M\.M\.Pd|M\.Pd\.I|S\.Pd\.I|S\.IP|S\.Pd|M\.Pd|S\.Kom|Dra|Drs|Dr|Hj|SP|MM|H)\b\.?/gi, '')
-    .replace(/[.,'"`]/g, '')
-    .trim()
-    .toLowerCase();
-  const parts = clean.split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return 'guru';
-  if (parts.length === 1) return parts[0];
-  const nonSingleParts = parts.filter(p => p.length > 1);
-  if (nonSingleParts.length === 1) return nonSingleParts[0];
-  if (nonSingleParts.length >= 2) return `${nonSingleParts[0]}.${nonSingleParts[1]}`;
-  return `${parts[0]}.${parts[1]}`;
+  const rawName = teacher.name || '';
+  // 1. Ambil bagian sebelum koma pertama (gelar akademik belakang selalu diawali koma)
+  const base = rawName.split(',')[0].trim();
+  // 2. Bersihkan gelar kehormatan depan (H., Hj., Drs., Dra., Dr., Prof., Ir., dll.)
+  const withoutPrefix = base.replace(/^(H\.|Hj\.|Drs\.|Dra\.|Dr\.|Prof\.|Ir\.|H\b|Hj\b)\s*/gi, '');
+  // 3. Gabungkan nama menjadi huruf kecil tanpa spasi dan tanda baca (contoh: ichsanularifin)
+  const clean = withoutPrefix.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+
+  if (clean) return clean;
+  if (teacher.username) return teacher.username.toLowerCase().replace(/[^a-z0-9]/g, '');
+  return 'guru';
 }
 
 export function formatWhatsAppUrl(phone?: string, text?: string): string {
