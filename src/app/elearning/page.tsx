@@ -2161,8 +2161,15 @@ export default function ELearningPage() {
         showToast('⚠️ Masukkan User ID guru Anda (nama tanpa gelar, contoh: ichsanularifin).', 'warn');
         return;
       }
+
+      // Validasi Ketat: tolak jika mengandung spasi
+      if (/\s/.test(loginIdentifier)) {
+        showToast('⚠️ User ID tidak boleh menggunakan spasi! Wajib disatukan (contoh: ichsanularifin, bukan ichsanul arifin).', 'warn');
+        return;
+      }
+
       // User ID guru: nama tanpa gelar, disatukan (contoh: ichsanularifin)
-      const inputClean = inputRaw.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const inputClean = inputRaw.toLowerCase();
 
       const teacher = activeTeachers.find(t => {
         const tUsername = getTeacherUsername(t);
@@ -2209,11 +2216,10 @@ export default function ELearningPage() {
       });
     } else if (loginRole === 'piket') {
       const inputId = loginIdentifier.trim();
-      const inputClean = inputId.toLowerCase().replace(/[^a-z0-9]/g, '');
       const trimmedPass = loginPassword.trim();
 
-      if (inputClean !== 'piket') {
-        showToast('⚠️ User ID stasiun piket salah! Masukkan: piket', 'warn');
+      if (inputId.toLowerCase() !== 'piket') {
+        showToast('⚠️ User ID stasiun piket salah! Masukkan: piket (tanpa spasi)', 'warn');
         return;
       }
 
@@ -2246,11 +2252,10 @@ export default function ELearningPage() {
       });
     } else if (loginRole === 'panitia') {
       const inputId = loginIdentifier.trim();
-      const inputClean = inputId.toLowerCase().replace(/[^a-z0-9]/g, '');
       const trimmedPass = loginPassword.trim();
 
-      if (inputClean !== 'panitia') {
-        showToast('⚠️ User ID panitia salah! Masukkan: panitia', 'warn');
+      if (inputId.toLowerCase() !== 'panitia') {
+        showToast('⚠️ User ID panitia salah! Masukkan: panitia (tanpa spasi)', 'warn');
         return;
       }
 
@@ -2284,19 +2289,21 @@ export default function ELearningPage() {
       showToast('🏛️ Selamat datang di Pusat Komando Panitia Ujian CBT!', 'success');
     } else if (loginRole === 'siswa') {
       const cleanInput = loginIdentifier.trim();
-      const cleanNisn = cleanInput.replace(/\D/g, '');
 
-      if (!cleanNisn || cleanNisn.length < 8) {
-        showToast('⚠️ Silakan masukkan 10 digit NISN resmi peserta didik Anda.', 'warn');
+      if (/\s/.test(loginIdentifier)) {
+        showToast('⚠️ NISN tidak boleh mengandung spasi! Masukkan 10 digit angka resmi.', 'warn');
         return;
       }
 
-      const student = activeStudents.find(s => 
-        s.nisn.replace(/\D/g, '') === cleanNisn
-      );
+      if (!/^\d{10}$/.test(cleanInput)) {
+        showToast('⚠️ NISN harus terdiri dari tepat 10 digit angka (contoh: 0133138158).', 'warn');
+        return;
+      }
+
+      const student = activeStudents.find(s => s.nisn === cleanInput);
 
       if (!student) {
-        showToast('⚠️ NISN peserta didik tidak ditemukan dalam data sekolah! Periksa kembali kartu pelajar atau rapor Anda.', 'warn');
+        showToast('⚠️ NISN peserta didik tidak ditemukan dalam data sekolah! Periksa kembali kartu pelajar Anda.', 'warn');
         return;
       }
 
@@ -2312,7 +2319,7 @@ export default function ELearningPage() {
           const raw = localStorage.getItem('smpn3_student_passwords');
           if (raw) {
             const map = JSON.parse(raw);
-            const fromStorage = map[student.nisn] || (cleanNisn ? map[cleanNisn] : '') || '';
+            const fromStorage = map[student.nisn] || (cleanInput ? map[cleanInput] : '') || '';
             if (fromStorage) customPass = fromStorage;
           }
         } catch {}

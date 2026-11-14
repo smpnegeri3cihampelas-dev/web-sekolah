@@ -22,8 +22,8 @@ export default function LoginPage() {
       return;
     }
 
-    if (username.trim().toLowerCase() !== 'admin') {
-      setErrorMessage('User ID salah! Masukkan User ID resmi: admin');
+    if (/\s/.test(username) || username.trim().toLowerCase() !== 'admin') {
+      setErrorMessage('User ID salah! Masukkan User ID resmi: admin (tanpa spasi)');
       return;
     }
 

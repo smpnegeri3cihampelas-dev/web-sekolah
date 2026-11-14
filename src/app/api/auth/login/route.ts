@@ -22,12 +22,19 @@ export async function POST(req: Request) {
     const users = await query<any[]>(sql, params);
 
     if (!users || users.length === 0) {
-      // Cek apakah siswa (hanya by 10-digit NISN) di tabel students
+      // Cek apakah siswa (hanya by 10-digit NISN ketat tanpa spasi) di tabel students
       if (role === 'siswa') {
-        const cleanNisn = username.trim().replace(/\D/g, '');
+        const trimmedInput = username.trim();
+        if (/\s/.test(username) || !/^\d{10}$/.test(trimmedInput)) {
+          return NextResponse.json({
+            success: false,
+            message: 'NISN tidak boleh mengandung spasi dan harus tepat 10 digit angka!'
+          }, { status: 400 });
+        }
+
         const students = await query<any[]>(
           'SELECT * FROM students WHERE nisn = ?',
-          [cleanNisn]
+          [trimmedInput]
         );
 
         if (students && students.length > 0) {
@@ -51,12 +58,18 @@ export async function POST(req: Request) {
         }
       }
 
-      // Cek apakah guru (hanya by username tanpa gelar) di tabel teachers
+      // Cek apakah guru (hanya by username tanpa gelar & ketat tanpa spasi) di tabel teachers
       if (role === 'guru' || role === 'guru_mapel') {
-        const cleanNameId = cleanUsername.replace(/[^a-z0-9]/g, '');
+        if (/\s/.test(username)) {
+          return NextResponse.json({
+            success: false,
+            message: 'User ID guru tidak boleh menggunakan spasi! Wajib disatukan (contoh: ichsanularifin).'
+          }, { status: 400 });
+        }
+
         const teachers = await query<any[]>(
           'SELECT * FROM teachers WHERE username = ?',
-          [cleanNameId]
+          [cleanUsername]
         );
 
         if (teachers && teachers.length > 0) {
