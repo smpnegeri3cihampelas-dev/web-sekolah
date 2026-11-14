@@ -84,7 +84,7 @@ export default function DashboardPage() {
     };
   }, []);
 
-  const handleAddStudent = (data: { name: string; nisn: string; nis: string; classId: string }) => {
+  const handleAddStudent = async (data: { name: string; nisn: string; nis: string; classId: string }) => {
     const newStudent: Student = {
       id: `${data.classId.replace('-', '')}-${String(studentsList.length + 1).padStart(2, '0')}`,
       name: data.name,
@@ -97,26 +97,75 @@ export default function DashboardPage() {
     saveStoredStudents(updated);
     setStudentsList(updated);
     showToast(`✅ Siswa "${newStudent.name}" berhasil ditambahkan ke ${newStudent.classId}!`);
+
+    // Sync to Cloud MariaDB database so Guru & Piket immediately receive this student
+    try {
+      const res = await fetch('/api/students', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newStudent)
+      });
+      const json = await res.json();
+      if (json.success && json.data) {
+        const finalUpdated = [json.data, ...studentsList.filter(s => s.nisn !== newStudent.nisn)];
+        saveStoredStudents(finalUpdated);
+        setStudentsList(finalUpdated);
+      }
+    } catch (e) {
+      console.warn('Background sync student to cloud failed:', e);
+    }
   };
 
-  const handleEditStudent = (id: string, data: { name: string; nisn: string; nis: string; classId: string }) => {
+  const handleEditStudent = async (id: string, data: { name: string; nisn: string; nis: string; classId: string }) => {
     const updated = studentsList.map(s => s.id === id ? { ...s, ...data } : s);
     saveStoredStudents(updated);
     setStudentsList(updated);
     showToast(`✅ Data siswa "${data.name}" berhasil diperbarui!`);
+
+    try {
+      await fetch('/api/students', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studentId: id, ...data })
+      });
+    } catch (e) {
+      console.warn('Background sync student edit to cloud failed:', e);
+    }
   };
 
-  const handleDeleteStudent = (studentId: string, studentName: string) => {
+  const handleDeleteStudent = async (studentId: string, studentName: string) => {
     if (!confirm(`Yakin ingin menghapus data siswa "${studentName}"?`)) return;
     const updated = studentsList.filter(s => s.id !== studentId);
     saveStoredStudents(updated);
     setStudentsList(updated);
     showToast(`Data siswa "${studentName}" berhasil dihapus.`);
+
+    try {
+      await fetch('/api/students', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studentId })
+      });
+    } catch (e) {
+      console.warn('Background sync student delete to cloud failed:', e);
+    }
   };
 
-  const handleImportStudents = (allImported: Student[]) => {
+  const handleImportStudents = async (allImported: Student[]) => {
     saveStoredStudents(allImported);
     setStudentsList(allImported);
+    showToast(`📥 Memproses dan menyinkronkan ${allImported.length} siswa ke database...`);
+
+    try {
+      await fetch('/api/students', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ students: allImported })
+      });
+      showToast(`✅ ${allImported.length} siswa berhasil tersinkron ke cloud database!`);
+    } catch (e) {
+      console.warn('Background sync import to cloud failed:', e);
+    }
   };
 
   const handleResetStudents = () => {

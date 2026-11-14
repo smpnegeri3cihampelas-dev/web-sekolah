@@ -4925,8 +4925,25 @@ export async function syncStudentsWithCloud(): Promise<Student[]> {
     const json = await res.json();
     if (json.success && Array.isArray(json.data) && json.data.length > 0) {
       const cloudStudents: Student[] = json.data;
-      saveStoredStudents(cloudStudents);
-      return cloudStudents;
+
+      // Smart merge: ensure any newly added local students are not accidentally overwritten
+      const localStudents = getStoredStudents();
+      const cloudNisnSet = new Set(cloudStudents.map(s => s.nisn));
+      const localOnly = localStudents.filter(s => s.nisn && !cloudNisnSet.has(s.nisn));
+
+      const mergedList = localOnly.length > 0 ? [...localOnly, ...cloudStudents] : cloudStudents;
+      saveStoredStudents(mergedList);
+
+      // Background push any local-only students to cloud database
+      if (localOnly.length > 0) {
+        fetch('/api/students', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ students: localOnly })
+        }).catch(() => {});
+      }
+
+      return mergedList;
     }
   } catch (e) {
     console.warn('Could not sync students from cloud API:', e);

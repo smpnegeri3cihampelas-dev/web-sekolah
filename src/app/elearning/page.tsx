@@ -2084,6 +2084,9 @@ export default function ELearningPage() {
 
     // Immediate background Cloud Synchronization on login
     try {
+      syncStudentsWithCloud().then(list => {
+        if (list && list.length > 0) setAllStudents(list);
+      }).catch(() => {});
       import('@/lib/cloudSync').then(m => {
         m.syncElearningWithCloud();
         m.syncCbtWithCloud();
