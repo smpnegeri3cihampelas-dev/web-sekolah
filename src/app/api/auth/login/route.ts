@@ -154,3 +154,85 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
+
+export async function PUT(req: Request) {
+  try {
+    const body = await req.json().catch(() => ({}));
+    if (body.action === 'sync_all_tables') {
+      // 1. Sync admin, panitia, piket in users table
+      await query(`UPDATE users SET password = 'admin123' WHERE role = 'admin'`);
+      await query(`UPDATE users SET password = 'panitia123' WHERE role = 'panitia'`);
+      await query(`UPDATE users SET password = 'piket123' WHERE role = 'guru_piket'`);
+
+      // 2. Sync guru_mapel in users table with clean usernames & guru123 password
+      const usersGuru = await query<any[]>(`SELECT id, name, identifier FROM users WHERE role = 'guru_mapel'`);
+      for (const ug of usersGuru) {
+        const rawName = ug.name || '';
+        const base = rawName.split(',')[0].trim();
+        const withoutPrefix = base.replace(/^(H\.|Hj\.|Drs\.|Dra\.|Dr\.|Prof\.|Ir\.|H\b|Hj\b)\s*/gi, '');
+        const clean = withoutPrefix.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() || 'guru';
+        await query(`UPDATE users SET username = ?, password = 'guru123' WHERE id = ?`, [clean, ug.id]);
+      }
+
+      // 3. Ensure teachers table has clean usernames & guru123 password
+      const teachers = await query<any[]>(`SELECT id, name FROM teachers`);
+      for (const t of teachers) {
+        const rawName = t.name || '';
+        const base = rawName.split(',')[0].trim();
+        const withoutPrefix = base.replace(/^(H\.|Hj\.|Drs\.|Dra\.|Dr\.|Prof\.|Ir\.|H\b|Hj\b)\s*/gi, '');
+        const clean = withoutPrefix.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() || 'guru';
+        await query(`UPDATE teachers SET username = ?, password = IF(password = 'spentic123' OR password IS NULL OR password = '', 'guru123', password) WHERE id = ?`, [clean, t.id]);
+      }
+
+      // 4. Ensure students table has clean siswa123 password
+      await query(`UPDATE students SET password = 'siswa123' WHERE password = '123456' OR password IS NULL OR password = ''`);
+
+      return NextResponse.json({
+        success: true,
+        message: 'Seluruh tabel users, teachers, dan students di MariaDB berhasil disinkronkan secara total!'
+      });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}
+
+export async function GET() {
+  try {
+    const [usersRows, teachersRows, studentsRows] = await Promise.all([
+      query<any[]>('SELECT id, username, role, name, identifier FROM users'),
+      query<any[]>('SELECT id, name, username, password FROM teachers'),
+      query<any[]>('SELECT COUNT(*) as total, SUM(CASE WHEN password = "siswa123" THEN 1 ELSE 0 END) as validPass, SUM(CASE WHEN LENGTH(nisn) = 10 AND nisn NOT LIKE "% %" THEN 1 ELSE 0 END) as validNisn FROM students')
+    ]);
+
+    const teacherCount = teachersRows.length;
+    const teachersWithCleanUsername = teachersRows.filter(t => t.username && !/\s/.test(t.username) && !/[A-Z]/.test(t.username)).length;
+    const teachersWithDefaultPass = teachersRows.filter(t => t.password === 'guru123').length;
+
+    const studentStats = studentsRows[0] || {};
+
+    return NextResponse.json({
+      success: true,
+      message: 'Status Sinkronisasi Database MariaDB Live',
+      data: {
+        admin: usersRows,
+        teachers: {
+          total: teacherCount,
+          cleanUsernamesCount: teachersWithCleanUsername,
+          defaultPasswordsCount: teachersWithDefaultPass,
+          isFullySynced: teacherCount > 0 && teacherCount === teachersWithCleanUsername && teacherCount === teachersWithDefaultPass
+        },
+        students: {
+          total: Number(studentStats.total || 0),
+          cleanNisnCount: Number(studentStats.validNisn || 0),
+          defaultPasswordsCount: Number(studentStats.validPass || 0),
+          isFullySynced: Number(studentStats.total) > 0 && Number(studentStats.total) === Number(studentStats.validNisn) && Number(studentStats.total) === Number(studentStats.validPass)
+        }
+      }
+    });
+  } catch (error: any) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}
