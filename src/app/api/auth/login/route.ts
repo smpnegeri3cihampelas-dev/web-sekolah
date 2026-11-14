@@ -31,7 +31,8 @@ export async function POST(req: Request) {
 
         if (students && students.length > 0) {
           const s = students[0];
-          const isValidPass = password === s.password || password === 'siswa123' || password === s.nisn;
+          const customPass = s.password && s.password !== 'siswa123' ? s.password : null;
+          const isValidPass = customPass ? password === customPass : password === 'siswa123';
           if (isValidPass) {
             return NextResponse.json({
               success: true,
@@ -57,8 +58,19 @@ export async function POST(req: Request) {
 
     const user = users[0];
 
-    // Verifikasi password (plain atau hash)
-    if (user.password !== password && password !== 'spentic2026') {
+    // Verifikasi password (1 default password per role atau password kustom tersimpan)
+    const defaultPasswordMap: Record<string, string> = {
+      admin: 'admin123',
+      guru: 'guru123',
+      guru_mapel: 'guru123',
+      guru_piket: 'piket123',
+      panitia: 'panitia123',
+      siswa: 'siswa123'
+    };
+    const roleDefault = defaultPasswordMap[user.role] || 'admin123';
+    const expectedPassword = user.password || roleDefault;
+
+    if (password !== expectedPassword) {
       return NextResponse.json({
         success: false,
         message: 'Kata sandi tidak sesuai! Silakan periksa kembali.'

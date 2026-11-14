@@ -12,6 +12,7 @@ export interface Student {
   exitReason?: string;
   exitDate?: string;
   exitMarkedBy?: string;
+  password?: string;
 }
 
 export type AttendanceStatus = 'H' | 'S' | 'I' | 'A' | 'T' | 'K'; // Hadir, Sakit, Izin, Alpa, Terlambat, Keluar (Tidak bersekolah lagi)
@@ -4884,6 +4885,7 @@ export async function updateStudentExitStatus(params: {
   exitReason?: string;
   exitDate?: string;
   exitMarkedBy?: string;
+  password?: string;
 }): Promise<Student[]> {
   const currentList = getStoredStudents();
   const updatedList = currentList.map(st => {

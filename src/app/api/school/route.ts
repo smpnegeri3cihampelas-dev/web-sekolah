@@ -92,7 +92,7 @@ export async function POST(req: Request) {
       const phone = t.phone || '';
       const username = t.username || cleanName.toLowerCase().replace(/[^a-z0-9]/g, '');
       const active = t.active !== false ? 1 : 0;
-      const password = t.password || 'spentic123';
+      const password = t.password || 'guru123';
 
       const result = await query(
         `INSERT INTO teachers (name, username, phone, role, subject, category, nip, photo, status, active, quote, password)

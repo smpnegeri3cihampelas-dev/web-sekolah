@@ -174,7 +174,7 @@ export function TabPengaturan({
             Keamanan & Kata Sandi Admin
           </h3>
           <p className="text-xs text-slate-600 font-semibold">
-            Perbarui kata sandi untuk masuk ke Dashboard Portal Admin (Password bawaan sistem: <code className="bg-slate-100 px-1.5 py-0.5 rounded font-mono text-indigo-700 font-bold">smpn3juara</code>)
+            Perbarui kata sandi untuk masuk ke Dashboard Portal Admin (Password bawaan sistem: <code className="bg-slate-100 px-1.5 py-0.5 rounded font-mono text-indigo-700 font-bold">admin123</code>)
           </p>
         </div>
         

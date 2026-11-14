@@ -77,7 +77,7 @@ export default function TeacherSettingsModal({
     const trimmedCurrent = currentPassword.trim();
     const isCurrentCorrect = currentStoredPass
       ? (trimmedCurrent === currentStoredPass)
-      : (trimmedCurrent === 'guru123' || trimmedCurrent === 'spentic2026' || trimmedCurrent === cleanNip);
+      : (trimmedCurrent === 'guru123');
 
     if (!isCurrentCorrect) {
       showToast('⚠️ Kata sandi saat ini salah! Masukkan sandi Anda dengan benar.', 'warn');

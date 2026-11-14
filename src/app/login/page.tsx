@@ -38,13 +38,13 @@ export default function LoginPage() {
           customPassword = localStorage.getItem('smpn3_admin_password') || '';
         } catch {}
       }
-      const validPasswords = ['smpn3juara', 'admin123'];
-      if (customPassword) {
-        validPasswords.push(customPassword);
-      }
+      
+      const isPasswordValid = customPassword
+        ? password === customPassword
+        : password === 'admin123';
 
-      if (!validPasswords.includes(password)) {
-        setErrorMessage('Password salah! Periksa kembali kata sandi Anda.');
+      if (!isPasswordValid) {
+        setErrorMessage('Password salah! Default: admin123 (atau gunakan kata sandi kustom Anda).');
       } else {
         // Record login in database
         try {

@@ -34,7 +34,8 @@ export async function GET(req: Request) {
       status: r.status || 'Aktif',
       exitReason: r.exit_reason || undefined,
       exitDate: r.exit_date || undefined,
-      exitMarkedBy: r.exit_marked_by || undefined
+      exitMarkedBy: r.exit_marked_by || undefined,
+      password: r.password || 'siswa123'
     }));
 
     return NextResponse.json({
@@ -209,7 +210,16 @@ export async function POST(req: Request) {
 export async function PUT(req: Request) {
   try {
     const body = await req.json();
-    const { id, studentId, name, nisn, nis, classId, gender } = body;
+    const { id, studentId, name, nisn, nis, classId, gender, password, action } = body;
+
+    // Standardize all default passwords in database
+    if (action === 'standardize_passwords') {
+      await query(`UPDATE students SET password = 'siswa123' WHERE password = '123456' OR password IS NULL OR password = ''`);
+      return NextResponse.json({
+        success: true,
+        message: 'Password bawaan seluruh siswa berhasil distandarisasi ke siswa123 di cloud database'
+      });
+    }
 
     const targetId = studentId || id;
     if (!targetId && !nisn) {
@@ -219,14 +229,20 @@ export async function PUT(req: Request) {
     const cleanNis = nis ? String(nis).trim() : null;
 
     await query(
-      `UPDATE students SET name = ?, nisn = ?, nis = ?, class_id = ?, gender = COALESCE(?, gender)
+      `UPDATE students SET 
+         name = COALESCE(?, name), 
+         nisn = COALESCE(?, nisn), 
+         nis = COALESCE(?, nis), 
+         class_id = COALESCE(?, class_id), 
+         gender = COALESCE(?, gender),
+         password = COALESCE(?, password)
        WHERE student_id = ? OR id = ? OR nisn = ?`,
-      [name, nisn, cleanNis, classId, gender || null, targetId || '', targetId || 0, nisn || '']
+      [name || null, nisn || null, cleanNis, classId || null, gender || null, password || null, targetId || '', targetId || 0, nisn || '']
     );
 
     return NextResponse.json({
       success: true,
-      message: `Data siswa "${name}" berhasil diperbarui di database cloud`
+      message: `Data siswa "${name || targetId || nisn}" berhasil diperbarui di database cloud`
     });
   } catch (error: any) {
     console.error('Error updating student:', error);

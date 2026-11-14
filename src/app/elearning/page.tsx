@@ -2093,7 +2093,7 @@ export default function ELearningPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           username: user.nipOrNisn || user.name,
-          password: 'spentic2026',
+          password: user.role === 'guru_piket' ? 'piket123' : user.role === 'panitia' ? 'panitia123' : user.role === 'siswa' ? 'siswa123' : 'guru123',
           role: user.role
         })
       }).catch(() => {});
@@ -2204,7 +2204,7 @@ export default function ELearningPage() {
       const trimmedPass = loginPassword.trim();
       const isValidPass = customPassword
         ? (trimmedPass === customPassword)
-        : (trimmedPass === 'guru123' || trimmedPass === 'spentic2026' || trimmedPass === teacherUsername || (tNipClean && trimmedPass === tNipClean));
+        : (trimmedPass === 'guru123');
 
       if (!isValidPass) {
         showToast('⚠️ Kata sandi akun guru salah! Default: guru123 (hubungi Admin jika Anda lupa).', 'warn');
@@ -2227,9 +2227,19 @@ export default function ELearningPage() {
         return;
       }
 
-      const isValidPiket = trimmedPass === 'piket123' || trimmedPass === 'spentic2026' || trimmedPass === 'guru123';
+      let customPiketPass = '';
+      if (typeof window !== 'undefined') {
+        try {
+          customPiketPass = localStorage.getItem('smpn3_piket_password') || '';
+        } catch {}
+      }
+
+      const isValidPiket = customPiketPass
+        ? (trimmedPass === customPiketPass)
+        : (trimmedPass === 'piket123');
+
       if (!isValidPiket) {
-        showToast('⚠️ Kata sandi stasiun piket tidak sesuai! Hubungi Kesiswaan / Tim IT.', 'warn');
+        showToast('⚠️ Kata sandi stasiun piket salah! Default: piket123 (hubungi Kesiswaan / Tim IT).', 'warn');
         return;
       }
 
@@ -2253,11 +2263,20 @@ export default function ELearningPage() {
         return;
       }
 
+      let customPanitiaPass = '';
+      if (typeof window !== 'undefined') {
+        try {
+          customPanitiaPass = localStorage.getItem('smpn3_panitia_password') || '';
+        } catch {}
+      }
+
       const isValidUsername = inputId === 'panitia' || inputId === 'panitia_cbt' || inputId === 'poskocbt' || inputId === 'panitiacbt';
-      const isValidPass = trimmedPass === 'panitia123' || trimmedPass === 'panitia2026' || trimmedPass === 'smpn3cihampelas';
+      const isValidPass = customPanitiaPass
+        ? (trimmedPass === customPanitiaPass)
+        : (trimmedPass === 'panitia123');
 
       if (!isValidUsername || !isValidPass) {
-        showToast('⚠️ Username atau kata sandi panitia tidak sesuai! Silakan periksa kembali.', 'warn');
+        showToast('⚠️ Username atau kata sandi panitia salah! Default: panitia123.', 'warn');
         return;
       }
 
@@ -2294,20 +2313,21 @@ export default function ELearningPage() {
         return;
       }
 
-      let customPass = '';
+      let customPass = student.password || '';
       if (typeof window !== 'undefined') {
         try {
           const raw = localStorage.getItem('smpn3_student_passwords');
           if (raw) {
             const map = JSON.parse(raw);
-            customPass = map[student.nisn] || (cleanNisn ? map[cleanNisn] : '') || '';
+            const fromStorage = map[student.nisn] || (cleanNisn ? map[cleanNisn] : '') || '';
+            if (fromStorage) customPass = fromStorage;
           }
         } catch {}
       }
 
-      const isValidSiswa = customPass
-        ? (trimmedPass === customPass || trimmedPass === 'siswa123')
-        : (trimmedPass === 'siswa123' || trimmedPass === 'spentic2026' || trimmedPass === student.nisn || (cleanNisn && trimmedPass === cleanNisn) || trimmedPass.length >= 4);
+      const isValidSiswa = customPass && customPass !== 'siswa123'
+        ? (trimmedPass === customPass)
+        : (trimmedPass === 'siswa123');
 
       if (!isValidSiswa) {
         showToast('⚠️ Kata sandi peserta didik salah! Default: siswa123 (hubungi Wali Kelas jika lupa).', 'warn');
