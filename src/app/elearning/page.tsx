@@ -3795,17 +3795,20 @@ export default function ELearningPage() {
                     <input 
                       type="text"
                       value={loginIdentifier}
-                      onChange={(e) => setLoginIdentifier(e.target.value)}
-                      placeholder={loginRole === 'siswa' ? "NISN (10 Digit)" : "User ID"}
+                      onChange={(e) => {
+                        const val = loginRole === 'siswa' ? e.target.value : e.target.value.toLowerCase();
+                        setLoginIdentifier(val);
+                      }}
+                      placeholder={loginRole === 'siswa' ? "NISN" : "User ID"}
                       maxLength={loginRole === 'siswa' ? 10 : undefined}
-                      className={`w-full pl-10 pr-4 py-2.5 sm:py-3 rounded-xl bg-slate-50 hover:bg-slate-100/70 focus:bg-white text-xs sm:text-sm text-slate-800 placeholder-slate-400 border border-slate-200/90 focus:outline-none focus:ring-2 transition-all font-medium ${
+                      className={`w-full pl-10 pr-4 py-2.5 sm:py-3 rounded-xl bg-slate-50 hover:bg-slate-100/70 focus:bg-white text-xs sm:text-sm text-slate-800 placeholder-slate-400 border border-slate-200/90 focus:outline-none focus:ring-2 transition-all ${
                         loginRole === 'guru'
-                          ? 'focus:border-indigo-400 focus:ring-indigo-500/20 lowercase'
+                          ? 'focus:border-indigo-400 focus:ring-indigo-500/20'
                           : loginRole === 'piket'
-                          ? 'focus:border-emerald-400 focus:ring-emerald-500/20 font-mono lowercase'
+                          ? 'focus:border-emerald-400 focus:ring-emerald-500/20'
                           : loginRole === 'panitia'
-                          ? 'focus:border-amber-400 focus:ring-amber-500/20 font-mono lowercase'
-                          : 'focus:border-purple-400 focus:ring-purple-500/20 font-mono'
+                          ? 'focus:border-amber-400 focus:ring-amber-500/20'
+                          : 'focus:border-purple-400 focus:ring-purple-500/20'
                       }`}
                       autoComplete="off"
                       required
