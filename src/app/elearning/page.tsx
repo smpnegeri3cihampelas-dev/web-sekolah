@@ -2158,13 +2158,13 @@ export default function ELearningPage() {
     if (loginRole === 'guru') {
       const inputRaw = loginIdentifier.trim();
       if (!inputRaw) {
-        showToast('⚠️ Masukkan User ID guru Anda (nama tanpa gelar, contoh: ichsanularifin).', 'warn');
+        showToast('⚠️ Masukkan User ID.', 'warn');
         return;
       }
 
       // Validasi Ketat: tolak jika mengandung spasi
       if (/\s/.test(loginIdentifier)) {
-        showToast('⚠️ User ID tidak boleh menggunakan spasi! Wajib disatukan (contoh: ichsanularifin, bukan ichsanul arifin).', 'warn');
+        showToast('⚠️ User ID tidak boleh menggunakan spasi.', 'warn');
         return;
       }
 
@@ -2177,7 +2177,7 @@ export default function ELearningPage() {
       });
 
       if (!teacher) {
-        showToast('⚠️ User ID guru tidak ditemukan! Masukkan nama tanpa gelar dan disatukan (contoh: ichsanularifin).', 'warn');
+        showToast('⚠️ User ID tidak terdaftar.', 'warn');
         return;
       }
 
@@ -2203,7 +2203,7 @@ export default function ELearningPage() {
         : (trimmedPass === 'guru123');
 
       if (!isValidPass) {
-        showToast('⚠️ Kata sandi akun guru salah! Default: guru123 (hubungi Admin jika Anda lupa).', 'warn');
+        showToast('⚠️ Kata sandi salah.', 'warn');
         return;
       }
 
@@ -2219,12 +2219,12 @@ export default function ELearningPage() {
       const trimmedPass = loginPassword.trim();
 
       if (inputId.toLowerCase() !== 'piket') {
-        showToast('⚠️ User ID stasiun piket salah! Masukkan: piket (tanpa spasi)', 'warn');
+        showToast('⚠️ User ID stasiun piket salah.', 'warn');
         return;
       }
 
       if (!trimmedPass) {
-        showToast('⚠️ Silakan masukkan kata sandi stasiun meja piket.', 'warn');
+        showToast('⚠️ Masukkan kata sandi.', 'warn');
         return;
       }
 
@@ -2240,7 +2240,7 @@ export default function ELearningPage() {
         : (trimmedPass === 'piket123');
 
       if (!isValidPiket) {
-        showToast('⚠️ Kata sandi stasiun piket salah! Default: piket123 (hubungi Kesiswaan / Tim IT).', 'warn');
+        showToast('⚠️ Kata sandi salah.', 'warn');
         return;
       }
 
@@ -2255,12 +2255,12 @@ export default function ELearningPage() {
       const trimmedPass = loginPassword.trim();
 
       if (inputId.toLowerCase() !== 'panitia') {
-        showToast('⚠️ User ID panitia salah! Masukkan: panitia (tanpa spasi)', 'warn');
+        showToast('⚠️ User ID panitia salah.', 'warn');
         return;
       }
 
       if (!trimmedPass) {
-        showToast('⚠️ Silakan masukkan kata sandi panitia ujian CBT.', 'warn');
+        showToast('⚠️ Masukkan kata sandi.', 'warn');
         return;
       }
 
@@ -2276,7 +2276,7 @@ export default function ELearningPage() {
         : (trimmedPass === 'panitia123');
 
       if (!isValidPass) {
-        showToast('⚠️ Kata sandi panitia salah! Default: panitia123.', 'warn');
+        showToast('⚠️ Kata sandi salah.', 'warn');
         return;
       }
 
@@ -2290,26 +2290,31 @@ export default function ELearningPage() {
     } else if (loginRole === 'siswa') {
       const cleanInput = loginIdentifier.trim();
 
+      if (!cleanInput) {
+        showToast('⚠️ Masukkan NISN.', 'warn');
+        return;
+      }
+
       if (/\s/.test(loginIdentifier)) {
-        showToast('⚠️ NISN tidak boleh mengandung spasi! Masukkan 10 digit angka resmi.', 'warn');
+        showToast('⚠️ NISN tidak boleh mengandung spasi.', 'warn');
         return;
       }
 
       if (!/^\d{10}$/.test(cleanInput)) {
-        showToast('⚠️ NISN harus terdiri dari tepat 10 digit angka (contoh: 0133138158).', 'warn');
+        showToast('⚠️ NISN harus 10 digit angka.', 'warn');
         return;
       }
 
       const student = activeStudents.find(s => s.nisn === cleanInput);
 
       if (!student) {
-        showToast('⚠️ NISN peserta didik tidak ditemukan dalam data sekolah! Periksa kembali kartu pelajar Anda.', 'warn');
+        showToast('⚠️ NISN tidak terdaftar.', 'warn');
         return;
       }
 
       const trimmedPass = loginPassword.trim();
       if (!trimmedPass) {
-        showToast('⚠️ Silakan masukkan kata sandi peserta didik.', 'warn');
+        showToast('⚠️ Masukkan kata sandi.', 'warn');
         return;
       }
 
@@ -2330,7 +2335,7 @@ export default function ELearningPage() {
         : (trimmedPass === 'siswa123');
 
       if (!isValidSiswa) {
-        showToast('⚠️ Kata sandi peserta didik salah! Default: siswa123 (hubungi Wali Kelas jika lupa).', 'warn');
+        showToast('⚠️ Kata sandi salah.', 'warn');
         return;
       }
 
@@ -3767,14 +3772,14 @@ export default function ELearningPage() {
                   <>
                     <div>
                       <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                        User ID Guru (Nama Tanpa Gelar)
+                        User ID
                       </label>
                       <input
                         type="text"
                         value={loginIdentifier}
                         onChange={(e) => setLoginIdentifier(e.target.value)}
                         className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition lowercase"
-                        placeholder="contoh: ichsanularifin"
+                        placeholder="User ID"
                         autoComplete="off"
                         required
                       />
@@ -3790,7 +3795,7 @@ export default function ELearningPage() {
                           value={loginPassword}
                           onChange={(e) => setLoginPassword(e.target.value)}
                           className="w-full px-3.5 py-2.5 pr-10 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition"
-                          placeholder="Masukkan kata sandi"
+                          placeholder="Kata Sandi"
                           autoComplete="new-password"
                           required
                         />
@@ -3809,7 +3814,7 @@ export default function ELearningPage() {
                       type="submit"
                       className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm transition shadow-md shadow-indigo-600/20 flex items-center justify-center gap-1.5 cursor-pointer mt-2 active:scale-[0.99]"
                     >
-                      Masuk sebagai Guru Mapel ➔
+                      Masuk
                     </button>
                   </>
                 )}
@@ -3818,14 +3823,14 @@ export default function ELearningPage() {
                   <>
                     <div>
                       <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                        User ID Meja Piket
+                        User ID
                       </label>
                       <input
                         type="text"
                         value={loginIdentifier}
                         onChange={(e) => setLoginIdentifier(e.target.value)}
                         className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition font-mono lowercase"
-                        placeholder="piket"
+                        placeholder="User ID"
                         autoComplete="off"
                         required
                       />
@@ -3841,7 +3846,7 @@ export default function ELearningPage() {
                           value={loginPassword}
                           onChange={(e) => setLoginPassword(e.target.value)}
                           className="w-full px-3.5 py-2.5 pr-10 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition"
-                          placeholder="Masukkan kata sandi"
+                          placeholder="Kata Sandi"
                           autoComplete="new-password"
                           required
                         />
@@ -3860,33 +3865,23 @@ export default function ELearningPage() {
                       type="submit"
                       className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm transition shadow-md shadow-emerald-600/20 flex items-center justify-center gap-1.5 cursor-pointer mt-2 active:scale-[0.99]"
                     >
-                      Masuk sebagai Guru Piket ➔
+                      Masuk
                     </button>
                   </>
                 )}
 
                 {loginRole === 'panitia' && (
                   <>
-                    <div className="p-3 rounded-2xl bg-amber-50 border border-amber-200/80 text-amber-900 text-xs flex items-start gap-2.5">
-                      <span className="text-base flex-shrink-0">🏛️</span>
-                      <div>
-                        <strong className="block text-amber-950 font-bold mb-0.5">Portal Posko Panitia Asesmen CBT</strong>
-                        <p className="text-[11px] text-amber-800">
-                          Khusus tim panitia pelaksana ujian (PTS / PAS / Asesmen Sumatif). Silakan masukkan kredensial posko resmi.
-                        </p>
-                      </div>
-                    </div>
-
                     <div>
                       <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                        User ID Panitia CBT
+                        User ID
                       </label>
                       <input
                         type="text"
                         value={loginIdentifier}
                         onChange={(e) => setLoginIdentifier(e.target.value)}
                         className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-amber-500 focus:bg-white focus:ring-2 focus:ring-amber-500/20 transition font-mono lowercase"
-                        placeholder="panitia"
+                        placeholder="User ID"
                         autoComplete="off"
                         required
                       />
@@ -3902,7 +3897,7 @@ export default function ELearningPage() {
                           value={loginPassword}
                           onChange={(e) => setLoginPassword(e.target.value)}
                           className="w-full px-3.5 py-2.5 pr-10 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-amber-500 focus:bg-white focus:ring-2 focus:ring-amber-500/20 transition"
-                          placeholder="Masukkan kata sandi posko"
+                          placeholder="Kata Sandi"
                           autoComplete="current-password"
                           required
                         />
@@ -3921,7 +3916,7 @@ export default function ELearningPage() {
                       type="submit"
                       className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-sm transition shadow-md shadow-amber-500/20 flex items-center justify-center gap-1.5 cursor-pointer mt-2 active:scale-[0.99]"
                     >
-                      Masuk sebagai Panitia CBT ➔
+                      Masuk
                     </button>
                   </>
                 )}
@@ -3930,15 +3925,15 @@ export default function ELearningPage() {
                   <>
                     <div>
                       <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                        NISN Peserta Didik (10 Digit)
+                        NISN
                       </label>
                       <input
                         type="text"
                         value={loginIdentifier}
                         onChange={(e) => setLoginIdentifier(e.target.value)}
                         className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-purple-500 focus:bg-white focus:ring-2 focus:ring-purple-500/20 transition font-mono"
-                        placeholder="10 digit NISN (contoh: 0133138158)"
-                        maxLength={12}
+                        placeholder="NISN"
+                        maxLength={10}
                         autoComplete="off"
                         required
                       />
@@ -3954,7 +3949,7 @@ export default function ELearningPage() {
                           value={loginPassword}
                           onChange={(e) => setLoginPassword(e.target.value)}
                           className="w-full px-3.5 py-2.5 pr-10 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm focus:outline-none focus:border-purple-500 focus:bg-white focus:ring-2 focus:ring-purple-500/20 transition"
-                          placeholder="Masukkan kata sandi"
+                          placeholder="Kata Sandi"
                           autoComplete="new-password"
                           required
                         />
@@ -3973,25 +3968,17 @@ export default function ELearningPage() {
                       type="submit"
                       className="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-sm transition shadow-md shadow-purple-600/20 flex items-center justify-center gap-1.5 cursor-pointer mt-2 active:scale-[0.99]"
                     >
-                      Masuk sebagai Siswa ➔
+                      Masuk
                     </button>
 
                     {/* Tombol Uji Coba Akun Siswa Cepat (1 Siswa Saja) */}
                     <div className="pt-2">
-                      <div className="relative flex py-1 items-center">
-                        <div className="flex-grow border-t border-slate-200"></div>
-                        <span className="flex-shrink mx-2 text-[11px] text-slate-400 font-medium">uji coba cepat</span>
-                        <div className="flex-grow border-t border-slate-200"></div>
-                      </div>
-
                       <button
                         type="button"
                         onClick={handleQuickLoginStudent}
-                        className="w-full mt-1 py-2 px-3 rounded-xl bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 shadow-2xs"
+                        className="w-full py-2 px-3 rounded-xl bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 text-xs font-semibold transition flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
                       >
-                        <span>⚡</span>
-                        <span>Masuk sebagai <b>Abdul Hanan</b> (Kelas 7-A)</span>
-                        <span>→</span>
+                        <span>Akun Uji Coba: <b>Abdul Hanan (7-A)</b></span>
                       </button>
                     </div>
                   </>

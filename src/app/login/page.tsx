@@ -18,17 +18,17 @@ export default function LoginPage() {
     setErrorMessage('');
 
     if (!username.trim()) {
-      setErrorMessage('Username tidak boleh kosong!');
+      setErrorMessage('User ID wajib diisi!');
       return;
     }
 
     if (/\s/.test(username) || username.trim().toLowerCase() !== 'admin') {
-      setErrorMessage('User ID salah! Masukkan User ID resmi: admin (tanpa spasi)');
+      setErrorMessage('User ID salah!');
       return;
     }
 
     if (!password) {
-      setErrorMessage('Password tidak boleh kosong!');
+      setErrorMessage('Kata sandi wajib diisi!');
       return;
     }
 
@@ -49,7 +49,7 @@ export default function LoginPage() {
         : password === 'admin123';
 
       if (!isPasswordValid) {
-        setErrorMessage('Password salah! Default: admin123 (atau gunakan kata sandi kustom Anda).');
+        setErrorMessage('Kata sandi salah!');
       } else {
         // Record login in database
         try {
@@ -167,7 +167,7 @@ export default function LoginPage() {
                     setUsername(e.target.value);
                     if (errorMessage) setErrorMessage('');
                   }}
-                  placeholder="User ID (admin)"
+                  placeholder="User ID"
                   className="w-full pl-10 pr-4 py-2.5 sm:py-3 rounded-xl bg-slate-50 hover:bg-slate-100/70 focus:bg-white text-xs sm:text-sm text-slate-800 placeholder-slate-400 border border-slate-200/90 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
                   autoComplete="username"
                 />
@@ -188,7 +188,7 @@ export default function LoginPage() {
                     setPassword(e.target.value);
                     if (errorMessage) setErrorMessage('');
                   }}
-                  placeholder="Password"
+                  placeholder="Kata Sandi"
                   className={`w-full pl-10 pr-11 py-2.5 sm:py-3 rounded-xl bg-slate-50 hover:bg-slate-100/70 focus:bg-white text-xs sm:text-sm text-slate-800 placeholder-slate-400 border ${
                     errorMessage ? 'border-red-400 ring-1 ring-red-300' : 'border-slate-200/90 focus:border-indigo-400'
                   } focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all`}
