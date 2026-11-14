@@ -43,6 +43,7 @@ export interface TeacherUser {
   role: 'mapel' | 'piket' | 'both';
   subject: string;
   classes: string[];
+  password?: string;
 }
 
 export interface AuthUserSession {

@@ -76,7 +76,7 @@ export default function TeacherSettingsModal({
 
     const trimmedCurrent = currentPassword.trim();
     const isCurrentCorrect = currentStoredPass
-      ? (trimmedCurrent === currentStoredPass || trimmedCurrent === 'guru123')
+      ? (trimmedCurrent === currentStoredPass)
       : (trimmedCurrent === 'guru123' || trimmedCurrent === 'spentic2026' || trimmedCurrent === cleanNip);
 
     if (!isCurrentCorrect) {
@@ -95,6 +95,20 @@ export default function TeacherSettingsModal({
     if (typeof window !== 'undefined') {
       try {
         localStorage.setItem('smpn3_teacher_passwords', JSON.stringify(map));
+        // Background sync to database
+        fetch('/api/school', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'teacher',
+            teacher: {
+              nip: currentUser.nipOrNisn,
+              username: teacherUsername,
+              name: currentUser.name,
+              password: newTrimmed
+            }
+          })
+        }).catch(() => {});
       } catch (err) {
         console.error(err);
       }

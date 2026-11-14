@@ -1825,7 +1825,8 @@ export default function ELearningPage() {
               role: (existingDemo?.role || (st.role === 'Kepala Sekolah' ? 'both' : 'mapel')) as 'mapel' | 'piket' | 'both',
               subject: existingDemo?.subject || st.subject || 'Guru Mata Pelajaran',
               classes: existingDemo?.classes || ['7-A', '7-B', '8-A'],
-              username: st.username || getTeacherUsername(st)
+              username: st.username || getTeacherUsername(st),
+              password: st.password
             };
           });
           setAllTeachers(merged);
@@ -2188,20 +2189,21 @@ export default function ELearningPage() {
       const tNipClean = (teacher.nip || '').replace(/\s+/g, '');
 
       // Custom password verification set by administrator or teacher
-      let customPassword = '';
+      let customPassword = teacher.password || '';
       if (typeof window !== 'undefined') {
         try {
           const raw = localStorage.getItem('smpn3_teacher_passwords');
           if (raw) {
             const map = JSON.parse(raw);
-            customPassword = map[teacherUsername] || (tNipClean ? map[tNipClean] : '') || map[teacher.name] || map[inputNipClean] || '';
+            const fromStorage = map[teacherUsername] || (tNipClean ? map[tNipClean] : '') || map[teacher.name] || map[inputNipClean] || '';
+            if (fromStorage) customPassword = fromStorage;
           }
         } catch {}
       }
 
       const trimmedPass = loginPassword.trim();
       const isValidPass = customPassword
-        ? (trimmedPass === customPassword || trimmedPass === 'guru123')
+        ? (trimmedPass === customPassword)
         : (trimmedPass === 'guru123' || trimmedPass === 'spentic2026' || trimmedPass === teacherUsername || (tNipClean && trimmedPass === tNipClean));
 
       if (!isValidPass) {

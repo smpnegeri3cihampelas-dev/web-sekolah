@@ -42,7 +42,8 @@ export async function GET() {
       photo: r.photo || '/teachers/default_avatar.svg',
       status: r.status || 'GTT / Honorer',
       active: Boolean(r.active !== 0 && r.active !== false),
-      quote: r.quote || ''
+      quote: r.quote || '',
+      password: r.password || 'guru123'
     }));
 
     // Format Data Pokok
@@ -190,12 +191,15 @@ export async function PUT(req: Request) {
 
     // 2. Update Teacher
     if (type === 'teacher') {
-      const targetId = id || teacher?.id;
-      if (!targetId) {
-        return NextResponse.json({ success: false, error: 'ID guru diperlukan' }, { status: 400 });
+      const t = teacher || body;
+      const targetId = id || t?.id;
+      const targetNip = t?.nip ? String(t.nip).trim() : null;
+      const targetUsername = t?.username ? String(t.username).trim() : null;
+
+      if (!targetId && !targetNip && !targetUsername) {
+        return NextResponse.json({ success: false, error: 'ID, NIP, atau username guru diperlukan' }, { status: 400 });
       }
 
-      const t = teacher || body;
       const activeVal = t.active !== undefined ? (t.active ? 1 : 0) : null;
 
       await query(
@@ -212,7 +216,7 @@ export async function PUT(req: Request) {
              phone = COALESCE(?, phone),
              username = COALESCE(?, username),
              password = COALESCE(?, password)
-         WHERE id = ?`,
+         WHERE id = ? OR (nip IS NOT NULL AND nip != '-' AND nip = ?) OR username = ?`,
         [
           t.name || null,
           t.role || null,
@@ -226,13 +230,15 @@ export async function PUT(req: Request) {
           t.phone !== undefined ? t.phone : null,
           t.username || null,
           t.password || null,
-          targetId
+          targetId || 0,
+          targetNip || '',
+          targetUsername || ''
         ]
       );
 
       return NextResponse.json({
         success: true,
-        message: `Data guru ID ${targetId} berhasil diperbarui di database cloud`
+        message: `Data guru "${t.name || targetId || targetUsername}" berhasil diperbarui di database cloud`
       });
     }
 

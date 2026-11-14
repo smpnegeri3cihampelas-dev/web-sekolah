@@ -23,6 +23,7 @@ export interface Teacher {
   status: string;
   active?: boolean;
   quote?: string;
+  password?: string;
 }
 
 export interface DataPokok {
@@ -441,3 +442,4 @@ export const DEFAULT_DATA_POKOK: DataPokok = {
   guru: '33',
   staf: '8'
 };
+

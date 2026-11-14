@@ -871,7 +871,10 @@ export function ResetTeacherPasswordModal({
     }
 
     if (onSaveTeacher && teacher) {
-      onSaveTeacher(teacher.id, { phone: phone.trim() || undefined });
+      onSaveTeacher(teacher.id, { 
+        password: password.trim(),
+        phone: phone.trim() || undefined 
+      });
     }
 
     showToast(`🔑 Kata sandi akun "${teacher.name}" berhasil diperbarui!`);
