@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { AgendaItem, KaldikPdfInfo } from '@/lib/agendaData';
+import { AgendaItem, KaldikPdfInfo, getAgendaSortTime, computeAutomaticStatus } from '@/lib/agendaData';
 import { AddAgendaModal, EditAgendaModal } from './AgendaModal';
 
 interface TabAgendaProps {
@@ -40,13 +40,34 @@ export function TabAgenda({
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(8);
 
-  const sem1Count = useMemo(() => {
-    return agendaList.filter((a) => (a.semester || '').includes('1') || a.id <= 16).length;
+  // Resolve dynamic status and chronological sorting
+  const resolvedAgendaList = useMemo(() => {
+    return agendaList
+      .map((item) => ({
+        ...item,
+        status: computeAutomaticStatus(item.date, item.status)
+      }))
+      .sort((a, b) => {
+        const timeA = getAgendaSortTime(a.date);
+        const timeB = getAgendaSortTime(b.date);
+        if (timeA !== timeB) return timeA - timeB;
+        return (a.id || 0) - (b.id || 0);
+      });
   }, [agendaList]);
 
+  const sem1Count = useMemo(() => {
+    return resolvedAgendaList.filter((a) => {
+      const sem = (a.semester || '').toLowerCase();
+      return sem ? sem.includes('1') : a.id <= 16;
+    }).length;
+  }, [resolvedAgendaList]);
+
   const sem2Count = useMemo(() => {
-    return agendaList.filter((a) => (a.semester || '').includes('2') || a.id > 16).length;
-  }, [agendaList]);
+    return resolvedAgendaList.filter((a) => {
+      const sem = (a.semester || '').toLowerCase();
+      return sem ? sem.includes('2') : a.id > 16;
+    }).length;
+  }, [resolvedAgendaList]);
 
   // Reset to page 1 when filter/search/pageSize changes
   useEffect(() => {
@@ -54,10 +75,10 @@ export function TabAgenda({
   }, [activeFilter, searchQuery, pageSize]);
 
   const filteredList = useMemo(() => {
-    return agendaList.filter((item) => {
+    return resolvedAgendaList.filter((item) => {
       const sem = (item.semester || '').toLowerCase();
-      const isSem1 = sem.includes('1') || item.id <= 16;
-      const isSem2 = sem.includes('2') || item.id > 16;
+      const isSem1 = sem ? sem.includes('1') : item.id <= 16;
+      const isSem2 = sem ? sem.includes('2') : item.id > 16;
 
       if (activeFilter === 'SEM1' && !isSem1) return false;
       if (activeFilter === 'SEM2' && !isSem2) return false;
@@ -72,7 +93,7 @@ export function TabAgenda({
 
       return true;
     });
-  }, [agendaList, activeFilter, searchQuery]);
+  }, [resolvedAgendaList, activeFilter, searchQuery]);
 
   // Pagination calculation
   const totalItems = filteredList.length;
@@ -332,7 +353,7 @@ export function TabAgenda({
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            Semua ({agendaList.length})
+            Semua ({resolvedAgendaList.length})
           </button>
           <button
             type="button"

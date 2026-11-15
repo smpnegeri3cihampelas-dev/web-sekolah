@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
-import { OFFICIAL_KALDIK_SMPN3, DEFAULT_PDF_URL, DEFAULT_PDF_NAME, KaldikPdfInfo } from '@/lib/agendaConstants';
+import { OFFICIAL_KALDIK_SMPN3, DEFAULT_PDF_URL, DEFAULT_PDF_NAME, KaldikPdfInfo, getAgendaSortTime } from '@/lib/agendaConstants';
 
 // Helper: Auto-seed 27 official kaldik items if table is empty
 async function ensureAgendaSeeded() {
@@ -57,9 +57,18 @@ export async function GET() {
       }
     }
 
+    const sortedRows = Array.isArray(rows)
+      ? [...rows].sort((a: any, b: any) => {
+          const timeA = getAgendaSortTime(a.date);
+          const timeB = getAgendaSortTime(b.date);
+          if (timeA !== timeB) return timeA - timeB;
+          return (Number(a.id) || 0) - (Number(b.id) || 0);
+        })
+      : [];
+
     return NextResponse.json({
       success: true,
-      data: rows,
+      data: sortedRows,
       pdfInfo
     });
   } catch (error: any) {

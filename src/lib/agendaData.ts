@@ -7,7 +7,9 @@ import {
   KaldikPdfInfo,
   OFFICIAL_KALDIK_SMPN3,
   DEFAULT_PDF_URL,
-  DEFAULT_PDF_NAME
+  DEFAULT_PDF_NAME,
+  getAgendaSortTime,
+  computeAutomaticStatus
 } from './agendaConstants';
 
 const STORAGE_KEY = 'smpn3_agenda_data_v2';
@@ -74,17 +76,27 @@ export function resetStoredPdfInfo(): KaldikPdfInfo {
   return defaultInfo;
 }
 
+export function sortAgendaItems(items: AgendaItem[]): AgendaItem[] {
+  return [...items].sort((a, b) => {
+    const timeA = getAgendaSortTime(a.date);
+    const timeB = getAgendaSortTime(b.date);
+    if (timeA !== timeB) return timeA - timeB;
+    return (a.id || 0) - (b.id || 0);
+  });
+}
+
 export function getStoredAgenda(): AgendaItem[] {
-  if (typeof window === 'undefined') return OFFICIAL_KALDIK_SMPN3;
+  if (typeof window === 'undefined') return sortAgendaItems(OFFICIAL_KALDIK_SMPN3);
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (!saved) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(OFFICIAL_KALDIK_SMPN3));
-      return OFFICIAL_KALDIK_SMPN3;
+      const initialSorted = sortAgendaItems(OFFICIAL_KALDIK_SMPN3);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(initialSorted));
+      return initialSorted;
     }
     const parsed = JSON.parse(saved);
     if (Array.isArray(parsed) && parsed.length > 0) {
-      return parsed.map((p) => ({
+      const mapped = parsed.map((p) => ({
         id: Number(p.id) || Date.now(),
         name: p.name || p.title || 'Agenda Sekolah',
         date: p.date || 'Mendatang',
@@ -93,20 +105,22 @@ export function getStoredAgenda(): AgendaItem[] {
         semester: p.semester || 'Semester 1',
         title: p.title || p.name || ''
       }));
+      return sortAgendaItems(mapped);
     }
-    return OFFICIAL_KALDIK_SMPN3;
+    return sortAgendaItems(OFFICIAL_KALDIK_SMPN3);
   } catch (err) {
     console.error('Error reading agenda from storage', err);
-    return OFFICIAL_KALDIK_SMPN3;
+    return sortAgendaItems(OFFICIAL_KALDIK_SMPN3);
   }
 }
 
 export function saveStoredAgenda(items: AgendaItem[]): AgendaItem[] {
   if (typeof window === 'undefined') return items;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+    const sorted = sortAgendaItems(items);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(sorted));
     window.dispatchEvent(new Event(EVENT_NAME));
-    return items;
+    return sorted;
   } catch (err) {
     console.error('Error saving agenda to storage', err);
     return items;
@@ -122,7 +136,7 @@ export async function syncAgendaWithCloud(): Promise<{ agendaList: AgendaItem[];
 
     let fetchedAgenda: AgendaItem[] = [];
     if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-      fetchedAgenda = json.data.map((r: any) => ({
+      const mapped = json.data.map((r: any) => ({
         id: Number(r.id),
         name: r.name || r.title || 'Agenda Sekolah',
         date: r.date || 'Mendatang',
@@ -131,6 +145,7 @@ export async function syncAgendaWithCloud(): Promise<{ agendaList: AgendaItem[];
         semester: r.semester || 'Semester 1',
         title: r.title || r.name || ''
       }));
+      fetchedAgenda = sortAgendaItems(mapped);
 
       if (typeof window !== 'undefined') {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(fetchedAgenda));
