@@ -13,7 +13,7 @@ export default function LoginPage() {
   const [errorMessage, setErrorMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
 
@@ -33,35 +33,56 @@ export default function LoginPage() {
     }
 
     setIsLoading(true);
+    setErrorMessage('');
 
-    // Simulasi verifikasi login
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: username.trim(), password, role: 'admin' })
+      });
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.setItem('smpn3_admin_password', password);
+          } catch {}
+        }
+        router.push('/dashboard');
+        return;
+      } else {
+        // Fallback to local offline check if server returned error
+        let customPassword = '';
+        if (typeof window !== 'undefined') {
+          try {
+            customPassword = localStorage.getItem('smpn3_admin_password') || '';
+          } catch {}
+        }
+        const isLocalValid = customPassword ? password === customPassword : password === 'admin123';
+        if (isLocalValid) {
+          router.push('/dashboard');
+          return;
+        }
+        setErrorMessage(data.message || 'Kata sandi salah!');
+      }
+    } catch {
+      // Offline fallback
       let customPassword = '';
       if (typeof window !== 'undefined') {
         try {
           customPassword = localStorage.getItem('smpn3_admin_password') || '';
         } catch {}
       }
-      
-      const isPasswordValid = customPassword
-        ? password === customPassword
-        : password === 'admin123';
-
-      if (!isPasswordValid) {
-        setErrorMessage('Kata sandi salah!');
-      } else {
-        // Record login in database
-        try {
-          fetch('/api/auth/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password, role: 'admin' })
-          }).catch(() => {});
-        } catch {}
+      const isLocalValid = customPassword ? password === customPassword : password === 'admin123';
+      if (isLocalValid) {
         router.push('/dashboard');
+      } else {
+        setErrorMessage('Kata sandi salah atau tidak dapat terhubung ke server!');
       }
-    }, 600);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

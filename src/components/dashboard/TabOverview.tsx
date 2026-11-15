@@ -5,6 +5,7 @@ import { Leader, Teacher } from '@/lib/schoolData';
 import { WartaItem } from '@/lib/wartaData';
 import { Student } from '@/lib/elearningData';
 import { GalleryItem } from '@/lib/galleryData';
+import { useSettingsData } from '@/lib/settingsData';
 
 interface TabOverviewProps {
   newsList: WartaItem[];
@@ -25,6 +26,7 @@ export function TabOverview({
   studentsList,
   onNavigateTab
 }: TabOverviewProps) {
+  const { identity } = useSettingsData();
   const totalStudents = studentsList.length || 535;
   const activeCount = studentsList.filter(s => s.status !== 'Keluar').length;
   const keluarCount = studentsList.filter(s => s.status === 'Keluar').length;
@@ -106,7 +108,7 @@ export function TabOverview({
                 </div>
                 <div>
                   <h3 className="text-sm font-black text-slate-950 tracking-tight">Status Operasional Sekolah</h3>
-                  <p className="text-[11px] text-slate-600 font-bold">SMP Negeri 3 Cihampelas · Akreditasi B</p>
+                  <p className="text-[11px] text-slate-600 font-bold">{identity.schoolName} · Akreditasi {identity.akreditasi}</p>
                 </div>
               </div>
               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
@@ -117,7 +119,7 @@ export function TabOverview({
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
               <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
                 <span className="text-[10px] text-slate-600 font-bold uppercase tracking-wider block mb-0.5">NPSN</span>
-                <span className="text-xs font-mono font-black text-slate-900">20279930</span>
+                <span className="text-xs font-mono font-black text-slate-900">{identity.npsn}</span>
               </div>
               <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
                 <span className="text-[10px] text-slate-600 font-bold uppercase tracking-wider block mb-0.5">Bentuk Pendidikan</span>
@@ -142,7 +144,7 @@ export function TabOverview({
             </div>
 
             <div className="pt-2 flex items-center justify-between text-xs text-slate-600 font-semibold border-t border-slate-100">
-              <span>Alamat: Kp. Sukawangi RT 02/09, Situwangi, Bandung Barat</span>
+              <span className="truncate max-w-[280px] sm:max-w-md">Alamat: {identity.address || 'Kp. Sukawangi RT 02/09, Situwangi, Bandung Barat'}</span>
               <button
                 type="button"
                 onClick={() => onNavigateTab('pimpinan')}
