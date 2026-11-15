@@ -1,75 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+export * from './galleryConstants';
+import {
+  GalleryItem,
+  DEFAULT_GALLERY_PHOTOS,
+  GALLERY_CATEGORIES
+} from './galleryConstants';
 
-export interface GalleryItem {
-  id: number;
-  src: string;
-  category: 'FASILITAS' | 'KEGIATAN' | 'EKSTRAKURIKULER' | 'AKADEMIK' | string;
-  title: string;
-  desc?: string;
-}
-
-export const DEFAULT_GALLERY_PHOTOS: GalleryItem[] = [
-  { 
-    id: 1, 
-    src: '/gallery_2.jpg', 
-    category: 'FASILITAS', 
-    title: 'Laboratorium Komputer & Praktikum TIK',
-    desc: 'Sarana pembelajaran komputasi, literasi digital, dan pelaksanaan asesmen nasional ANBK.'
-  },
-  { 
-    id: 2, 
-    src: '/gallery_1.jpg', 
-    category: 'FASILITAS', 
-    title: 'Perpustakaan & Pojok Baca Siswa',
-    desc: 'Pusat sumber belajar, koleksi buku literasi harian, dan ruang baca yang nyaman bagi siswa.'
-  },
-  { 
-    id: 3, 
-    src: '/slide1.jpeg', 
-    category: 'KEGIATAN', 
-    title: 'Upacara Bendera & Apel Kedisiplinan',
-    desc: 'Pembiasaan rutin hari Senin untuk menanamkan jiwa patriotisme, budi pekerti, dan kepemimpinan.'
-  },
-  { 
-    id: 4, 
-    src: '/slide3.jpeg', 
-    category: 'EKSTRAKURIKULER', 
-    title: 'Kegiatan Olahraga & Pengembangan Bakat',
-    desc: 'Wadah pembinaan bakat olahraga, sportivitas, dan kebugaran jasmani seluruh siswa.'
-  },
-  { 
-    id: 5, 
-    src: '/slide4.jpeg', 
-    category: 'KEGIATAN', 
-    title: 'Pentas Seni & Gelar Budaya Sunda',
-    desc: 'Apresiasi bakat seni budaya daerah, pelestarian kearifan lokal, dan unjuk kreativitas siswa.'
-  },
-  { 
-    id: 6, 
-    src: '/slide7.jpeg', 
-    category: 'AKADEMIK', 
-    title: 'Praktikum Sains & Diskusi Berdiferensiasi',
-    desc: 'Pembelajaran kontekstual melalui observasi langsung, eksperimen ilmiah, dan kerja sama tim.'
-  },
-  { 
-    id: 7, 
-    src: '/slide2.jpeg', 
-    category: 'AKADEMIK', 
-    title: 'Gelar Karya Projek Penguatan P5',
-    desc: 'Pameran hasil karya inovatif, daur ulang ramah lingkungan, dan kewirausahaan siswa.'
-  },
-  { 
-    id: 8, 
-    src: '/slide6.jpeg', 
-    category: 'KEGIATAN', 
-    title: 'Senam Sehat & Jumat Bersih Lingkungan',
-    desc: 'Pembiasaan rutin hidup sehat dan gotong royong memelihara keasrian lingkungan sekolah.'
-  },
-];
-
-const STORAGE_KEY = 'smpn3_gallery_data_v1';
+const STORAGE_KEY = 'smpn3_gallery_data_v2';
 const EVENT_NAME = 'smpn3_gallery_updated';
 
 export function getStoredGallery(): GalleryItem[] {
@@ -83,11 +22,12 @@ export function getStoredGallery(): GalleryItem[] {
     const parsed = JSON.parse(saved);
     if (Array.isArray(parsed) && parsed.length > 0) {
       return parsed.map((p) => ({
-        id: p.id || Date.now(),
-        src: p.src || '/gallery_2.jpg',
-        category: (p.category || 'KEGIATAN').toUpperCase(),
+        id: Number(p.id) || Date.now(),
+        src: p.src || p.image_url || '/gallery_2.jpg',
+        category: (p.category || 'FASILITAS').toUpperCase(),
         title: p.title || 'Dokumentasi Sekolah',
-        desc: p.desc || (p.category === 'FASILITAS' ? 'Sarana penunjang kegiatan di SMPN 3 Cihampelas.' : 'Dokumentasi kegiatan siswa dan guru SMP Negeri 3 Cihampelas.')
+        desc: p.desc || p.caption || (p.category === 'FASILITAS' ? 'Sarana penunjang kegiatan di SMPN 3 Cihampelas.' : 'Dokumentasi kegiatan siswa dan guru SMP Negeri 3 Cihampelas.'),
+        created_at: p.created_at
       }));
     }
     return DEFAULT_GALLERY_PHOTOS;
@@ -109,16 +49,73 @@ export function saveStoredGallery(items: GalleryItem[]): GalleryItem[] {
   }
 }
 
+// Full Two-Way Cloud Sync with MariaDB
+export async function syncGalleryWithCloud(): Promise<{ galleryList: GalleryItem[] }> {
+  try {
+    const res = await fetch('/api/gallery', { cache: 'no-store' });
+    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+    const json = await res.json();
+
+    let fetchedGallery: GalleryItem[] = [];
+    if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+      fetchedGallery = json.data.map((r: any) => ({
+        id: Number(r.id),
+        title: r.title || 'Dokumentasi Sekolah',
+        category: (r.category || 'FASILITAS').toUpperCase(),
+        src: r.src || r.image_url || '/gallery_2.jpg',
+        desc: r.desc || r.caption || '',
+        created_at: r.created_at
+      }));
+
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(fetchedGallery));
+      }
+    }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event(EVENT_NAME));
+    }
+
+    return {
+      galleryList: fetchedGallery.length > 0 ? fetchedGallery : getStoredGallery()
+    };
+  } catch (err) {
+    console.warn('Sync with cloud gallery failed, using local cache:', err);
+    return {
+      galleryList: getStoredGallery()
+    };
+  }
+}
+
 export function addStoredGallery(item: Omit<GalleryItem, 'id'>): GalleryItem[] {
   const current = getStoredGallery();
+  const tempId = Date.now();
   const newItem: GalleryItem = {
     ...item,
-    id: Date.now(),
-    category: (item.category || 'KEGIATAN').toUpperCase(),
+    id: tempId,
+    category: (item.category || 'FASILITAS').toUpperCase(),
     desc: item.desc || (item.category === 'FASILITAS' ? 'Sarana penunjang kegiatan di SMPN 3 Cihampelas.' : 'Dokumentasi kegiatan siswa dan guru SMP Negeri 3 Cihampelas.')
   };
   const updated = [newItem, ...current];
-  return saveStoredGallery(updated);
+  saveStoredGallery(updated);
+
+  // Sync to MariaDB Cloud asynchronously
+  fetch('/api/gallery', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(newItem)
+  })
+    .then((res) => res.json())
+    .then((data) => {
+      if (data.success && data.insertId) {
+        const finalCurrent = getStoredGallery();
+        const adjusted = finalCurrent.map((g) => (g.id === tempId ? { ...g, id: Number(data.insertId) } : g));
+        saveStoredGallery(adjusted);
+      }
+    })
+    .catch((err) => console.error('Cloud add gallery error:', err));
+
+  return updated;
 }
 
 export function updateStoredGallery(id: number, patch: Partial<GalleryItem>): GalleryItem[] {
@@ -131,29 +128,61 @@ export function updateStoredGallery(id: number, patch: Partial<GalleryItem>): Ga
     }
     return item;
   });
-  return saveStoredGallery(updated);
+  saveStoredGallery(updated);
+
+  // Sync to MariaDB Cloud asynchronously
+  fetch('/api/gallery', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, ...patch })
+  }).catch((err) => console.error('Cloud update gallery error:', err));
+
+  return updated;
 }
 
 export function deleteStoredGallery(id: number): GalleryItem[] {
   const current = getStoredGallery();
   const updated = current.filter((item) => item.id !== id);
-  return saveStoredGallery(updated);
+  saveStoredGallery(updated);
+
+  // Sync to MariaDB Cloud asynchronously
+  fetch(`/api/gallery?id=${id}`, {
+    method: 'DELETE'
+  }).catch((err) => console.error('Cloud delete gallery error:', err));
+
+  return updated;
 }
 
 export function resetStoredGallery(): GalleryItem[] {
   if (typeof window !== 'undefined') {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_GALLERY_PHOTOS));
     window.dispatchEvent(new Event(EVENT_NAME));
+
+    // Sync to MariaDB Cloud asynchronously
+    fetch('/api/gallery?action=reset', {
+      method: 'DELETE'
+    }).catch((err) => console.error('Cloud reset gallery error:', err));
   }
   return DEFAULT_GALLERY_PHOTOS;
 }
 
 export function useGalleryData() {
-  const [galleryList, setGalleryList] = useState<GalleryItem[]>(DEFAULT_GALLERY_PHOTOS);
+  const [galleryList, setGalleryList] = useState<GalleryItem[]>(() => getStoredGallery());
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
+
+  const refreshFromCloud = useCallback(async () => {
+    setIsSyncing(true);
+    try {
+      const res = await syncGalleryWithCloud();
+      setGalleryList(res.galleryList);
+    } finally {
+      setIsSyncing(false);
+    }
+  }, []);
 
   useEffect(() => {
-    // Initial load
-    setGalleryList(getStoredGallery());
+    // Initial fetch from cloud on component mount
+    refreshFromCloud();
 
     const handleUpdate = () => {
       setGalleryList(getStoredGallery());
@@ -166,10 +195,12 @@ export function useGalleryData() {
       window.removeEventListener(EVENT_NAME, handleUpdate);
       window.removeEventListener('storage', handleUpdate);
     };
-  }, []);
+  }, [refreshFromCloud]);
 
   return {
     galleryList,
+    isSyncing,
+    refreshFromCloud,
     addGallery: (item: Omit<GalleryItem, 'id'>) => addStoredGallery(item),
     updateGallery: (id: number, patch: Partial<GalleryItem>) => updateStoredGallery(id, patch),
     deleteGallery: (id: number) => deleteStoredGallery(id),

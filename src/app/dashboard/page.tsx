@@ -316,9 +316,10 @@ export default function DashboardPage() {
     showToast('🗑️ Agenda berhasil dihapus dari Database MariaDB.');
   };
 
-  // 5. Galeri & Fasilitas (Terintegrasi Penuh dengan Landing Page)
+  // 5. Galeri & Fasilitas (Terintegrasi Penuh dengan Landing Page & Database MariaDB)
   const {
     galleryList,
+    isSyncing: isGallerySyncing,
     addGallery,
     updateGallery,
     deleteGallery,
@@ -327,17 +328,17 @@ export default function DashboardPage() {
 
   const handleAddGallery = (data: { title: string; category: string; src: string; desc?: string }) => {
     addGallery(data);
-    showToast('📸 Foto berhasil ditambahkan ke Galeri & Fasilitas.');
+    showToast('📸 Foto berhasil disimpan ke Database MariaDB & Landing Page.');
   };
 
   const handleUpdateGallery = (id: number, data: Partial<GalleryItem>) => {
     updateGallery(id, data);
-    showToast('✏️ Informasi foto galeri berhasil diperbarui.');
+    showToast('✏️ Informasi foto galeri berhasil diperbarui di Database MariaDB.');
   };
 
   const handleDeleteGallery = (id: number) => {
     deleteGallery(id);
-    showToast('🗑️ Foto telah dihapus dari galeri.');
+    showToast('🗑️ Foto telah dihapus dari Database MariaDB & Galeri.');
   };
 
   const handleLogout = () => {
@@ -718,6 +719,7 @@ export default function DashboardPage() {
                 onDeleteGallery={handleDeleteGallery}
                 onResetGallery={resetGallery}
                 showToast={showToast}
+                isSyncing={isGallerySyncing}
               />
             )}
 

@@ -12,6 +12,7 @@ interface TabGaleriProps {
   onDeleteGallery: (id: number) => void;
   onResetGallery?: () => void;
   showToast: (msg: string) => void;
+  isSyncing?: boolean;
 }
 
 const CATEGORIES = [
@@ -28,7 +29,8 @@ export function TabGaleri({
   onUpdateGallery,
   onDeleteGallery, 
   onResetGallery,
-  showToast 
+  showToast,
+  isSyncing = false 
 }: TabGaleriProps) {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [editingPhoto, setEditingPhoto] = useState<GalleryItem | null>(null);
@@ -53,11 +55,11 @@ export function TabGaleri({
   }, [galleryList, activeFilter, searchQuery]);
 
   const handleReset = () => {
-    if (confirm('⚠️ Apakah Anda yakin ingin mereset seluruh galeri ke 8 foto dokumentasi standar sekolah?')) {
+    if (confirm('⚠️ Apakah Anda yakin ingin mereset seluruh galeri ke 8 foto dokumentasi standar sekolah? Data di database MariaDB akan disinkronkan kembali.')) {
       if (onResetGallery) {
         onResetGallery();
       }
-      showToast('🔄 Galeri berhasil direset ke 8 foto dokumentasi standar!');
+      showToast('🔄 Galeri berhasil direset ke 8 foto dokumentasi standar di Database MariaDB!');
     }
   };
 
@@ -66,14 +68,23 @@ export function TabGaleri({
       {/* Header */}
       <div className="p-5 sm:p-6 rounded-2xl bg-white border-2 border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <h2 className="text-xl font-black text-slate-950 tracking-tight">Manajemen Galeri & Fasilitas</h2>
+            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-black bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
+              Live MariaDB
+            </span>
             <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-black bg-indigo-100 text-indigo-800 border border-indigo-300">
               {galleryList.length} Foto
             </span>
+            {isSyncing && (
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono text-slate-600 bg-slate-100 border border-slate-200 animate-pulse">
+                Menyinkronkan...
+              </span>
+            )}
           </div>
           <p className="text-xs text-slate-700 font-semibold mt-0.5">
-            Dokumentasi kegiatan belajar, kesiswaan, dan sarana sekolah (Tersinkron otomatis ke Landing Page)
+            Dokumentasi kegiatan belajar, kesiswaan, dan sarana sekolah (Tersinkron otomatis ke database cloud dan Landing Page)
           </p>
         </div>
 
@@ -199,7 +210,7 @@ export function TabGaleri({
                   <button
                     type="button"
                     onClick={() => {
-                      if (confirm(`Yakin ingin menghapus foto "${photo.title}" dari galeri?`)) {
+                      if (confirm(`Yakin ingin menghapus foto "${photo.title}" dari galeri? Foto akan dihapus permanen dari Database MariaDB.`)) {
                         onDeleteGallery(photo.id);
                       }
                     }}
