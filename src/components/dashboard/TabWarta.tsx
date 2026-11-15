@@ -38,16 +38,6 @@ export function TabWarta({ newsList, onOpenAdd, onOpenEdit, onDelete, onRefresh 
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap">
-          {onRefresh && (
-            <button
-              type="button"
-              onClick={onRefresh}
-              className="p-2.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border-2 border-slate-300 transition-all text-xs cursor-pointer shadow-xs active:scale-98 font-bold"
-              title="Sinkronkan ulang dari database MariaDB"
-            >
-              🔄
-            </button>
-          )}
           <a
             href="/warta"
             target="_blank"
