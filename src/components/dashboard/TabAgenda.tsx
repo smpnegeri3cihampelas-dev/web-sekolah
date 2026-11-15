@@ -14,6 +14,7 @@ interface TabAgendaProps {
   onUpdatePdfInfo?: (info: Partial<KaldikPdfInfo>) => void;
   onResetPdfInfo?: () => void;
   showToast: (msg: string) => void;
+  isSyncing?: boolean;
 }
 
 export function TabAgenda({
@@ -25,7 +26,8 @@ export function TabAgenda({
   onResetAgenda,
   onUpdatePdfInfo,
   onResetPdfInfo,
-  showToast
+  showToast,
+  isSyncing = false
 }: TabAgendaProps) {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<AgendaItem | null>(null);
@@ -76,7 +78,7 @@ export function TabAgenda({
   const totalItems = filteredList.length;
   const effectivePageSize = pageSize === 0 ? totalItems || 1 : pageSize;
   const totalPages = Math.max(1, Math.ceil(totalItems / effectivePageSize));
-  
+
   const paginatedList = useMemo(() => {
     if (pageSize === 0) return filteredList;
     const startIndex = (currentPage - 1) * pageSize;
@@ -84,11 +86,11 @@ export function TabAgenda({
   }, [filteredList, currentPage, pageSize]);
 
   const handleReset = () => {
-    if (confirm('⚠️ Apakah Anda yakin ingin mereset seluruh agenda kembali ke 27 Kaldik Resmi PDF (SK Kepala Sekolah)?')) {
+    if (confirm('⚠️ Apakah Anda yakin ingin mereset seluruh agenda kembali ke 27 Kaldik Resmi PDF (SK Kepala Sekolah)? Data di database MariaDB akan disinkronkan kembali.')) {
       if (onResetAgenda) {
         onResetAgenda();
       }
-      showToast('🔄 Agenda berhasil direset ke Kaldik Resmi PDF (27 agenda)!');
+      showToast('🔄 Agenda berhasil direset ke Kaldik Resmi (27 agenda) di Database MariaDB!');
     }
   };
 
@@ -101,11 +103,6 @@ export function TabAgenda({
       return;
     }
 
-    if (file.size > 15 * 1024 * 1024) {
-      showToast('⚠️ Ukuran file PDF terlalu besar (maksimal 15MB)!');
-      return;
-    }
-
     const reader = new FileReader();
     reader.onload = () => {
       const dataUrl = reader.result as string;
@@ -115,7 +112,7 @@ export function TabAgenda({
           fileName: file.name
         });
       }
-      showToast(`✅ Berkas PDF "${file.name}" berhasil diunggah & tersinkron ke Landing Page!`);
+      showToast(`✅ Berkas PDF "${file.name}" berhasil diunggah & tersimpan di Database MariaDB!`);
     };
     reader.onerror = () => {
       showToast('❌ Gagal memproses berkas PDF.');
@@ -137,7 +134,7 @@ export function TabAgenda({
       });
     }
     setPdfLinkInput('');
-    showToast('✅ Tautan dokumen PDF berhasil disimpan & aktif di Beranda!');
+    showToast('✅ Tautan dokumen PDF berhasil disimpan ke Database MariaDB & aktif di Beranda!');
   };
 
   return (
@@ -147,12 +144,13 @@ export function TabAgenda({
         <div>
           <div className="flex items-center gap-2">
             <h2 className="text-xl font-black text-slate-950 tracking-tight">Manajemen Kalender & Agenda</h2>
-            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
-              ⚡ Tersinkron Otomatis
+            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-black bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
+              Live MariaDB
             </span>
           </div>
           <p className="text-xs text-slate-700 font-semibold mt-0.5">
-            Jadwal kegiatan akademik, ujian CBT, dan agenda resmi (Langsung terhubung dengan tampilan Halaman Utama)
+            Jadwal kegiatan akademik, ujian CBT, dan agenda resmi (Tersinkron otomatis ke database cloud dan Kalender Beranda)
           </p>
         </div>
 
@@ -162,7 +160,7 @@ export function TabAgenda({
               type="button"
               onClick={handleReset}
               className="px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border border-slate-300 active:scale-98"
-              title="Kembalikan semua agenda ke Kaldik Resmi PDF SMPN 3 Cihampelas"
+              title="Kembalikan semua agenda ke Kaldik Resmi PDF SMPN 3 Cihampelas di Database"
             >
               <span>🔄 Reset ke Kaldik Resmi (27)</span>
             </button>
@@ -175,6 +173,34 @@ export function TabAgenda({
           >
             <span>+ Tambah Agenda Baru</span>
           </button>
+        </div>
+      </div>
+
+      {/* 3 Metric Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="p-5 rounded-2xl bg-white border-2 border-slate-200 shadow-sm">
+          <div className="text-xs font-black text-slate-700 uppercase tracking-wider">Semester 1 (Ganjil)</div>
+          <div className="text-3xl font-black text-slate-950 mt-1">{sem1Count} Agenda</div>
+          <div className="text-xs text-slate-600 mt-1 font-semibold flex items-center gap-1.5">
+            <span className="text-indigo-700 font-bold">📅 Juli – Desember 2026</span>
+          </div>
+        </div>
+
+        <div className="p-5 rounded-2xl bg-white border-2 border-slate-200 shadow-sm">
+          <div className="text-xs font-black text-slate-700 uppercase tracking-wider">Semester 2 (Genap)</div>
+          <div className="text-3xl font-black text-indigo-700 mt-1">{sem2Count} Agenda</div>
+          <div className="text-xs text-slate-600 mt-1 font-semibold flex items-center gap-1.5">
+            <span className="text-indigo-700 font-bold">📅 Januari – Juli 2027</span>
+          </div>
+        </div>
+
+        <div className="p-5 rounded-2xl bg-white border-2 border-slate-200 shadow-sm">
+          <div className="text-xs font-black text-slate-700 uppercase tracking-wider">Status Sinkronisasi</div>
+          <div className="text-3xl font-black text-emerald-700 mt-1 flex items-center gap-2">
+            <span>Live MariaDB</span>
+            {isSyncing && <span className="text-xs font-normal text-slate-500 animate-spin">⏳</span>}
+          </div>
+          <div className="text-xs text-emerald-800 mt-1 font-bold">Tersinkron Database Cloud, Landing Page & Kalender Akademik</div>
         </div>
       </div>
 
@@ -214,7 +240,7 @@ export function TabAgenda({
                 type="button"
                 onClick={() => {
                   onResetPdfInfo();
-                  showToast('🔄 Dokumen PDF dikembalikan ke file server bawaan.');
+                  showToast('🔄 Dokumen PDF dikembalikan ke file server bawaan di Database.');
                 }}
                 className="px-3 py-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-600 text-xs font-semibold transition-all border border-slate-200 cursor-pointer"
                 title="Kembalikan tautan ke file PDF bawaan server"
@@ -234,7 +260,7 @@ export function TabAgenda({
               <h4 className="text-xs font-black text-slate-900">Opsi 1: Upload File PDF Langsung</h4>
             </div>
             <p className="text-[11px] text-slate-600 font-medium leading-relaxed">
-              Pilih file PDF kalender bertanda tangan dari komputer/laptop/HP Anda. File langsung tersimpan & aktif di Beranda.
+              Pilih file PDF kalender bertanda tangan dari komputer/laptop/HP Anda. File langsung tersimpan di Database MariaDB & aktif di Beranda.
             </p>
             <div className="pt-1 flex items-center gap-3">
               <label className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold cursor-pointer transition-all shadow-xs active:scale-98">
@@ -420,7 +446,7 @@ export function TabAgenda({
                           {agenda.name || agenda.title}
                         </div>
                         <div className="text-[11px] font-mono text-indigo-700 font-bold flex items-center gap-1.5 mt-0.5">
-                          <span>🗓️</span>
+                          <span>📅</span>
                           <span>{agenda.date}</span>
                         </div>
                       </td>
@@ -460,7 +486,7 @@ export function TabAgenda({
                           <button
                             type="button"
                             onClick={() => {
-                              if (confirm(`Yakin ingin menghapus agenda "${agenda.name || agenda.title}"?`)) {
+                              if (confirm(`Yakin ingin menghapus agenda "${agenda.name || agenda.title}"? Agenda akan dihapus dari Database MariaDB.`)) {
                                 onDeleteAgenda(agenda.id);
                               }
                             }}
@@ -512,7 +538,7 @@ export function TabAgenda({
                     {agenda.name || agenda.title}
                   </h4>
                   <p className="text-xs font-mono font-black text-indigo-700 flex items-center gap-1.5">
-                    <span>🗓️</span>
+                    <span>📅</span>
                     <span>{agenda.date}</span>
                   </p>
                 </div>
@@ -532,7 +558,7 @@ export function TabAgenda({
                   <button
                     type="button"
                     onClick={() => {
-                      if (confirm(`Yakin ingin menghapus agenda "${agenda.name || agenda.title}"?`)) {
+                      if (confirm(`Yakin ingin menghapus agenda "${agenda.name || agenda.title}"? Agenda akan dihapus dari Database MariaDB.`)) {
                         onDeleteAgenda(agenda.id);
                       }
                     }}
@@ -551,7 +577,7 @@ export function TabAgenda({
       {/* KOSONG / TIDAK DITEMUKAN */}
       {filteredList.length === 0 && (
         <div className="p-12 text-center text-slate-700 text-xs font-bold rounded-2xl bg-white border-2 border-slate-200">
-          {searchQuery ? 'Tidak ada agenda yang cocok dengan pencarian.' : 'Belum ada agenda akademik yang terdaftar.'}
+          {searchQuery ? 'Tidak ada agenda yang cocok dengan pencarian.' : 'Belum ada agenda akademik yang terdaftar di database.'}
         </div>
       )}
 

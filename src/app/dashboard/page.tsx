@@ -287,6 +287,7 @@ export default function DashboardPage() {
   const { 
     agendaList, 
     pdfInfo,
+    isSyncing: isAgendaSyncing,
     addAgenda, 
     updateAgenda, 
     deleteAgenda, 
@@ -302,17 +303,17 @@ export default function DashboardPage() {
       category: data.category,
       semester: data.semester || 'Semester 1'
     });
-    showToast('📅 Agenda berhasil ditambahkan & tersinkron ke Landing Page.');
+    showToast('📅 Agenda berhasil disimpan ke Database MariaDB & Landing Page.');
   };
 
   const handleUpdateAgenda = (id: number, data: Partial<AgendaItem>) => {
     updateAgenda(id, data);
-    showToast('✏️ Agenda berhasil diperbarui & tersinkron ke Landing Page.');
+    showToast('✏️ Agenda berhasil diperbarui di Database MariaDB & Landing Page.');
   };
 
   const handleDeleteAgenda = (id: number) => {
     deleteAgenda(id);
-    showToast('🗑️ Agenda berhasil dihapus dari sistem.');
+    showToast('🗑️ Agenda berhasil dihapus dari Database MariaDB.');
   };
 
   // 5. Galeri & Fasilitas (Terintegrasi Penuh dengan Landing Page)
@@ -705,6 +706,7 @@ export default function DashboardPage() {
                 onUpdatePdfInfo={updatePdfInfo}
                 onResetPdfInfo={resetPdfInfo}
                 showToast={showToast}
+                isSyncing={isAgendaSyncing}
               />
             )}
 
