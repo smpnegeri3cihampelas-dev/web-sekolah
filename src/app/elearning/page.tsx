@@ -1690,6 +1690,7 @@ export default function ELearningPage() {
   const [loginIdentifier, setLoginIdentifier] = useState<string>('');
   const [loginPassword, setLoginPassword] = useState<string>('');
   const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [loginErrorMessage, setLoginErrorMessage] = useState<string>('');
 
   // Realtime Attendance State (synced via localStorage)
   const [attendanceData, setAttendanceData] = useState<Record<string, ClassSessionAttendance>>({});
@@ -2136,6 +2137,7 @@ export default function ELearningPage() {
     setLoginIdentifier('');
     setLoginPassword('');
     setShowPassword(false);
+    setLoginErrorMessage('');
   };
 
   // 1-Click Quick Login khusus Uji Coba Akun Siswa (Abdul Hanan - 7-A)
@@ -2158,13 +2160,13 @@ export default function ELearningPage() {
     if (loginRole === 'guru') {
       const inputRaw = loginIdentifier.trim();
       if (!inputRaw) {
-        showToast('⚠️ Masukkan User ID.', 'warn');
+        setLoginErrorMessage('Masukkan User ID.');
         return;
       }
 
       // Validasi Ketat: tolak jika mengandung spasi
       if (/\s/.test(loginIdentifier)) {
-        showToast('⚠️ User ID tidak boleh menggunakan spasi.', 'warn');
+        setLoginErrorMessage('User ID tidak boleh menggunakan spasi.');
         return;
       }
 
@@ -2177,7 +2179,7 @@ export default function ELearningPage() {
       });
 
       if (!teacher) {
-        showToast('⚠️ User ID tidak terdaftar.', 'warn');
+        setLoginErrorMessage('User ID tidak terdaftar.');
         return;
       }
 
@@ -2198,15 +2200,21 @@ export default function ELearningPage() {
       }
 
       const trimmedPass = loginPassword.trim();
+      if (!trimmedPass) {
+        setLoginErrorMessage('Masukkan kata sandi.');
+        return;
+      }
+
       const isValidPass = customPassword
         ? (trimmedPass === customPassword)
         : (trimmedPass === 'guru123');
 
       if (!isValidPass) {
-        showToast('⚠️ Kata sandi salah.', 'warn');
+        setLoginErrorMessage('Kata sandi salah.');
         return;
       }
 
+      setLoginErrorMessage('');
       handleLogin({
         role: 'guru_mapel',
         name: teacher.name,
@@ -2219,12 +2227,12 @@ export default function ELearningPage() {
       const trimmedPass = loginPassword.trim();
 
       if (inputId.toLowerCase() !== 'piket') {
-        showToast('⚠️ User ID stasiun piket salah.', 'warn');
+        setLoginErrorMessage('User ID stasiun piket salah.');
         return;
       }
 
       if (!trimmedPass) {
-        showToast('⚠️ Masukkan kata sandi.', 'warn');
+        setLoginErrorMessage('Masukkan kata sandi.');
         return;
       }
 
@@ -2240,10 +2248,11 @@ export default function ELearningPage() {
         : (trimmedPass === 'piket123');
 
       if (!isValidPiket) {
-        showToast('⚠️ Kata sandi salah.', 'warn');
+        setLoginErrorMessage('Kata sandi salah.');
         return;
       }
 
+      setLoginErrorMessage('');
       handleLogin({
         role: 'guru_piket',
         name: 'Stasiun Meja Piket Utama',
@@ -2255,12 +2264,12 @@ export default function ELearningPage() {
       const trimmedPass = loginPassword.trim();
 
       if (inputId.toLowerCase() !== 'panitia') {
-        showToast('⚠️ User ID panitia salah.', 'warn');
+        setLoginErrorMessage('User ID panitia salah.');
         return;
       }
 
       if (!trimmedPass) {
-        showToast('⚠️ Masukkan kata sandi.', 'warn');
+        setLoginErrorMessage('Masukkan kata sandi.');
         return;
       }
 
@@ -2276,10 +2285,11 @@ export default function ELearningPage() {
         : (trimmedPass === 'panitia123');
 
       if (!isValidPass) {
-        showToast('⚠️ Kata sandi salah.', 'warn');
+        setLoginErrorMessage('Kata sandi salah.');
         return;
       }
 
+      setLoginErrorMessage('');
       handleLogin({
         role: 'panitia',
         name: 'Panitia Asesmen CBT (Posko Pusat)',
@@ -2291,30 +2301,30 @@ export default function ELearningPage() {
       const cleanInput = loginIdentifier.trim();
 
       if (!cleanInput) {
-        showToast('⚠️ Masukkan NISN.', 'warn');
+        setLoginErrorMessage('Masukkan NISN.');
         return;
       }
 
       if (/\s/.test(loginIdentifier)) {
-        showToast('⚠️ NISN tidak boleh mengandung spasi.', 'warn');
+        setLoginErrorMessage('NISN tidak boleh mengandung spasi.');
         return;
       }
 
       if (!/^\d{10}$/.test(cleanInput)) {
-        showToast('⚠️ NISN harus 10 digit angka.', 'warn');
+        setLoginErrorMessage('NISN harus 10 digit angka.');
         return;
       }
 
       const student = activeStudents.find(s => s.nisn === cleanInput);
 
       if (!student) {
-        showToast('⚠️ NISN tidak terdaftar.', 'warn');
+        setLoginErrorMessage('NISN tidak terdaftar.');
         return;
       }
 
       const trimmedPass = loginPassword.trim();
       if (!trimmedPass) {
-        showToast('⚠️ Masukkan kata sandi.', 'warn');
+        setLoginErrorMessage('Masukkan kata sandi.');
         return;
       }
 
@@ -2335,10 +2345,11 @@ export default function ELearningPage() {
         : (trimmedPass === 'siswa123');
 
       if (!isValidSiswa) {
-        showToast('⚠️ Kata sandi salah.', 'warn');
+        setLoginErrorMessage('Kata sandi salah.');
         return;
       }
 
+      setLoginErrorMessage('');
       handleLogin({
         role: 'siswa',
         name: student.name,
@@ -3781,6 +3792,16 @@ export default function ELearningPage() {
                   </button>
                 </div>
 
+                {/* Error Banner: Ditampilkan langsung di dalam kartu tepat di atas kolom input */}
+                {loginErrorMessage && (
+                  <div className="w-full mb-3.5 p-3 rounded-xl bg-red-50 border border-red-200 flex items-center gap-2.5 text-xs text-red-600 animate-[fadeIn_0.2s_ease-out]">
+                    <svg className="w-4 h-4 shrink-0 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                    <span className="font-medium">{loginErrorMessage}</span>
+                  </div>
+                )}
+
                 {/* Clean Login Form */}
                 <form onSubmit={handleFormLoginSubmit} className="w-full flex flex-col gap-3.5" autoComplete="off">
                   
@@ -3798,10 +3819,15 @@ export default function ELearningPage() {
                       onChange={(e) => {
                         const val = loginRole === 'siswa' ? e.target.value : e.target.value.toLowerCase();
                         setLoginIdentifier(val);
+                        if (loginErrorMessage) setLoginErrorMessage('');
                       }}
                       placeholder={loginRole === 'siswa' ? "NISN" : "User ID"}
                       maxLength={loginRole === 'siswa' ? 10 : undefined}
-                      className={`w-full pl-10 pr-4 py-2.5 sm:py-3 rounded-xl bg-slate-50 hover:bg-slate-100/70 focus:bg-white text-xs sm:text-sm text-slate-800 placeholder-slate-400 border border-slate-200/90 focus:outline-none focus:ring-2 transition-all ${
+                      className={`w-full pl-10 pr-4 py-2.5 sm:py-3 rounded-xl bg-slate-50 hover:bg-slate-100/70 focus:bg-white text-xs sm:text-sm text-slate-800 placeholder-slate-400 border ${
+                        loginErrorMessage && (loginErrorMessage.includes('User ID') || loginErrorMessage.includes('NISN'))
+                          ? 'border-red-400 ring-1 ring-red-300'
+                          : 'border-slate-200/90'
+                      } focus:outline-none focus:ring-2 transition-all ${
                         loginRole === 'guru'
                           ? 'focus:border-indigo-400 focus:ring-indigo-500/20'
                           : loginRole === 'piket'
@@ -3826,9 +3852,16 @@ export default function ELearningPage() {
                     <input 
                       type={showPassword ? 'text' : 'password'}
                       value={loginPassword}
-                      onChange={(e) => setLoginPassword(e.target.value)}
+                      onChange={(e) => {
+                        setLoginPassword(e.target.value);
+                        if (loginErrorMessage) setLoginErrorMessage('');
+                      }}
                       placeholder="Kata Sandi"
-                      className={`w-full pl-10 pr-11 py-2.5 sm:py-3 rounded-xl bg-slate-50 hover:bg-slate-100/70 focus:bg-white text-xs sm:text-sm text-slate-800 placeholder-slate-400 border border-slate-200/90 focus:outline-none focus:ring-2 transition-all ${
+                      className={`w-full pl-10 pr-11 py-2.5 sm:py-3 rounded-xl bg-slate-50 hover:bg-slate-100/70 focus:bg-white text-xs sm:text-sm text-slate-800 placeholder-slate-400 border ${
+                        loginErrorMessage && loginErrorMessage.includes('sandi')
+                          ? 'border-red-400 ring-1 ring-red-300'
+                          : 'border-slate-200/90'
+                      } focus:outline-none focus:ring-2 transition-all ${
                         loginRole === 'guru'
                           ? 'focus:border-indigo-400 focus:ring-indigo-500/20'
                           : loginRole === 'piket'
