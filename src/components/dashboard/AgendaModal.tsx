@@ -64,7 +64,7 @@ export function parseDateStringToRange(dateStr: string): { startDate: string; en
   if (!dateStr) return null;
   const trimmed = dateStr.trim();
 
-  // Cross year range: "28 Des 2026 - 08 Jan 2027"
+  // 1. Cross year range: "28 Des 2026 - 08 Jan 2027"
   const crossYear = trimmed.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})\s*[-–]\s*(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})/i);
   if (crossYear) {
     const sM = MONTH_INDEX_MAP[crossYear[2].toLowerCase().slice(0, 3)];
@@ -78,7 +78,7 @@ export function parseDateStringToRange(dateStr: string): { startDate: string; en
     }
   }
 
-  // Cross month range: "30 Nov - 11 Des 2026"
+  // 2. Cross month range: "30 Nov - 11 Des 2026"
   const crossMonth = trimmed.match(/^(\d{1,2})\s+([A-Za-z]+)\s*[-–]\s*(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})/i);
   if (crossMonth) {
     const sM = MONTH_INDEX_MAP[crossMonth[2].toLowerCase().slice(0, 3)];
@@ -93,7 +93,21 @@ export function parseDateStringToRange(dateStr: string): { startDate: string; en
     }
   }
 
-  // Same month range: "03 - 26 Agustus 2026"
+  // 3. Multi range in same month: "15 - 17 & 20 - 21 Juli 2026"
+  const multiRange = trimmed.match(/^(\d{1,2}).+[-–]\s*(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})/i);
+  if (multiRange) {
+    const m = MONTH_INDEX_MAP[multiRange[3].toLowerCase().slice(0, 3)];
+    const year = multiRange[4];
+    if (m !== undefined) {
+      return {
+        startDate: `${year}-${pad(m + 1)}-${pad(parseInt(multiRange[1], 10))}`,
+        endDate: `${year}-${pad(m + 1)}-${pad(parseInt(multiRange[2], 10))}`,
+        isRange: true
+      };
+    }
+  }
+
+  // 4. Same month range: "03 - 26 Agustus 2026"
   const stdRange = trimmed.match(/^(\d{1,2})\s*[-–]\s*(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})/i);
   if (stdRange) {
     const m = MONTH_INDEX_MAP[stdRange[3].toLowerCase().slice(0, 3)];
@@ -107,7 +121,22 @@ export function parseDateStringToRange(dateStr: string): { startDate: string; en
     }
   }
 
-  // Single date: "13 Juli 2026"
+  // 5. Month range: "Juni - Juli 2027"
+  const monthRange = trimmed.match(/^([A-Za-z]+)\s*[-–]\s*([A-Za-z]+)\s+(\d{4})/i);
+  if (monthRange) {
+    const sM = MONTH_INDEX_MAP[monthRange[1].toLowerCase().slice(0, 3)];
+    const eM = MONTH_INDEX_MAP[monthRange[2].toLowerCase().slice(0, 3)];
+    const year = monthRange[3];
+    if (sM !== undefined && eM !== undefined) {
+      return {
+        startDate: `${year}-${pad(sM + 1)}-01`,
+        endDate: `${year}-${pad(eM + 1)}-28`,
+        isRange: true
+      };
+    }
+  }
+
+  // 6. Single date: "13 Juli 2026"
   const single = trimmed.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})/i);
   if (single) {
     const m = MONTH_INDEX_MAP[single[2].toLowerCase().slice(0, 3)];
@@ -125,8 +154,8 @@ export function parseDateStringToRange(dateStr: string): { startDate: string; en
   return null;
 }
 
-// Subcomponent: Smart Date Range Selector (Date Picker with Manual Fallback)
-function DateRangeSelector({
+// Subcomponent: Pure Visual Date Picker (Satu Hari atau Rentang Mulai - Selesai)
+function DateRangePicker({
   value,
   onChange
 }: {
@@ -134,17 +163,13 @@ function DateRangeSelector({
   onChange: (val: string) => void;
 }) {
   const parsed = useMemo(() => parseDateStringToRange(value), [value]);
-  const [mode, setMode] = useState<'picker' | 'manual'>(() => (value && !parsed ? 'manual' : 'picker'));
   const [isRange, setIsRange] = useState<boolean>(() => parsed?.isRange ?? true);
   const [startDate, setStartDate] = useState<string>(() => parsed?.startDate ?? '');
   const [endDate, setEndDate] = useState<string>(() => (parsed?.isRange ? parsed?.endDate : '') ?? '');
 
   useEffect(() => {
     const p = parseDateStringToRange(value);
-    if (value && !p) {
-      setMode('manual');
-    } else if (p) {
-      setMode('picker');
+    if (p) {
       setIsRange(p.isRange);
       setStartDate(p.startDate);
       setEndDate(p.isRange ? p.endDate : '');
@@ -152,7 +177,6 @@ function DateRangeSelector({
       setStartDate('');
       setEndDate('');
       setIsRange(true);
-      setMode('picker');
     }
   }, [value]);
 
@@ -188,115 +212,74 @@ function DateRangeSelector({
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <label className="text-slate-800 font-black text-xs">Rentang Tanggal *</label>
-        
-        {/* Toggle Mode: Pemilih Kalender vs Tulis Manual */}
-        <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-300 text-[11px]">
-          <button
-            type="button"
-            onClick={() => setMode('picker')}
-            className={`px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer ${
-              mode === 'picker'
-                ? 'bg-white text-indigo-900 shadow-2xs font-black'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            📅 Pilih Kalender
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode('manual')}
-            className={`px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer ${
-              mode === 'manual'
-                ? 'bg-white text-indigo-900 shadow-2xs font-black'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            ✍️ Tulis Manual
-          </button>
-        </div>
-      </div>
+      <label className="text-slate-800 block font-black text-xs">Rentang Tanggal *</label>
 
-      {mode === 'picker' ? (
-        <div className="p-3.5 rounded-2xl bg-slate-50 border-2 border-slate-200 space-y-3">
-          {/* Tipe: Satu Hari atau Rentang */}
-          <div className="flex items-center gap-4 text-xs font-bold text-slate-700">
-            <label className="inline-flex items-center gap-1.5 cursor-pointer">
-              <input
-                type="radio"
-                name="dateTypeSelection"
-                checked={!isRange}
-                onChange={() => handleToggleRange(false)}
-                className="w-3.5 h-3.5 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-              />
-              <span>Satu Hari Saja</span>
-            </label>
-            <label className="inline-flex items-center gap-1.5 cursor-pointer">
-              <input
-                type="radio"
-                name="dateTypeSelection"
-                checked={isRange}
-                onChange={() => handleToggleRange(true)}
-                className="w-3.5 h-3.5 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-              />
-              <span>Rentang (Mulai - Selesai)</span>
-            </label>
+      <div className="p-3.5 rounded-2xl bg-slate-50 border-2 border-slate-200 space-y-3">
+        {/* Tipe: Satu Hari Saja vs Rentang Tanggal */}
+        <div className="flex items-center gap-4 text-xs font-bold text-slate-700">
+          <label className="inline-flex items-center gap-1.5 cursor-pointer">
+            <input
+              type="radio"
+              name="dateTypeSelection"
+              checked={!isRange}
+              onChange={() => handleToggleRange(false)}
+              className="w-3.5 h-3.5 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+            />
+            <span>Satu Hari Saja</span>
+          </label>
+          <label className="inline-flex items-center gap-1.5 cursor-pointer">
+            <input
+              type="radio"
+              name="dateTypeSelection"
+              checked={isRange}
+              onChange={() => handleToggleRange(true)}
+              className="w-3.5 h-3.5 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+            />
+            <span>Rentang (Mulai - Selesai)</span>
+          </label>
+        </div>
+
+        {/* Input Pemilih Kalender HTML5 */}
+        <div className={`grid gap-2.5 ${isRange ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
+          <div>
+            <span className="text-[11px] font-bold text-slate-700 block mb-1">
+              {isRange ? 'Tanggal Mulai *' : 'Tanggal Kegiatan *'}
+            </span>
+            <input
+              type="date"
+              required
+              value={startDate}
+              onChange={(e) => handleStartChange(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl bg-white border-2 border-slate-300 text-slate-950 font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 cursor-pointer shadow-2xs"
+            />
           </div>
 
-          {/* Date Pickers */}
-          <div className={`grid gap-2.5 ${isRange ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
+          {isRange && (
             <div>
-              <span className="text-[11px] font-bold text-slate-700 block mb-1">
-                {isRange ? 'Tanggal Mulai *' : 'Tanggal Kegiatan *'}
-              </span>
+              <span className="text-[11px] font-bold text-slate-700 block mb-1">Tanggal Selesai *</span>
               <input
                 type="date"
                 required
-                value={startDate}
-                onChange={(e) => handleStartChange(e.target.value)}
+                min={startDate || undefined}
+                value={endDate}
+                onChange={(e) => handleEndChange(e.target.value)}
                 className="w-full px-3 py-2 rounded-xl bg-white border-2 border-slate-300 text-slate-950 font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 cursor-pointer shadow-2xs"
               />
             </div>
-
-            {isRange && (
-              <div>
-                <span className="text-[11px] font-bold text-slate-700 block mb-1">Tanggal Selesai *</span>
-                <input
-                  type="date"
-                  required
-                  min={startDate || undefined}
-                  value={endDate}
-                  onChange={(e) => handleEndChange(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-white border-2 border-slate-300 text-slate-950 font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 cursor-pointer shadow-2xs"
-                />
-              </div>
-            )}
-          </div>
-
-          {/* Preview Format Teks Otomatis */}
-          <div className="pt-1 flex items-center justify-between text-[11px] border-t border-slate-200">
-            <span className="text-slate-500 font-semibold">Format Jadwal Terbuat:</span>
-            <span className="font-mono font-black text-indigo-900 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-lg">
-              {value || 'Pilih tanggal di atas'}
-            </span>
-          </div>
+          )}
         </div>
-      ) : (
-        <div className="space-y-1">
-          <input
-            type="text"
-            required
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder="Contoh: 12 - 18 Desember 2026 atau 15 - 17 & 20 - 21 Juli 2026"
-            className="w-full px-3.5 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-slate-950 font-bold placeholder:text-slate-400 focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 shadow-xs"
-          />
-          <p className="text-[10px] text-slate-500 font-semibold">
-            Gunakan mode manual untuk tanggal ganda, jadwal khusus, atau format khusus dari SK Dinas.
-          </p>
+
+        {/* Kotak Preview Format Otomatis */}
+        <div className="pt-2 flex items-center justify-between text-[11px] border-t border-slate-200">
+          <span className="text-slate-600 font-semibold">Hasil Format Kalender:</span>
+          <span className="font-mono font-black text-indigo-950 bg-white border-2 border-indigo-200 px-2.5 py-1 rounded-lg shadow-2xs">
+            {value ? `📅 ${value}` : 'Pilih tanggal pada kalender'}
+          </span>
         </div>
-      )}
+      </div>
+      <p className="text-[10px] text-slate-500 font-semibold">
+        Format otomatis disesuaikan dengan kalender pendidikan dan sistem status kegiatan sekolah.
+      </p>
     </div>
   );
 }
@@ -332,7 +315,7 @@ export function AddAgendaModal({ isOpen, onClose, onAdd, showToast }: AddAgendaM
       return;
     }
     if (!date.trim()) {
-      showToast('⚠️ Harap pilih atau isi tanggal agenda terlebih dahulu!');
+      showToast('⚠️ Harap pilih tanggal agenda pada kalender!');
       return;
     }
 
@@ -387,8 +370,8 @@ export function AddAgendaModal({ isOpen, onClose, onAdd, showToast }: AddAgendaM
             />
           </div>
 
-          {/* Smart Date Range Selector */}
-          <DateRangeSelector value={date} onChange={setDate} />
+          {/* Pure Visual Date Picker */}
+          <DateRangePicker value={date} onChange={setDate} />
 
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -474,7 +457,7 @@ export function EditAgendaModal({ isOpen, item, onClose, onSave, showToast }: Ed
       return;
     }
     if (!date.trim()) {
-      showToast('⚠️ Harap pilih atau isi tanggal agenda terlebih dahulu!');
+      showToast('⚠️ Harap pilih tanggal agenda pada kalender!');
       return;
     }
 
@@ -528,8 +511,8 @@ export function EditAgendaModal({ isOpen, item, onClose, onSave, showToast }: Ed
             />
           </div>
 
-          {/* Smart Date Range Selector */}
-          <DateRangeSelector value={date} onChange={setDate} />
+          {/* Pure Visual Date Picker */}
+          <DateRangePicker value={date} onChange={setDate} />
 
           <div className="grid grid-cols-2 gap-3">
             <div>
