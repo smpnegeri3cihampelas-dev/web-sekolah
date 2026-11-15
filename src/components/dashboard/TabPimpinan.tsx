@@ -280,7 +280,7 @@ export function TabPimpinan({
         {/* Teachers Table */}
         <div className="rounded-2xl bg-white border-2 border-slate-200 overflow-hidden shadow-sm">
           <div className="w-full overflow-x-auto">
-            <table className="w-full text-left text-xs table-auto">
+            <table className="min-w-[650px] w-full text-left text-xs table-auto">
               <thead className="bg-slate-100 text-slate-900 font-mono uppercase text-xs tracking-wider border-b-2 border-slate-300 font-black">
                 <tr>
                   <th className="py-4 px-4 sm:px-5">Guru & Tenaga Pendidik</th>

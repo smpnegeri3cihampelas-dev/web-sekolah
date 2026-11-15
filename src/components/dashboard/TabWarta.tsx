@@ -119,7 +119,7 @@ export function TabWarta({ newsList, onOpenAdd, onOpenEdit, onDelete, onRefresh 
       {/* Table of Articles */}
       <div className="rounded-2xl bg-white border-2 border-slate-200 overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+          <table className="min-w-[650px] w-full text-left text-xs">
             <thead className="bg-slate-100 text-slate-900 font-mono uppercase text-xs tracking-wider border-b-2 border-slate-300 font-black">
               <tr>
                 <th className="py-4 px-4 sm:px-6">Artikel</th>

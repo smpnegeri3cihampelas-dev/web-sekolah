@@ -32,7 +32,15 @@ export function TabSiswa({
   const [studentPage, setStudentPage] = useState(1);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [viewMode, setViewMode] = useState<'card' | 'table'>('table');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Auto set card mode on mobile screens for comfortable view
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setViewMode('card');
+    }
+  }, []);
 
   // Modal Tandai Keluar / Mutasi oleh Admin
   const [exitModalStudent, setExitModalStudent] = useState<Student | null>(null);
@@ -315,16 +323,16 @@ export function TabSiswa({
 
       {/* Filter & Search Bar */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-4 rounded-2xl bg-white border-2 border-slate-200 shadow-xs">
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full md:w-auto">
           {/* Select Class Filter */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             <span className="text-xs font-black text-slate-800 uppercase tracking-wider mr-1 whitespace-nowrap">
               Kelas:
             </span>
             <select
               value={studentClassFilter}
               onChange={(e) => setStudentClassFilter(e.target.value)}
-              className="px-3.5 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-slate-950 text-xs font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 cursor-pointer shadow-xs"
+              className="w-full sm:w-auto px-3.5 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-slate-950 text-xs font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 cursor-pointer shadow-xs"
             >
               <option value="ALL">
                 Semua Kelas ({aktifCount} Aktif{keluarCount > 0 ? ` · ${keluarCount} Keluar` : ''})
@@ -343,14 +351,14 @@ export function TabSiswa({
           </div>
 
           {/* Select Status Filter */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             <span className="text-xs font-black text-slate-800 uppercase tracking-wider mr-1 whitespace-nowrap">
               Status:
             </span>
             <select
               value={studentStatusFilter}
               onChange={(e) => setStudentStatusFilter(e.target.value as any)}
-              className="px-3.5 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-slate-950 text-xs font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 cursor-pointer shadow-xs"
+              className="w-full sm:w-auto px-3.5 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-slate-950 text-xs font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 cursor-pointer shadow-xs"
             >
               <option value="ALL">Semua Status ({studentsList.length})</option>
               <option value="AKTIF">Hanya Siswa Aktif ({aktifCount})</option>
@@ -360,13 +368,13 @@ export function TabSiswa({
         </div>
 
         {/* Search Input */}
-        <div className="relative">
+        <div className="relative w-full md:w-72">
           <input
             type="text"
             value={studentSearch}
             onChange={(e) => setStudentSearch(e.target.value)}
             placeholder="Cari nama siswa atau NISN..."
-            className="w-full md:w-72 pl-8 pr-4 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-xs font-bold text-slate-950 placeholder:text-slate-400 focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 shadow-xs"
+            className="w-full pl-8 pr-4 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-xs font-bold text-slate-950 placeholder:text-slate-400 focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 shadow-xs"
           />
           <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-bold">
             🔍
@@ -374,13 +382,14 @@ export function TabSiswa({
         </div>
       </div>
 
-      {/* Students Table */}
+      {/* Students Table / Cards Container */}
       <div className="rounded-2xl bg-white border-2 border-slate-200 overflow-hidden shadow-sm">
-        <div className="p-3.5 bg-slate-100 border-b-2 border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-800 font-bold">
-          <span>
-            Menampilkan <span className="font-black text-slate-950">{filteredStudents.length}</span> dari {studentsList.length} siswa
-          </span>
-          <div className="flex items-center gap-2">
+        {/* Header Toolbar with View Mode Toggle */}
+        <div className="p-3.5 bg-slate-100 border-b-2 border-slate-200 flex flex-wrap items-center justify-between gap-2.5 text-xs text-slate-800 font-bold">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span>
+              Menampilkan <span className="font-black text-slate-950">{filteredStudents.length}</span> dari {studentsList.length} siswa
+            </span>
             {studentClassFilter !== 'ALL' && (
               <span className="px-2.5 py-0.5 rounded font-mono font-black text-xs bg-indigo-100 text-indigo-900 border border-indigo-300">
                 Kelas: {studentClassFilter}
@@ -396,138 +405,298 @@ export function TabSiswa({
               </span>
             )}
           </div>
+
+          {/* View Mode Toggle Button */}
+          <div className="flex items-center gap-1 bg-slate-200/90 p-1 rounded-xl">
+            <button
+              type="button"
+              onClick={() => setViewMode('card')}
+              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                viewMode === 'card'
+                  ? 'bg-white text-indigo-900 shadow-xs font-black'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+              title="Tampilan Kartu Ramah Layar HP"
+            >
+              <span>📱</span>
+              <span>Kartu</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('table')}
+              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                viewMode === 'table'
+                  ? 'bg-white text-indigo-900 shadow-xs font-black'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+              title="Tampilan Tabel Lengkap"
+            >
+              <span>📋</span>
+              <span>Tabel</span>
+            </button>
+          </div>
         </div>
 
-        <div className="overflow-x-auto max-h-[600px] overflow-y-auto [scrollbar-width:thin]">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-100 text-slate-900 font-mono uppercase text-xs tracking-wider border-b-2 border-slate-300 sticky top-0 font-black backdrop-blur-md">
-              <tr>
-                <th className="py-3.5 px-4 w-12 text-center">No</th>
-                <th className="py-3.5 px-4 w-32">NISN</th>
-                <th className="py-3.5 px-4 w-28">NIS</th>
-                <th className="py-3.5 px-4">Nama Lengkap Siswa</th>
-                <th className="py-3.5 px-4 w-20">Kelas</th>
-                <th className="py-3.5 px-4 w-48">Status Siswa</th>
-                <th className="py-3.5 px-4 w-32 text-center">Aksi</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200">
+        {/* Swipe Hint for Table View on Mobile */}
+        {viewMode === 'table' && (
+          <div className="md:hidden px-3.5 py-2 bg-indigo-50/90 border-b border-indigo-100 text-indigo-800 text-[11px] font-bold flex items-center justify-between">
+            <span className="flex items-center gap-1.5">
+              <span>👉</span>
+              <span>Geser tabel ke samping untuk melihat kolom lengkap</span>
+            </span>
+            <span className="font-mono text-[10px] bg-white px-2 py-0.5 rounded border border-indigo-200 text-indigo-600">↔ Swipe</span>
+          </div>
+        )}
+
+        {/* 1. TAMPILAN KARTU (CARD VIEW - RAMAH HP & RESPONSIVE) */}
+        {viewMode === 'card' && paginatedStudents.length > 0 && (
+          <div className="p-3 sm:p-4 bg-slate-50/50">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {paginatedStudents.map((st, idx) => {
                 const absoluteIndex = (studentPage - 1) * STUDENTS_PER_PAGE + idx + 1;
                 const isExit = st.status === 'Keluar';
                 return (
-                  <tr key={st.id} className={`hover:bg-slate-50 transition-colors ${isExit ? 'bg-rose-50/30' : ''}`}>
-                    <td className="py-3 px-4 text-center font-mono text-slate-700 font-bold">{absoluteIndex}</td>
-                    <td className="py-3 px-4 font-mono font-black text-indigo-700">{st.nisn}</td>
-                    <td className="py-3 px-4 font-mono font-bold text-slate-800">{st.nis || '-'}</td>
-                    <td className="py-3 px-4">
-                      <div className={`font-black text-sm ${isExit ? 'line-through text-slate-500' : 'text-slate-950'}`}>
-                        {st.name}
-                      </div>
-                      {isExit && (
-                        <div className="text-[10px] text-rose-700 font-semibold mt-0.5">
-                          {st.exitReason ? `Alasan: ${st.exitReason}` : 'Sudah Keluar / Mutasi Sekolah'}
-                        </div>
-                      )}
-                    </td>
-                    <td className="py-3 px-4">
-                      <span className="px-2.5 py-1 rounded text-xs font-black bg-indigo-100 border border-indigo-300 text-indigo-900 font-mono">
-                        {st.classId}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4">
-                      {isExit ? (
-                        <div className="space-y-0.5">
-                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-rose-100 text-rose-800 border border-rose-300 inline-flex items-center gap-1">
-                            <span>🚪</span> Keluar Sekolah
+                  <div
+                    key={st.id}
+                    className={`p-3.5 rounded-xl border-2 transition-all flex flex-col justify-between ${
+                      isExit
+                        ? 'bg-rose-50/40 border-rose-200'
+                        : 'bg-white border-slate-200 hover:border-indigo-300 shadow-xs'
+                    }`}
+                  >
+                    <div>
+                      {/* Card Header: Nomor & Status */}
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="w-6 h-6 rounded-full bg-slate-200 text-slate-800 text-[11px] font-mono font-bold flex items-center justify-center shrink-0">
+                            #{absoluteIndex}
                           </span>
-                          <div className="text-[9px] text-slate-500 font-medium leading-tight">
-                            {st.exitDate ? `Tgl: ${st.exitDate}` : ''} {st.exitMarkedBy ? `• Oleh: ${st.exitMarkedBy}` : ''}
-                          </div>
+                          <span className="px-2.5 py-0.5 rounded-lg font-mono font-black text-xs bg-indigo-100 text-indigo-900 border border-indigo-200">
+                            Kelas {st.classId}
+                          </span>
                         </div>
-                      ) : (
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 inline-flex items-center gap-1">
-                          <span>✅</span> Siswa Aktif
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-3 px-4 text-center">
-                      <div className="flex items-center justify-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => setEditingStudent(st)}
-                          className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 transition cursor-pointer"
-                          title="Edit data siswa"
-                        >
-                          ✏️
-                        </button>
-
                         {isExit ? (
-                          <button
-                            type="button"
-                            onClick={() => setRestoreModalStudent(st)}
-                            className="px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 font-black text-[11px] transition cursor-pointer shadow-xs flex items-center gap-1"
-                            title="Pulihkan status siswa aktif"
-                          >
-                            <span>🔄</span>
-                            <span>Pulihkan</span>
-                          </button>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-100 text-rose-800 border border-rose-300 flex items-center gap-1">
+                            <span>🚪</span> Keluar
+                          </span>
                         ) : (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setExitModalStudent(st);
-                              setExitReasonType('Pindah / Mutasi ke Sekolah Lain');
-                              setExitCustomReason('');
-                              setExitDateInput(new Date().toISOString().split('T')[0]);
-                            }}
-                            className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 transition cursor-pointer"
-                            title="Tandai siswa keluar / mutasi sekolah"
-                          >
-                            🚪
-                          </button>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
+                            <span>✅</span> Aktif
+                          </span>
                         )}
+                      </div>
 
+                      {/* Card Body: Nama, NISN, NIS */}
+                      <div className="space-y-1">
+                        <div className={`font-black text-sm sm:text-base leading-snug ${isExit ? 'line-through text-slate-500' : 'text-slate-950'}`}>
+                          {st.name}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-xs text-slate-600 font-mono">
+                          <span>NISN: <strong className="text-indigo-700 font-black">{st.nisn}</strong></span>
+                          {st.nis && (
+                            <>
+                              <span className="text-slate-300">•</span>
+                              <span>NIS: <strong className="text-slate-800">{st.nis}</strong></span>
+                            </>
+                          )}
+                        </div>
+                        {isExit && (
+                          <div className="text-[11px] text-rose-700 font-medium mt-1.5 bg-rose-100/70 p-2 rounded-lg border border-rose-200 space-y-0.5">
+                            <div><strong>Alasan:</strong> {st.exitReason || 'Sudah Keluar / Mutasi Sekolah'}</div>
+                            <div className="text-[10px] text-slate-500">
+                              {st.exitDate ? `Tanggal: ${st.exitDate}` : ''} {st.exitMarkedBy ? `• Oleh: ${st.exitMarkedBy}` : ''}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Card Actions */}
+                    <div className="flex items-center gap-2 pt-3 mt-3 border-t border-slate-100">
+                      <button
+                        type="button"
+                        onClick={() => setEditingStudent(st)}
+                        className="flex-1 py-1.5 px-3 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 text-xs font-bold transition flex items-center justify-center gap-1 active:scale-98"
+                      >
+                        <span>✏️</span>
+                        <span>Edit</span>
+                      </button>
+
+                      {isExit ? (
                         <button
                           type="button"
-                          onClick={() => onDeleteStudent(st.id, st.name)}
-                          className="p-1.5 rounded-lg bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-700 border border-slate-300 transition cursor-pointer"
-                          title="Hapus siswa"
+                          onClick={() => setRestoreModalStudent(st)}
+                          className="flex-1 py-1.5 px-3 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-black transition flex items-center justify-center gap-1 active:scale-98"
                         >
-                          🗑️
+                          <span>🔄</span>
+                          <span>Pulihkan</span>
                         </button>
-                      </div>
-                    </td>
-                  </tr>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setExitModalStudent(st);
+                            setExitReasonType('Pindah / Mutasi ke Sekolah Lain');
+                            setExitCustomReason('');
+                            setExitDateInput(new Date().toISOString().split('T')[0]);
+                          }}
+                          className="flex-1 py-1.5 px-3 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 text-xs font-bold transition flex items-center justify-center gap-1 active:scale-98"
+                        >
+                          <span>🚪</span>
+                          <span>Keluar</span>
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => onDeleteStudent(st.id, st.name)}
+                        className="p-1.5 rounded-lg bg-slate-100 hover:bg-rose-100 text-slate-600 hover:text-rose-700 border border-slate-300 text-xs transition active:scale-98"
+                        title="Hapus data siswa"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  </div>
                 );
               })}
-            </tbody>
-          </table>
-        </div>
+            </div>
+          </div>
+        )}
 
+        {/* 2. TAMPILAN TABEL LENGKAP (TABLE VIEW - MIN-W 700PX DENGAN SCROLL HALUS) */}
+        {viewMode === 'table' && paginatedStudents.length > 0 && (
+          <div className="overflow-x-auto max-h-[600px] overflow-y-auto [scrollbar-width:thin]">
+            <table className="min-w-[700px] w-full text-left text-xs">
+              <thead className="bg-slate-100 text-slate-900 font-mono uppercase text-xs tracking-wider border-b-2 border-slate-300 sticky top-0 font-black backdrop-blur-md">
+                <tr>
+                  <th className="py-3.5 px-4 w-12 text-center">No</th>
+                  <th className="py-3.5 px-4 w-32">NISN</th>
+                  <th className="py-3.5 px-4 w-28">NIS</th>
+                  <th className="py-3.5 px-4">Nama Lengkap Siswa</th>
+                  <th className="py-3.5 px-4 w-20">Kelas</th>
+                  <th className="py-3.5 px-4 w-48">Status Siswa</th>
+                  <th className="py-3.5 px-4 w-32 text-center">Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {paginatedStudents.map((st, idx) => {
+                  const absoluteIndex = (studentPage - 1) * STUDENTS_PER_PAGE + idx + 1;
+                  const isExit = st.status === 'Keluar';
+                  return (
+                    <tr key={st.id} className={`hover:bg-slate-50 transition-colors ${isExit ? 'bg-rose-50/30' : ''}`}>
+                      <td className="py-3 px-4 text-center font-mono text-slate-700 font-bold">{absoluteIndex}</td>
+                      <td className="py-3 px-4 font-mono font-black text-indigo-700">{st.nisn}</td>
+                      <td className="py-3 px-4 font-mono font-bold text-slate-800">{st.nis || '-'}</td>
+                      <td className="py-3 px-4">
+                        <div className={`font-black text-sm ${isExit ? 'line-through text-slate-500' : 'text-slate-950'}`}>
+                          {st.name}
+                        </div>
+                        {isExit && (
+                          <div className="text-[10px] text-rose-700 font-semibold mt-0.5">
+                            {st.exitReason ? `Alasan: ${st.exitReason}` : 'Sudah Keluar / Mutasi Sekolah'}
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className="px-2.5 py-1 rounded text-xs font-black bg-indigo-100 border border-indigo-300 text-indigo-900 font-mono">
+                          {st.classId}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4">
+                        {isExit ? (
+                          <div className="space-y-0.5">
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-rose-100 text-rose-800 border border-rose-300 inline-flex items-center gap-1">
+                              <span>🚪</span> Keluar Sekolah
+                            </span>
+                            <div className="text-[9px] text-slate-500 font-medium leading-tight">
+                              {st.exitDate ? `Tgl: ${st.exitDate}` : ''} {st.exitMarkedBy ? `• Oleh: ${st.exitMarkedBy}` : ''}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 inline-flex items-center gap-1">
+                            <span>✅</span> Siswa Aktif
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setEditingStudent(st)}
+                            className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 transition cursor-pointer"
+                            title="Edit data siswa"
+                          >
+                            ✏️
+                          </button>
+
+                          {isExit ? (
+                            <button
+                              type="button"
+                              onClick={() => setRestoreModalStudent(st)}
+                              className="px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 font-black text-[11px] transition cursor-pointer shadow-xs flex items-center gap-1"
+                              title="Pulihkan status siswa aktif"
+                            >
+                              <span>🔄</span>
+                              <span>Pulihkan</span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setExitModalStudent(st);
+                                setExitReasonType('Pindah / Mutasi ke Sekolah Lain');
+                                setExitCustomReason('');
+                                setExitDateInput(new Date().toISOString().split('T')[0]);
+                              }}
+                              className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 transition cursor-pointer"
+                              title="Tandai siswa keluar / mutasi sekolah"
+                            >
+                              🚪
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => onDeleteStudent(st.id, st.name)}
+                            className="p-1.5 rounded-lg bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-700 border border-slate-300 transition cursor-pointer"
+                            title="Hapus siswa"
+                          >
+                            🗑️
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Responsive Pagination Bar */}
         {filteredStudents.length > 0 && (
           <div className="p-3.5 bg-slate-100 border-t-2 border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-800 font-bold">
-            <div>
+            <div className="text-center sm:text-left">
               Menampilkan <span className="text-slate-950 font-black">{(studentPage - 1) * STUDENTS_PER_PAGE + 1}</span> - <span className="text-slate-950 font-black">{Math.min(studentPage * STUDENTS_PER_PAGE, filteredStudents.length)}</span> dari <span className="text-slate-950 font-black">{filteredStudents.length}</span> siswa
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center justify-center gap-2 w-full sm:w-auto">
               <button
                 type="button"
                 disabled={studentPage <= 1}
                 onClick={() => setStudentPage(p => Math.max(1, p - 1))}
-                className="px-3.5 py-1.5 rounded-lg bg-white hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed border-2 border-slate-300 text-slate-900 text-xs font-extrabold transition cursor-pointer shadow-xs"
+                className="flex-1 sm:flex-initial px-3.5 py-2 rounded-xl bg-white hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed border-2 border-slate-300 text-slate-900 text-xs font-extrabold transition cursor-pointer shadow-xs text-center"
               >
                 ◀ Sebelumnya
               </button>
-              <span className="px-3.5 py-1.5 rounded-lg bg-white border-2 border-slate-300 text-slate-950 font-mono font-black text-xs shadow-xs">
+              <span className="px-3.5 py-2 rounded-xl bg-white border-2 border-slate-300 text-slate-950 font-mono font-black text-xs shadow-xs text-center whitespace-nowrap">
                 Hal {studentPage} / {totalPages}
               </span>
               <button
                 type="button"
                 disabled={studentPage >= totalPages}
                 onClick={() => setStudentPage(p => Math.min(totalPages, p + 1))}
-                className="px-3.5 py-1.5 rounded-lg bg-white hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed border-2 border-slate-300 text-slate-900 text-xs font-extrabold transition cursor-pointer shadow-xs"
+                className="flex-1 sm:flex-initial px-3.5 py-2 rounded-xl bg-white hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed border-2 border-slate-300 text-slate-900 text-xs font-extrabold transition cursor-pointer shadow-xs text-center"
               >
                 Berikutnya ▶
               </button>

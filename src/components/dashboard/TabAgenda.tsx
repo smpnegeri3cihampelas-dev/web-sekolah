@@ -439,7 +439,7 @@ export function TabAgenda({
       {viewMode === 'table' && paginatedList.length > 0 && (
         <div className="bg-white rounded-2xl border-2 border-slate-200 overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
+            <table className="min-w-[650px] w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-slate-100/80 border-b-2 border-slate-200 text-slate-700 font-black uppercase text-[11px] tracking-wider">
                   <th className="py-3 px-4 w-12 text-center">No</th>
