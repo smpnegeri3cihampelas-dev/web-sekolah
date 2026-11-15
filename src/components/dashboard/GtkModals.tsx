@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Leader, Teacher } from '@/lib/schoolData';
 import { compressImage } from '@/lib/imageCompression';
 import { getTeacherUsername, formatWhatsAppUrl } from '@/lib/elearningData';
@@ -235,6 +235,137 @@ export function EditLeaderModal({ isOpen, leader, onClose, onSave, showToast }: 
 }
 
 // =========================================================================
+// MATA PELAJARAN RESMI SMP & SELECTOR DROPDOWN
+// =========================================================================
+export interface SubjectOption {
+  label: string;
+  category: 'MIPA' | 'Bahasa' | 'Teknologi' | 'Sosial & Agama' | 'Olahraga & Seni';
+}
+
+export const STANDARD_SMP_SUBJECTS: SubjectOption[] = [
+  { label: 'Matematika', category: 'MIPA' },
+  { label: 'Ilmu Pengetahuan Alam (IPA)', category: 'MIPA' },
+  { label: 'Bahasa Indonesia', category: 'Bahasa' },
+  { label: 'Bahasa Inggris', category: 'Bahasa' },
+  { label: 'Bahasa Sunda', category: 'Bahasa' },
+  { label: 'Ilmu Pengetahuan Sosial (IPS)', category: 'Sosial & Agama' },
+  { label: 'Pendidikan Agama Islam & Budi Pekerti', category: 'Sosial & Agama' },
+  { label: 'Pendidikan Pancasila & Kewarganegaraan', category: 'Sosial & Agama' },
+  { label: 'Pendidikan Jasmani, Olahraga & Kesehatan', category: 'Olahraga & Seni' },
+  { label: 'Informatika', category: 'Teknologi' },
+  { label: 'Seni Budaya & Keterampilan (SBK)', category: 'Olahraga & Seni' },
+  { label: 'Prakarya & Kewirausahaan', category: 'Teknologi' },
+  { label: 'Bimbingan & Konseling (BK)', category: 'Sosial & Agama' },
+  { label: 'Tenaga Kependidikan / Tata Usaha (TU)', category: 'Sosial & Agama' }
+];
+
+export function getCategoryForSubject(subjectName: string): 'MIPA' | 'Bahasa' | 'Teknologi' | 'Sosial & Agama' | 'Olahraga & Seni' {
+  const found = STANDARD_SMP_SUBJECTS.find(s => s.label.toLowerCase() === subjectName.toLowerCase());
+  if (found) return found.category;
+  
+  const lower = subjectName.toLowerCase();
+  if (lower.includes('matematika') || lower.includes('ipa') || lower.includes('sains') || lower.includes('fisika') || lower.includes('biologi')) return 'MIPA';
+  if (lower.includes('inggris') || lower.includes('indonesia') || lower.includes('sunda') || lower.includes('bahasa')) return 'Bahasa';
+  if (lower.includes('informatika') || lower.includes('komputer') || lower.includes('tik') || lower.includes('prakarya')) return 'Teknologi';
+  if (lower.includes('pjok') || lower.includes('olahraga') || lower.includes('jasmani') || lower.includes('seni') || lower.includes('musik') || lower.includes('budaya')) return 'Olahraga & Seni';
+  return 'Sosial & Agama';
+}
+
+function SubjectSelectInput({
+  value,
+  onChange
+}: {
+  value: string;
+  onChange: (val: string) => void;
+}) {
+  const isPredefined = useMemo(() => {
+    return STANDARD_SMP_SUBJECTS.some(s => s.label.toLowerCase() === value.trim().toLowerCase());
+  }, [value]);
+
+  const [selectedOption, setSelectedOption] = useState<string>(() => {
+    if (!value) return '';
+    return isPredefined ? value : 'LAINNYA';
+  });
+
+  const [customSubject, setCustomSubject] = useState<string>(() => {
+    return isPredefined ? '' : value;
+  });
+
+  useEffect(() => {
+    if (!value) {
+      setSelectedOption('');
+      setCustomSubject('');
+      return;
+    }
+    const matched = STANDARD_SMP_SUBJECTS.find(s => s.label.toLowerCase() === value.trim().toLowerCase());
+    if (matched) {
+      setSelectedOption(matched.label);
+      setCustomSubject('');
+    } else {
+      setSelectedOption('LAINNYA');
+      setCustomSubject(value);
+    }
+  }, [value]);
+
+  const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value;
+    setSelectedOption(val);
+    if (val !== 'LAINNYA') {
+      onChange(val);
+    } else {
+      onChange(customSubject);
+    }
+  };
+
+  const handleCustomChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setCustomSubject(val);
+    onChange(val);
+  };
+
+  return (
+    <div>
+      <label className="text-slate-800 block mb-1.5 font-extrabold text-xs">Mata Pelajaran / Tugas *</label>
+      <select
+        required
+        value={selectedOption}
+        onChange={handleSelectChange}
+        className="w-full px-3.5 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-slate-950 font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 cursor-pointer shadow-xs text-xs"
+      >
+        <option value="" disabled>-- Pilih Mata Pelajaran Resmi SMP --</option>
+        <optgroup label="Mata Pelajaran Kurikulum SMP">
+          {STANDARD_SMP_SUBJECTS.map((s) => (
+            <option key={s.label} value={s.label}>
+              {s.label}
+            </option>
+          ))}
+        </optgroup>
+        <optgroup label="Khusus / Tambahan">
+          <option value="LAINNYA">✏️ Lainnya / Tulis Mata Pelajaran Khusus...</option>
+        </optgroup>
+      </select>
+
+      {selectedOption === 'LAINNYA' && (
+        <div className="mt-2 animate-[fadeIn_0.15s_ease-out]">
+          <input
+            type="text"
+            required
+            autoFocus
+            value={customSubject}
+            onChange={handleCustomChange}
+            placeholder="Tulis nama mapel atau tugas tambahan (contoh: PABP & Bahasa Sunda)..."
+            className="w-full px-3.5 py-2 rounded-xl bg-white border-2 border-slate-300 text-slate-950 font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 shadow-xs placeholder:text-slate-400 text-xs"
+          />
+          <p className="text-[10px] text-slate-500 font-semibold mt-1">
+            Gunakan opsi ini jika guru mengampu mapel gabungan atau tugas khusus.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// =========================================================================
 // MODAL: TAMBAH GURU BARU
 // =========================================================================
 interface AddTeacherModalProps {
@@ -311,17 +442,20 @@ export function AddTeacherModal({ isOpen, onClose, onAdd, showToast }: AddTeache
       }
     }
 
+    const finalSubject = subject.trim() || 'Guru Mata Pelajaran';
+    const finalCategory = getCategoryForSubject(finalSubject);
+
     onAdd({
       name: name.trim(),
       username: generatedUsername,
       phone: phone.trim() || undefined,
-      subject: subject.trim() || 'Guru Mata Pelajaran',
+      subject: finalSubject,
       nip: nip.trim() || '-',
       status,
       photo,
       active: true,
-      category: 'MIPA',
-      role: subject.trim() || 'Guru Mata Pelajaran',
+      category: finalCategory,
+      role: finalSubject,
       quote: 'Mendidik dengan keteladanan dan budi pekerti luhur.'
     });
     showToast(`👨‍🏫 Guru baru "${name}" & Akun @${generatedUsername} berhasil dibuat!`);
@@ -424,17 +558,8 @@ export function AddTeacherModal({ isOpen, onClose, onAdd, showToast }: AddTeache
             />
           </div>
 
-          <div>
-            <label className="text-slate-800 block mb-1.5 font-extrabold">Mata Pelajaran / Tugas *</label>
-            <input
-              type="text"
-              required
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              placeholder="Contoh: Ilmu Pengetahuan Sosial (IPS)"
-              className="w-full px-3.5 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-slate-950 font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 shadow-xs placeholder:text-slate-400"
-            />
-          </div>
+          {/* Dropdown Mata Pelajaran dengan Opsi Lainnya */}
+          <SubjectSelectInput value={subject} onChange={setSubject} />
 
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -592,9 +717,14 @@ export function EditTeacherModal({ isOpen, teacher, onClose, onSave, onDelete, s
       return;
     }
 
+    const finalSubject = subject.trim() || 'Guru Mata Pelajaran';
+    const finalCategory = getCategoryForSubject(finalSubject);
+
     onSave(teacher.id, {
       name: name.trim(),
-      subject: subject.trim(),
+      subject: finalSubject,
+      category: finalCategory,
+      role: finalSubject,
       nip: nip.trim(),
       phone: phone.trim() || undefined,
       status,
@@ -700,16 +830,8 @@ export function EditTeacherModal({ isOpen, teacher, onClose, onSave, onDelete, s
             />
           </div>
 
-          <div>
-            <label className="text-slate-800 block mb-1.5 font-extrabold">Mata Pelajaran / Tugas *</label>
-            <input
-              type="text"
-              required
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-slate-950 font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 shadow-xs"
-            />
-          </div>
+          {/* Dropdown Mata Pelajaran dengan Opsi Lainnya */}
+          <SubjectSelectInput value={subject} onChange={setSubject} />
 
           <div className="grid grid-cols-2 gap-3">
             <div>
