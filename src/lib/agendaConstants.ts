@@ -290,6 +290,13 @@ export function getAgendaSortTime(dateStr: string): number {
   }
 
   // 4. Month range e.g. 'Juni - Juli 2027'
+  const monthRange = trimmed.match(/^([A-Za-z]+)\s*[-–]\s*([A-Za-z]+)/i);
+  if (monthRange) {
+    const startM = MONTH_INDEX_MAP[monthRange[1].toLowerCase().slice(0, 3)] ?? 0;
+    // Agenda rentang bulan tanpa tanggal (seperti Masa PPDB Juni - Juli) dilaksanakan di akhir bulan setelah pembagian rapor
+    return new Date(year, startM, 29).getTime();
+  }
+
   const monthOnly = trimmed.match(/^([A-Za-z]+)/);
   if (monthOnly) {
     const m = MONTH_INDEX_MAP[monthOnly[1].toLowerCase().slice(0, 3)] ?? 0;
