@@ -35,6 +35,7 @@ export function TabPengaturan({
   const [region, setRegion] = useState(identity.region);
   const [address, setAddress] = useState(identity.address || '');
   const [email, setEmail] = useState(identity.email || '');
+  const [phone, setPhone] = useState(identity.phone || '');
 
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -51,6 +52,7 @@ export function TabPengaturan({
       setRegion(identity.region || 'Cihampelas, Kab. Bandung Barat');
       setAddress(identity.address || '');
       setEmail(identity.email || '');
+      setPhone(identity.phone || '0812-3456-7890');
     }
   }, [identity]);
 
@@ -64,7 +66,8 @@ export function TabPengaturan({
         akreditasi,
         region,
         address,
-        email
+        email,
+        phone
       });
       showToast('✅ Identitas resmi sekolah berhasil disimpan ke Database MariaDB & aktif di seluruh sistem!');
     } catch {
@@ -244,6 +247,16 @@ export function TabPengaturan({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="info@smpn3cihampelas.sch.id"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-slate-950 font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 shadow-xs font-mono"
+              />
+            </div>
+            <div>
+              <label className="text-slate-800 font-black block mb-1.5 text-xs">Nomor Telepon / WhatsApp Resmi</label>
+              <input 
+                type="text" 
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="0812-3456-7890"
                 className="w-full px-3.5 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-slate-950 font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 shadow-xs font-mono"
               />
             </div>

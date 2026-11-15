@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { useSettingsData } from '@/lib/settingsData';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -10,6 +11,7 @@ const TOTAL_FRAMES = 26;
 const LERP_FACTOR = 0.08;
 
 export default function Hero() {
+  const { identity } = useSettingsData();
   const containerRef = useRef<HTMLDivElement>(null);
   const stickyRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -250,7 +252,7 @@ export default function Hero() {
 
             {/* Headline with drop shadow for 100% crisp readability over canvas */}
             <h1 className="font-sans text-2xl sm:text-3xl md:text-4xl lg:text-[2.65rem] xl:text-[2.85rem] tracking-tight leading-[1.15] mb-3.5 sm:mb-4 drop-shadow-[0_2px_12px_rgba(0,0,0,0.9)]">
-              <span className="font-light text-slate-200 block drop-shadow-md">SMPN 3 Cihampelas</span>
+              <span className="font-light text-slate-200 block drop-shadow-md">{identity.schoolName || 'SMPN 3 Cihampelas'}</span>
               <span className="font-bold text-white block drop-shadow-lg">Mencetak Generasi Unggul</span>
             </h1>
 

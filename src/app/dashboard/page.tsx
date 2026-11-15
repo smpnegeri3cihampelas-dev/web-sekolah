@@ -33,6 +33,7 @@ import { TabPimpinan } from '@/components/dashboard/TabPimpinan';
 import { TabAgenda } from '@/components/dashboard/TabAgenda';
 import { TabGaleri } from '@/components/dashboard/TabGaleri';
 import { TabPengaturan } from '@/components/dashboard/TabPengaturan';
+import { useSettingsData } from '@/lib/settingsData';
 import { useAgendaData, AgendaItem } from '@/lib/agendaData';
 import { useGalleryData, GalleryItem } from '@/lib/galleryData';
 
@@ -54,6 +55,7 @@ const DashboardClock = React.memo(function DashboardClock() {
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { identity } = useSettingsData();
 
   // Navigation State
   const [activeTab, setActiveTab] = useState<'overview' | 'warta' | 'siswa' | 'pimpinan' | 'agenda' | 'galeri' | 'pengaturan'>('overview');
@@ -398,7 +400,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="flex flex-col">
                   <span className="text-sm font-extrabold tracking-tight text-slate-950 flex items-center gap-1.5 group-hover:text-indigo-600 transition-colors">
-                    SMPN 3 Cihampelas
+                    {identity.schoolName || 'SMPN 3 Cihampelas'}
                   </span>
                   <span className="text-[11px] font-mono text-indigo-700 font-extrabold tracking-wider uppercase flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse" />
@@ -608,7 +610,7 @@ export default function DashboardPage() {
                   {activeTab === 'pengaturan' && 'Pengaturan Profil & Website'}
                 </h1>
                 <p className="text-xs text-slate-600 font-semibold hidden sm:block">
-                  Sistem Informasi & Manajemen Konten SMP Negeri 3 Cihampelas
+                  Sistem Informasi & Manajemen Konten {identity.schoolName || 'SMP Negeri 3 Cihampelas'}
                 </p>
               </div>
             </div>

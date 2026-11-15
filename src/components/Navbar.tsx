@@ -3,8 +3,10 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useState, useEffect, useRef } from 'react';
+import { useSettingsData } from '@/lib/settingsData';
 
 export default function Navbar() {
+  const { identity } = useSettingsData();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [portalOpen, setPortalOpen] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -115,7 +117,7 @@ export default function Navbar() {
             <div className="relative w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center transition-transform duration-300 group-hover:scale-105 shrink-0">
               <Image 
                 src="/logo.png" 
-                alt="Logo SMP Negeri 3 Cihampelas" 
+                alt={`Logo ${identity.schoolName || 'SMP Negeri 3 Cihampelas'}`}
                 width={40} 
                 height={40} 
                 className="w-full h-full object-contain drop-shadow-[0_2px_8px_rgba(0,0,0,0.35)]"
@@ -124,7 +126,7 @@ export default function Navbar() {
             </div>
             <div className="flex flex-col">
               <span className="text-xs sm:text-base font-semibold tracking-tight text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)] flex items-center gap-1.5 sm:gap-2 whitespace-nowrap">
-                SMPN 3 Cihampelas
+                {identity.schoolName || 'SMPN 3 Cihampelas'}
                 <span className="inline-block w-1.5 h-1.5 rounded-full bg-indigo-400 shadow-[0_0_8px_#6366f1]" />
               </span>
             </div>

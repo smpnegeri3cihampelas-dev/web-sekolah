@@ -4,9 +4,11 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
+import { useSettingsData } from '@/lib/settingsData';
 
 export default function LoginPage() {
   const router = useRouter();
+  const { identity } = useSettingsData();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -118,7 +120,7 @@ export default function LoginPage() {
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm sm:text-base font-semibold tracking-tight text-slate-900">
-              SMPN 3 Cihampelas
+              {identity.schoolName || 'SMPN 3 Cihampelas'}
             </span>
             <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shadow-[0_0_8px_#6366f1]" />
           </div>
@@ -263,7 +265,7 @@ export default function LoginPage() {
                 <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                 <path d="M7 11V7a5 5 0 0 1 10 0v4" />
               </svg>
-              <span>Akses terbatas khusus pengelola resmi SMPN 3 Cihampelas</span>
+              <span>Akses terbatas khusus pengelola resmi {identity.schoolName || 'SMPN 3 Cihampelas'}</span>
             </div>
           </div>
 
@@ -273,7 +275,7 @@ export default function LoginPage() {
       {/* Footer Info */}
       <footer className="relative z-10 w-full max-w-7xl mx-auto py-3 text-center">
         <p className="text-[11px] text-stone-500 font-light">
-          © {new Date().getFullYear()} SMP Negeri 3 Cihampelas · All Rights Reserved
+          © {new Date().getFullYear()} {identity.schoolName || 'SMP Negeri 3 Cihampelas'} · All Rights Reserved
         </p>
       </footer>
 

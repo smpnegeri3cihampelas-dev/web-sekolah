@@ -178,9 +178,10 @@ export async function executeMasterResetCloud(): Promise<boolean> {
 }
 
 export function useSettingsData() {
-  const [identity, setIdentity] = useState<SchoolIdentity>(() => getStoredIdentity());
+  const [identity, setIdentity] = useState<SchoolIdentity>(DEFAULT_SCHOOL_IDENTITY);
   const [hasCustomPassword, setHasCustomPassword] = useState<boolean>(false);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const [isMounted, setIsMounted] = useState<boolean>(false);
 
   const refreshFromCloud = useCallback(async () => {
     setIsSyncing(true);
@@ -194,6 +195,8 @@ export function useSettingsData() {
   }, []);
 
   useEffect(() => {
+    setIsMounted(true);
+    setIdentity(getStoredIdentity());
     refreshFromCloud();
 
     const handleUpdate = () => {
@@ -213,6 +216,7 @@ export function useSettingsData() {
     identity,
     hasCustomPassword,
     isSyncing,
+    isMounted,
     refreshFromCloud,
     saveIdentity: (data: Partial<SchoolIdentity>) => saveStoredIdentity(data),
     updatePassword: (password: string) => updateAdminPasswordCloud(password),

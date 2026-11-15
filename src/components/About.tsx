@@ -3,10 +3,12 @@
 import { useState, useEffect } from 'react';
 import { useLenis } from 'lenis/react';
 import { useSchoolData } from '@/lib/schoolData';
+import { useSettingsData } from '@/lib/settingsData';
 
 export default function About() {
   const lenis = useLenis();
   const { leaders, teachers, dataPokok } = useSchoolData();
+  const { identity } = useSettingsData();
 
   const [activeTab, setActiveTab] = useState<'visi' | 'sejarah' | 'akreditasi' | 'pimpinan'>('visi');
   const [isTeacherModalOpen, setIsTeacherModalOpen] = useState(false);
@@ -71,7 +73,7 @@ export default function About() {
             <span>Profil &amp; Identitas Sekolah</span>
           </div>
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-light text-slate-900 tracking-tight leading-[1.12]">
-            Mengenal Lebih Dekat <span className="font-semibold text-indigo-900">SMPN 3 Cihampelas</span>
+            Mengenal Lebih Dekat <span className="font-semibold text-indigo-900">{identity.schoolName || 'SMPN 3 Cihampelas'}</span>
           </h2>
         </div>
 
@@ -361,7 +363,7 @@ export default function About() {
                   Direktori Resmi GTK
                 </div>
                 <h3 className="text-xl sm:text-2xl font-light text-slate-900 tracking-tight">
-                  Dewan Guru &amp; Tenaga Pendidik <span className="font-semibold text-indigo-600">SMPN 3 Cihampelas</span>
+                  Dewan Guru &amp; Tenaga Pendidik <span className="font-semibold text-indigo-600">{identity.schoolName || 'SMPN 3 Cihampelas'}</span>
                 </h3>
               </div>
               <button 

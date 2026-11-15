@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useSettingsData } from '@/lib/settingsData';
 import { 
   OFFICIAL_KALDIK_SMPN3, 
   AgendaItem, 
@@ -56,6 +57,7 @@ function parseDateParts(dateStr: string) {
 }
 
 export default function Calendar() {
+  const { identity } = useSettingsData();
   const { agendaList, pdfInfo } = useAgendaData();
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [modalFilter, setModalFilter] = useState<string>('SEMUA');
@@ -181,7 +183,7 @@ export default function Calendar() {
             </h2>
 
             <p className="text-slate-600 text-xs sm:text-sm leading-relaxed mb-6 font-light max-w-md">
-              Menampilkan kegiatan resmi terdekat di SMP Negeri 3 Cihampelas. Untuk melihat jadwal lengkap 1 tahun ajaran atau mengunduh surat ketetapan resmi, silakan buka rekap kalender.
+              Menampilkan kegiatan resmi terdekat di {identity.schoolName || 'SMP Negeri 3 Cihampelas'}. Untuk melihat jadwal lengkap 1 tahun ajaran atau mengunduh surat ketetapan resmi, silakan buka rekap kalender.
             </p>
 
             {/* Single Action Button */}
@@ -309,7 +311,7 @@ export default function Calendar() {
               <div className="flex items-center gap-2">
                 <span className="w-3 h-3 rounded-full bg-indigo-600" />
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                  Rekap Kalender Pendidikan Resmi SMPN 3 Cihampelas
+                  Rekap Kalender Pendidikan Resmi {identity.schoolName || 'SMPN 3 Cihampelas'}
                 </span>
               </div>
               <div className="flex items-center gap-2">
@@ -355,7 +357,7 @@ export default function Calendar() {
                   Dinas Pendidikan Kabupaten Bandung Barat
                 </p>
                 <h3 className="text-lg sm:text-xl font-black text-slate-950 uppercase tracking-tight">
-                  SMP Negeri 3 Cihampelas
+                  {identity.schoolName || 'SMP Negeri 3 Cihampelas'}
                 </h3>
                 <p className="text-xs text-slate-600">
                   Kalender Pendidikan Tahun Pelajaran 2026 / 2027 — Semester 1 & 2
@@ -425,7 +427,7 @@ export default function Calendar() {
                 </div>
                 <div className="text-right">
                   <p className="text-slate-500">Cihampelas, 13 Juli 2026</p>
-                  <p className="font-bold text-slate-900">Kepala SMP Negeri 3 Cihampelas</p>
+                  <p className="font-bold text-slate-900">Kepala {identity.schoolName || 'SMP Negeri 3 Cihampelas'}</p>
                   <div className="h-10" />
                   <p className="font-black text-slate-950 underline">H. Rustandi, M.Pd.</p>
                   <p className="text-[11px] text-slate-500 font-mono">NIP. 197006081998021001</p>

@@ -1,8 +1,10 @@
 'use client';
 
 import React from 'react';
+import { useSettingsData } from '@/lib/settingsData';
 
 export default function Contact() {
+  const { identity } = useSettingsData();
   return (
     <section id="kontak" className="relative w-full py-20 sm:py-28 bg-[#f8fafc] text-slate-900 border-b border-indigo-100/70 overflow-hidden select-none">
       {/* Ambient Lighting */}
@@ -51,8 +53,8 @@ export default function Contact() {
                       </svg>
                     </div>
                     <div className="min-w-0">
-                      <div className="text-xs font-bold text-slate-900 truncate">SMP Negeri 3 Cihampelas</div>
-                      <div className="text-[11px] text-slate-500 truncate">Kp. Sukawangi, Situwangi, Bandung Barat</div>
+                      <div className="text-xs font-bold text-slate-900 truncate">{identity.schoolName || 'SMP Negeri 3 Cihampelas'}</div>
+                      <div className="text-[11px] text-slate-500 truncate">{identity.region || 'Kp. Sukawangi, Situwangi, Bandung Barat'}</div>
                     </div>
                   </div>
                   <a 
@@ -96,7 +98,7 @@ export default function Contact() {
                 <div>
                   <h4 className="text-[11px] font-mono uppercase tracking-wider text-indigo-600 font-bold mb-1">Alamat Resmi</h4>
                   <p className="text-slate-600 text-xs sm:text-sm leading-relaxed font-light">
-                    Kp. Sukawangi RT 02 / RW 09, Desa Situwangi, Kec. Cihampelas, Kabupaten Bandung Barat, Jawa Barat 40767
+                    {identity.address || 'Kp. Sukawangi RT 02 / RW 09, Desa Situwangi, Kec. Cihampelas, Kabupaten Bandung Barat, Jawa Barat 40767'}
                   </p>
                   <a 
                     href="https://maps.google.com/?q=SMPN+3+Cihampelas" 
@@ -119,7 +121,7 @@ export default function Contact() {
                 </div>
                 <div>
                   <h4 className="text-[11px] font-mono uppercase tracking-wider text-purple-700 font-bold mb-1">Pusat Panggilan & WhatsApp</h4>
-                  <p className="text-slate-600 text-xs sm:text-sm font-light">0812-3456-7890 <span className="text-[10px] text-slate-500 font-mono ml-2">(Layanan Informasi & PPDB)</span></p>
+                  <p className="text-slate-600 text-xs sm:text-sm font-light">{identity.phone || '0812-3456-7890'} <span className="text-[10px] text-slate-500 font-mono ml-2">(Layanan Informasi & PPDB)</span></p>
                 </div>
               </div>
 
@@ -132,7 +134,7 @@ export default function Contact() {
                 </div>
                 <div>
                   <h4 className="text-[11px] font-mono uppercase tracking-wider text-blue-700 font-bold mb-1">Surat Elektronik (Email)</h4>
-                  <p className="text-slate-600 text-xs sm:text-sm font-light">info@smpn3cihampelas.sch.id</p>
+                  <p className="text-slate-600 text-xs sm:text-sm font-light">{identity.email || 'info@smpn3cihampelas.sch.id'}</p>
                 </div>
               </div>
 
