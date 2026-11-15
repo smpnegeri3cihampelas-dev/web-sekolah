@@ -5,12 +5,7 @@ import { Leader, Teacher } from '@/lib/schoolData';
 import { compressImage } from '@/lib/imageCompression';
 import { getTeacherUsername, formatWhatsAppUrl } from '@/lib/elearningData';
 
-export const GTK_PHOTO_PRESETS = [
-  { label: 'Avatar Default', src: '/teachers/default_avatar.svg' },
-  { label: 'Foto Guru 1', src: '/teachers/teacher_1.jpg' },
-  { label: 'Foto Guru 2', src: '/teachers/teacher_2.jpg' },
-  { label: 'Foto Guru 3', src: '/teachers/teacher_3.jpg' }
-];
+
 
 // =========================================================================
 // MODAL: EDIT PIMPINAN (KEPALA SEKOLAH / WAKASEK)
@@ -92,7 +87,7 @@ export function EditLeaderModal({ isOpen, leader, onClose, onSave, showToast }: 
         data-lenis-prevent="true"
         data-lenis-prevent-wheel="true"
         data-lenis-prevent-touch="true"
-        className="w-full max-w-lg rounded-3xl bg-white border-2 border-slate-300 p-6 sm:p-7 shadow-2xl relative max-h-[90vh] overflow-y-auto"
+        className="w-full max-w-2xl rounded-3xl bg-white border-2 border-slate-300 p-6 sm:p-7 shadow-2xl relative max-h-[90vh] overflow-y-auto"
       >
         <div className="flex items-center justify-between pb-4 border-b-2 border-slate-100 mb-5">
           <div>
@@ -109,61 +104,46 @@ export function EditLeaderModal({ isOpen, leader, onClose, onSave, showToast }: 
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 text-xs">
-          {/* Photo Selector */}
-          <div>
-            <label className="text-slate-800 block mb-1.5 font-black text-xs">Foto Profil Pimpinan</label>
-            <div className="flex items-center gap-3.5 mb-3">
+          {/* Foto Profil Bersih & Minimalis */}
+          <div className="flex items-center gap-4 p-3.5 rounded-2xl bg-slate-50 border-2 border-slate-200">
+            <div className="relative shrink-0">
               <img 
                 src={photo || '/teachers/default_avatar.svg'} 
                 alt="Preview" 
-                className="w-16 h-16 rounded-2xl object-cover border-2 border-slate-300 shadow-xs flex-shrink-0 bg-slate-100"
+                className="w-16 h-16 rounded-2xl object-cover border-2 border-slate-300 bg-white shadow-xs"
               />
-              <div className="flex-1 space-y-2">
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  accept="image/*"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                />
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isCompressing}
-                    className="px-3.5 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-2 border-indigo-200 font-bold text-xs flex items-center gap-1.5 cursor-pointer active:scale-98"
-                  >
-                    <span>📷</span>
-                    <span>{isCompressing ? 'Memproses...' : 'Upload dari Perangkat'}</span>
-                  </button>
-                </div>
-                <input
-                  type="text"
-                  value={photo}
-                  onChange={(e) => setPhoto(e.target.value)}
-                  placeholder="Atau tempel URL gambar..."
-                  className="w-full px-3 py-1.5 rounded-xl bg-white border-2 border-slate-300 text-slate-950 font-mono text-[11px] font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 shadow-xs"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs text-slate-700 font-black">Pilihan Cepat:</span>
-              {GTK_PHOTO_PRESETS.map((p) => (
+              {photo && photo !== '/teachers/default_avatar.svg' && (
                 <button
-                  key={p.src}
                   type="button"
-                  onClick={() => setPhoto(p.src)}
-                  className={`px-3 py-1.5 rounded-lg border-2 text-xs flex items-center gap-1.5 transition-all cursor-pointer font-bold ${
-                    photo === p.src
-                      ? 'border-indigo-600 bg-indigo-50 text-indigo-900 font-black'
-                      : 'border-slate-300 bg-slate-50 text-slate-800 hover:bg-slate-100'
-                  }`}
+                  onClick={() => setPhoto('/teachers/default_avatar.svg')}
+                  className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-rose-600 hover:bg-rose-700 text-white rounded-full text-[10px] font-bold flex items-center justify-center shadow-xs cursor-pointer"
+                  title="Kembalikan ke avatar default"
                 >
-                  <img src={p.src} alt={p.label} className="w-4 h-4 rounded-full object-cover" />
-                  <span>{p.label}</span>
+                  ✕
                 </button>
-              ))}
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <span className="text-xs font-black text-slate-800 block mb-1">Foto Profil Pimpinan</span>
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept="image/*"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isCompressing}
+                  className="px-3.5 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-800 border-2 border-slate-300 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-2xs active:scale-98 transition-all"
+                >
+                  <span>📷</span>
+                  <span>{isCompressing ? 'Memproses...' : 'Upload Foto'}</span>
+                </button>
+                <span className="text-[11px] text-slate-500 font-medium">Format JPG/PNG</span>
+              </div>
             </div>
           </div>
 
@@ -473,12 +453,12 @@ export function AddTeacherModal({ isOpen, onClose, onAdd, showToast }: AddTeache
         data-lenis-prevent="true"
         data-lenis-prevent-wheel="true"
         data-lenis-prevent-touch="true"
-        className="w-full max-w-md rounded-3xl bg-white border-2 border-slate-300 p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto"
+        className="w-full max-w-2xl rounded-3xl bg-white border-2 border-slate-300 p-6 sm:p-7 shadow-2xl relative max-h-[90vh] overflow-y-auto"
       >
         <div className="flex items-center justify-between pb-4 border-b-2 border-slate-200 mb-5">
           <div>
             <h3 className="text-lg font-black text-slate-950">Tambah Guru / Pendidik Baru</h3>
-            <p className="text-xs text-slate-700 font-bold mt-0.5">Daftarkan guru baru ke database sekolah</p>
+            <p className="text-xs text-slate-600 font-bold mt-0.5">Daftarkan pendidik baru ke database sekolah</p>
           </div>
           <button 
             type="button"
@@ -490,64 +470,52 @@ export function AddTeacherModal({ isOpen, onClose, onAdd, showToast }: AddTeache
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 text-xs">
-          {/* Photo Selector */}
-          <div>
-            <label className="text-slate-800 block mb-1.5 font-extrabold">Foto Profil Guru</label>
-            <div className="flex items-center gap-3 mb-2.5">
+          {/* Foto Profil Bersih & Minimalis */}
+          <div className="flex items-center gap-4 p-3.5 rounded-2xl bg-slate-50 border-2 border-slate-200">
+            <div className="relative shrink-0">
               <img 
                 src={photo || '/teachers/default_avatar.svg'} 
                 alt="Preview" 
-                className="w-14 h-14 rounded-2xl object-cover border-2 border-slate-300 shadow-sm flex-shrink-0 bg-slate-100"
+                className="w-16 h-16 rounded-2xl object-cover border-2 border-slate-300 bg-white shadow-xs"
               />
-              <div className="flex-1 space-y-1.5">
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  accept="image/*"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                />
+              {photo && photo !== '/teachers/default_avatar.svg' && (
+                <button
+                  type="button"
+                  onClick={() => setPhoto('/teachers/default_avatar.svg')}
+                  className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-rose-600 hover:bg-rose-700 text-white rounded-full text-[10px] font-bold flex items-center justify-center shadow-xs cursor-pointer"
+                  title="Kembalikan ke avatar default"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <span className="text-xs font-black text-slate-800 block mb-1">Foto Profil</span>
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept="image/*"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={isCompressing}
-                  className="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-2 border-indigo-200 font-bold text-xs flex items-center gap-1.5 cursor-pointer active:scale-98"
+                  className="px-3.5 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-800 border-2 border-slate-300 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-2xs active:scale-98 transition-all"
                 >
                   <span>📷</span>
-                  <span>{isCompressing ? 'Memproses...' : 'Upload dari Perangkat'}</span>
+                  <span>{isCompressing ? 'Memproses...' : 'Upload Foto'}</span>
                 </button>
-                <input
-                  type="text"
-                  value={photo}
-                  onChange={(e) => setPhoto(e.target.value)}
-                  placeholder="Atau link foto..."
-                  className="w-full px-3 py-1.5 rounded-xl bg-white border-2 border-slate-300 text-slate-950 font-mono text-[11px] font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 shadow-xs placeholder:text-slate-400"
-                />
+                <span className="text-[11px] text-slate-500 font-medium">Format JPG/PNG</span>
               </div>
-            </div>
-
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs text-slate-700 font-extrabold">Preset:</span>
-              {GTK_PHOTO_PRESETS.map((p) => (
-                <button
-                  key={p.src}
-                  type="button"
-                  onClick={() => setPhoto(p.src)}
-                  className={`px-2 py-1 rounded-lg border-2 text-[11px] flex items-center gap-1.5 transition-all cursor-pointer ${
-                    photo === p.src
-                      ? 'border-indigo-600 bg-indigo-50 text-indigo-700 font-black'
-                      : 'border-slate-300 bg-slate-100 text-slate-800 font-bold hover:bg-slate-200'
-                  }`}
-                >
-                  <img src={p.src} alt={p.label} className="w-4 h-4 rounded-full object-cover" />
-                  <span>{p.label}</span>
-                </button>
-              ))}
             </div>
           </div>
 
+          {/* Nama Lengkap & Gelar */}
           <div>
-            <label className="text-slate-800 block mb-1.5 font-extrabold">Nama Lengkap & Gelar *</label>
+            <label className="text-slate-800 block mb-1.5 font-extrabold text-xs">Nama Lengkap & Gelar *</label>
             <input
               type="text"
               required
@@ -561,19 +529,20 @@ export function AddTeacherModal({ isOpen, onClose, onAdd, showToast }: AddTeache
           {/* Dropdown Mata Pelajaran dengan Opsi Lainnya */}
           <SubjectSelectInput value={subject} onChange={setSubject} />
 
-          <div className="grid grid-cols-2 gap-3">
+          {/* Grid 2 Kolom: NIP & Status Kepegawaian */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="text-slate-800 block mb-1.5 font-extrabold">NIP / NUPTK</label>
+              <label className="text-slate-800 block mb-1.5 font-extrabold text-xs">NIP / NUPTK</label>
               <input
                 type="text"
                 value={nip}
                 onChange={(e) => setNip(e.target.value)}
-                placeholder="Boleh kosong jika GTT"
+                placeholder="Boleh kosong jika non-NIP"
                 className="w-full px-3.5 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-slate-950 font-mono font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 shadow-xs placeholder:text-slate-400"
               />
             </div>
             <div>
-              <label className="text-slate-800 block mb-1.5 font-extrabold">Status Kepegawaian</label>
+              <label className="text-slate-800 block mb-1.5 font-extrabold text-xs">Status Kepegawaian</label>
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
@@ -587,9 +556,10 @@ export function AddTeacherModal({ isOpen, onClose, onAdd, showToast }: AddTeache
             </div>
           </div>
 
+          {/* Nomor WhatsApp Guru */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label className="text-slate-800 font-extrabold">Nomor WhatsApp Guru</label>
+              <label className="text-slate-800 font-extrabold text-xs">Nomor WhatsApp Guru</label>
               <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
                 Opsional
               </span>
@@ -598,46 +568,30 @@ export function AddTeacherModal({ isOpen, onClose, onAdd, showToast }: AddTeache
               type="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              placeholder="Contoh: 081234567890 (Boleh kosong)"
+              placeholder="Contoh: 081234567890"
               className="w-full px-3.5 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-slate-950 font-mono font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 shadow-xs placeholder:text-slate-400"
             />
-            <p className="text-[10px] text-slate-500 mt-1 font-medium">
-              *Jika diisi, admin bisa langsung membagikan info akun ke WA pribadi guru dengan satu klik.
-            </p>
           </div>
 
-          {/* Automatic E-Learning Account Preview Box */}
-          <div className="p-3.5 rounded-2xl bg-indigo-50 border-2 border-indigo-200 text-xs">
-            <div className="flex items-center justify-between mb-2">
-              <span className="font-extrabold text-indigo-950 flex items-center gap-1.5">
-                <span>⚡</span> Akun E-Learning Otomatis
-              </span>
-              <span className="text-[10px] font-black bg-indigo-200/80 text-indigo-800 px-2 py-0.5 rounded-lg font-mono">
-                SIAP SPENTIC
+          {/* Ringkas: Akun E-Learning Otomatis */}
+          <div className="p-3 rounded-2xl bg-indigo-50/80 border-2 border-indigo-200 text-xs flex items-center justify-between text-indigo-950 flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-base">⚡</span>
+              <span className="font-semibold">Akun Login E-Learning:</span>
+              <span className="font-mono font-black text-indigo-800 bg-white px-2 py-0.5 rounded-lg border border-indigo-200">
+                @{name.trim() ? getTeacherUsername({ name: name.trim() }) : 'username'}
               </span>
             </div>
-            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-indigo-200/60 text-[11px]">
-              <div>
-                <span className="text-slate-600 block font-semibold text-[10px]">Username Masuk:</span>
-                <span className="font-mono font-black text-indigo-700">
-                  @{name.trim() ? getTeacherUsername({ name: name.trim() }) : 'nama.guru'}
-                </span>
-              </div>
-              <div>
-                <span className="text-slate-600 block font-semibold text-[10px]">Kata Sandi Awal:</span>
-                <span className="font-mono font-black text-slate-900">guru123</span>
-              </div>
+            <div className="text-[11px] text-slate-600 font-medium">
+              Sandi Awal: <strong className="font-mono text-slate-900">guru123</strong>
             </div>
-            <p className="text-[10px] text-slate-600 mt-2 font-medium">
-              *Akun langsung aktif setelah disimpan. Guru baru dapat langsung login di <span className="font-mono text-indigo-700 font-bold">/elearning</span>.
-            </p>
           </div>
 
           <div className="pt-3 flex items-center justify-end gap-2.5 border-t-2 border-slate-200">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2.5 rounded-xl border-2 border-slate-300 bg-slate-100 hover:bg-slate-200 text-slate-800 font-extrabold cursor-pointer transition-colors"
+              className="px-4 py-2.5 rounded-xl border-2 border-slate-300 bg-slate-100 hover:bg-slate-200 text-slate-800 font-extrabold cursor-pointer transition-colors active:scale-98"
             >
               Batal
             </button>
@@ -746,12 +700,12 @@ export function EditTeacherModal({ isOpen, teacher, onClose, onSave, onDelete, s
         data-lenis-prevent="true"
         data-lenis-prevent-wheel="true"
         data-lenis-prevent-touch="true"
-        className="w-full max-w-md rounded-3xl bg-white border-2 border-slate-300 p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto"
+        className="w-full max-w-2xl rounded-3xl bg-white border-2 border-slate-300 p-6 sm:p-7 shadow-2xl relative max-h-[90vh] overflow-y-auto"
       >
         <div className="flex items-center justify-between pb-4 border-b-2 border-slate-200 mb-5">
           <div>
             <h3 className="text-lg font-black text-slate-950">Ubah Data & Foto Guru</h3>
-            <p className="text-xs text-slate-700 font-bold mt-0.5">Kelola identitas pendidik</p>
+            <p className="text-xs text-slate-600 font-bold mt-0.5">Kelola identitas pendidik</p>
           </div>
           <button 
             type="button"
@@ -763,59 +717,46 @@ export function EditTeacherModal({ isOpen, teacher, onClose, onSave, onDelete, s
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 text-xs">
-          {/* Photo Selector */}
-          <div>
-            <label className="text-slate-800 block mb-1.5 font-extrabold">Foto Profil Guru</label>
-            <div className="flex items-center gap-3 mb-2.5">
+          {/* Foto Profil Bersih & Minimalis */}
+          <div className="flex items-center gap-4 p-3.5 rounded-2xl bg-slate-50 border-2 border-slate-200">
+            <div className="relative shrink-0">
               <img 
                 src={photo || '/teachers/default_avatar.svg'} 
                 alt="Preview" 
-                className="w-14 h-14 rounded-2xl object-cover border-2 border-slate-300 shadow-sm flex-shrink-0 bg-slate-100"
+                className="w-16 h-16 rounded-2xl object-cover border-2 border-slate-300 bg-white shadow-xs"
               />
-              <div className="flex-1 space-y-1.5">
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  accept="image/*"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                />
+              {photo && photo !== '/teachers/default_avatar.svg' && (
+                <button
+                  type="button"
+                  onClick={() => setPhoto('/teachers/default_avatar.svg')}
+                  className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-rose-600 hover:bg-rose-700 text-white rounded-full text-[10px] font-bold flex items-center justify-center shadow-xs cursor-pointer"
+                  title="Kembalikan ke avatar default"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <span className="text-xs font-black text-slate-800 block mb-1">Foto Profil</span>
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept="image/*"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={isCompressing}
-                  className="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-2 border-indigo-200 font-bold text-xs flex items-center gap-1.5 cursor-pointer active:scale-98"
+                  className="px-3.5 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-800 border-2 border-slate-300 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-2xs active:scale-98 transition-all"
                 >
                   <span>📷</span>
-                  <span>{isCompressing ? 'Memproses...' : 'Upload dari Perangkat'}</span>
+                  <span>{isCompressing ? 'Memproses...' : 'Upload Foto'}</span>
                 </button>
-                <input
-                  type="text"
-                  value={photo}
-                  onChange={(e) => setPhoto(e.target.value)}
-                  placeholder="Atau link foto..."
-                  className="w-full px-3 py-1.5 rounded-xl bg-white border-2 border-slate-300 text-slate-950 font-mono text-[11px] font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 shadow-xs"
-                />
+                <span className="text-[11px] text-slate-500 font-medium">Format JPG/PNG</span>
               </div>
-            </div>
-
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs text-slate-700 font-extrabold">Pilihan Cepat:</span>
-              {GTK_PHOTO_PRESETS.map((p) => (
-                <button
-                  key={p.src}
-                  type="button"
-                  onClick={() => setPhoto(p.src)}
-                  className={`px-2 py-1 rounded-lg border-2 text-[11px] flex items-center gap-1.5 transition-all cursor-pointer ${
-                    photo === p.src
-                      ? 'border-indigo-600 bg-indigo-50 text-indigo-700 font-black'
-                      : 'border-slate-300 bg-slate-100 text-slate-800 font-bold hover:bg-slate-200'
-                  }`}
-                >
-                  <img src={p.src} alt={p.label} className="w-4 h-4 rounded-full object-cover" />
-                  <span>{p.label}</span>
-                </button>
-              ))}
             </div>
           </div>
 
