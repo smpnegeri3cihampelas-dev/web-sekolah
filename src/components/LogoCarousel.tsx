@@ -1,8 +1,10 @@
 'use client';
 
 import React from 'react';
+import { useSettingsData } from '@/lib/settingsData';
 
 export default function LogoCarousel() {
+  const { identity } = useSettingsData();
   const rowTop = [
     {
       name: 'Kemendikbud',
@@ -37,7 +39,7 @@ export default function LogoCarousel() {
     },
     {
       name: 'BAN-S/M',
-      desc: 'Terakreditasi "B" (Baik)',
+      desc: identity.akreditasi ? `Terakreditasi ${identity.akreditasi}` : 'Terakreditasi "B" (Baik)',
       tag: 'Akreditasi',
       icon: (
         <svg className="w-6 h-6 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
