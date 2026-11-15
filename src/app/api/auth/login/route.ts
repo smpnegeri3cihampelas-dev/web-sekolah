@@ -112,13 +112,8 @@ export async function POST(req: Request) {
     const roleDefault = defaultPasswordMap[user.role] || 'admin123';
     const expectedPassword = user.password || roleDefault;
 
-    // Verifikasi kata sandi fleksibel (case-insensitive & dukungan master fallback admin123)
-    const isPasswordMatch = 
-      password === expectedPassword ||
-      password.toLowerCase() === (expectedPassword || '').toLowerCase() ||
-      (user.role === 'admin' && (password === 'admin123' || password.toLowerCase() === 'admin2026'));
-
-    if (!isPasswordMatch) {
+    // Verifikasi kata sandi ketat: HANYA 1 kata sandi yang sah sesuai database
+    if (password !== expectedPassword) {
       return NextResponse.json({
         success: false,
         message: 'Kata sandi tidak sesuai! Silakan periksa kembali.'

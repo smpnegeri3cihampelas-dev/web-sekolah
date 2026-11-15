@@ -54,39 +54,21 @@ export default function LoginPage() {
         router.push('/dashboard');
         return;
       } else {
-        // Fallback to local offline check if server returned error
-        let customPassword = '';
-        if (typeof window !== 'undefined') {
-          try {
-            customPassword = localStorage.getItem('smpn3_admin_password') || '';
-          } catch {}
-        }
-        const isLocalValid = 
-          (customPassword && (password === customPassword || password.toLowerCase() === customPassword.toLowerCase())) ||
-          password === 'admin123' ||
-          password.toLowerCase() === 'admin2026';
-        if (isLocalValid) {
-          router.push('/dashboard');
-          return;
-        }
         setErrorMessage(data.message || 'Kata sandi tidak sesuai! Silakan periksa kembali.');
       }
     } catch {
-      // Offline fallback
-      let customPassword = '';
+      // Offline fallback hanya jika server benar-benar tidak merespons
+      let storedPassword = '';
       if (typeof window !== 'undefined') {
         try {
-          customPassword = localStorage.getItem('smpn3_admin_password') || '';
+          storedPassword = localStorage.getItem('smpn3_admin_password') || '';
         } catch {}
       }
-      const isLocalValid = 
-        (customPassword && (password === customPassword || password.toLowerCase() === customPassword.toLowerCase())) ||
-        password === 'admin123' ||
-        password.toLowerCase() === 'admin2026';
-      if (isLocalValid) {
+      const activePassword = storedPassword || 'admin123';
+      if (password === activePassword) {
         router.push('/dashboard');
       } else {
-        setErrorMessage('Kata sandi salah atau tidak dapat terhubung ke server!');
+        setErrorMessage('Kata sandi tidak sesuai!');
       }
     } finally {
       setIsLoading(false);
