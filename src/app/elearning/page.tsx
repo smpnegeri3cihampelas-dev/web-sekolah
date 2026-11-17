@@ -2565,8 +2565,8 @@ export default function ELearningPage() {
     );
 
     const isCurrentActive = classToExport === selectedClassId && dateToExport === new Date().toISOString().split('T')[0];
-    const recordsToExport = isCurrentActive ? workingRecords : (sessionOnDate?.records || {});
-    const notesToExport = isCurrentActive ? { ...workingNotes, ...workingNotesRef.current } : (sessionOnDate?.notes || {});
+    const recordsToExport = sessionOnDate?.records || (isCurrentActive ? workingRecords : {});
+    const notesToExport = sessionOnDate?.notes || (isCurrentActive ? { ...workingNotes, ...workingNotesRef.current } : {});
 
     exportMapelAttendanceToExcel({
       classId: classToExport,
@@ -3261,15 +3261,10 @@ export default function ELearningPage() {
         dayPresentPercent: 0
       };
     }
-    const isTodayReport = reportDate === todayStr && reportClassId === selectedClassId;
     const dailySession = myTeacherReportSessions.find(s => s.date === reportDate);
-    const dailyRecords: Record<string, AttendanceStatus> = (isTodayReport && Object.keys(workingRecords).length > 0)
-      ? workingRecords
-      : (dailySession?.records || {});
-    const dailyNotes: Record<string, string> = (isTodayReport && (Object.keys(workingNotes).length > 0 || Object.keys(workingNotesRef.current).length > 0))
-      ? { ...workingNotes, ...workingNotesRef.current }
-      : (dailySession?.notes || {});
-    const hasDailyData = Boolean(dailySession || (isTodayReport && Object.keys(workingRecords).length > 0));
+    const dailyRecords: Record<string, AttendanceStatus> = dailySession?.records || {};
+    const dailyNotes: Record<string, string> = dailySession?.notes || {};
+    const hasDailyData = Boolean(dailySession);
 
     let dayH = 0, dayS = 0, dayI = 0, dayA = 0, dayT = 0;
     studentsInReport.forEach(st => {
@@ -3294,7 +3289,7 @@ export default function ELearningPage() {
       dayTotal,
       dayPresentPercent
     };
-  }, [activeMenu, reportMode, reportDate, todayStr, reportClassId, selectedClassId, myTeacherReportSessions, workingRecords, workingNotes, studentsInReport]);
+  }, [activeMenu, reportMode, reportDate, myTeacherReportSessions, studentsInReport]);
 
   // Data Laporan Matriks Bulanan (Tgl 1 - 31, super-cepat & hanya berjalan jika mode bulanan aktif)
   const monthlyReportData = useMemo(() => {
@@ -4009,7 +4004,10 @@ export default function ELearningPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setActiveMenu('laporan')}
+                  onClick={() => {
+                    setActiveMenu('laporan');
+                    import('@/lib/cloudSync').then(m => m.syncElearningWithCloud()).catch(() => {});
+                  }}
                   className={`px-3 py-2 sm:py-1.5 rounded-lg transition-all cursor-pointer text-center sm:whitespace-nowrap ${
                     activeMenu === 'laporan' 
                       ? 'bg-white text-indigo-700 font-bold shadow-xs border border-indigo-100/60' 
@@ -4366,18 +4364,35 @@ export default function ELearningPage() {
                 {/* Top Action Bar */}
                 <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div>
-                    <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                    <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight flex flex-wrap items-center gap-2">
                       <span>Rekapitulasi Presensi</span>
                       <span className="text-xs px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 font-semibold">
                         {currentTeacher.subject}
                       </span>
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        Live MariaDB
+                      </span>
                     </h2>
                     <p className="text-xs text-slate-500 mt-0.5">
-                      Laporan presensi harian, bulanan, dan semester kelas.
+                      Laporan presensi harian, bulanan, dan semester kelas yang tersinkron langsung dari database.
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-2 flex-shrink-0">
+                  <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        import('@/lib/cloudSync').then(async m => {
+                          await m.syncElearningWithCloud();
+                          showToast('Rekap kehadiran berhasil disinkronkan dari database MariaDB!', 'success');
+                        }).catch(() => {});
+                      }}
+                      className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 font-semibold text-xs transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                      title="Tarik pembaruan data presensi terbaru dari database MariaDB"
+                    >
+                      <span>🔄 Sinkronkan</span>
+                    </button>
                     <button
                       type="button"
                       onClick={() => {

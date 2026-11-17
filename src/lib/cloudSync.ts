@@ -169,29 +169,31 @@ export async function syncElearningWithCloud(): Promise<void> {
   }
 
   try {
-    // 3. Sync Subject Sessions (Presensi & Jurnal)
+    // 3. Sync Subject Sessions (Presensi & Jurnal): Database MariaDB is Single Source of Truth
     const sessRes = await fetch('/api/elearning/sessions', { cache: 'no-store' });
     if (sessRes.ok) {
       const { data } = await sessRes.json();
       if (Array.isArray(data)) {
-        const local = getStoredSessions();
-        const cloudIds = new Set(data.map((s: SubjectSession) => s.id));
-
-        local.forEach((localSess: SubjectSession) => {
-          if (!cloudIds.has(localSess.id)) {
-            pushSubjectSessionToCloud(localSess);
-          }
+        const cloudMap = new Map<string, SubjectSession>();
+        data.forEach((cloudSess: SubjectSession) => {
+          cloudMap.set(cloudSess.id, cloudSess);
         });
 
-        if (data.length > 0) {
-          const localMap = new Map(local.map(s => [s.id, s]));
-          data.forEach((cloudSess: SubjectSession) => {
-            localMap.set(cloudSess.id, cloudSess);
-          });
-          const merged = Array.from(localMap.values());
-          localStorage.setItem(SESSIONS_STORAGE_KEY, JSON.stringify(merged));
-          window.dispatchEvent(new Event('elearningSessionsUpdated'));
-        }
+        // Flush any pending local session uploads not yet confirmed in cloud
+        try {
+          const rawPendingSess = localStorage.getItem('spentic_pending_sess_uploads_v1');
+          if (rawPendingSess) {
+            const pendingList: SubjectSession[] = JSON.parse(rawPendingSess);
+            for (const pSess of pendingList) {
+              cloudMap.set(pSess.id, pSess);
+              pushSubjectSessionToCloud(pSess);
+            }
+          }
+        } catch {}
+
+        const authoritativeSessions = Array.from(cloudMap.values());
+        localStorage.setItem(SESSIONS_STORAGE_KEY, JSON.stringify(authoritativeSessions));
+        window.dispatchEvent(new Event('elearningSessionsUpdated'));
       }
     }
   } catch (err) {
@@ -406,11 +408,33 @@ export function pushSubmissionToCloud(submission: AssignmentSubmission): void {
 
 export function pushSubjectSessionToCloud(session: SubjectSession): void {
   if (typeof window === 'undefined') return;
+  try {
+    const raw = localStorage.getItem('spentic_pending_sess_uploads_v1');
+    const list: SubjectSession[] = raw ? JSON.parse(raw) : [];
+    const idx = list.findIndex(s => s.id === session.id);
+    if (idx >= 0) list[idx] = session;
+    else list.push(session);
+    localStorage.setItem('spentic_pending_sess_uploads_v1', JSON.stringify(list));
+  } catch {}
+
   fetch('/api/elearning/sessions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(session)
-  }).catch(err => console.warn('Background session upload queued:', err));
+  })
+    .then(res => {
+      if (res.ok) {
+        try {
+          const raw = localStorage.getItem('spentic_pending_sess_uploads_v1');
+          if (raw) {
+            const list: SubjectSession[] = JSON.parse(raw);
+            const filtered = list.filter(s => s.id !== session.id);
+            localStorage.setItem('spentic_pending_sess_uploads_v1', JSON.stringify(filtered));
+          }
+        } catch {}
+      }
+    })
+    .catch(err => console.warn('Background session upload queued:', err));
 }
 
 export function pushCbtPackageToCloud(pkg: CbtExamPackage): void {
