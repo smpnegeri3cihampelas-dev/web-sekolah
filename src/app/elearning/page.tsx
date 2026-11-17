@@ -64,7 +64,14 @@ import {
   markStudentCbtAttendancePresent,
   evaluateCbtPackageSchedule
 } from '@/lib/cbtData';
-import { getStoredSchoolData } from '@/lib/schoolData';
+import { getStoredSchoolData, syncSchoolWithCloud } from '@/lib/schoolData';
+
+function getLocalDateYmd(d = new Date()): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
 
 const STATUS_BADGE_STYLES: Record<string, string> = {
   H: 'bg-emerald-500 text-white',
@@ -1700,7 +1707,7 @@ export default function ELearningPage() {
 
   // Laporan Presensi State (Teacher & Meja Piket)
   const [reportClassId, setReportClassId] = useState<string>('7-A');
-  const [reportDate, setReportDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
+  const [reportDate, setReportDate] = useState<string>(() => getLocalDateYmd());
   const [reportMonth, setReportMonth] = useState<number>(() => new Date().getMonth() + 1); // 1-12
   const [reportYear, setReportYear] = useState<number>(() => new Date().getFullYear());
   const [reportMode, setReportMode] = useState<'harian' | 'bulanan' | 'semester'>('bulanan');
@@ -1807,43 +1814,54 @@ export default function ELearningPage() {
   
   // Dynamic Teachers List (synced with getStoredSchoolData and dashboard additions)
   const [allTeachers, setAllTeachers] = useState<TeacherUser[]>(DEMO_TEACHERS);
+  const mapSchoolTeachers = useCallback((stored: ReturnType<typeof getStoredSchoolData>['teachers']): TeacherUser[] => {
+    return (stored || []).map(st => {
+      const cleanStNip = (st.nip || '').replace(/\s+/g, '');
+      const existingDemo = DEMO_TEACHERS.find(dt =>
+        dt.name.toLowerCase() === st.name.toLowerCase() ||
+        (cleanStNip && cleanStNip !== '-' && (dt.nip || '').replace(/\s+/g, '') === cleanStNip)
+      );
+      return {
+        nip: (existingDemo?.nip && !existingDemo.nip.includes('Pembina') && !existingDemo.nip.includes('Penata'))
+          ? existingDemo.nip
+          : (st.nip || '-'),
+        name: st.name,
+        role: (existingDemo?.role || (st.role === 'Kepala Sekolah' ? 'both' : 'mapel')) as 'mapel' | 'piket' | 'both',
+        subject: st.subject || existingDemo?.subject || 'Guru Mata Pelajaran',
+        classes: existingDemo?.classes || ['7-A', '7-B', '8-A'],
+        username: st.username || getTeacherUsername(st),
+        password: st.password
+      };
+    });
+  }, []);
+
   useEffect(() => {
     const loadSchoolTeachers = () => {
       try {
         const stored = getStoredSchoolData().teachers;
         if (stored && stored.length > 0) {
-          const merged: TeacherUser[] = stored.map(st => {
-            const cleanStNip = (st.nip || '').replace(/\s+/g, '');
-            const existingDemo = DEMO_TEACHERS.find(dt => 
-              dt.name.toLowerCase() === st.name.toLowerCase() ||
-              (cleanStNip && cleanStNip !== '-' && (dt.nip || '').replace(/\s+/g, '') === cleanStNip)
-            );
-            return {
-              nip: (existingDemo?.nip && !existingDemo.nip.includes('Pembina') && !existingDemo.nip.includes('Penata'))
-                ? existingDemo.nip
-                : (st.nip || '-'),
-              name: st.name,
-              role: (existingDemo?.role || (st.role === 'Kepala Sekolah' ? 'both' : 'mapel')) as 'mapel' | 'piket' | 'both',
-              subject: existingDemo?.subject || st.subject || 'Guru Mata Pelajaran',
-              classes: existingDemo?.classes || ['7-A', '7-B', '8-A'],
-              username: st.username || getTeacherUsername(st),
-              password: st.password
-            };
-          });
-          setAllTeachers(merged);
+          setAllTeachers(mapSchoolTeachers(stored));
         }
       } catch (err) {
         console.error('Failed syncing school teachers', err);
       }
     };
     loadSchoolTeachers();
+    // Sync daftar seluruh guru & kata sandi terbaru dari database cloud MariaDB
+    syncSchoolWithCloud()
+      .then(cloud => {
+        if (cloud?.teachers && cloud.teachers.length > 0) {
+          setAllTeachers(mapSchoolTeachers(cloud.teachers));
+        }
+      })
+      .catch(() => {});
     window.addEventListener('smpn3_school_data_changed', loadSchoolTeachers);
     window.addEventListener('storage', loadSchoolTeachers);
     return () => {
       window.removeEventListener('smpn3_school_data_changed', loadSchoolTeachers);
       window.removeEventListener('storage', loadSchoolTeachers);
     };
-  }, []);
+  }, [mapSchoolTeachers]);
 
   const activeTeachers = allTeachers.length > 0 ? allTeachers : DEMO_TEACHERS;
 
@@ -1853,8 +1871,8 @@ export default function ELearningPage() {
     const cleanCurNip = (currentUser.nipOrNisn || '').replace(/\s+/g, '');
     return activeTeachers.find(t => {
       const cleanTNip = (t.nip || '').replace(/\s+/g, '');
-      return (cleanTNip && cleanTNip !== '-' && cleanTNip === cleanCurNip) ||
-        t.name.toLowerCase() === currentUser.name.toLowerCase();
+      return (cleanTNip && cleanTNip !== '-' && cleanCurNip && cleanCurNip !== '-' && cleanTNip === cleanCurNip) ||
+        t.name.toLowerCase().trim() === currentUser.name.toLowerCase().trim();
     }) || null;
   }, [currentUser, activeTeachers]);
 
@@ -1871,6 +1889,25 @@ export default function ELearningPage() {
     }
     return activeTeachers[0] || DEMO_TEACHERS[0];
   }, [loggedInTeacher, currentUser, activeTeachers]);
+
+  // Isolasi ketat sesi presensi per akun guru (NIP -> Nama Lengkap -> Mapel jika sesi lawas kosong)
+  const isTeacherSession = useCallback((s: SubjectSession, teacher?: TeacherUser | null): boolean => {
+    if (!teacher) return false;
+    const tNipClean = (teacher.nip || '').replace(/\s+/g, '');
+    const sNipClean = (s.teacherNip || '').replace(/\s+/g, '');
+
+    if (tNipClean && tNipClean !== '-' && sNipClean && sNipClean !== '-') {
+      return tNipClean === sNipClean;
+    }
+    if (s.teacherName && teacher.name) {
+      return s.teacherName.toLowerCase().trim() === teacher.name.toLowerCase().trim();
+    }
+    return Boolean(
+      s.subject &&
+      teacher.subject &&
+      s.subject.toLowerCase().trim() === teacher.subject.toLowerCase().trim()
+    );
+  }, []);
 
   // Duty officer at Pos Meja Piket for the day (from official roster)
   const [piketDutyTeacher, setPiketDutyTeacher] = useState<string>('Rohidin, S.Pd.');
@@ -1987,6 +2024,7 @@ export default function ELearningPage() {
           m.syncElearningWithCloud();
           m.syncCbtWithCloud();
         }).catch(() => {});
+        syncSchoolWithCloud().catch(() => {});
       } catch {}
     };
     window.addEventListener('focus', handleFocusSync);
@@ -2010,16 +2048,15 @@ export default function ELearningPage() {
   // Sync working records when selected class or current teacher changes (Isolated per Teacher & Subject)
   useEffect(() => {
     if (!selectedClassId || !currentTeacher) return;
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = getLocalDateYmd();
     const studentsInClass = activeStudents.filter(s => s.classId === selectedClassId);
     
-    // Look up this specific teacher's session for this class today
-    const teacherNipClean = (currentTeacher?.nip || '').replace(/\s+/g, '');
-    const teacherKey = `${currentTeacher.nip}_${currentTeacher.subject}`;
+    // Look up this specific teacher's session for this class today (strict per-teacher isolation)
+    const teacherKey = `${currentTeacher.nip}_${currentTeacher.name}_${currentTeacher.subject}`;
     const mySession = sessions.find(s => 
       s.date === todayStr && 
       s.classId === selectedClassId && 
-      (s.teacherNip.replace(/\s+/g, '') === teacherNipClean || s.subject.toLowerCase() === (currentTeacher?.subject || '').toLowerCase())
+      isTeacherSession(s, currentTeacher)
     );
 
     const currentSessionKey = mySession ? `${mySession.id}_${mySession.submittedAt}` : '';
@@ -2069,7 +2106,7 @@ export default function ELearningPage() {
     prevSelectedClassForWorkingRef.current = selectedClassId;
     prevTeacherKeyForWorkingRef.current = teacherKey;
     prevLoadedSessionKeyRef.current = currentSessionKey;
-  }, [selectedClassId, currentTeacher?.nip, currentTeacher?.subject, sessions, activeStudents]);
+  }, [selectedClassId, currentTeacher, isTeacherSession, sessions, activeStudents]);
 
   // Authentication & Session Management
   const handleLogin = (user: AuthUserSession) => {
@@ -2163,7 +2200,7 @@ export default function ELearningPage() {
     }
   };
 
-  const handleFormLoginSubmit = (e: React.FormEvent) => {
+  const handleFormLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (loginRole === 'guru') {
@@ -2182,10 +2219,23 @@ export default function ELearningPage() {
       // User ID guru: nama tanpa gelar, disatukan (contoh: ichsanularifin)
       const inputClean = inputRaw.toLowerCase();
 
-      const teacher = activeTeachers.find(t => {
+      let teacherPool = activeTeachers;
+      let teacher = teacherPool.find(t => {
         const tUsername = getTeacherUsername(t);
         return tUsername === inputClean;
       });
+
+      // Jika belum ditemukan di cache lokal (mis. guru baru ditambahkan Admin dari perangkat lain), tarik dari MariaDB
+      if (!teacher) {
+        try {
+          const cloud = await syncSchoolWithCloud();
+          if (cloud?.teachers && cloud.teachers.length > 0) {
+            teacherPool = mapSchoolTeachers(cloud.teachers);
+            setAllTeachers(teacherPool);
+            teacher = teacherPool.find(t => getTeacherUsername(t) === inputClean);
+          }
+        } catch {}
+      }
 
       if (!teacher) {
         setLoginErrorMessage('User ID tidak terdaftar.');
@@ -2202,7 +2252,7 @@ export default function ELearningPage() {
           const raw = localStorage.getItem('smpn3_teacher_passwords');
           if (raw) {
             const map = JSON.parse(raw);
-            const fromStorage = map[teacherUsername] || (tNipClean ? map[tNipClean] : '') || map[teacher.name] || '';
+            const fromStorage = map[teacherUsername] || (tNipClean && tNipClean !== '-' ? map[tNipClean] : '') || map[teacher.name] || '';
             if (fromStorage) customPassword = fromStorage;
           }
         } catch {}
@@ -2215,7 +2265,7 @@ export default function ELearningPage() {
       }
 
       const isValidPass = customPassword
-        ? (trimmedPass === customPassword)
+        ? (trimmedPass === customPassword || (teacher.password ? trimmedPass === teacher.password : false))
         : (trimmedPass === 'guru123');
 
       if (!isValidPass) {
@@ -2507,13 +2557,17 @@ export default function ELearningPage() {
   const handleSaveAttendance = () => {
     const now = new Date();
     const timeString = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB';
-    const today = now.toISOString().split('T')[0];
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     const teacherNipClean = (currentTeacher?.nip || '').replace(/\s+/g, '');
+    const hasValidNip = Boolean(teacherNipClean && teacherNipClean !== '-');
+    const teacherIdentityKey = hasValidNip
+      ? teacherNipClean
+      : (getTeacherUsername(currentTeacher) || currentTeacher.name.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() || 'guru');
     const finalNotes = { ...workingNotes, ...workingNotesRef.current };
 
     // 1. Save individual isolated session log for this teacher & mapel
     const newSession: SubjectSession = {
-      id: `${today}_${selectedClassId}_${teacherNipClean}`,
+      id: `${today}_${selectedClassId}_${teacherIdentityKey}`,
       classId: selectedClassId,
       date: today,
       subject: currentTeacher.subject,
@@ -2552,19 +2606,18 @@ export default function ELearningPage() {
   // Export Mapel Attendance to Excel (.xlsx) - Jurnal Harian
   const handleExportMapelExcel = (targetClass?: string, targetDate?: string) => {
     const classToExport = targetClass || reportClassId || selectedClassId;
-    const dateToExport = targetDate || reportDate || new Date().toISOString().split('T')[0];
+    const dateToExport = targetDate || reportDate || getLocalDateYmd();
     const studentsInClass = activeStudents.filter(s => s.classId === classToExport);
     const cls = SCHOOL_CLASSES.find(c => c.id === classToExport);
 
-    // Look for session on target date for this teacher & class
-    const teacherNipClean = (currentTeacher?.nip || '').replace(/\s+/g, '');
+    // Look for session on target date strictly for this teacher & class
     const sessionOnDate = sessions.find(s => 
       s.date === dateToExport && 
       s.classId === classToExport && 
-      (s.teacherNip.replace(/\s+/g, '') === teacherNipClean || s.subject.toLowerCase() === (currentTeacher?.subject || '').toLowerCase())
+      isTeacherSession(s, currentTeacher)
     );
 
-    const isCurrentActive = classToExport === selectedClassId && dateToExport === new Date().toISOString().split('T')[0];
+    const isCurrentActive = classToExport === selectedClassId && dateToExport === getLocalDateYmd();
     const recordsToExport = sessionOnDate?.records || (isCurrentActive ? workingRecords : {});
     const notesToExport = sessionOnDate?.notes || (isCurrentActive ? { ...workingNotes, ...workingNotesRef.current } : {});
 
@@ -2591,14 +2644,9 @@ export default function ELearningPage() {
     const monthName = MONTH_NAMES[reportMonth - 1];
 
     // Filter sessions strictly for this teacher & this class
-    const teacherNipClean = (currentTeacher?.nip || '').replace(/\s+/g, '');
-    const teacherSessionsForClass = sessions.filter(s => {
-      const sNipClean = (s.teacherNip || '').replace(/\s+/g, '');
-      const isMyTeacher = (teacherNipClean && sNipClean && teacherNipClean === sNipClean) ||
-        s.teacherName.toLowerCase() === currentTeacher.name.toLowerCase() ||
-        s.subject.toLowerCase() === currentTeacher.subject.toLowerCase();
-      return isMyTeacher && s.classId === reportClassId;
-    });
+    const teacherSessionsForClass = sessions.filter(s =>
+      isTeacherSession(s, currentTeacher) && s.classId === reportClassId
+    );
 
     exportMonthlyAttendanceMatrixToExcel({
       classId: reportClassId,
@@ -2627,15 +2675,10 @@ export default function ELearningPage() {
     const [startYearStr, endYearStr] = reportAcademicYear.split('/');
     const startYear = parseInt(startYearStr, 10) || 2026;
     const endYear = parseInt(endYearStr, 10) || (startYear + 1);
-    const tNipClean = (currentTeacher?.nip || '').replace(/\s+/g, '');
 
     const targetSemesterSessions = sessions.filter(s => {
       if (s.classId !== targetClassId) return false;
-      const cleanSessionNip = (s.teacherNip || '').replace(/\s+/g, '');
-      const isTeacherMatch = (cleanSessionNip && tNipClean && cleanSessionNip === tNipClean) ||
-        (s.teacherName && currentTeacher?.name && s.teacherName.toLowerCase().trim() === currentTeacher.name.toLowerCase().trim()) ||
-        (s.subject && currentTeacher?.subject && s.subject.toLowerCase().trim() === currentTeacher.subject.toLowerCase().trim());
-      if (!isTeacherMatch) return false;
+      if (!isTeacherSession(s, currentTeacher)) return false;
 
       const parts = s.date.split('-');
       if (parts.length < 3) return false;
@@ -3127,7 +3170,7 @@ export default function ELearningPage() {
   };
 
   // Memoized Today Date String
-  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const todayStr = useMemo(() => getLocalDateYmd(), []);
 
   // Calculate stats for Piket Dashboard (Only executed when Piket role is active)
   const schoolStats = useMemo(() => {
@@ -3177,28 +3220,22 @@ export default function ELearningPage() {
     activeStudents.filter(s => s.classId === selectedClassId),
     [activeStudents, selectedClassId]
   );
-  
-  const teacherNipClean = useMemo(() => 
-    (currentTeacher?.nip || '').replace(/\s+/g, ''),
-    [currentTeacher?.nip]
-  );
 
   const mySubjectSession = useMemo(() => {
     return sessions.find(s => 
       s.date === todayStr && 
       s.classId === selectedClassId && 
-      (s.teacherNip.replace(/\s+/g, '') === teacherNipClean || s.subject.toLowerCase() === (currentTeacher?.subject || '').toLowerCase())
+      isTeacherSession(s, currentTeacher)
     );
-  }, [sessions, todayStr, selectedClassId, teacherNipClean, currentTeacher?.subject]);
+  }, [sessions, todayStr, selectedClassId, currentTeacher, isTeacherSession]);
 
   const otherClassSessions = useMemo(() => {
     return sessions.filter(s =>
       s.date === todayStr &&
       s.classId === selectedClassId &&
-      s.teacherNip.replace(/\s+/g, '') !== teacherNipClean &&
-      s.subject.toLowerCase() !== (currentTeacher?.subject || '').toLowerCase()
+      !isTeacherSession(s, currentTeacher)
     );
-  }, [sessions, todayStr, selectedClassId, teacherNipClean, currentTeacher?.subject]);
+  }, [sessions, todayStr, selectedClassId, currentTeacher, isTeacherSession]);
 
   // ==========================================
   // TOP-LEVEL MEMOIZED DATA UNTUK TAB LAPORAN REKAP
@@ -3238,15 +3275,10 @@ export default function ELearningPage() {
   // Sesi Guru Terisolasi untuk Kelas Laporan (Hanya berjalan jika di tab Laporan)
   const myTeacherReportSessions = useMemo(() => {
     if (activeMenu !== 'laporan') return [];
-    const tNipClean = (currentTeacher?.nip || '').replace(/\s+/g, '');
-    return sessions.filter(s => {
-      const sNipClean = (s.teacherNip || '').replace(/\s+/g, '');
-      const isMyTeacher = (tNipClean && sNipClean && tNipClean === sNipClean) ||
-        s.teacherName.toLowerCase() === (currentTeacher?.name || '').toLowerCase() ||
-        s.subject.toLowerCase() === (currentTeacher?.subject || '').toLowerCase();
-      return isMyTeacher && s.classId === reportClassId;
-    });
-  }, [activeMenu, sessions, currentTeacher?.nip, currentTeacher?.name, currentTeacher?.subject, reportClassId]);
+    return sessions.filter(s =>
+      isTeacherSession(s, currentTeacher) && s.classId === reportClassId
+    );
+  }, [activeMenu, sessions, currentTeacher, isTeacherSession, reportClassId]);
 
   // Data Laporan Harian (O(N) ringan, hanya berjalan jika mode harian aktif)
   const dailyReportData = useMemo(() => {
@@ -4928,8 +4960,8 @@ export default function ELearningPage() {
                       onChange={(e) => setPiketDutyTeacher(e.target.value)}
                       className="bg-transparent text-emerald-700 font-bold focus:outline-none cursor-pointer max-w-[200px] truncate"
                     >
-                      {DEMO_TEACHERS.map((teacher) => (
-                        <option key={teacher.nip} value={teacher.name} className="bg-white text-slate-900">
+                      {activeTeachers.map((teacher) => (
+                        <option key={`${teacher.name}_${teacher.nip}`} value={teacher.name} className="bg-white text-slate-900">
                           {teacher.name} ({teacher.subject})
                         </option>
                       ))}
