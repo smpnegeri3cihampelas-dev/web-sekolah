@@ -46,6 +46,7 @@ export default function SubmissionSplitPreviewModal({
   const [activeCanvasTab, setActiveCanvasTab] = useState<'document' | 'quiz'>('document');
 
   useEffect(() => {
+    setIsSaving(false);
     setLocalGrade(sub.grade ?? sub.quizScore ?? 95);
     setLocalFeedback(sub.feedback ?? 'Bagus sekali, tugas sudah lengkap dan dikerjakan dengan rapi!');
     if (!sub.fileData && asg?.quizQuestions && asg.quizQuestions.length > 0) {

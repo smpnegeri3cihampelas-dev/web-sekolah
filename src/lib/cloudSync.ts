@@ -3,11 +3,9 @@
 import { 
   Assignment, 
   AssignmentSubmission, 
-  SubjectSession, 
-  getStoredAssignments, 
-  getStoredSubmissions, 
-  getStoredSessions 
+  SubjectSession
 } from './elearningData';
+import { safeSaveSubmissions } from './elearningStorage';
 import { 
   CbtExamPackage, 
   CbtStudentAnswerState, 
@@ -28,13 +26,13 @@ import {
 // -------------------------------------------------------------
 
 const ASSIGNMENTS_STORAGE_KEY = 'spentic_elearning_assignments_v1';
-const SUBMISSIONS_STORAGE_KEY = 'spentic_elearning_submissions_v1';
 const SESSIONS_STORAGE_KEY = 'spentic_elearning_subject_sessions_v1';
 const CBT_PACKAGES_KEY = 'spentic_cbt_packages_v1';
 const CBT_STUDENT_SESSIONS_KEY = 'spentic_cbt_student_sessions_v1';
 const CBT_PANITIA_CONFIG_KEY = 'cbt_panitia_config_v2';
 const DELETED_ASG_KEY = 'spentic_deleted_asg_ids_v1';
 const PENDING_ASG_UPLOADS_KEY = 'spentic_pending_asg_uploads_v1';
+const PENDING_SUB_UPLOADS_KEY = 'spentic_pending_sub_uploads_v1';
 
 // Tombstone tracking for deleted assignments
 export function getDeletedAssignmentIds(): Set<string> {
@@ -90,11 +88,41 @@ export function dequeuePendingAssignmentUpload(id: string): void {
   } catch {}
 }
 
+export function queuePendingSubmissionUpload(submission: AssignmentSubmission): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const raw = localStorage.getItem(PENDING_SUB_UPLOADS_KEY);
+    const list: AssignmentSubmission[] = raw ? JSON.parse(raw) : [];
+    const safeFileData =
+      submission.fileData && (submission.fileData.startsWith('blob:') || submission.fileData.length > 50000)
+        ? undefined
+        : submission.fileData;
+    const safeSub: AssignmentSubmission = { ...submission, fileData: safeFileData };
+    const idx = list.findIndex(s => s.id === safeSub.id);
+    if (idx >= 0) list[idx] = safeSub;
+    else list.push(safeSub);
+    localStorage.setItem(PENDING_SUB_UPLOADS_KEY, JSON.stringify(list));
+  } catch {}
+}
+
+export function dequeuePendingSubmissionUpload(id: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const raw = localStorage.getItem(PENDING_SUB_UPLOADS_KEY);
+    if (!raw) return;
+    const list: AssignmentSubmission[] = JSON.parse(raw);
+    const filtered = list.filter(s => s.id !== id);
+    localStorage.setItem(PENDING_SUB_UPLOADS_KEY, JSON.stringify(filtered));
+  } catch {}
+}
+
 /**
  * Sync E-Learning assignments, submissions, and subject sessions from Hostinger database
  */
 export async function syncElearningWithCloud(): Promise<void> {
   if (typeof window === 'undefined') return;
+
+  const deletedIds = getDeletedAssignmentIds();
 
   try {
     // 1. Sync Assignments: Database MariaDB is Single Source of Truth
@@ -102,8 +130,6 @@ export async function syncElearningWithCloud(): Promise<void> {
     if (asgRes.ok) {
       const { data } = await asgRes.json();
       if (Array.isArray(data)) {
-        const deletedIds = getDeletedAssignmentIds();
-
         // If cloud still has an assignment that was explicitly deleted, delete from cloud
         data.forEach((cloudAsg: Assignment) => {
           if (deletedIds.has(cloudAsg.id)) {
@@ -111,16 +137,19 @@ export async function syncElearningWithCloud(): Promise<void> {
           }
         });
 
-        // Filter out deleted assignments
-        const activeCloudAssignments = data.filter((c: Assignment) => !deletedIds.has(c.id));
+        const asgMap = new Map<string, Assignment>();
+        data
+          .filter((c: Assignment) => !deletedIds.has(c.id))
+          .forEach((c: Assignment) => asgMap.set(c.id, c));
 
-        // Flush any offline queued pending assignments created by teacher
+        // Overlay & retry any queued/in-flight teacher assignments so newly published tasks are never overwritten
         try {
           const rawPending = localStorage.getItem(PENDING_ASG_UPLOADS_KEY);
           if (rawPending) {
             const pendingList: Assignment[] = JSON.parse(rawPending);
             for (const pendingAsg of pendingList) {
               if (!deletedIds.has(pendingAsg.id)) {
+                asgMap.set(pendingAsg.id, pendingAsg);
                 const ok = await pushAssignmentToCloud(pendingAsg);
                 if (ok) dequeuePendingAssignmentUpload(pendingAsg.id);
               }
@@ -128,8 +157,8 @@ export async function syncElearningWithCloud(): Promise<void> {
           }
         } catch {}
 
-        // Overwrite local cache with current authoritative cloud data
-        localStorage.setItem(ASSIGNMENTS_STORAGE_KEY, JSON.stringify(activeCloudAssignments));
+        const authoritativeAssignments = Array.from(asgMap.values());
+        localStorage.setItem(ASSIGNMENTS_STORAGE_KEY, JSON.stringify(authoritativeAssignments));
         window.dispatchEvent(new Event('elearningAssignmentsUpdated'));
       }
     }
@@ -138,30 +167,34 @@ export async function syncElearningWithCloud(): Promise<void> {
   }
 
   try {
-    // 2. Sync Submissions (Two-Way Synchronization)
+    // 2. Sync Submissions: Database MariaDB is Single Source of Truth + Safe Pending Queue
     const subRes = await fetch('/api/elearning/submissions', { cache: 'no-store' });
     if (subRes.ok) {
       const { data } = await subRes.json();
       if (Array.isArray(data)) {
-        const local = getStoredSubmissions();
-        const cloudIds = new Set(data.map((s: AssignmentSubmission) => s.id));
-
-        // Push any local submission not yet on server
-        local.forEach((localSub: AssignmentSubmission) => {
-          if (!cloudIds.has(localSub.id)) {
-            pushSubmissionToCloud(localSub);
+        const subMap = new Map<string, AssignmentSubmission>();
+        data.forEach((cloudSub: AssignmentSubmission) => {
+          if (!deletedIds.has(cloudSub.assignmentId)) {
+            subMap.set(cloudSub.id, cloudSub);
           }
         });
 
-        if (data.length > 0) {
-          const localMap = new Map(local.map(s => [s.id, s]));
-          data.forEach((cloudSub: AssignmentSubmission) => {
-            localMap.set(cloudSub.id, cloudSub);
-          });
-          const merged = Array.from(localMap.values());
-          localStorage.setItem(SUBMISSIONS_STORAGE_KEY, JSON.stringify(merged));
-          window.dispatchEvent(new Event('elearningSubmissionsUpdated'));
-        }
+        // Overlay & retry any pending/in-flight student submissions or teacher grades
+        try {
+          const rawPendingSubs = localStorage.getItem(PENDING_SUB_UPLOADS_KEY);
+          if (rawPendingSubs) {
+            const pendingSubs: AssignmentSubmission[] = JSON.parse(rawPendingSubs);
+            for (const pSub of pendingSubs) {
+              if (!deletedIds.has(pSub.assignmentId)) {
+                subMap.set(pSub.id, pSub);
+                await pushSubmissionToCloud(pSub);
+              }
+            }
+          }
+        } catch {}
+
+        const authoritativeSubmissions = Array.from(subMap.values());
+        safeSaveSubmissions(authoritativeSubmissions);
       }
     }
   } catch (err) {
@@ -378,6 +411,7 @@ export async function syncCbtWithCloud(): Promise<void> {
 export async function pushAssignmentToCloud(assignment: Assignment): Promise<boolean> {
   if (typeof window === 'undefined') return false;
   unmarkDeletedAssignmentId(assignment.id);
+  queuePendingAssignmentUpload(assignment);
   try {
     const res = await fetch('/api/elearning/assignments', {
       method: 'POST',
@@ -388,22 +422,36 @@ export async function pushAssignmentToCloud(assignment: Assignment): Promise<boo
       dequeuePendingAssignmentUpload(assignment.id);
       return true;
     }
-    queuePendingAssignmentUpload(assignment);
     return false;
   } catch (err) {
     console.warn('Background assignment upload queued:', err);
-    queuePendingAssignmentUpload(assignment);
     return false;
   }
 }
 
-export function pushSubmissionToCloud(submission: AssignmentSubmission): void {
-  if (typeof window === 'undefined') return;
-  fetch('/api/elearning/submissions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(submission)
-  }).catch(err => console.warn('Background submission upload queued:', err));
+export async function pushSubmissionToCloud(submission: AssignmentSubmission): Promise<boolean> {
+  if (typeof window === 'undefined') return false;
+  const safeFileData =
+    typeof submission.fileData === 'string' && submission.fileData.startsWith('blob:')
+      ? undefined
+      : submission.fileData;
+  const payload: AssignmentSubmission = { ...submission, fileData: safeFileData };
+  queuePendingSubmissionUpload(payload);
+  try {
+    const res = await fetch('/api/elearning/submissions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (res.ok) {
+      dequeuePendingSubmissionUpload(payload.id);
+      return true;
+    }
+    return false;
+  } catch (err) {
+    console.warn('Background submission upload queued:', err);
+    return false;
+  }
 }
 
 export function pushSubjectSessionToCloud(session: SubjectSession): void {

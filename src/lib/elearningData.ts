@@ -4978,7 +4978,7 @@ export function getStoredAssignments(): Assignment[] {
   }
 }
 
-export function saveStoredAssignment(assignment: Assignment) {
+export function saveStoredAssignment(assignment: Assignment, options?: { skipCloudSync?: boolean }) {
   if (typeof window === 'undefined') return;
   try {
     const list = getStoredAssignments();
@@ -4990,30 +4990,34 @@ export function saveStoredAssignment(assignment: Assignment) {
     }
     localStorage.setItem(ASSIGNMENTS_STORAGE_KEY, JSON.stringify(list));
     window.dispatchEvent(new Event('elearningAssignmentsUpdated'));
-    // Asynchronous background cloud sync to Hostinger MySQL
-    try {
-      import('./cloudSync').then(m => {
-        m.unmarkDeletedAssignmentId(assignment.id);
-        m.pushAssignmentToCloud(assignment);
-      }).catch(() => {});
-    } catch {}
+    if (!options?.skipCloudSync) {
+      // Asynchronous background cloud sync to Hostinger MySQL
+      try {
+        import('./cloudSync').then(m => {
+          m.unmarkDeletedAssignmentId(assignment.id);
+          m.pushAssignmentToCloud(assignment);
+        }).catch(() => {});
+      } catch {}
+    }
   } catch (e) {
     console.error('Failed saving assignment to localStorage', e);
   }
 }
 
-export function deleteStoredAssignment(id: string) {
+export function deleteStoredAssignment(id: string, options?: { skipCloudSync?: boolean }) {
   if (typeof window === 'undefined') return;
   try {
     const list = getStoredAssignments().filter(a => a.id !== id);
     localStorage.setItem(ASSIGNMENTS_STORAGE_KEY, JSON.stringify(list));
     window.dispatchEvent(new Event('elearningAssignmentsUpdated'));
-    try {
-      import('./cloudSync').then(m => {
-        m.recordDeletedAssignmentId(id);
-        m.deleteAssignmentFromCloud(id);
-      }).catch(() => {});
-    } catch {}
+    if (!options?.skipCloudSync) {
+      try {
+        import('./cloudSync').then(m => {
+          m.recordDeletedAssignmentId(id);
+          m.deleteAssignmentFromCloud(id);
+        }).catch(() => {});
+      } catch {}
+    }
   } catch (e) {
     console.error('Failed deleting assignment from localStorage', e);
   }
@@ -5057,24 +5061,34 @@ export function getStoredSubmissions(): AssignmentSubmission[] {
   }
 }
 
-export function saveStoredSubmission(submission: AssignmentSubmission) {
+export function saveStoredSubmission(submission: AssignmentSubmission, options?: { skipCloudSync?: boolean }) {
   if (typeof window === 'undefined') return;
   try {
     const list = getStoredSubmissions();
     const idx = list.findIndex(
       s => s.id === submission.id || (s.assignmentId === submission.assignmentId && s.studentId === submission.studentId)
     );
+    const sanitizedIncoming: AssignmentSubmission = {
+      ...submission,
+      fileData: (submission.fileData && submission.fileData.startsWith('blob:')) ? undefined : submission.fileData
+    };
     if (idx >= 0) {
-      list[idx] = { ...list[idx], ...submission };
+      list[idx] = {
+        ...list[idx],
+        ...sanitizedIncoming,
+        fileData: sanitizedIncoming.fileData ?? list[idx].fileData
+      };
     } else {
-      list.push(submission);
+      list.push(sanitizedIncoming);
     }
     // Use safe storage that will never crash with QuotaExceededError
     safeSaveSubmissions(list);
-    // Asynchronous background cloud sync to Hostinger MySQL
-    try {
-      import('./cloudSync').then(m => m.pushSubmissionToCloud(submission)).catch(() => {});
-    } catch {}
+    if (!options?.skipCloudSync) {
+      // Asynchronous background cloud sync to Hostinger MySQL
+      try {
+        import('./cloudSync').then(m => m.pushSubmissionToCloud(sanitizedIncoming)).catch(() => {});
+      } catch {}
+    }
   } catch (e) {
     console.error('Failed saving submission safely', e);
   }

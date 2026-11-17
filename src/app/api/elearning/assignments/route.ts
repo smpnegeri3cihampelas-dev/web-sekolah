@@ -96,8 +96,16 @@ export async function POST(req: Request) {
       ON DUPLICATE KEY UPDATE
         title=VALUES(title),
         subject=VALUES(subject),
+        teacher_name=VALUES(teacher_name),
+        teacher_nip=VALUES(teacher_nip),
+        target_class=VALUES(target_class),
         due_date=VALUES(due_date),
         description=VALUES(description),
+        allow_upload=VALUES(allow_upload),
+        material_url=VALUES(material_url),
+        material_name=VALUES(material_name),
+        video_url=VALUES(video_url),
+        video_title=VALUES(video_title),
         quiz_questions=VALUES(quiz_questions);
     `, [
       assignmentId,

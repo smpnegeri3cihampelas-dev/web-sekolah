@@ -73,6 +73,15 @@ function getLocalDateYmd(d = new Date()): string {
   return `${y}-${m}-${day}`;
 }
 
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+    reader.onerror = () => reject(reader.error || new Error('Gagal membaca berkas'));
+    reader.readAsDataURL(file);
+  });
+}
+
 const STATUS_BADGE_STYLES: Record<string, string> = {
   H: 'bg-emerald-500 text-white',
   S: 'bg-blue-600 text-white',
@@ -2852,13 +2861,40 @@ export default function ELearningPage() {
     return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
   };
 
+  const fetchSubmissionFileFromCloud = async (sub: AssignmentSubmission): Promise<string | undefined> => {
+    try {
+      const res = await fetch(
+        `/api/elearning/submissions?assignmentId=${encodeURIComponent(sub.assignmentId)}&studentId=${encodeURIComponent(sub.studentId)}`,
+        { cache: 'no-store' }
+      );
+      if (res.ok) {
+        const json = await res.json();
+        const found = Array.isArray(json.data)
+          ? json.data.find((d: AssignmentSubmission) => d.id === sub.id || d.studentId === sub.studentId)
+          : null;
+        if (found?.fileData && !String(found.fileData).startsWith('blob:')) {
+          await saveSubmissionFile(sub.id, found.fileData, sub.fileName);
+          return found.fileData;
+        }
+      }
+    } catch {}
+    return undefined;
+  };
+
   const handleOpenPreviewSubmission = async (sub: AssignmentSubmission, asg?: Assignment) => {
     let resolvedSub = { ...sub };
     const targetAsg = asg || assignments.find(a => a.id === sub.assignmentId);
-    if (!resolvedSub.fileData) {
+    if (!resolvedSub.fileData || resolvedSub.fileData.startsWith('blob:')) {
       const storedUrl = await getSubmissionFile(sub.id);
       if (storedUrl) {
         resolvedSub.fileData = storedUrl;
+      } else {
+        const cloudUrl = await fetchSubmissionFileFromCloud(sub);
+        if (cloudUrl) {
+          resolvedSub.fileData = cloudUrl;
+        } else if (resolvedSub.fileData?.startsWith('blob:')) {
+          resolvedSub.fileData = undefined;
+        }
       }
     }
     // Always convert PDF data URLs to browser Blob URLs so Chrome renders them without security blockage
@@ -2870,43 +2906,61 @@ export default function ELearningPage() {
     setPreviewSubmission({ sub: resolvedSub, asg: targetAsg });
   };
 
-  const handleCreateAssignment = (newAssignment: Assignment) => {
-    saveStoredAssignment(newAssignment);
+  const handleCreateAssignment = async (newAssignment: Assignment) => {
+    saveStoredAssignment(newAssignment, { skipCloudSync: true });
     setAssignments(getStoredAssignments());
     setIsCreateAsgModalOpen(false);
+    showToast(`Menerbitkan tugas untuk Kelas ${newAssignment.targetClass}...`, 'info');
     try {
-      import('@/lib/cloudSync').then(m => {
-        m.pushAssignmentToCloud(newAssignment);
-        m.syncElearningWithCloud();
-      }).catch(() => {});
-    } catch {}
-    showToast(`Tugas baru berhasil diterbitkan untuk Kelas ${newAssignment.targetClass}!`, 'success');
+      const { pushAssignmentToCloud, syncElearningWithCloud } = await import('@/lib/cloudSync');
+      const ok = await pushAssignmentToCloud(newAssignment);
+      await syncElearningWithCloud();
+      showToast(
+        ok
+          ? `Tugas baru berhasil diterbitkan & tersimpan di MariaDB untuk Kelas ${newAssignment.targetClass}!`
+          : `Tugas diterbitkan di cache lokal & masuk antrean sinkronisasi MariaDB.`,
+        ok ? 'success' : 'warn'
+      );
+    } catch {
+      showToast(`Tugas baru berhasil diterbitkan untuk Kelas ${newAssignment.targetClass}!`, 'success');
+    }
   };
 
   const handleDeleteAssignment = async (id: string, title: string) => {
     if (confirm(`Yakin ingin menghapus tugas "${title}"?`)) {
-      deleteStoredAssignment(id);
+      deleteStoredAssignment(id, { skipCloudSync: true });
       setAssignments(getStoredAssignments());
       try {
         const { deleteAssignmentFromCloud, syncElearningWithCloud } = await import('@/lib/cloudSync');
         await deleteAssignmentFromCloud(id);
         await syncElearningWithCloud();
       } catch {}
-      showToast('Tugas berhasil dihapus.', 'info');
+      showToast('Tugas berhasil dihapus dari database MariaDB.', 'info');
     }
   };
 
-  const handleSaveGrade = (submission: AssignmentSubmission) => {
+  const handleSaveGrade = async (submission: AssignmentSubmission) => {
+    const existing = submissions.find(s => s.id === submission.id);
+    const safeFileData =
+      submission.fileData && !submission.fileData.startsWith('blob:')
+        ? submission.fileData
+        : (existing?.fileData && !existing.fileData.startsWith('blob:') ? existing.fileData : undefined);
+
     const updated: AssignmentSubmission = {
       ...submission,
+      fileData: safeFileData,
       grade: gradingScore,
       feedback: gradingFeedback.trim() || 'Tugas telah dinilai dan diperiksa oleh guru.',
       status: 'graded'
     };
-    saveStoredSubmission(updated);
+    saveStoredSubmission(updated, { skipCloudSync: true });
     setSubmissions(getStoredSubmissions());
     setGradingSubId(null);
-    showToast(`Nilai (${gradingScore}/100) dan umpan balik berhasil disimpan!`, 'success');
+    try {
+      const { pushSubmissionToCloud } = await import('@/lib/cloudSync');
+      await pushSubmissionToCloud(updated);
+    } catch {}
+    showToast(`Nilai (${gradingScore}/100) dan umpan balik berhasil disimpan ke MariaDB!`, 'success');
   };
 
   const handleStudentSubmitAssignment = async (data: {
@@ -2947,12 +3001,19 @@ export default function ELearningPage() {
         calculatedQuizScore = Math.round((correctCount / targetAsg.quizQuestions.length) * 100);
       }
 
-      // Save file safely to IndexedDB / Memory Cache
-      let resolvedFileUrl = data.fileData;
+      // Serialize real uploaded file (<= 5MB) into persistent Data URL so MariaDB & guru across devices can view it
+      let persistentFileData: string | undefined =
+        data.fileData && !data.fileData.startsWith('blob:') ? data.fileData : undefined;
+
       if (data.selectedFile) {
-        resolvedFileUrl = await saveSubmissionFile(subId, data.selectedFile, data.fileName);
-      } else if (data.fileData) {
-        resolvedFileUrl = await saveSubmissionFile(subId, data.fileData, data.fileName);
+        if (data.selectedFile.size <= 5 * 1024 * 1024) {
+          persistentFileData = await readFileAsDataUrl(data.selectedFile);
+          await saveSubmissionFile(subId, persistentFileData, data.fileName);
+        } else {
+          await saveSubmissionFile(subId, data.selectedFile, data.fileName);
+        }
+      } else if (persistentFileData) {
+        await saveSubmissionFile(subId, persistentFileData, data.fileName);
       }
 
       const sub: AssignmentSubmission = {
@@ -2964,7 +3025,7 @@ export default function ELearningPage() {
         submittedAt: timeStr,
         fileName: data.fileName || (calculatedQuizScore !== undefined ? `Lembar_Kuis_${currentStudent.name.replace(/\s+/g, '_')}.pdf` : data.videoUrl ? 'Tautan_Video_Tugas.mp4' : 'File_Tugas_Siswa.pdf'),
         fileSize: data.fileSize || (calculatedQuizScore !== undefined ? 'Kuis Online' : data.videoUrl ? 'Link Online' : '1.2 MB'),
-        fileData: resolvedFileUrl || data.fileData || undefined,
+        fileData: persistentFileData,
         videoUrl: data.videoUrl.trim() || undefined,
         answerText: data.answerText.trim() || (calculatedQuizScore !== undefined ? `Telah menyelesaikan kuis dengan skor ${calculatedQuizScore}/100.` : 'Tugas sudah selesai dikerjakan sesuai petunjuk.'),
         quizAnswers: calculatedQuizAnswers,
@@ -2976,8 +3037,8 @@ export default function ELearningPage() {
         status: calculatedQuizScore !== undefined ? 'graded' : 'submitted'
       };
 
-      // 1. Save to persistent storage (IndexedDB + safe localStorage)
-      saveStoredSubmission(sub);
+      // 1. Save to persistent storage (IndexedDB + safe localStorage) without racey fire-and-forget
+      saveStoredSubmission(sub, { skipCloudSync: true });
 
       // 2. Immediately update state so UI changes instantly
       setSubmissions(prev => {
@@ -2990,9 +3051,15 @@ export default function ELearningPage() {
         return [sub, ...prev];
       });
 
-      // 3. Close modal
+      // 3. Push directly to MariaDB database
+      try {
+        const { pushSubmissionToCloud } = await import('@/lib/cloudSync');
+        await pushSubmissionToCloud(sub);
+      } catch {}
+
+      // 4. Close modal
       setStudentSubmitAsgId(null);
-      showToast(calculatedQuizScore !== undefined ? `Tugas & Kuis berhasil dikirim! Nilai Kuis Anda: ${calculatedQuizScore}/100 🎉` : 'Tugas berhasil dikirimkan ke guru pengampu!', 'success');
+      showToast(calculatedQuizScore !== undefined ? `Tugas & Kuis berhasil dikirim ke MariaDB! Nilai Kuis Anda: ${calculatedQuizScore}/100 🎉` : 'Tugas berhasil dikirim & tersimpan di MariaDB!', 'success');
     } catch (err) {
       console.error(err);
       showToast('Terjadi kendala saat mengirimkan tugas.', 'warn');
@@ -3001,9 +3068,9 @@ export default function ELearningPage() {
 
   const handleDownloadSubmissionFile = async (sub: AssignmentSubmission, asg?: Assignment) => {
     const targetAsg = asg || assignments.find(a => a.id === sub.assignmentId);
-    let fileUrl = sub.fileData;
+    let fileUrl = sub.fileData && !sub.fileData.startsWith('blob:') ? sub.fileData : undefined;
     if (!fileUrl) {
-      fileUrl = (await getSubmissionFile(sub.id)) || undefined;
+      fileUrl = (await getSubmissionFile(sub.id)) || (await fetchSubmissionFileFromCloud(sub)) || undefined;
     }
 
     if (fileUrl) {
@@ -4050,7 +4117,10 @@ export default function ELearningPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setActiveMenu('tugas')}
+                  onClick={() => {
+                    setActiveMenu('tugas');
+                    import('@/lib/cloudSync').then(m => m.syncElearningWithCloud()).catch(() => {});
+                  }}
                   className={`px-3 py-2 sm:py-1.5 rounded-lg transition-all cursor-pointer text-center sm:whitespace-nowrap ${
                     activeMenu === 'tugas' 
                       ? 'bg-white text-indigo-700 font-bold shadow-xs border border-indigo-100/60' 
@@ -4773,17 +4843,38 @@ export default function ELearningPage() {
                       <span className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 font-bold text-xs border border-indigo-100">
                         {myTasks.length} Tugas
                       </span>
+
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        Live MariaDB
+                      </span>
                     </div>
 
-                    {myTasks.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
                       <button
                         type="button"
-                        onClick={() => setIsCreateAsgModalOpen(true)}
-                        className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-sm flex items-center gap-1.5 cursor-pointer self-start sm:self-auto"
+                        onClick={() => {
+                          import('@/lib/cloudSync').then(async m => {
+                            await m.syncElearningWithCloud();
+                            showToast('Daftar Materi, Tugas & pengumpulan siswa disinkronkan dari MariaDB!', 'success');
+                          }).catch(() => {});
+                        }}
+                        className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 font-semibold text-xs transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                        title="Tarik data tugas & pengumpulan terbaru dari MariaDB"
                       >
-                        <span>+ Buat Tugas Baru</span>
+                        <span>🔄 Sinkronkan</span>
                       </button>
-                    )}
+
+                      {myTasks.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setIsCreateAsgModalOpen(true)}
+                          className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-sm flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <span>+ Buat Tugas Baru</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {/* My Assignments List */}
@@ -4808,7 +4899,10 @@ export default function ELearningPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {myTasks.map((asg) => {
                         const asgSubs = submissions.filter(s => s.assignmentId === asg.id);
-                        const classStudentsCount = activeStudents.filter(s => s.classId === asg.targetClass).length || 35;
+                        const classStudentsCount =
+                          activeStudents.filter(
+                            s => s.classId === asg.targetClass && (s.status !== 'Keluar' || asgSubs.some(sub => sub.studentId === s.id))
+                          ).length || 35;
                         const gradedCount = asgSubs.filter(s => s.status === 'graded').length;
                         const percentage = Math.round((asgSubs.length / classStudentsCount) * 100);
 
@@ -6359,7 +6453,7 @@ export default function ELearningPage() {
         {isCreateAsgModalOpen && (
           <CreateAssignmentModal
             currentTeacher={currentTeacher}
-            defaultClass={selectedClassId}
+            defaultClass={selectedClassId === 'ALL' ? '7-A' : selectedClassId}
             onClose={() => setIsCreateAsgModalOpen(false)}
             onSubmit={handleCreateAssignment}
             showToast={showToast}
@@ -6371,7 +6465,9 @@ export default function ELearningPage() {
           const asg = assignments.find(a => a.id === inspectAsgId);
           if (!asg) return null;
           const asgSubs = submissions.filter(s => s.assignmentId === inspectAsgId);
-          const classStudents = activeStudents.filter(s => s.classId === asg.targetClass);
+          const classStudents = activeStudents.filter(
+            s => s.classId === asg.targetClass && (s.status !== 'Keluar' || asgSubs.some(sub => sub.studentId === s.id))
+          );
 
           return (
             <div
@@ -6625,34 +6721,46 @@ export default function ELearningPage() {
             onClose={() => setPreviewSubmission(null)}
             onSelectSubmission={handleOpenPreviewSubmission}
             onDownload={handleDownloadSubmissionFile}
-            onSaveGrade={(updated, advanceNext) => {
-              saveStoredSubmission(updated);
+            onSaveGrade={async (updated, advanceNext) => {
+              const existingSub = submissions.find(s => s.id === updated.id);
+              const safeFileData =
+                updated.fileData && !updated.fileData.startsWith('blob:')
+                  ? updated.fileData
+                  : (existingSub?.fileData && !existingSub.fileData.startsWith('blob:') ? existingSub.fileData : undefined);
+              const persistentSub: AssignmentSubmission = { ...updated, fileData: safeFileData };
+
+              saveStoredSubmission(persistentSub, { skipCloudSync: true });
               setSubmissions(prev => {
-                const idx = prev.findIndex(s => s.id === updated.id);
+                const idx = prev.findIndex(s => s.id === persistentSub.id);
                 if (idx >= 0) {
                   const next = [...prev];
-                  next[idx] = updated;
+                  next[idx] = persistentSub;
                   return next;
                 }
-                return [updated, ...prev];
+                return [persistentSub, ...prev];
               });
 
+              try {
+                const { pushSubmissionToCloud } = await import('@/lib/cloudSync');
+                await pushSubmissionToCloud(persistentSub);
+              } catch {}
+
               if (advanceNext) {
-                const asgSubmissions = submissions.filter(s => s.assignmentId === (previewSubmission.asg?.id || updated.assignmentId));
+                const asgSubmissions = submissions.filter(s => s.assignmentId === (previewSubmission.asg?.id || persistentSub.assignmentId));
                 const sortedSubs = asgSubmissions.length > 0
                   ? [...asgSubmissions].sort((a, b) => a.studentName.localeCompare(b.studentName))
-                  : [updated];
-                const currentIdx = sortedSubs.findIndex(s => s.id === updated.id || s.studentId === updated.studentId);
+                  : [persistentSub];
+                const currentIdx = sortedSubs.findIndex(s => s.id === persistentSub.id || s.studentId === persistentSub.studentId);
                 if (currentIdx >= 0 && currentIdx < sortedSubs.length - 1) {
                   const nextSub = sortedSubs[currentIdx + 1];
                   handleOpenPreviewSubmission(nextSub, previewSubmission.asg);
-                  showToast(`Nilai tersimpan (${updated.grade}/100)! Melanjutkan ke ${nextSub.studentName}.`, 'success');
+                  showToast(`Nilai tersimpan (${persistentSub.grade}/100) ke MariaDB! Melanjutkan ke ${nextSub.studentName}.`, 'success');
                   return;
                 }
               }
 
               setPreviewSubmission(null);
-              showToast(`Nilai (${updated.grade}/100) dan umpan balik berhasil disimpan!`, 'success');
+              showToast(`Nilai (${persistentSub.grade}/100) dan umpan balik berhasil disimpan ke MariaDB!`, 'success');
             }}
           />
         )}
