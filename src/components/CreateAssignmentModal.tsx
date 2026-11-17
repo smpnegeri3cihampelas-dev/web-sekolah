@@ -499,15 +499,50 @@ export default function CreateAssignmentModal({
         </div>
         <div className="space-y-2.5">
           <div>
-            <label className="block text-[11px] font-semibold text-slate-600 mb-1">Tautan File Dokumen:</label>
+            <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+              Unggah File dari Perangkat (PDF / Gambar maks. 5 MB):
+            </label>
             <input
-              type="url"
-              value={materialUrl}
-              onChange={(e) => setMaterialUrl(e.target.value)}
-              placeholder="https://.../LKPD_Materi.pdf"
-              className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:border-indigo-600 text-xs bg-white font-medium"
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                if (file.size > 5 * 1024 * 1024) {
+                  showToast('Ukuran file modul maksimal 5 MB. Untuk file lebih besar, gunakan Tautan Google Drive.', 'warn');
+                  return;
+                }
+                const reader = new FileReader();
+                reader.onload = () => {
+                  if (typeof reader.result === 'string') {
+                    setMaterialUrl(reader.result);
+                    setMaterialName(file.name);
+                    showToast(`Berkas "${file.name}" siap dilampirkan ke MariaDB!`, 'info');
+                  }
+                };
+                reader.readAsDataURL(file);
+              }}
+              className="w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-indigo-100 file:text-indigo-700 hover:file:bg-indigo-200 cursor-pointer"
             />
           </div>
+
+          {materialUrl.startsWith('data:') ? (
+            <div className="px-3 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center justify-between gap-2">
+              <span className="truncate">✓ Berkas perangkat terlampir: {materialName || 'Modul_Guru.pdf'}</span>
+            </div>
+          ) : (
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-600 mb-1">Atau Tautan File Dokumen (Google Drive / Web):</label>
+              <input
+                type="url"
+                value={materialUrl}
+                onChange={(e) => setMaterialUrl(e.target.value)}
+                placeholder="https://.../LKPD_Materi.pdf"
+                className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:border-indigo-600 text-xs bg-white font-medium"
+              />
+            </div>
+          )}
+
           <div>
             <label className="block text-[11px] font-semibold text-slate-600 mb-1">Nama File Dokumen:</label>
             <input

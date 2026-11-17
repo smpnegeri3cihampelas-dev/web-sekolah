@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { Assignment, AssignmentSubmission, Student } from '@/lib/elearningData';
+import { dataUrlToBlobUrl } from '@/lib/elearningStorage';
 
 interface StudentSubmitModalProps {
   asg: Assignment;
@@ -70,12 +71,13 @@ export default function StudentSubmitModal({
   const hasUpload = Boolean(fileName || videoUrl.trim() || answerText.trim());
 
   const generateMockNotebookSvg = (subject: string, studentName: string, title: string) => {
+    const classLabel = currentStudent.classId || '7-A';
     const subjectText = `
       <text x="95" y="190" font-family="monospace" font-size="14" font-weight="bold" fill="#1e3a8a">Hasil Pengerjaan Tugas ${subject}:</text>
       <text x="95" y="225" font-family="sans-serif" font-size="13" fill="#1e293b">1. Topik Tugas: ${title}</text>
       <text x="95" y="253" font-family="sans-serif" font-size="13" fill="#1e293b">2. Semua instruksi guru pengampu telah dikerjakan secara runut.</text>
       <text x="95" y="281" font-family="sans-serif" font-size="13" fill="#1e293b">3. Catatan dan resume materi pembelajaran tersusun rapi.</text>
-      <text x="95" y="319" font-family="sans-serif" font-size="13" font-style="italic" fill="#047857">Peserta Didik: ${studentName} (Kelas 7-A)</text>
+      <text x="95" y="319" font-family="sans-serif" font-size="13" font-style="italic" fill="#047857">Peserta Didik: ${studentName} (Kelas ${classLabel})</text>
     `;
 
     let lines = '';
@@ -88,7 +90,7 @@ export default function StudentSubmitModal({
       ${lines}
       <line x1="80" y1="20" x2="80" y2="580" stroke="#f87171" stroke-width="2" />
       <text x="95" y="55" font-family="sans-serif" font-size="11" font-weight="bold" fill="#64748b" letter-spacing="1">SMP NEGERI 3 CIHAMPELAS • BUKU TUGAS SISWA</text>
-      <text x="95" y="80" font-family="sans-serif" font-size="14" font-weight="bold" fill="#0f172a">Nama: ${studentName} | Kelas: 7-A</text>
+      <text x="95" y="80" font-family="sans-serif" font-size="14" font-weight="bold" fill="#0f172a">Nama: ${studentName} | Kelas: ${classLabel}</text>
       <text x="95" y="105" font-family="sans-serif" font-size="12" font-weight="bold" fill="#4338ca">Mata Pelajaran: ${subject}</text>
       <text x="95" y="150" font-family="sans-serif" font-size="13" font-weight="bold" fill="#0f172a">Tugas: ${title}</text>
       ${subjectText}
@@ -157,14 +159,29 @@ export default function StudentSubmitModal({
                 </div>
               </div>
             </div>
-            <a
-              href={asg.materialUrl}
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
+              type="button"
+              onClick={() => {
+                if (!asg.materialUrl) return;
+                if (asg.materialUrl.startsWith('data:')) {
+                  const blobUrl = dataUrlToBlobUrl(asg.materialUrl);
+                  const win = window.open(blobUrl, '_blank', 'noopener,noreferrer');
+                  if (!win) {
+                    const a = document.createElement('a');
+                    a.href = blobUrl;
+                    a.download = asg.materialName || 'Bahan_Ajar.pdf';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                  }
+                } else {
+                  window.open(asg.materialUrl, '_blank', 'noopener,noreferrer');
+                }
+              }}
               className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1 flex-shrink-0 cursor-pointer shadow-xs"
             >
               {hasQuiz ? 'Buka Modul ↗' : 'Buka LKPD ↗'}
-            </a>
+            </button>
           </div>
         )}
 
