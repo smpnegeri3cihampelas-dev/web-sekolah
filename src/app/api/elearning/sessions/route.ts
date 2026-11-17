@@ -1,6 +1,22 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 
+function toLocalDateString(val: any): string {
+  if (!val) return '';
+  if (val instanceof Date && !isNaN(val.getTime())) {
+    const y = val.getFullYear();
+    const m = String(val.getMonth() + 1).padStart(2, '0');
+    const day = String(val.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+  if (typeof val === 'string') {
+    const match = val.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (match) return match[1];
+    return val.split('T')[0];
+  }
+  return String(val);
+}
+
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
@@ -33,13 +49,13 @@ export async function GET(req: Request) {
     const sessions = rows.map(r => ({
       id: r.id,
       classId: r.class_id,
-      date: typeof r.date === 'string' ? r.date : r.date.toISOString().split('T')[0],
+      date: toLocalDateString(r.date),
       subject: r.subject,
       teacherName: r.teacher_name,
       teacherNip: r.teacher_nip,
       submittedAt: r.submitted_at,
-      records: r.records ? JSON.parse(r.records) : {},
-      notes: r.notes ? JSON.parse(r.notes) : {},
+      records: typeof r.records === 'string' ? JSON.parse(r.records) : (r.records || {}),
+      notes: typeof r.notes === 'string' ? JSON.parse(r.notes) : (r.notes || {}),
       topicMaterial: r.topic_material
     }));
 
@@ -91,24 +107,34 @@ export async function POST(req: Request) {
       JSON.stringify(notes || {})
     ]);
 
-    // Simpan juga ke attendance_records jika ada detail presensi
+    // Simpan juga ke attendance_records secara bulk (tanpa duplikasi)
     if (records && typeof records === 'object') {
-      for (const [studentId, status] of Object.entries(records)) {
+      const entries = Object.entries(records);
+      if (entries.length > 0) {
+        await query('DELETE FROM attendance_records WHERE session_id = ?', [sessionId]);
+        const placeholders: string[] = [];
+        const values: any[] = [];
+        const sessionDate = date || toLocalDateString(new Date());
+
+        for (const [studentId, status] of entries) {
+          placeholders.push('(?, ?, ?, ?, ?, ?, ?, ?)');
+          values.push(
+            sessionId,
+            studentId,
+            studentId,
+            classId,
+            sessionDate,
+            subject,
+            status,
+            notes?.[studentId] || null
+          );
+        }
+
         await query(`
           INSERT INTO attendance_records (
             session_id, student_id, student_name, class_id, date, subject, status, note
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-          ON DUPLICATE KEY UPDATE status=VALUES(status), note=VALUES(note);
-        `, [
-          sessionId,
-          studentId,
-          studentId, // fallback name jika tidak disediakan
-          classId,
-          date || new Date().toISOString().split('T')[0],
-          subject,
-          status,
-          notes?.[studentId] || null
-        ]);
+          ) VALUES ${placeholders.join(', ')}
+        `, values);
       }
     }
 

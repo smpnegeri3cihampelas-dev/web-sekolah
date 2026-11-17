@@ -2002,9 +2002,10 @@ export default function ELearningPage() {
     };
   }, []);
 
-  // Track previous class and teacher so unsaved attendance edits aren't wiped when marking a student as keluar
+  // Track previous class, teacher, and cloud-loaded session so unsaved attendance edits aren't wiped while cloud sync updates properly
   const prevSelectedClassForWorkingRef = useRef<string>('');
   const prevTeacherKeyForWorkingRef = useRef<string>('');
+  const prevLoadedSessionKeyRef = useRef<string>('');
 
   // Sync working records when selected class or current teacher changes (Isolated per Teacher & Subject)
   useEffect(() => {
@@ -2021,6 +2022,9 @@ export default function ELearningPage() {
       (s.teacherNip.replace(/\s+/g, '') === teacherNipClean || s.subject.toLowerCase() === (currentTeacher?.subject || '').toLowerCase())
     );
 
+    const currentSessionKey = mySession ? `${mySession.id}_${mySession.submittedAt}` : '';
+    const isNewSessionLoadedFromCloud = currentSessionKey !== '' && prevLoadedSessionKeyRef.current !== currentSessionKey;
+
     const isClassOrTeacherChanged =
       prevSelectedClassForWorkingRef.current !== selectedClassId ||
       prevTeacherKeyForWorkingRef.current !== teacherKey;
@@ -2030,6 +2034,8 @@ export default function ELearningPage() {
       studentsInClass.forEach(student => {
         if (student.status === 'Keluar') {
           records[student.id] = 'K';
+        } else if (isNewSessionLoadedFromCloud && mySession?.records?.[student.id]) {
+          records[student.id] = mySession.records[student.id];
         } else if (!isClassOrTeacherChanged && prev[student.id] !== undefined) {
           // Tetap pertahankan status presensi yang baru saja dipilih guru (misal Sakit, Izin, Alpa, Terlambat)
           records[student.id] = prev[student.id];
@@ -2047,6 +2053,8 @@ export default function ELearningPage() {
       studentsInClass.forEach(student => {
         if (student.status === 'Keluar') {
           notes[student.id] = student.exitReason ? `Keluar/Pindah: ${student.exitReason}` : 'Sudah Keluar Sekolah';
+        } else if (isNewSessionLoadedFromCloud && mySession?.notes?.[student.id]) {
+          notes[student.id] = mySession.notes[student.id];
         } else if (!isClassOrTeacherChanged && prev[student.id] !== undefined) {
           // Tetap pertahankan catatan yang sedang diketik guru
           notes[student.id] = prev[student.id];
@@ -2060,6 +2068,7 @@ export default function ELearningPage() {
 
     prevSelectedClassForWorkingRef.current = selectedClassId;
     prevTeacherKeyForWorkingRef.current = teacherKey;
+    prevLoadedSessionKeyRef.current = currentSessionKey;
   }, [selectedClassId, currentTeacher?.nip, currentTeacher?.subject, sessions, activeStudents]);
 
   // Authentication & Session Management
