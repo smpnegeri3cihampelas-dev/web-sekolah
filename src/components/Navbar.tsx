@@ -10,8 +10,11 @@ export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [portalOpen, setPortalOpen] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [isVisible, setIsVisible] = useState(true);
+  const [isPastHero, setIsPastHero] = useState(false);
   const portalRef = useRef<HTMLDivElement>(null);
   const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastScrollYRef = useRef<number>(0);
 
   const handleMouseEnter = () => {
     if (closeTimeoutRef.current) {
@@ -40,6 +43,42 @@ export default function Navbar() {
       clearTimeout(timer);
       if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
     };
+  }, []);
+
+  // Smart Auto-Hide (sembunyi saat scroll ke bawah, muncul saat scroll ke atas) + Deteksi melewati Hero
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentY = window.scrollY;
+      const prevY = lastScrollYRef.current;
+      const delta = currentY - prevY;
+
+      // Deteksi apakah sudah melewati area Hero masuk ke section berlatar putih
+      const beritaEl = document.getElementById('berita');
+      if (beritaEl) {
+        const rect = beritaEl.getBoundingClientRect();
+        setIsPastHero(rect.top <= 96);
+      } else {
+        setIsPastHero(currentY > window.innerHeight * 0.85);
+      }
+
+      if (currentY <= 80) {
+        setIsVisible(true);
+      } else if (delta > 6) {
+        // Scroll ke bawah -> sembunyikan navbar (kecuali menu/dropdown sedang dibuka)
+        setIsVisible(false);
+        setPortalOpen(false);
+        setMobileMenuOpen(false);
+      } else if (delta < -6) {
+        // Scroll ke atas -> tampilkan kembali navbar
+        setIsVisible(true);
+      }
+
+      lastScrollYRef.current = currentY;
+    };
+
+    handleScroll();
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   // Click outside listener to close portal dropdown automatically
@@ -113,18 +152,27 @@ export default function Navbar() {
 
   return (
     <header 
-      className={`fixed top-0 left-0 right-0 z-50 px-4 sm:px-8 lg:px-12 pt-4 sm:pt-6 pb-3 sm:pb-4 bg-transparent transition-all duration-1000 ease-out ${
-        isLoaded 
-          ? 'opacity-100 translate-y-0' 
-          : 'opacity-0 -translate-y-4 pointer-events-none'
+      className={`fixed top-0 left-0 right-0 z-50 px-4 sm:px-8 lg:px-12 pt-3.5 sm:pt-5 pb-3 transition-all duration-300 ease-out ${
+        !isLoaded
+          ? 'opacity-0 -translate-y-4 pointer-events-none'
+          : isVisible || portalOpen || mobileMenuOpen
+          ? 'opacity-100 translate-y-0'
+          : 'opacity-0 -translate-y-full pointer-events-none'
       }`}
     >
       <div className="max-w-7xl mx-auto flex items-center justify-between md:grid md:grid-cols-[1fr_auto_1fr] gap-3 sm:gap-4">
         
         {/* Brand (Left) */}
         <div className="flex items-center justify-start md:justify-self-start shrink-0">
-          <a href="#" className="flex items-center gap-2.5 sm:gap-3 group">
-            <div className="relative w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center transition-transform duration-300 group-hover:scale-105 shrink-0">
+          <a
+            href="#"
+            className={`flex items-center gap-2.5 sm:gap-3 group rounded-full transition-all duration-300 ${
+              isPastHero
+                ? 'px-3.5 py-1.5 bg-white/90 backdrop-blur-2xl border border-indigo-100/90 shadow-md shadow-indigo-950/10'
+                : ''
+            }`}
+          >
+            <div className="relative w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center transition-transform duration-300 group-hover:scale-105 shrink-0">
               <Image 
                 src="/logo.png" 
                 alt={`Logo ${identity.schoolName || 'SMP Negeri 3 Cihampelas'}`}
@@ -135,9 +183,15 @@ export default function Navbar() {
               />
             </div>
             <div className="flex flex-col">
-              <span className="text-xs sm:text-base font-semibold tracking-tight text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)] flex items-center gap-1.5 sm:gap-2 whitespace-nowrap">
+              <span
+                className={`text-xs sm:text-base font-semibold tracking-tight flex items-center gap-1.5 sm:gap-2 whitespace-nowrap transition-colors duration-300 ${
+                  isPastHero
+                    ? 'text-slate-900'
+                    : 'text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]'
+                }`}
+              >
                 {identity.schoolName || 'SMPN 3 Cihampelas'}
-                <span className="inline-block w-1.5 h-1.5 rounded-full bg-indigo-400 shadow-[0_0_8px_#6366f1]" />
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-indigo-500 shadow-[0_0_8px_#6366f1]" />
               </span>
             </div>
           </a>
@@ -147,13 +201,21 @@ export default function Navbar() {
         <div className="hidden md:flex items-center justify-center md:justify-self-center">
           <nav 
             aria-label="Navigasi Utama"
-            className="inline-flex items-center gap-0.5 lg:gap-1 p-1.5 rounded-full glass-pill-nav text-xs lg:text-[13px] font-semibold text-white drop-shadow-[0_1px_4px_rgba(0,0,0,0.65)] transition-all duration-300 whitespace-nowrap w-fit"
+            className={`inline-flex items-center gap-0.5 lg:gap-1 p-1.5 rounded-full text-xs lg:text-[13px] font-semibold transition-all duration-300 whitespace-nowrap w-fit ${
+              isPastHero
+                ? 'bg-white/90 backdrop-blur-2xl border border-indigo-100/90 text-slate-800 shadow-lg shadow-indigo-950/10'
+                : 'glass-pill-nav text-white drop-shadow-[0_1px_4px_rgba(0,0,0,0.65)]'
+            }`}
           >
             {navMenuItems.map((item) => (
               <a
                 key={item.href}
                 href={item.href}
-                className="px-3 lg:px-3.5 py-1.5 rounded-full leading-none hover:bg-white/25 hover:text-white active:scale-95 transition-all duration-200 flex items-center justify-center"
+                className={`px-3 lg:px-3.5 py-1.5 rounded-full leading-none active:scale-95 transition-all duration-200 flex items-center justify-center ${
+                  isPastHero
+                    ? 'hover:bg-indigo-50 hover:text-indigo-700'
+                    : 'hover:bg-white/25 hover:text-white'
+                }`}
               >
                 {item.label}
               </a>
@@ -178,10 +240,14 @@ export default function Navbar() {
                 setPortalOpen(!portalOpen);
                 if (!portalOpen) setMobileMenuOpen(false);
               }}
-              className={`px-3.5 sm:px-4 lg:px-5 py-1.5 sm:py-2 rounded-full glass-pill-btn text-xs sm:text-sm font-semibold whitespace-nowrap transition-all duration-300 flex items-center gap-1.5 cursor-pointer text-white drop-shadow-[0_1px_4px_rgba(0,0,0,0.7)] ${
-                portalOpen 
-                  ? 'bg-white/40 border-white/60 shadow-[0_0_20px_rgba(255,255,255,0.25)]' 
-                  : 'hover:bg-white/35'
+              className={`px-3.5 sm:px-4 lg:px-5 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold whitespace-nowrap transition-all duration-300 flex items-center gap-1.5 cursor-pointer ${
+                isPastHero
+                  ? portalOpen
+                    ? 'bg-indigo-600 text-white border border-indigo-600 shadow-md shadow-indigo-600/25'
+                    : 'bg-white/90 hover:bg-indigo-50 text-slate-900 border border-indigo-100/90 shadow-md shadow-indigo-950/10 backdrop-blur-2xl'
+                  : portalOpen 
+                  ? 'glass-pill-btn text-white drop-shadow-[0_1px_4px_rgba(0,0,0,0.7)] bg-white/40 border-white/60 shadow-[0_0_20px_rgba(255,255,255,0.25)]' 
+                  : 'glass-pill-btn text-white drop-shadow-[0_1px_4px_rgba(0,0,0,0.7)] hover:bg-white/35'
               }`}
               aria-expanded={portalOpen}
               aria-haspopup="true"
@@ -189,7 +255,7 @@ export default function Navbar() {
               <span>Portal</span>
               <svg 
                 className={`w-3.5 h-3.5 transition-transform duration-300 ${
-                  portalOpen ? 'rotate-180 text-white' : 'text-white'
+                  portalOpen ? 'rotate-180' : ''
                 }`}
                 viewBox="0 0 24 24" 
                 fill="none" 
@@ -286,7 +352,11 @@ export default function Navbar() {
               setMobileMenuOpen(!mobileMenuOpen);
               if (!mobileMenuOpen) setPortalOpen(false);
             }}
-            className="md:hidden p-2 rounded-full glass-pill-btn text-white hover:text-white transition-colors shrink-0 cursor-pointer"
+            className={`md:hidden p-2 rounded-full transition-colors shrink-0 cursor-pointer ${
+              isPastHero
+                ? 'bg-white/90 text-slate-900 border border-indigo-100/90 shadow-md shadow-indigo-950/10 backdrop-blur-2xl'
+                : 'glass-pill-btn text-white hover:text-white'
+            }`}
             aria-label="Buka Menu Navigasi"
           >
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
