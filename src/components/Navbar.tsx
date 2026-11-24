@@ -59,6 +59,16 @@ export default function Navbar() {
     };
   }, []);
 
+  const navMenuItems = [
+    { label: 'Warta', href: '#berita' },
+    { label: 'Profil', href: '#profil' },
+    { label: 'Kalender', href: '#kalender' },
+    { label: 'Program', href: '#kurikulum' },
+    { label: 'Galeri', href: '#galeri' },
+    { label: 'Ekskul', href: '#ekstrakurikuler' },
+    { label: 'Kontak', href: '#kontak' },
+  ];
+
   const portalMenuItems = [
     {
       title: 'e-Rapor Kurikulum Merdeka',
@@ -103,16 +113,16 @@ export default function Navbar() {
 
   return (
     <header 
-      className={`fixed top-0 left-0 right-0 z-50 px-4 sm:px-8 lg:px-12 pt-4 sm:pt-8 pb-3 sm:pb-4 bg-transparent transition-all duration-1000 ease-out ${
+      className={`fixed top-0 left-0 right-0 z-50 px-4 sm:px-8 lg:px-12 pt-4 sm:pt-6 pb-3 sm:pb-4 bg-transparent transition-all duration-1000 ease-out ${
         isLoaded 
           ? 'opacity-100 translate-y-0' 
           : 'opacity-0 -translate-y-4 pointer-events-none'
       }`}
     >
-      <div className="max-w-7xl mx-auto flex items-center justify-between gap-3 sm:gap-4">
+      <div className="max-w-7xl mx-auto flex items-center justify-between md:grid md:grid-cols-[1fr_auto_1fr] gap-3 sm:gap-4">
         
         {/* Brand (Left) */}
-        <div className="flex items-center justify-start shrink-0">
+        <div className="flex items-center justify-start md:justify-self-start shrink-0">
           <a href="#" className="flex items-center gap-2.5 sm:gap-3 group">
             <div className="relative w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center transition-transform duration-300 group-hover:scale-105 shrink-0">
               <Image 
@@ -133,31 +143,26 @@ export default function Navbar() {
           </a>
         </div>
 
-        {/* Center Floating Pill Menu (Clean Frosted Glass Pill - Desktop Only) */}
-        <div className="hidden md:flex items-center justify-center">
+        {/* Center Floating Pill Menu (Clean Frosted Glass Pill - Perfectly Centered & Fitted to Contents) */}
+        <div className="hidden md:flex items-center justify-center md:justify-self-center">
           <nav 
-            className="flex items-center gap-4 lg:gap-6 px-5 lg:px-6 py-2 rounded-full glass-pill-nav text-xs sm:text-sm font-medium text-white drop-shadow-[0_1px_4px_rgba(0,0,0,0.7)] transition-all duration-300 whitespace-nowrap"
+            aria-label="Navigasi Utama"
+            className="inline-flex items-center gap-0.5 lg:gap-1 p-1.5 rounded-full glass-pill-nav text-xs lg:text-[13px] font-semibold text-white drop-shadow-[0_1px_4px_rgba(0,0,0,0.65)] transition-all duration-300 whitespace-nowrap w-fit"
           >
-            <a href="#kurikulum" className="hover:text-indigo-200 transition-colors">
-              Program
-            </a>
-            <a href="#kalender" className="hover:text-indigo-200 transition-colors">
-              Kalender
-            </a>
-            <a href="#galeri" className="hover:text-indigo-200 transition-colors">
-              Galeri
-            </a>
-            <a href="/warta" className="hover:text-indigo-200 transition-colors">
-              Warta
-            </a>
-            <a href="#kontak" className="hover:text-indigo-200 transition-colors">
-              Kontak
-            </a>
+            {navMenuItems.map((item) => (
+              <a
+                key={item.href}
+                href={item.href}
+                className="px-3 lg:px-3.5 py-1.5 rounded-full leading-none hover:bg-white/25 hover:text-white active:scale-95 transition-all duration-200 flex items-center justify-center"
+              >
+                {item.label}
+              </a>
+            ))}
           </nav>
         </div>
 
         {/* Right Actions: Portal Dropdown + Mobile Menu Trigger */}
-        <div className="flex items-center justify-end gap-2 sm:gap-3 shrink-0">
+        <div className="flex items-center justify-end md:justify-self-end gap-2 sm:gap-3 shrink-0">
           
           {/* Dropdown Portal Button (Accessible on both Mobile & Desktop) */}
           <div 
@@ -296,44 +301,19 @@ export default function Navbar() {
 
       </div>
 
-      {/* Mobile Glass Drawer (Hanya isi: Beranda, Profil, Program, Fasilitas, Warta, Kontak) */}
+      {/* Mobile Glass Drawer (Sesuai urutan isi halaman utama) */}
       {mobileMenuOpen && (
-        <div className="md:hidden mt-3 max-w-sm mx-auto p-4 rounded-3xl bg-white/95 backdrop-blur-2xl border border-white/80 shadow-2xl flex flex-col gap-1 text-sm font-semibold text-slate-800 animate-[fadeIn_0.2s_ease-out]">
-          <a 
-            href="#kurikulum" 
-            onClick={() => setMobileMenuOpen(false)} 
-            className="px-4 py-2.5 rounded-xl hover:bg-indigo-50/80 hover:text-indigo-700 transition-colors"
-          >
-            Program
-          </a>
-          <a 
-            href="#kalender" 
-            onClick={() => setMobileMenuOpen(false)} 
-            className="px-4 py-2.5 rounded-xl hover:bg-indigo-50/80 hover:text-indigo-700 transition-colors"
-          >
-            Kalender
-          </a>
-          <a 
-            href="#galeri" 
-            onClick={() => setMobileMenuOpen(false)} 
-            className="px-4 py-2.5 rounded-xl hover:bg-indigo-50/80 hover:text-indigo-700 transition-colors"
-          >
-            Galeri
-          </a>
-          <a 
-            href="/warta" 
-            onClick={() => setMobileMenuOpen(false)} 
-            className="px-4 py-2.5 rounded-xl hover:bg-indigo-50/80 hover:text-indigo-700 transition-colors"
-          >
-            Warta
-          </a>
-          <a 
-            href="#kontak" 
-            onClick={() => setMobileMenuOpen(false)} 
-            className="px-4 py-2.5 rounded-xl hover:bg-indigo-50/80 hover:text-indigo-700 transition-colors"
-          >
-            Kontak
-          </a>
+        <div className="md:hidden mt-3 max-w-sm mx-auto p-3.5 rounded-3xl bg-white/95 backdrop-blur-2xl border border-white/80 shadow-2xl flex flex-col gap-1 text-sm font-semibold text-slate-800 animate-[fadeIn_0.2s_ease-out]">
+          {navMenuItems.map((item) => (
+            <a
+              key={item.href}
+              href={item.href}
+              onClick={() => setMobileMenuOpen(false)}
+              className="px-4 py-2.5 rounded-xl hover:bg-indigo-50/80 hover:text-indigo-700 transition-colors"
+            >
+              {item.label}
+            </a>
+          ))}
         </div>
       )}
     </header>
