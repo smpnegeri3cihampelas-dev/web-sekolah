@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useCallback, useMemo } from 'react';
-import { Assignment, QuizQuestion, SCHOOL_CLASSES } from '@/lib/elearningData';
+import { Assignment, QuizQuestion, SCHOOL_CLASSES, parseTeacherSubjects } from '@/lib/elearningData';
 
 interface CreateAssignmentModalProps {
   currentTeacher: {
@@ -14,6 +14,7 @@ interface CreateAssignmentModalProps {
   onSubmit: (newAssignment: Assignment) => void;
   showToast: (message: string, type?: 'success' | 'info' | 'warn') => void;
   defaultClass?: string;
+  defaultSubject?: string;
 }
 
 // -------------------------------------------------------------
@@ -169,28 +170,21 @@ const QuizQuestionCard = React.memo(function QuizQuestionCard({
 export default function CreateAssignmentModal({
   currentTeacher,
   defaultClass,
+  defaultSubject,
   onClose,
   onSubmit,
   showToast
 }: CreateAssignmentModalProps) {
-  const availableTeacherSubjects: string[] = useMemo(() => {
-    const raw = currentTeacher.subject || 'Umum';
-    if (raw.includes('&') || raw.includes(' dan ')) {
-      const parts = raw.split(/&|dan/i).map(s => s.trim()).filter(Boolean);
-      return parts.map(s => {
-        if (s.toLowerCase().includes('pabp') || s.toLowerCase().includes('agama')) {
-          return 'Pendidikan Agama Islam (PABP)';
-        }
-        if (s.toLowerCase().includes('sunda')) {
-          return 'Bahasa Sunda';
-        }
-        return s;
-      });
-    }
-    return [raw];
-  }, [currentTeacher.subject]);
+  const availableTeacherSubjects: string[] = useMemo(
+    () => parseTeacherSubjects(currentTeacher.subject || 'Umum'),
+    [currentTeacher.subject]
+  );
 
-  const [selectedSubject, setSelectedSubject] = useState<string>(() => availableTeacherSubjects[0]);
+  const [selectedSubject, setSelectedSubject] = useState<string>(() =>
+    defaultSubject && availableTeacherSubjects.includes(defaultSubject)
+      ? defaultSubject
+      : availableTeacherSubjects[0]
+  );
   const [title, setTitle] = useState('');
   const [targetClass, setTargetClass] = useState(defaultClass || '7-A');
   const [dueDate, setDueDate] = useState(() => {

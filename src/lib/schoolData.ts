@@ -8,11 +8,12 @@ import {
   SchoolData, 
   DEFAULT_LEADERS, 
   DEFAULT_TEACHERS, 
-  DEFAULT_DATA_POKOK 
+  DEFAULT_DATA_POKOK,
+  isTendikOrTu
 } from './schoolConstants';
 
 export type { Leader, Teacher, DataPokok, SchoolData };
-export { DEFAULT_LEADERS, DEFAULT_TEACHERS, DEFAULT_DATA_POKOK };
+export { DEFAULT_LEADERS, DEFAULT_TEACHERS, DEFAULT_DATA_POKOK, isTendikOrTu };
 
 const STORAGE_KEY = 'smpn3_school_data_v3';
 const EVENT_NAME = 'smpn3_school_data_changed';
@@ -92,7 +93,7 @@ export async function syncSchoolWithCloud(): Promise<SchoolData> {
   }
 
   try {
-    const res = await fetch('/api/school');
+    const res = await fetch('/api/school', { cache: 'no-store' });
     if (!res.ok) return getStoredSchoolData();
     const json = await res.json();
     if (json.success) {

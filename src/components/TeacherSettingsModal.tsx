@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { AuthUserSession, getTeacherUsername } from '@/lib/elearningData';
+import { AuthUserSession, getTeacherUsername, syncStudentsWithCloud } from '@/lib/elearningData';
+import { syncSchoolWithCloud } from '@/lib/schoolData';
 
 interface TeacherSettingsModalProps {
   isOpen: boolean;
@@ -34,9 +35,12 @@ export default function TeacherSettingsModal({
 
   if (!isOpen || !currentUser) return null;
 
+  const isPiketRole = currentUser.role === 'guru_piket';
+  const isPanitiaRole = currentUser.role === 'panitia';
+  const isSiswaRole = currentUser.role === 'siswa';
   const cleanNip = (currentUser.nipOrNisn || '').replace(/\s+/g, '');
 
-  const handleSavePassword = (e: React.FormEvent) => {
+  const handleSavePassword = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!currentPassword.trim()) {
@@ -59,56 +63,122 @@ export default function TeacherSettingsModal({
       return;
     }
 
-    const teacherUsername = getTeacherUsername(currentUser);
-
-    // Verify current active password
-    let currentStoredPass = '';
-    let map: Record<string, string> = {};
-    if (typeof window !== 'undefined') {
-      try {
-        const raw = localStorage.getItem('smpn3_teacher_passwords');
-        if (raw) {
-          map = JSON.parse(raw);
-          currentStoredPass = map[teacherUsername] || (cleanNip ? map[cleanNip] : '') || map[currentUser.name] || '';
-        }
-      } catch {}
-    }
-
+    const teacherUsername = isPiketRole
+      ? 'piket'
+      : isPanitiaRole
+      ? 'panitia'
+      : isSiswaRole
+      ? (cleanNip || currentUser.name)
+      : getTeacherUsername(currentUser);
     const trimmedCurrent = currentPassword.trim();
-    const isCurrentCorrect = currentStoredPass
-      ? (trimmedCurrent === currentStoredPass)
-      : (trimmedCurrent === 'guru123');
-
-    if (!isCurrentCorrect) {
-      showToast('⚠️ Kata sandi saat ini salah! Masukkan sandi Anda dengan benar.', 'warn');
-      return;
-    }
-
-    // Save newly changed password
     const newTrimmed = newPassword.trim();
-    if (cleanNip && cleanNip !== '-') map[cleanNip] = newTrimmed;
-    map[teacherUsername] = newTrimmed;
-    if (currentUser.name) {
-      map[currentUser.name] = newTrimmed;
+
+    // Verify & update in MariaDB first
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'change_password',
+          role: currentUser.role,
+          username: teacherUsername,
+          nipOrNisn: currentUser.nipOrNisn,
+          name: currentUser.name,
+          currentPassword: trimmedCurrent,
+          newPassword: newTrimmed
+        })
+      });
+      if (res.status === 401) {
+        const errData = await res.json().catch(() => ({}));
+        showToast(`⚠️ ${errData.error || errData.message || 'Kata sandi saat ini salah! Masukkan sandi Anda dengan benar.'}`, 'warn');
+        return;
+      }
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        showToast(`⚠️ ${errData.error || errData.message || 'Gagal menyimpan kata sandi ke database.'}`, 'warn');
+        return;
+      }
+    } catch {
+      // Fallback local verification if offline
+      let currentStoredPass = '';
+      if (typeof window !== 'undefined') {
+        try {
+          if (isPiketRole) {
+            currentStoredPass = localStorage.getItem('smpn3_piket_password') || '';
+          } else if (isPanitiaRole) {
+            currentStoredPass = localStorage.getItem('smpn3_panitia_password') || '';
+          } else if (isSiswaRole) {
+            const raw = localStorage.getItem('smpn3_student_passwords');
+            if (raw) {
+              const map = JSON.parse(raw);
+              currentStoredPass = (cleanNip ? map[cleanNip] : '') || map[currentUser.name] || '';
+            }
+          } else {
+            const raw = localStorage.getItem('smpn3_teacher_passwords');
+            if (raw) {
+              const map = JSON.parse(raw);
+              currentStoredPass = map[teacherUsername] || (cleanNip ? map[cleanNip] : '') || map[currentUser.name] || '';
+            }
+          }
+        } catch {}
+      }
+      const defaultPass = isPiketRole ? 'piket123' : isPanitiaRole ? 'panitia123' : isSiswaRole ? 'siswa123' : 'guru123';
+      const isCurrentCorrect = currentStoredPass
+        ? (trimmedCurrent === currentStoredPass)
+        : (trimmedCurrent === defaultPass);
+
+      if (!isCurrentCorrect) {
+        showToast('⚠️ Kata sandi saat ini salah! Masukkan sandi Anda dengan benar.', 'warn');
+        return;
+      }
     }
 
+    // Save newly changed password locally & refresh cache from MariaDB
     if (typeof window !== 'undefined') {
       try {
-        localStorage.setItem('smpn3_teacher_passwords', JSON.stringify(map));
-        // Background sync to database
-        fetch('/api/school', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            type: 'teacher',
-            teacher: {
-              nip: currentUser.nipOrNisn,
-              username: teacherUsername,
-              name: currentUser.name,
-              password: newTrimmed
-            }
-          })
-        }).catch(() => {});
+        if (isPiketRole) {
+          localStorage.setItem('smpn3_piket_password', newTrimmed);
+        } else if (isPanitiaRole) {
+          localStorage.setItem('smpn3_panitia_password', newTrimmed);
+        } else if (isSiswaRole) {
+          let map: Record<string, string> = {};
+          const raw = localStorage.getItem('smpn3_student_passwords');
+          if (raw) {
+            try { map = JSON.parse(raw); } catch {}
+          }
+          if (cleanNip) map[cleanNip] = newTrimmed;
+          if (currentUser.name) map[currentUser.name] = newTrimmed;
+          localStorage.setItem('smpn3_student_passwords', JSON.stringify(map));
+          syncStudentsWithCloud().catch(() => {});
+        } else {
+          let map: Record<string, string> = {};
+          const raw = localStorage.getItem('smpn3_teacher_passwords');
+          if (raw) {
+            try { map = JSON.parse(raw); } catch {}
+          }
+          if (cleanNip && cleanNip !== '-') map[cleanNip] = newTrimmed;
+          map[teacherUsername] = newTrimmed;
+          if (currentUser.name) {
+            map[currentUser.name] = newTrimmed;
+          }
+          localStorage.setItem('smpn3_teacher_passwords', JSON.stringify(map));
+
+          await fetch('/api/school', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'teacher',
+              teacher: {
+                nip: currentUser.nipOrNisn,
+                username: teacherUsername,
+                name: currentUser.name,
+                password: newTrimmed
+              }
+            })
+          }).catch(() => {});
+
+          syncSchoolWithCloud().catch(() => {});
+        }
       } catch (err) {
         console.error(err);
       }
@@ -139,7 +209,13 @@ export default function TeacherSettingsModal({
             </div>
             <div>
               <h3 className="text-base sm:text-lg font-black text-slate-950">
-                Pengaturan Akun Guru
+                {isPiketRole
+                  ? 'Pengaturan Stasiun Meja Piket'
+                  : isPanitiaRole
+                  ? 'Pengaturan Akun Panitia CBT'
+                  : isSiswaRole
+                  ? 'Pengaturan Akun Siswa'
+                  : 'Pengaturan Akun Guru'}
               </h3>
               <p className="text-xs text-slate-600 font-semibold mt-0.5">
                 Kelola profil & ubah kata sandi portal SIAP SPENTIC
@@ -189,12 +265,18 @@ export default function TeacherSettingsModal({
             {/* Account Badge */}
             <div className="p-3.5 rounded-2xl bg-indigo-50/70 border border-indigo-200 flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-white border border-indigo-200 flex items-center justify-center text-lg shrink-0">
-                👨‍🏫
+                {isPiketRole ? '🏢' : isPanitiaRole ? '🏛️' : isSiswaRole ? '🎓' : '👨‍🏫'}
               </div>
               <div className="min-w-0 flex-1">
                 <h4 className="text-xs font-black text-slate-950 truncate">{currentUser.name}</h4>
                 <p className="text-[11px] font-mono text-indigo-900 font-bold mt-0.5">
-                  NIP: {currentUser.nipOrNisn || '-'}
+                  {isPiketRole
+                    ? `Kode Stasiun: ${currentUser.nipOrNisn || 'POSKO-PIKET'}`
+                    : isPanitiaRole
+                    ? `Kode Posko: ${currentUser.nipOrNisn || 'PANITIA-CBT'}`
+                    : isSiswaRole
+                    ? `NISN: ${currentUser.nipOrNisn || '-'} • Kelas ${currentUser.classId || '7-A'}`
+                    : `NIP: ${currentUser.nipOrNisn || '-'}`}
                 </p>
               </div>
             </div>
@@ -213,7 +295,7 @@ export default function TeacherSettingsModal({
                 className="w-full px-3.5 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-slate-950 font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 shadow-xs"
               />
               <span className="text-[10px] text-slate-500 mt-1 block">
-                *Jika belum pernah diubah, gunakan kata sandi awal: <span className="font-mono font-bold text-slate-700">guru123</span>
+                *Jika belum pernah diubah, gunakan kata sandi awal: <span className="font-mono font-bold text-slate-700">{isPiketRole ? 'piket123' : isPanitiaRole ? 'panitia123' : isSiswaRole ? 'siswa123' : 'guru123'}</span>
               </span>
             </div>
 
@@ -283,12 +365,18 @@ export default function TeacherSettingsModal({
                 <span className="font-black text-slate-950">{currentUser.name}</span>
               </div>
               <div className="flex justify-between items-center py-1 border-b border-slate-200/80">
-                <span className="text-slate-500 font-medium">NIP / NUPTK</span>
+                <span className="text-slate-500 font-medium">User ID Login</span>
+                <span className="font-mono font-bold text-indigo-700">{isPiketRole ? 'piket' : isPanitiaRole ? 'panitia' : isSiswaRole ? (currentUser.nipOrNisn || '-') : getTeacherUsername(currentUser)}</span>
+              </div>
+              <div className="flex justify-between items-center py-1 border-b border-slate-200/80">
+                <span className="text-slate-500 font-medium">{isPiketRole ? 'Kode Stasiun' : isPanitiaRole ? 'Kode Posko' : isSiswaRole ? 'NISN' : 'NIP / NUPTK'}</span>
                 <span className="font-mono font-bold text-slate-900">{currentUser.nipOrNisn || '-'}</span>
               </div>
               <div className="flex justify-between items-center py-1 border-b border-slate-200/80">
-                <span className="text-slate-500 font-medium">Mata Pelajaran</span>
-                <span className="font-bold text-indigo-700">{currentUser.subject || 'Guru Mata Pelajaran'}</span>
+                <span className="text-slate-500 font-medium">{isPiketRole || isPanitiaRole ? 'Unit Tugas' : isSiswaRole ? 'Kelas / Rombel' : 'Mata Pelajaran'}</span>
+                <span className="font-bold text-indigo-700">
+                  {isSiswaRole ? `Kelas ${currentUser.classId || '7-A'}` : (currentUser.subject || 'Guru Mata Pelajaran')}
+                </span>
               </div>
               <div className="flex justify-between items-center py-1 border-b border-slate-200/80">
                 <span className="text-slate-500 font-medium">Status Akun</span>

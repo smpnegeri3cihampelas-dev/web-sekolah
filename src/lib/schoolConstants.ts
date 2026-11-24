@@ -19,11 +19,24 @@ export interface Teacher {
   subject: string;
   category?: string;
   nip: string;
+  nuptk?: string;
   photo: string;
   status: string;
   active?: boolean;
   quote?: string;
   password?: string;
+}
+
+export function isTendikOrTu(t?: { category?: string; subject?: string; role?: string; status?: string } | null): boolean {
+  if (!t) return false;
+  const cat = (t.category || '').toLowerCase();
+  const sub = (t.subject || '').toLowerCase();
+  const role = (t.role || '').toLowerCase();
+  if (cat.includes('tata usaha') || cat === 'tu' || cat.includes('tendik')) return true;
+  if (/\b(tata usaha|tu|caraka|tenaga kependidikan|operator layanan operasional|penata layanan operasional)\b/i.test(`${sub} ${role}`)) {
+    return true;
+  }
+  return false;
 }
 
 export interface DataPokok {
@@ -425,21 +438,87 @@ export const DEFAULT_TEACHERS: Teacher[] = [
   {
     id: 28,
     name: 'Dani Ramdani, S.Pd.',
-    role: 'Guru Bahasa Indonesia',
-    subject: 'Bahasa Indonesia',
-    category: 'Bahasa',
-    nip: '19910408 201603 1 010',
+    role: 'TU - Penata Layanan Operasional',
+    subject: 'Tata Usaha (TU) - Penata Layanan Operasional',
+    category: 'Tata Usaha (TU)',
+    nip: '198805052025211172',
+    nuptk: '4840766667130192',
     photo: '/teachers/default_avatar.svg',
-    status: 'GTT / Honorer',
+    status: 'PPPK PW',
     active: true,
-    quote: 'Membudayakan ekspresi sastra, tata bahasa santun, dan pemikiran kritis.'
+    quote: 'Melayani administrasi ketatausahaan sekolah secara tertib, cepat, dan akuntabel.'
+  },
+  {
+    id: 29,
+    name: 'Dadan Padilah, S.Pd.',
+    role: 'TU - Penata Layanan Operasional',
+    subject: 'Tata Usaha (TU) - Penata Layanan Operasional',
+    category: 'Tata Usaha (TU)',
+    nip: '199310182025211069',
+    nuptk: '9350771672130023',
+    photo: '/teachers/default_avatar.svg',
+    status: 'PPPK PW',
+    active: true,
+    quote: 'Mendukung kelancaran layanan operasional dan tata kelola administrasi pendidikan.'
+  },
+  {
+    id: 30,
+    name: 'Sopian Sihabudin, S.sos',
+    role: 'TU - Penata Layanan Operasional',
+    subject: 'Tata Usaha (TU) - Penata Layanan Operasional',
+    category: 'Tata Usaha (TU)',
+    nip: '198602102025211067',
+    nuptk: '5542764665130182',
+    photo: '/teachers/default_avatar.svg',
+    status: 'PPPK PW',
+    active: true,
+    quote: 'Menjaga ketertiban arsip dan pelayanan prima bagi warga sekolah serta masyarakat.'
+  },
+  {
+    id: 31,
+    name: 'Muhamad Syamsul Arif, S.Pd.',
+    role: 'TU - Operator Layanan Operasional',
+    subject: 'Tata Usaha (TU) - Operator Layanan Operasional',
+    category: 'Tata Usaha (TU)',
+    nip: '199311202025211059',
+    nuptk: '9452771672130043',
+    photo: '/teachers/default_avatar.svg',
+    status: 'PPPK PW',
+    active: true,
+    quote: 'Mengelola data pokok dan sistem informasi operasional sekolah secara akurat.'
+  },
+  {
+    id: 32,
+    name: 'Suryana, S.H',
+    role: 'TU - Penata Layanan Operasional',
+    subject: 'Tata Usaha (TU) - Penata Layanan Operasional',
+    category: 'Tata Usaha (TU)',
+    nip: '-',
+    nuptk: '0242773674130023',
+    photo: '/teachers/default_avatar.svg',
+    status: 'PPPK PW',
+    active: true,
+    quote: 'Memberikan pelayanan administrasi sekolah yang ramah, responsif, dan profesional.'
+  },
+  {
+    id: 33,
+    name: 'Agus Supriatna',
+    role: 'Caraka - Operator Layanan Operasional',
+    subject: 'Caraka - Operator Layanan Operasional',
+    category: 'Tata Usaha (TU)',
+    nip: '197208152025211038',
+    nuptk: '8147750651130163',
+    photo: '/teachers/default_avatar.svg',
+    status: 'PPPK PW',
+    active: true,
+    quote: 'Menjaga kebersihan, kerapian, dan kenyamanan sarana lingkungan sekolah.'
   }
 ];
 
 export const DEFAULT_DATA_POKOK: DataPokok = {
   siswa: '535',
   rombel: '17',
-  guru: '33',
-  staf: '8'
+  guru: '27',
+  staf: '6'
 };
 

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Leader, Teacher } from '@/lib/schoolData';
+import { Leader, Teacher, isTendikOrTu } from '@/lib/schoolData';
 import { compressImage } from '@/lib/imageCompression';
 import { getTeacherUsername, formatWhatsAppUrl } from '@/lib/elearningData';
 
@@ -132,7 +132,7 @@ export function EditLeaderModal({ isOpen, leader, onClose, onSave, showToast }: 
                 onChange={handleFileUpload}
                 className="hidden"
               />
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
@@ -142,7 +142,23 @@ export function EditLeaderModal({ isOpen, leader, onClose, onSave, showToast }: 
                   <span>📷</span>
                   <span>{isCompressing ? 'Memproses...' : 'Upload Foto'}</span>
                 </button>
-                <span className="text-[11px] text-slate-500 font-medium">Format JPG/PNG</span>
+                {photo && photo !== '/teachers/default_avatar.svg' ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPhoto('/teachers/default_avatar.svg');
+                      showToast('🔄 Dikembalikan ke Foto Default.');
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 font-bold text-xs flex items-center gap-1 cursor-pointer transition-all"
+                  >
+                    <span>🔄</span>
+                    <span>Pakai Foto Default</span>
+                  </button>
+                ) : (
+                  <span className="text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg font-bold">
+                    ✓ Foto Default Aktif
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -219,7 +235,7 @@ export function EditLeaderModal({ isOpen, leader, onClose, onSave, showToast }: 
 // =========================================================================
 export interface SubjectOption {
   label: string;
-  category: 'MIPA' | 'Bahasa' | 'Teknologi' | 'Sosial & Agama' | 'Olahraga & Seni';
+  category: 'MIPA' | 'Bahasa' | 'Teknologi' | 'Sosial & Agama' | 'Olahraga & Seni' | 'Tata Usaha (TU)';
 }
 
 export const STANDARD_SMP_SUBJECTS: SubjectOption[] = [
@@ -236,14 +252,18 @@ export const STANDARD_SMP_SUBJECTS: SubjectOption[] = [
   { label: 'Seni Budaya & Keterampilan (SBK)', category: 'Olahraga & Seni' },
   { label: 'Prakarya & Kewirausahaan', category: 'Teknologi' },
   { label: 'Bimbingan & Konseling (BK)', category: 'Sosial & Agama' },
-  { label: 'Tenaga Kependidikan / Tata Usaha (TU)', category: 'Sosial & Agama' }
+  { label: 'Tata Usaha (TU) - Penata Layanan Operasional', category: 'Tata Usaha (TU)' },
+  { label: 'Tata Usaha (TU) - Operator Layanan Operasional', category: 'Tata Usaha (TU)' },
+  { label: 'Caraka - Operator Layanan Operasional', category: 'Tata Usaha (TU)' },
+  { label: 'Tenaga Kependidikan / Tata Usaha (TU)', category: 'Tata Usaha (TU)' }
 ];
 
-export function getCategoryForSubject(subjectName: string): 'MIPA' | 'Bahasa' | 'Teknologi' | 'Sosial & Agama' | 'Olahraga & Seni' {
+export function getCategoryForSubject(subjectName: string): 'MIPA' | 'Bahasa' | 'Teknologi' | 'Sosial & Agama' | 'Olahraga & Seni' | 'Tata Usaha (TU)' {
   const found = STANDARD_SMP_SUBJECTS.find(s => s.label.toLowerCase() === subjectName.toLowerCase());
   if (found) return found.category;
   
   const lower = subjectName.toLowerCase();
+  if (lower.includes('tata usaha') || lower.includes('caraka') || lower.includes('tenaga kependidikan') || /\btu\b/.test(lower) || lower.includes('layanan operasional')) return 'Tata Usaha (TU)';
   if (lower.includes('matematika') || lower.includes('ipa') || lower.includes('sains') || lower.includes('fisika') || lower.includes('biologi')) return 'MIPA';
   if (lower.includes('inggris') || lower.includes('indonesia') || lower.includes('sunda') || lower.includes('bahasa')) return 'Bahasa';
   if (lower.includes('informatika') || lower.includes('komputer') || lower.includes('tik') || lower.includes('prakarya')) return 'Teknologi';
@@ -358,7 +378,9 @@ interface AddTeacherModalProps {
 export function AddTeacherModal({ isOpen, onClose, onAdd, showToast }: AddTeacherModalProps) {
   const [name, setName] = useState('');
   const [subject, setSubject] = useState('');
+  const [role, setRole] = useState('');
   const [nip, setNip] = useState('');
+  const [nuptk, setNuptk] = useState('');
   const [phone, setPhone] = useState('');
   const [status, setStatus] = useState('PNS');
   const [photo, setPhoto] = useState('/teachers/default_avatar.svg');
@@ -369,7 +391,9 @@ export function AddTeacherModal({ isOpen, onClose, onAdd, showToast }: AddTeache
     if (isOpen) {
       setName('');
       setSubject('');
+      setRole('');
       setNip('');
+      setNuptk('');
       setPhone('');
       setStatus('PNS');
       setPhoto('/teachers/default_avatar.svg');
@@ -379,16 +403,22 @@ export function AddTeacherModal({ isOpen, onClose, onAdd, showToast }: AddTeache
 
   if (!isOpen) return null;
 
+  const isSelectedTendik = isTendikOrTu({
+    category: getCategoryForSubject(subject),
+    subject,
+    status
+  });
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     try {
       setIsCompressing(true);
-      showToast('⏳ Mengompres foto guru...');
+      showToast('⏳ Mengompres foto...');
       const compressed = await compressImage(file, 800, 0.85);
       setPhoto(compressed);
-      showToast('✅ Foto guru berhasil dimuat.');
+      showToast('✅ Foto berhasil dimuat.');
     } catch {
       showToast('❌ Gagal memproses foto.');
     } finally {
@@ -400,14 +430,17 @@ export function AddTeacherModal({ isOpen, onClose, onAdd, showToast }: AddTeache
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
-      showToast('⚠️ Nama lengkap guru wajib diisi!');
+      showToast('⚠️ Nama lengkap wajib diisi!');
       return;
     }
 
-    const generatedUsername = getTeacherUsername({ name: name.trim() });
+    const finalSubject = subject.trim() || 'Guru Mata Pelajaran';
+    const finalCategory = getCategoryForSubject(finalSubject);
+    const isTendik = isTendikOrTu({ category: finalCategory, subject: finalSubject, status });
+    const generatedUsername = isTendik ? undefined : getTeacherUsername({ name: name.trim() });
 
-    // Auto-seed default password guru123 into smpn3_teacher_passwords map
-    if (typeof window !== 'undefined') {
+    // Auto-seed default password guru123 into smpn3_teacher_passwords map (only for teachers)
+    if (!isTendik && generatedUsername && typeof window !== 'undefined') {
       try {
         const raw = localStorage.getItem('smpn3_teacher_passwords');
         const map = raw ? JSON.parse(raw) : {};
@@ -422,23 +455,27 @@ export function AddTeacherModal({ isOpen, onClose, onAdd, showToast }: AddTeache
       }
     }
 
-    const finalSubject = subject.trim() || 'Guru Mata Pelajaran';
-    const finalCategory = getCategoryForSubject(finalSubject);
-
     onAdd({
       name: name.trim(),
       username: generatedUsername,
       phone: phone.trim() || undefined,
       subject: finalSubject,
       nip: nip.trim() || '-',
+      nuptk: nuptk.trim() || undefined,
       status,
       photo,
       active: true,
       category: finalCategory,
-      role: finalSubject,
-      quote: 'Mendidik dengan keteladanan dan budi pekerti luhur.'
+      role: role.trim() || finalSubject,
+      quote: isTendik
+        ? 'Melayani administrasi dan operasional sekolah secara tertib dan akuntabel.'
+        : 'Mendidik dengan keteladanan dan budi pekerti luhur.'
     });
-    showToast(`👨‍🏫 Guru baru "${name}" & Akun @${generatedUsername} berhasil dibuat!`);
+    showToast(
+      isTendik
+        ? `✅ Staf TU "${name}" berhasil ditambahkan (Tanpa Akun Login)!`
+        : `👨‍🏫 Guru baru "${name}" & Akun @${generatedUsername} berhasil dibuat!`
+    );
     onClose();
   };
 
@@ -498,7 +535,7 @@ export function AddTeacherModal({ isOpen, onClose, onAdd, showToast }: AddTeache
                 onChange={handleFileUpload}
                 className="hidden"
               />
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
@@ -508,7 +545,23 @@ export function AddTeacherModal({ isOpen, onClose, onAdd, showToast }: AddTeache
                   <span>📷</span>
                   <span>{isCompressing ? 'Memproses...' : 'Upload Foto'}</span>
                 </button>
-                <span className="text-[11px] text-slate-500 font-medium">Format JPG/PNG</span>
+                {photo && photo !== '/teachers/default_avatar.svg' ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPhoto('/teachers/default_avatar.svg');
+                      showToast('🔄 Dikembalikan ke Foto Default.');
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 font-bold text-xs flex items-center gap-1 cursor-pointer transition-all"
+                  >
+                    <span>🔄</span>
+                    <span>Pakai Foto Default</span>
+                  </button>
+                ) : (
+                  <span className="text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg font-bold">
+                    ✓ Foto Default Aktif
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -529,10 +582,41 @@ export function AddTeacherModal({ isOpen, onClose, onAdd, showToast }: AddTeache
           {/* Dropdown Mata Pelajaran dengan Opsi Lainnya */}
           <SubjectSelectInput value={subject} onChange={setSubject} />
 
-          {/* Grid 2 Kolom: NIP & Status Kepegawaian */}
+          {/* Jabatan / Tugas Tambahan (Tampil di Struktur Organisasi) */}
+          {!isSelectedTendik && (
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-slate-800 font-extrabold text-xs">
+                  Jabatan / Tugas Tambahan (Tampil di Struktur Organisasi)
+                </label>
+                <span className="text-[10px] text-indigo-700 font-bold bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
+                  Opsional
+                </span>
+              </div>
+              <input
+                type="text"
+                list="structural-role-presets-add"
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+                placeholder="Kosongkan jika guru mapel biasa, atau isi misal: Kepala Lab IPA / Pembina OSIS"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-slate-950 font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 shadow-xs placeholder:text-slate-400"
+              />
+              <datalist id="structural-role-presets-add">
+                <option value="Kepala Lab IPA" />
+                <option value="Staf Lab IPA" />
+                <option value="Ka. Perpustakaan" />
+                <option value="Staf Perpustakaan" />
+                <option value="Pembina OSIS" />
+                <option value="Pembina PMR" />
+                <option value="Pembina Keputrian" />
+              </datalist>
+            </div>
+          )}
+
+          {/* Grid 2 Kolom: NIP & NUPTK */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="text-slate-800 block mb-1.5 font-extrabold text-xs">NIP / NUPTK</label>
+              <label className="text-slate-800 block mb-1.5 font-extrabold text-xs">NIP</label>
               <input
                 type="text"
                 value={nip}
@@ -542,6 +626,20 @@ export function AddTeacherModal({ isOpen, onClose, onAdd, showToast }: AddTeache
               />
             </div>
             <div>
+              <label className="text-slate-800 block mb-1.5 font-extrabold text-xs">NUPTK</label>
+              <input
+                type="text"
+                value={nuptk}
+                onChange={(e) => setNuptk(e.target.value)}
+                placeholder="Boleh kosong jika belum ada"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-slate-950 font-mono font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 shadow-xs placeholder:text-slate-400"
+              />
+            </div>
+          </div>
+
+          {/* Grid 2 Kolom: Status Kepegawaian & Nomor WhatsApp */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
               <label className="text-slate-800 block mb-1.5 font-extrabold text-xs">Status Kepegawaian</label>
               <select
                 value={status}
@@ -550,42 +648,53 @@ export function AddTeacherModal({ isOpen, onClose, onAdd, showToast }: AddTeache
               >
                 <option value="PNS">PNS</option>
                 <option value="PPPK">PPPK</option>
+                <option value="PPPK PW">PPPK PW</option>
                 <option value="GTT / Honorer">GTT / Honorer</option>
                 <option value="Tenaga Kependidikan">Tenaga Kependidikan</option>
               </select>
             </div>
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-slate-800 font-extrabold text-xs">Nomor WhatsApp</label>
+                <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                  Opsional
+                </span>
+              </div>
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="Contoh: 081234567890"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-slate-950 font-mono font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 shadow-xs placeholder:text-slate-400"
+              />
+            </div>
           </div>
 
-          {/* Nomor WhatsApp Guru */}
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="text-slate-800 font-extrabold text-xs">Nomor WhatsApp Guru</label>
-              <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                Opsional
+          {/* Ringkas: Akun E-Learning Otomatis vs Staf TU Tanpa Akun */}
+          {isSelectedTendik ? (
+            <div className="p-3 rounded-2xl bg-slate-100 border-2 border-slate-300 text-xs flex items-center justify-between text-slate-800 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-base">🗂️</span>
+                <span className="font-bold">Staf Tata Usaha (TU) / Tenaga Kependidikan:</span>
+              </div>
+              <span className="text-[11px] font-extrabold text-slate-700 bg-white px-2.5 py-0.5 rounded-lg border border-slate-300">
+                Disimpan ke Direktori GTK (Tanpa Akun Login E-Learning)
               </span>
             </div>
-            <input
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="Contoh: 081234567890"
-              className="w-full px-3.5 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-slate-950 font-mono font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 shadow-xs placeholder:text-slate-400"
-            />
-          </div>
-
-          {/* Ringkas: Akun E-Learning Otomatis */}
-          <div className="p-3 rounded-2xl bg-indigo-50/80 border-2 border-indigo-200 text-xs flex items-center justify-between text-indigo-950 flex-wrap gap-2">
-            <div className="flex items-center gap-2">
-              <span className="text-base">⚡</span>
-              <span className="font-semibold">Akun Login E-Learning:</span>
-              <span className="font-mono font-black text-indigo-800 bg-white px-2 py-0.5 rounded-lg border border-indigo-200">
-                @{name.trim() ? getTeacherUsername({ name: name.trim() }) : 'username'}
-              </span>
+          ) : (
+            <div className="p-3 rounded-2xl bg-indigo-50/80 border-2 border-indigo-200 text-xs flex items-center justify-between text-indigo-950 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-base">⚡</span>
+                <span className="font-semibold">Akun Login E-Learning:</span>
+                <span className="font-mono font-black text-indigo-800 bg-white px-2 py-0.5 rounded-lg border border-indigo-200">
+                  @{name.trim() ? getTeacherUsername({ name: name.trim() }) : 'username'}
+                </span>
+              </div>
+              <div className="text-[11px] text-slate-600 font-medium">
+                Sandi Awal: <strong className="font-mono text-slate-900">guru123</strong>
+              </div>
             </div>
-            <div className="text-[11px] text-slate-600 font-medium">
-              Sandi Awal: <strong className="font-mono text-slate-900">guru123</strong>
-            </div>
-          </div>
+          )}
 
           <div className="pt-3 flex items-center justify-end gap-2.5 border-t-2 border-slate-200">
             <button
@@ -599,7 +708,7 @@ export function AddTeacherModal({ isOpen, onClose, onAdd, showToast }: AddTeache
               type="submit"
               className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold cursor-pointer shadow-md shadow-indigo-600/20 active:scale-98 transition-all"
             >
-              Simpan Guru Baru
+              {isSelectedTendik ? 'Simpan Staf TU Baru' : 'Simpan Guru Baru'}
             </button>
           </div>
         </form>
@@ -623,7 +732,9 @@ interface EditTeacherModalProps {
 export function EditTeacherModal({ isOpen, teacher, onClose, onSave, onDelete, showToast }: EditTeacherModalProps) {
   const [name, setName] = useState('');
   const [subject, setSubject] = useState('');
+  const [role, setRole] = useState('');
   const [nip, setNip] = useState('');
+  const [nuptk, setNuptk] = useState('');
   const [phone, setPhone] = useState('');
   const [status, setStatus] = useState('PNS');
   const [photo, setPhoto] = useState('/teachers/default_avatar.svg');
@@ -635,7 +746,15 @@ export function EditTeacherModal({ isOpen, teacher, onClose, onSave, onDelete, s
     if (teacher) {
       setName(teacher.name || '');
       setSubject(teacher.subject || '');
+      setRole(
+        teacher.role &&
+          teacher.role.toLowerCase() !== (teacher.subject || '').toLowerCase() &&
+          !teacher.role.toLowerCase().startsWith('guru ')
+          ? teacher.role
+          : ''
+      );
       setNip(teacher.nip || '');
+      setNuptk(teacher.nuptk || '');
       setPhone(teacher.phone || '');
       setStatus(teacher.status || 'PNS');
       setPhoto(teacher.photo || '/teachers/default_avatar.svg');
@@ -652,10 +771,10 @@ export function EditTeacherModal({ isOpen, teacher, onClose, onSave, onDelete, s
 
     try {
       setIsCompressing(true);
-      showToast('⏳ Mengompres foto guru...');
+      showToast('⏳ Mengompres foto...');
       const compressed = await compressImage(file, 800, 0.85);
       setPhoto(compressed);
-      showToast('✅ Foto guru berhasil dimuat.');
+      showToast('✅ Foto berhasil dimuat.');
     } catch {
       showToast('❌ Gagal memproses foto.');
     } finally {
@@ -667,27 +786,36 @@ export function EditTeacherModal({ isOpen, teacher, onClose, onSave, onDelete, s
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
-      showToast('⚠️ Nama lengkap guru wajib diisi!');
+      showToast('⚠️ Nama lengkap wajib diisi!');
       return;
     }
 
     const finalSubject = subject.trim() || 'Guru Mata Pelajaran';
     const finalCategory = getCategoryForSubject(finalSubject);
+    const isTendik = isTendikOrTu({ category: finalCategory, subject: finalSubject, status });
 
     onSave(teacher.id, {
       name: name.trim(),
+      username: isTendik ? undefined : getTeacherUsername({ name: name.trim() }),
       subject: finalSubject,
       category: finalCategory,
-      role: finalSubject,
+      role: role.trim() || finalSubject,
       nip: nip.trim(),
+      nuptk: nuptk.trim() || undefined,
       phone: phone.trim() || undefined,
       status,
       photo,
       active
     });
-    showToast(`✅ Data guru "${name}" tersimpan!`);
+    showToast(`✅ Data "${name}" tersimpan!`);
     onClose();
   };
+
+  const isSelectedTendik = isTendikOrTu({
+    category: getCategoryForSubject(subject.trim() || 'Guru Mata Pelajaran'),
+    subject,
+    status
+  });
 
   return (
     <div 
@@ -745,7 +873,7 @@ export function EditTeacherModal({ isOpen, teacher, onClose, onSave, onDelete, s
                 onChange={handleFileUpload}
                 className="hidden"
               />
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
@@ -755,7 +883,23 @@ export function EditTeacherModal({ isOpen, teacher, onClose, onSave, onDelete, s
                   <span>📷</span>
                   <span>{isCompressing ? 'Memproses...' : 'Upload Foto'}</span>
                 </button>
-                <span className="text-[11px] text-slate-500 font-medium">Format JPG/PNG</span>
+                {photo && photo !== '/teachers/default_avatar.svg' ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPhoto('/teachers/default_avatar.svg');
+                      showToast('🔄 Dikembalikan ke Foto Default.');
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 font-bold text-xs flex items-center gap-1 cursor-pointer transition-all"
+                  >
+                    <span>🔄</span>
+                    <span>Pakai Foto Default</span>
+                  </button>
+                ) : (
+                  <span className="text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg font-bold">
+                    ✓ Foto Default Aktif
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -774,27 +918,69 @@ export function EditTeacherModal({ isOpen, teacher, onClose, onSave, onDelete, s
           {/* Dropdown Mata Pelajaran dengan Opsi Lainnya */}
           <SubjectSelectInput value={subject} onChange={setSubject} />
 
+          {/* Jabatan / Tugas Tambahan (Tampil di Struktur Organisasi) */}
+          {!isSelectedTendik && (
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-slate-800 font-extrabold text-xs">
+                  Jabatan / Tugas Tambahan (Tampil di Struktur Organisasi)
+                </label>
+                <span className="text-[10px] text-indigo-700 font-bold bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
+                  Opsional
+                </span>
+              </div>
+              <input
+                type="text"
+                list="structural-role-presets-add"
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+                placeholder="Kosongkan jika guru mapel biasa, atau isi misal: Kepala Lab IPA / Pembina OSIS"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-slate-950 font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 shadow-xs placeholder:text-slate-400"
+              />
+              <datalist id="structural-role-presets-add">
+                <option value="Kepala Lab IPA" />
+                <option value="Staf Lab IPA" />
+                <option value="Ka. Perpustakaan" />
+                <option value="Staf Perpustakaan" />
+                <option value="Pembina OSIS" />
+                <option value="Pembina PMR" />
+                <option value="Pembina Keputrian" />
+              </datalist>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-slate-800 block mb-1.5 font-extrabold">NIP / NUPTK</label>
+              <label className="text-slate-800 block mb-1.5 font-extrabold">NIP</label>
               <input
                 type="text"
                 value={nip}
                 onChange={(e) => setNip(e.target.value)}
-                placeholder="Boleh kosong jika GTT"
+                placeholder="Boleh kosong jika non-NIP"
                 className="w-full px-3.5 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-slate-950 font-mono font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 shadow-xs"
               />
             </div>
             <div>
-              <label className="text-slate-800 block mb-1.5 font-extrabold">Nomor WhatsApp Guru</label>
+              <label className="text-slate-800 block mb-1.5 font-extrabold">NUPTK</label>
               <input
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="Contoh: 081234567890"
+                type="text"
+                value={nuptk}
+                onChange={(e) => setNuptk(e.target.value)}
+                placeholder="Boleh kosong jika belum ada"
                 className="w-full px-3.5 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-slate-950 font-mono font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 shadow-xs"
               />
             </div>
+          </div>
+
+          <div>
+            <label className="text-slate-800 block mb-1.5 font-extrabold">Nomor WhatsApp</label>
+            <input
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="Contoh: 081234567890"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-slate-950 font-mono font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 shadow-xs"
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -807,6 +993,7 @@ export function EditTeacherModal({ isOpen, teacher, onClose, onSave, onDelete, s
               >
                 <option value="PNS">PNS</option>
                 <option value="PPPK">PPPK</option>
+                <option value="PPPK PW">PPPK PW</option>
                 <option value="GTT / Honorer">GTT / Honorer</option>
                 <option value="Tenaga Kependidikan">Tenaga Kependidikan</option>
               </select>
@@ -818,11 +1005,23 @@ export function EditTeacherModal({ isOpen, teacher, onClose, onSave, onDelete, s
                 onChange={(e) => setActive(e.target.value === 'true')}
                 className="w-full px-3 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-slate-950 font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 cursor-pointer shadow-xs"
               >
-                <option value="true">● Aktif Mengajar</option>
+                <option value="true">● Aktif Mengajar / Bertugas</option>
                 <option value="false">○ Mutasi / Nonaktif</option>
               </select>
             </div>
           </div>
+
+          {isSelectedTendik && (
+            <div className="p-3 rounded-2xl bg-slate-100 border-2 border-slate-300 text-xs flex items-center justify-between text-slate-800 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-base">🗂️</span>
+                <span className="font-bold">Staf Tata Usaha (TU) / Tenaga Kependidikan</span>
+              </div>
+              <span className="text-[11px] font-extrabold text-slate-700 bg-white px-2.5 py-0.5 rounded-lg border border-slate-300">
+                Tanpa Akun Login E-Learning
+              </span>
+            </div>
+          )}
 
           <div className="pt-3 flex items-center justify-between border-t-2 border-slate-200">
             {onDelete ? (
@@ -901,7 +1100,7 @@ export function ResetTeacherPasswordModal({
           }
         } catch {}
       }
-      setPassword(currentPass || 'guru123');
+      setPassword(teacher.password || currentPass || 'guru123');
       setShowPassword(false);
       setHasCopied(false);
     }

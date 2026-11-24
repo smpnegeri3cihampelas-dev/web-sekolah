@@ -89,6 +89,104 @@ export function formatWhatsAppUrl(phone?: string, text?: string): string {
   return encodedText ? `https://wa.me/${clean}?text=${encodedText}` : `https://wa.me/${clean}`;
 }
 
+/**
+ * Memecah string mata pelajaran guru jika guru mengampu > 1 mapel (contoh: "PABP & Bahasa Sunda"),
+ * tanpa memecah nama mapel tunggal resmi yang mengandung kata "&" (seperti SBK, PPKn, PJOK, BK, PABP).
+ */
+export function parseTeacherSubjects(rawSubject?: string): string[] {
+  const raw = (rawSubject || '').trim();
+  if (!raw) return ['Guru Mata Pelajaran'];
+  if (!raw.includes('&') && !/\bdan\b/i.test(raw) && !raw.includes('/')) {
+    return [raw];
+  }
+  const singleSubjectPatterns = [
+    /agama.*(?:&|\bdan\b)\s*budi\s*pekerti/i,
+    /pancasila.*(?:&|\bdan\b)\s*kewarganegaraan/i,
+    /seni\s*budaya.*(?:&|\bdan\b)\s*keterampilan/i,
+    /olahraga.*(?:&|\bdan\b)\s*kesehatan/i,
+    /bimbingan.*(?:&|\bdan\b)\s*konseling/i,
+    /prakarya.*(?:&|\bdan\b)\s*kewirausahaan/i,
+    /tenaga\s*kependidikan\s*\/\s*tata\s*usaha/i,
+  ];
+  if (singleSubjectPatterns.some((re) => re.test(raw))) {
+    return [raw];
+  }
+  const parts = raw
+    .split(/\s*(?:&|\/|\bdan\b)\s*/i)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (parts.length <= 1) return [raw];
+  return parts.map((s) => {
+    const low = s.toLowerCase();
+    if (low === 'pabp' || low.includes('pabp') || low.includes('agama')) {
+      return 'Pendidikan Agama Islam (PABP)';
+    }
+    if (low.includes('sunda')) {
+      return 'Bahasa Sunda';
+    }
+    return s;
+  });
+}
+
+/**
+ * Mencocokkan apakah suatu nama mapel (di Sesi Presensi, Tugas, atau Paket CBT)
+ * sesuai dengan mapel yang sedang dipilih oleh guru multi-mapel.
+ */
+export function isSubjectMatchingSelected(
+  itemSubject: string | undefined,
+  selectedSubject: string,
+  allTeacherSubjects: string[],
+  rawTeacherSubject?: string,
+  itemTitle?: string
+): boolean {
+  if (allTeacherSubjects.length <= 1) return true;
+  const itemClean = (itemSubject || '').toLowerCase().trim();
+  const selClean = (selectedSubject || '').toLowerCase().trim();
+  if (!itemClean) return selectedSubject === allTeacherSubjects[0];
+  if (itemClean === selClean) return true;
+
+  // Jika item masih memakai string gabungan (contoh: "PABP & Bahasa Sunda"),
+  // deteksi dari judul (jika ada) atau arahkan ke mapel pertama sebagai fallback.
+  if (
+    (rawTeacherSubject && itemClean === rawTeacherSubject.toLowerCase().trim()) ||
+    (itemClean.includes('&') && itemClean.includes('sunda') && (itemClean.includes('pabp') || itemClean.includes('agama')))
+  ) {
+    if (itemTitle) {
+      const titleLow = itemTitle.toLowerCase();
+      const isSundaTitle =
+        titleLow.includes('sunda') ||
+        titleLow.includes('paguneman') ||
+        titleLow.includes('pupuh') ||
+        titleLow.includes('aksara') ||
+        titleLow.includes('kawih') ||
+        titleLow.includes('biantara') ||
+        titleLow.includes('carpon');
+      if (isSundaTitle) {
+        return selClean.includes('sunda');
+      }
+      if (titleLow.includes('pabp') || titleLow.includes('agama') || titleLow.includes('pai') || titleLow.includes('akhlak')) {
+        return selClean.includes('pabp') || selClean.includes('agama');
+      }
+    }
+    return selectedSubject === allTeacherSubjects[0];
+  }
+
+  // Sinonim PABP / Pendidikan Agama
+  if (selClean.includes('pabp') || selClean.includes('agama')) {
+    if ((itemClean.includes('pabp') || itemClean.includes('agama')) && !itemClean.includes('sunda')) {
+      return true;
+    }
+  }
+  // Sinonim Bahasa Sunda
+  if (selClean.includes('sunda')) {
+    if (itemClean.includes('sunda') && !itemClean.includes('pabp') && !itemClean.includes('agama')) {
+      return true;
+    }
+  }
+
+  return itemClean.includes(selClean) || selClean.includes(itemClean);
+}
+
 export interface StudentUser {
   nisn: string;
   name: string;
@@ -4722,13 +4820,6 @@ export const OFFICIAL_TEACHERS: TeacherUser[] = [
     classes: ['7-A', '7-B', '8-A', '9-A']
   },
   {
-    nip: '19910408 201603 1 010',
-    name: 'Dani Ramdani, S.Pd.',
-    role: 'mapel',
-    subject: 'Bahasa Indonesia',
-    classes: ['7-A', '7-D', '8-D']
-  },
-  {
     nip: '19700608 199802 1 001',
     name: 'H. Rustandi, S.Pd., M.Pd.',
     role: 'both',
@@ -4921,7 +5012,7 @@ export async function updateStudentExitStatus(params: {
 export async function syncStudentsWithCloud(): Promise<Student[]> {
   if (typeof window === 'undefined') return INITIAL_STUDENTS;
   try {
-    const res = await fetch('/api/students');
+    const res = await fetch('/api/students', { cache: 'no-store' });
     if (!res.ok) return getStoredStudents();
     const json = await res.json();
     if (json.success && Array.isArray(json.data) && json.data.length > 0) {

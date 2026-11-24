@@ -3,7 +3,16 @@ import { query } from '@/lib/db';
 import { DEFAULT_SCHOOL_IDENTITY, SchoolIdentity } from '@/lib/settingsConstants';
 import { OFFICIAL_KALDIK_SMPN3 } from '@/lib/agendaConstants';
 import { DEFAULT_GALLERY_PHOTOS } from '@/lib/galleryConstants';
-import { DEFAULT_LEADERS, DEFAULT_TEACHERS, DEFAULT_DATA_POKOK } from '@/lib/schoolConstants';
+import { DEFAULT_LEADERS, DEFAULT_TEACHERS, DEFAULT_DATA_POKOK, isTendikOrTu } from '@/lib/schoolConstants';
+import { DEFAULT_WARTA } from '@/lib/wartaConstants';
+
+function cleanTeacherUsername(name: string): string {
+  const rawName = name || '';
+  const base = rawName.split(',')[0].trim();
+  const withoutPrefix = base.replace(/^(H\.|Hj\.|Drs\.|Dra\.|Dr\.|Prof\.|Ir\.|H\b|Hj\b)\s*/gi, '');
+  const clean = withoutPrefix.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+  return clean || 'guru';
+}
 
 // Helper: Ensure school_settings table exists and seed default identity if missing
 async function ensureSettingsTable() {
@@ -159,7 +168,7 @@ export async function POST(req: Request) {
 
     // 5. Action: Full Master Reset
     if (action === 'master_reset') {
-      // 5.1 Reset Identity & Admin Password
+      // 5.1 Reset Identity, Data Pokok, Kaldik PDF Info, & Admin Password
       await query(
         `INSERT INTO school_settings (setting_key, setting_value)
          VALUES ('schoolIdentity', ?), ('dataPokok', ?)
@@ -167,9 +176,30 @@ export async function POST(req: Request) {
         [JSON.stringify(DEFAULT_SCHOOL_IDENTITY), JSON.stringify(DEFAULT_DATA_POKOK)]
       );
       await query(`UPDATE users SET password = 'admin123' WHERE role = 'admin' OR username = 'admin'`);
-      await query(`DELETE FROM school_settings WHERE setting_key = 'adminPassword'`);
+      await query(`DELETE FROM school_settings WHERE setting_key IN ('adminPassword', 'kaldikPdfInfo')`);
 
-      // 5.2 Reset Agenda (27 Kaldik)
+      // 5.2 Reset Warta (7 default articles)
+      await query('DELETE FROM warta');
+      for (const item of DEFAULT_WARTA) {
+        await query(
+          `INSERT INTO warta (id, title, category, date, views, src, excerpt, content, status, author)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            item.id,
+            item.title,
+            item.category,
+            item.date,
+            item.views || '1',
+            item.src,
+            item.excerpt || '',
+            item.content || '',
+            item.status || 'Published',
+            item.author || 'Admin Humas'
+          ]
+        );
+      }
+
+      // 5.3 Reset Agenda (27 Kaldik)
       await query('DELETE FROM agenda');
       for (const item of OFFICIAL_KALDIK_SMPN3) {
         await query(
@@ -179,7 +209,7 @@ export async function POST(req: Request) {
         );
       }
 
-      // 5.3 Reset Gallery (8 default photos)
+      // 5.4 Reset Gallery (8 default photos)
       await query('DELETE FROM gallery');
       for (const item of DEFAULT_GALLERY_PHOTOS) {
         await query(
@@ -189,26 +219,41 @@ export async function POST(req: Request) {
         );
       }
 
-      // 5.4 Reset Leaders & Teachers
+      // 5.5 Reset Leaders & Teachers (+ sync users table)
       await query('DELETE FROM leaders');
-      for (const l of DEFAULT_LEADERS) {
+      for (let i = 0; i < DEFAULT_LEADERS.length; i++) {
+        const l = DEFAULT_LEADERS[i];
         await query(
-          `INSERT INTO leaders (id, name, role, badge, nip, quote, status, photo, badge_color)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [l.id, l.name, l.role, l.badge || '', l.nip || '-', l.quote || '', l.status || 'Aktif', l.photo || '/teachers/default_avatar.svg', l.badgeColor || '']
+          `INSERT INTO leaders (id, name, role, badge, nip, quote, status, photo, badge_color, sort_order)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [l.id, l.name, l.role, l.badge || '', l.nip || '-', l.quote || '', l.status || 'Aktif', l.photo || '/teachers/default_avatar.svg', l.badgeColor || 'text-cyan-300 border-cyan-400/30 bg-cyan-500/10', i + 1]
         );
       }
 
       await query('DELETE FROM teachers');
+      await query(`DELETE FROM users WHERE role = 'guru_mapel'`);
+      try {
+        await query(`ALTER TABLE teachers ADD COLUMN IF NOT EXISTS nuptk VARCHAR(100) DEFAULT NULL`);
+      } catch {}
       for (const t of DEFAULT_TEACHERS) {
+        const tendik = isTendikOrTu(t);
+        const uname = tendik ? null : (t.username || cleanTeacherUsername(t.name));
+        const pass = tendik ? null : (t.password || 'guru123');
         await query(
-          `INSERT INTO teachers (id, name, username, phone, role, subject, category, nip, photo, status, active, quote, password)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [t.id, t.name, t.username || 'guru', t.phone || '', t.role || '', t.subject || '', t.category || 'MIPA', t.nip || '-', t.photo || '/teachers/default_avatar.svg', t.status || 'GTT / Honorer', 1, t.quote || '', 'guru123']
+          `INSERT INTO teachers (id, name, username, phone, role, subject, category, nip, nuptk, photo, status, active, quote, password)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [t.id, t.name, uname, t.phone || '', t.role || 'Guru Mata Pelajaran', t.subject || '', t.category || 'MIPA', t.nip || '-', t.nuptk || null, t.photo || '/teachers/default_avatar.svg', t.status || 'GTT / Honorer', t.active !== false ? 1 : 0, t.quote || '', pass]
         );
+        if (!tendik && uname && pass) {
+          await query(
+            `INSERT INTO users (username, password, name, role, identifier, subject, phone, status)
+             VALUES (?, ?, ?, 'guru_mapel', ?, ?, ?, ?)`,
+            [uname, pass, t.name, t.nip || '-', t.subject || 'Mata Pelajaran', t.phone || null, t.active !== false ? 'active' : 'inactive']
+          );
+        }
       }
 
-      // 5.5 Reset Students
+      // 5.6 Reset Students & Sync Classes Total
       try {
         const fs = await import('fs/promises');
         const path = await import('path');
@@ -224,14 +269,46 @@ export async function POST(req: Request) {
             await query(`DELETE FROM students WHERE id = ?`, [extraId]);
           }
         }
-        await query(`UPDATE students SET status = 'Aktif', exit_reason = NULL, exit_date = NULL, exit_marked_by = NULL, password = 'siswa123'`);
+        const existingNisnMap = new Map<string, number>();
+        for (const r of currentRows) {
+          const n = String(r.nisn || '').trim();
+          if (officialNisns.has(n)) existingNisnMap.set(n, r.id);
+        }
+        for (const s of officialList) {
+          const cleanNisn = String(s.nisn || '').trim();
+          const cleanNis = s.nis ? String(s.nis).trim() : null;
+          const cleanClass = String(s.classId || s.class_id || '7-A').trim();
+          const cleanName = String(s.name || '').trim();
+          const cleanGender = s.gender || '-';
+          const cleanStudentId = s.id || `${cleanClass.replace('-', '')}-01`;
+          const dbId = existingNisnMap.get(cleanNisn);
+          if (dbId) {
+            await query(
+              `UPDATE students SET student_id = ?, nis = ?, name = ?, class_id = ?, gender = ?, status = 'Aktif', exit_reason = NULL, exit_date = NULL, exit_marked_by = NULL, password = 'siswa123' WHERE id = ?`,
+              [cleanStudentId, cleanNis, cleanName, cleanClass, cleanGender, dbId]
+            );
+          } else {
+            await query(
+              `INSERT INTO students (student_id, nis, nisn, name, class_id, gender, password, status)
+               VALUES (?, ?, ?, ?, ?, ?, 'siswa123', 'Aktif')`,
+              [cleanStudentId, cleanNis, cleanNisn, cleanName, cleanClass, cleanGender]
+            );
+          }
+        }
+        await query(`
+          UPDATE classes c
+          SET c.total_students = (
+            SELECT COUNT(*) FROM students s
+            WHERE s.class_id = c.id AND (s.status IS NULL OR s.status != 'Keluar')
+          )
+        `);
       } catch (err) {
         console.warn('Student reset during master reset:', err);
       }
 
       return NextResponse.json({
         success: true,
-        message: 'Seluruh database website (Identitas, Password, GTK, Siswa, Agenda, dan Galeri) berhasil direset ke kondisi master sekolah!'
+        message: 'Seluruh database website (Identitas, Password, Warta, GTK, Siswa, Agenda, dan Galeri) berhasil direset ke kondisi master sekolah!'
       });
     }
 

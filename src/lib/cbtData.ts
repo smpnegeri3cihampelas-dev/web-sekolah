@@ -137,6 +137,30 @@ export interface CbtPanitiaConfig {
   examSessionName: string;
   academicYear: string;
   semester: string;
+  defaultExamDate?: string;
+  defaultStartTime?: string;
+  defaultEndTime?: string;
+  defaultDurationMinutes?: number;
+  globalEmergencyPaused?: boolean;
+  globalEmergencyPauseReason?: string;
+  chairmanName?: string;
+  chairmanNip?: string;
+}
+
+export function extractPanitiaMeta(config: CbtPanitiaConfig) {
+  return {
+    examSessionName: config.examSessionName || 'Sesi 1 (Pagi)',
+    academicYear: config.academicYear || '2026/2027',
+    semester: config.semester || 'PTS / STS Ganjil',
+    defaultExamDate: config.defaultExamDate || undefined,
+    defaultStartTime: config.defaultStartTime || '07:30',
+    defaultEndTime: config.defaultEndTime || '09:00',
+    defaultDurationMinutes: Number(config.defaultDurationMinutes) || 60,
+    globalEmergencyPaused: Boolean(config.globalEmergencyPaused),
+    globalEmergencyPauseReason: config.globalEmergencyPaused ? (config.globalEmergencyPauseReason || null) : null,
+    chairmanName: config.chairmanName || undefined,
+    chairmanNip: config.chairmanNip || undefined
+  };
 }
 
 // -------------------------------------------------------------
@@ -344,13 +368,12 @@ export const REAL_SCHOOL_TEACHERS = [
   'Sonia Winjuni L, S.Pd.',
   "Elis Siti Sa'adah, S.Pd.",
   'Nira Destriyani, S.Pd.',
-  'Dani Ramdani, S.Pd.',
   'H. Rustandi, S.Pd., M.Pd.'
 ];
 
 export function getDefaultSupervisorSchedule(targetDate?: string): CbtSupervisorSchedule {
   const rooms = getDefaultSchoolRooms();
-  const dateToUse = targetDate || new Date().toISOString().split('T')[0];
+  const dateToUse = toLocalDateString(targetDate || new Date());
   const sessions: CbtScheduleSessionSlot[] = [
     { id: 's1', name: 'Jam Ke-1', startTime: '07:30', endTime: '09:00', subject: 'Informatika' },
     { id: 's2', name: 'Jam Ke-2', startTime: '09:30', endTime: '11:00', subject: 'Bahasa Inggris' }
@@ -366,7 +389,12 @@ export function getDefaultSupervisorSchedule(targetDate?: string): CbtSupervisor
 }
 
 export function getStoredSupervisorSchedule(targetDate?: string): CbtSupervisorSchedule {
-  const dateToUse = targetDate || (typeof window !== 'undefined' ? (localStorage.getItem('cbt_active_schedule_date') || new Date().toISOString().split('T')[0]) : new Date().toISOString().split('T')[0]);
+  const dateToUse = toLocalDateString(
+    targetDate ||
+      (typeof window !== 'undefined'
+        ? localStorage.getItem('cbt_active_schedule_date') || toLocalDateString(new Date())
+        : toLocalDateString(new Date()))
+  );
 
   if (typeof window === 'undefined') return getDefaultSupervisorSchedule(dateToUse);
   try {
@@ -410,10 +438,17 @@ export function getStoredSupervisorSchedule(targetDate?: string): CbtSupervisorS
   return getDefaultSupervisorSchedule(dateToUse);
 }
 
-export function saveStoredSupervisorSchedule(schedule: CbtSupervisorSchedule) {
+export function saveStoredSupervisorSchedule(
+  schedule: CbtSupervisorSchedule,
+  options?: { skipCloudSync?: boolean }
+) {
   if (typeof window === 'undefined') return;
   try {
-    const dateKey = schedule.examDate || new Date().toISOString().split('T')[0];
+    const dateKey = toLocalDateString(schedule.examDate || new Date());
+    const normalizedSchedule: CbtSupervisorSchedule = {
+      ...schedule,
+      examDate: dateKey
+    };
     localStorage.setItem('cbt_active_schedule_date', dateKey);
 
     // Simpan ke peta multi-hari
@@ -424,12 +459,47 @@ export function saveStoredSupervisorSchedule(schedule: CbtSupervisorSchedule) {
         map = JSON.parse(rawMap) || {};
       } catch (e) {}
     }
-    map[dateKey] = schedule;
+    map[dateKey] = normalizedSchedule;
     localStorage.setItem(CBT_SUPERVISOR_SCHEDULES_MAP_KEY, JSON.stringify(map));
 
     // Simpan juga ke key tunggal aktif
-    localStorage.setItem(CBT_SUPERVISOR_SCHEDULE_KEY, JSON.stringify(schedule));
+    localStorage.setItem(CBT_SUPERVISOR_SCHEDULE_KEY, JSON.stringify(normalizedSchedule));
+
+    if (!options?.skipCloudSync) {
+      try {
+        const pendingRaw = localStorage.getItem('spentic_pending_cbt_sched_uploads_v1');
+        const pendingMap: Record<string, CbtSupervisorSchedule> = pendingRaw ? JSON.parse(pendingRaw) : {};
+        pendingMap[dateKey] = normalizedSchedule;
+        localStorage.setItem('spentic_pending_cbt_sched_uploads_v1', JSON.stringify(pendingMap));
+      } catch {}
+    }
+
     window.dispatchEvent(new Event('cbtSupervisorScheduleUpdated'));
+
+    if (!options?.skipCloudSync) {
+      const payload = JSON.stringify(normalizedSchedule);
+      fetch('/api/cbt/schedules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: payload,
+        keepalive: payload.length < 60000
+      })
+        .then(res => {
+          if (res.ok) {
+            try {
+              const rawP = localStorage.getItem('spentic_pending_cbt_sched_uploads_v1');
+              if (rawP) {
+                const pMap = JSON.parse(rawP);
+                if (pMap && pMap[dateKey]) {
+                  delete pMap[dateKey];
+                  localStorage.setItem('spentic_pending_cbt_sched_uploads_v1', JSON.stringify(pMap));
+                }
+              }
+            } catch {}
+          }
+        })
+        .catch(() => {});
+    }
   } catch (e) {
     console.error('Failed saving supervisor schedule', e);
   }
@@ -553,6 +623,7 @@ export function getStoredCbtPanitiaConfig(): CbtPanitiaConfig {
   };
 }
 
+const PENDING_CBT_ROOMS_KEY = 'spentic_pending_cbt_rooms_upload_v1';
 let pendingRoomsPushCount = 0;
 let lastRoomsMutationAt = 0;
 let roomsSyncPendingUpload = false;
@@ -560,16 +631,46 @@ let lastRoomsForceEmpty = false;
 
 export function isRoomsCloudSyncSafeToApply(): boolean {
   if (pendingRoomsPushCount > 0 || roomsSyncPendingUpload) return false;
+  if (typeof window !== 'undefined') {
+    try {
+      if (localStorage.getItem(PENDING_CBT_ROOMS_KEY)) return false;
+    } catch {}
+  }
   if (Date.now() - lastRoomsMutationAt < 8000) return false;
   return true;
 }
 
 export function isRoomsUploadPending(): boolean {
-  return roomsSyncPendingUpload;
+  if (roomsSyncPendingUpload) return true;
+  if (typeof window !== 'undefined') {
+    try {
+      return Boolean(localStorage.getItem(PENDING_CBT_ROOMS_KEY));
+    } catch {}
+  }
+  return false;
+}
+
+export function markRoomsUploadCompleted(): void {
+  roomsSyncPendingUpload = false;
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.removeItem(PENDING_CBT_ROOMS_KEY);
+    } catch {}
+  }
 }
 
 export function getLastRoomsForceEmpty(): boolean {
-  return lastRoomsForceEmpty;
+  if (lastRoomsForceEmpty) return true;
+  if (typeof window !== 'undefined') {
+    try {
+      const raw = localStorage.getItem(PENDING_CBT_ROOMS_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        return Boolean(parsed?.forceEmpty);
+      }
+    } catch {}
+  }
+  return false;
 }
 
 export function saveStoredCbtPanitiaConfig(
@@ -586,11 +687,18 @@ export function saveStoredCbtPanitiaConfig(
       pendingRoomsPushCount += 1;
       roomsSyncPendingUpload = true;
       lastRoomsForceEmpty = Boolean(options?.forceEmpty);
+      try {
+        localStorage.setItem(
+          PENDING_CBT_ROOMS_KEY,
+          JSON.stringify({ ts: lastRoomsMutationAt, forceEmpty: lastRoomsForceEmpty })
+        );
+      } catch {}
       window.dispatchEvent(new CustomEvent('cbtRoomsSyncStatus', { detail: { status: 'syncing' } }));
 
       const payload = JSON.stringify({
         rooms: config.rooms,
-        forceEmpty: Boolean(options?.forceEmpty)
+        forceEmpty: Boolean(options?.forceEmpty),
+        meta: extractPanitiaMeta(config)
       });
 
       fetch('/api/cbt/rooms', {
@@ -601,7 +709,7 @@ export function saveStoredCbtPanitiaConfig(
       })
         .then(res => {
           if (res.ok) {
-            roomsSyncPendingUpload = false;
+            markRoomsUploadCompleted();
             window.dispatchEvent(new CustomEvent('cbtRoomsSyncStatus', { detail: { status: 'synced' } }));
           } else {
             roomsSyncPendingUpload = true;
@@ -974,35 +1082,151 @@ export function getStoredCbtPackages(): CbtExamPackage[] {
   }
 }
 
-export function deleteStoredCbtPackage(id: string) {
+const DELETED_CBT_PKG_KEY = 'spentic_deleted_cbt_pkg_ids_v1';
+const PENDING_CBT_PKG_UPLOADS_KEY = 'spentic_pending_cbt_pkg_uploads_v1';
+
+function markLocalCbtPackagePendingSync(pkg: CbtExamPackage) {
   if (typeof window === 'undefined') return;
   try {
+    // 1. Unmark from deleted tombstones
+    const rawDel = localStorage.getItem(DELETED_CBT_PKG_KEY);
+    if (rawDel) {
+      const delSet = new Set<string>(JSON.parse(rawDel));
+      if (delSet.has(pkg.id)) {
+        delSet.delete(pkg.id);
+        localStorage.setItem(DELETED_CBT_PKG_KEY, JSON.stringify(Array.from(delSet)));
+      }
+    }
+    // 2. Add/update in pending upload queue synchronously (prevents focus-sync race condition)
+    const rawPend = localStorage.getItem(PENDING_CBT_PKG_UPLOADS_KEY);
+    const pendList: CbtExamPackage[] = rawPend ? JSON.parse(rawPend) : [];
+    const idx = pendList.findIndex(p => p.id === pkg.id);
+    if (idx >= 0) pendList[idx] = pkg;
+    else pendList.push(pkg);
+    localStorage.setItem(PENDING_CBT_PKG_UPLOADS_KEY, JSON.stringify(pendList));
+  } catch {}
+}
+
+function markLocalCbtPackageDeletedSync(id: string) {
+  if (typeof window === 'undefined') return;
+  try {
+    // 1. Record tombstone synchronously before confirm() focus event can fire
+    const rawDel = localStorage.getItem(DELETED_CBT_PKG_KEY);
+    const delSet = new Set<string>(rawDel ? JSON.parse(rawDel) : []);
+    delSet.add(id);
+    localStorage.setItem(DELETED_CBT_PKG_KEY, JSON.stringify(Array.from(delSet)));
+
+    // 2. Remove from pending upload queue synchronously
+    const rawPend = localStorage.getItem(PENDING_CBT_PKG_UPLOADS_KEY);
+    if (rawPend) {
+      const pendList: CbtExamPackage[] = JSON.parse(rawPend);
+      const filtered = pendList.filter(p => p.id !== id);
+      localStorage.setItem(PENDING_CBT_PKG_UPLOADS_KEY, JSON.stringify(filtered));
+    }
+  } catch {}
+}
+
+export async function deleteStoredCbtPackage(
+  id: string,
+  options?: { skipCloudSync?: boolean }
+): Promise<boolean> {
+  if (typeof window === 'undefined') return false;
+  try {
+    markLocalCbtPackageDeletedSync(id);
     const list = getStoredCbtPackages().filter(p => p.id !== id);
     localStorage.setItem(CBT_PACKAGES_KEY, JSON.stringify(list));
     window.dispatchEvent(new Event('cbtPackagesUpdated'));
-    try {
-      import('./cloudSync').then(m => m.deleteCbtPackageFromCloud(id)).catch(() => {});
-    } catch {}
+    if (!options?.skipCloudSync) {
+      const m = await import('./cloudSync');
+      return await m.deleteCbtPackageFromCloud(id);
+    }
+    return true;
   } catch (e) {
     console.error('Failed deleting CBT package', e);
+    return false;
   }
 }
 
-export function saveStoredCbtPackages(packages: CbtExamPackage[]) {
+export async function saveStoredCbtPackage(
+  pkg: CbtExamPackage,
+  options?: { skipCloudSync?: boolean }
+): Promise<boolean> {
+  if (typeof window === 'undefined') return false;
+  try {
+    const questions = Array.isArray(pkg.questions)
+      ? pkg.questions.map((q, idx) => ({ ...q, number: idx + 1 }))
+      : [];
+    const sanitizedPkg: CbtExamPackage = {
+      ...pkg,
+      examDate: toLocalDateString(pkg.examDate),
+      questions,
+      totalQuestions: questions.length
+    };
+
+    if (!options?.skipCloudSync) {
+      markLocalCbtPackagePendingSync(sanitizedPkg);
+    }
+
+    const current = getStoredCbtPackages();
+    const idx = current.findIndex(p => p.id === sanitizedPkg.id);
+    const updated = idx >= 0
+      ? current.map(p => (p.id === sanitizedPkg.id ? sanitizedPkg : p))
+      : [sanitizedPkg, ...current];
+
+    localStorage.setItem(CBT_PACKAGES_KEY, JSON.stringify(updated));
+    window.dispatchEvent(new Event('cbtPackagesUpdated'));
+
+    if (!options?.skipCloudSync) {
+      const m = await import('./cloudSync');
+      return await m.pushCbtPackageToCloud(sanitizedPkg);
+    }
+    return true;
+  } catch (e) {
+    console.error('Failed saving single CBT package', e);
+    return false;
+  }
+}
+
+export function saveStoredCbtPackages(
+  packages: CbtExamPackage[],
+  options?: { skipCloudSync?: boolean; targetPkgId?: string }
+) {
   if (typeof window === 'undefined') return;
   try {
-    const sanitized = packages.map(p => ({
-      ...p,
-      examDate: toLocalDateString(p.examDate)
-    }));
+    const sanitized = packages.map(p => {
+      const questions = Array.isArray(p.questions)
+        ? p.questions.map((q, idx) => ({ ...q, number: idx + 1 }))
+        : [];
+      return {
+        ...p,
+        examDate: toLocalDateString(p.examDate),
+        questions,
+        totalQuestions: questions.length
+      };
+    });
+
+    if (!options?.skipCloudSync) {
+      const toQueue = options?.targetPkgId
+        ? sanitized.filter(p => p.id === options.targetPkgId)
+        : sanitized;
+      toQueue.forEach(p => markLocalCbtPackagePendingSync(p));
+    }
+
     localStorage.setItem(CBT_PACKAGES_KEY, JSON.stringify(sanitized));
     window.dispatchEvent(new Event('cbtPackagesUpdated'));
-    // Asynchronous background cloud sync to Hostinger MySQL
-    try {
-      import('./cloudSync').then(m => {
-        sanitized.forEach(p => m.pushCbtPackageToCloud(p));
-      }).catch(() => {});
-    } catch {}
+
+    if (!options?.skipCloudSync) {
+      try {
+        import('./cloudSync').then(m => {
+          const toPush = options?.targetPkgId
+            ? sanitized.filter(p => p.id === options.targetPkgId)
+            : sanitized;
+          toPush.forEach(p => {
+            m.pushCbtPackageToCloud(p);
+          });
+        }).catch(() => {});
+      } catch {}
+    }
   } catch (e) {
     console.error('Failed saving CBT packages', e);
   }
@@ -1041,8 +1265,9 @@ export function evaluateCbtPackageSchedule(
     };
   }
 
-  // 1. Cek Jeda Darurat Panitia (Manual Emergency Pause)
-  if (pkg.emergencyPaused || pkg.status === 'draft') {
+  // 1. Cek Jeda Darurat Panitia (Global maupun Per Paket)
+  const globalCfg = typeof window !== 'undefined' ? getStoredCbtPanitiaConfig() : null;
+  if (globalCfg?.globalEmergencyPaused || pkg.emergencyPaused || pkg.status === 'draft') {
     return {
       scheduleState: 'emergency_paused',
       isActiveNow: false,
@@ -1050,7 +1275,10 @@ export function evaluateCbtPackageSchedule(
       statusLabel: '⏸️ DIJEDA DARURAT',
       badgeClass: 'bg-rose-100 text-rose-800 border-rose-300 font-extrabold animate-pulse',
       scheduleText: pkg.startTime && pkg.endTime ? `${pkg.startTime} - ${pkg.endTime} WIB` : 'Dijeda',
-      message: pkg.emergencyPauseReason || 'Ujian sedang dijeda darurat oleh panitia (misal: kendala listrik/jaringan). Mohon tetap tenang di tempat duduk.'
+      message:
+        pkg.emergencyPauseReason ||
+        globalCfg?.globalEmergencyPauseReason ||
+        'Ujian sedang dijeda darurat oleh panitia (misal: kendala listrik/jaringan). Mohon tetap tenang di tempat duduk.'
     };
   }
 
@@ -1145,6 +1373,7 @@ export function evaluateCbtPackageSchedule(
 
 /**
  * Update jadwal waktu (tanggal, jam mulai, jam selesai, durasi) serentak atau per paket
+ * sekaligus menyinkronkan ke MariaDB (cbt_exam_packages + school_settings cbtPanitiaMeta)
  */
 export function updateCbtPackageSchedule(params: {
   packageId?: string; // jika kosong -> terapkan ke SEMUA paket
@@ -1152,6 +1381,8 @@ export function updateCbtPackageSchedule(params: {
   startTime?: string;
   endTime?: string;
   durationMinutes?: number;
+  academicYear?: string;
+  semester?: string;
 }) {
   const all = getStoredCbtPackages();
   const updated = all.map(pkg => {
@@ -1163,27 +1394,134 @@ export function updateCbtPackageSchedule(params: {
         startTime: params.startTime !== undefined ? params.startTime : pkg.startTime,
         endTime: params.endTime !== undefined ? params.endTime : pkg.endTime,
         durationMinutes: params.durationMinutes !== undefined ? params.durationMinutes : pkg.durationMinutes,
-        emergencyPaused: false
+        academicYear: params.academicYear !== undefined ? params.academicYear : pkg.academicYear,
+        emergencyPaused: false,
+        emergencyPauseReason: undefined
       };
     }
     return pkg;
   });
-  saveStoredCbtPackages(updated);
+
+  // Simpan juga konfigurasi jadwal global & meta Posko ke MariaDB (school_settings) agar tetap tersimpan meski paket belum ada
+  if (typeof window !== 'undefined') {
+    const currentCfg = getStoredCbtPanitiaConfig();
+    const nextCfg: CbtPanitiaConfig = {
+      ...currentCfg,
+      academicYear: params.academicYear !== undefined ? params.academicYear : currentCfg.academicYear,
+      semester: params.semester !== undefined ? params.semester : currentCfg.semester,
+      ...(!params.packageId
+        ? {
+            defaultExamDate: params.examDate !== undefined ? params.examDate : currentCfg.defaultExamDate,
+            defaultStartTime: params.startTime !== undefined ? params.startTime : currentCfg.defaultStartTime,
+            defaultEndTime: params.endTime !== undefined ? params.endTime : currentCfg.defaultEndTime,
+            defaultDurationMinutes: params.durationMinutes !== undefined ? params.durationMinutes : currentCfg.defaultDurationMinutes,
+            globalEmergencyPaused: false,
+            globalEmergencyPauseReason: undefined
+          }
+        : {})
+    };
+    localStorage.setItem(CBT_PANITIA_CONFIG_KEY, JSON.stringify(nextCfg));
+    window.dispatchEvent(new CustomEvent('cbtPanitiaConfigUpdated', { detail: nextCfg }));
+    lastRoomsMutationAt = Date.now();
+    pendingRoomsPushCount += 1;
+    roomsSyncPendingUpload = true;
+    fetch('/api/cbt/rooms', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ meta: extractPanitiaMeta(nextCfg) })
+    })
+      .then(res => {
+        if (res.ok) markRoomsUploadCompleted();
+      })
+      .catch(() => {})
+      .finally(() => {
+        pendingRoomsPushCount = Math.max(0, pendingRoomsPushCount - 1);
+      });
+  }
+
+  saveStoredCbtPackages(updated, { skipCloudSync: true });
+
+  const targets = params.packageId ? updated.filter(p => p.id === params.packageId) : updated;
+  if (targets.length > 0 && typeof window !== 'undefined') {
+    targets.forEach(p => markLocalCbtPackagePendingSync(p));
+    fetch('/api/cbt/packages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ packages: targets })
+    })
+      .then(res => {
+        if (res.ok) {
+          import('./cloudSync')
+            .then(m => targets.forEach(p => m.dequeuePendingCbtPackageUpload(p.id)))
+            .catch(() => {});
+        }
+      })
+      .catch(() => {});
+  }
   return updated;
 }
 
 /**
  * Toggle Jeda Darurat (Emergency Pause) serentak oleh Panitia
+ * langsung tersinkron ke MariaDB (school_settings + cbt_exam_packages)
  */
 export function toggleCbtEmergencyPause(isPaused: boolean, reason?: string) {
+  const effectiveReason = isPaused
+    ? (reason || 'Jeda darurat serentak oleh panitia (misal: kendala listrik/jaringan)')
+    : undefined;
+
+  if (typeof window !== 'undefined') {
+    const currentCfg = getStoredCbtPanitiaConfig();
+    const nextCfg: CbtPanitiaConfig = {
+      ...currentCfg,
+      globalEmergencyPaused: isPaused,
+      globalEmergencyPauseReason: effectiveReason
+    };
+    localStorage.setItem(CBT_PANITIA_CONFIG_KEY, JSON.stringify(nextCfg));
+    window.dispatchEvent(new CustomEvent('cbtPanitiaConfigUpdated', { detail: nextCfg }));
+    lastRoomsMutationAt = Date.now();
+    pendingRoomsPushCount += 1;
+    roomsSyncPendingUpload = true;
+    fetch('/api/cbt/rooms', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ meta: extractPanitiaMeta(nextCfg) })
+    })
+      .then(res => {
+        if (res.ok) markRoomsUploadCompleted();
+      })
+      .catch(() => {})
+      .finally(() => {
+        pendingRoomsPushCount = Math.max(0, pendingRoomsPushCount - 1);
+      });
+  }
+
   const all = getStoredCbtPackages();
   const updated = all.map(pkg => ({
     ...pkg,
     status: (isPaused ? 'draft' : 'active') as 'active' | 'draft',
     emergencyPaused: isPaused,
-    emergencyPauseReason: isPaused ? (reason || 'Jeda darurat serentak oleh panitia (misal: kendala listrik/jaringan)') : undefined
+    emergencyPauseReason: effectiveReason
   }));
-  saveStoredCbtPackages(updated);
+  saveStoredCbtPackages(updated, { skipCloudSync: true });
+
+  if (updated.length > 0 && typeof window !== 'undefined') {
+    updated.forEach(p => markLocalCbtPackagePendingSync(p));
+    fetch('/api/cbt/packages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ packages: updated })
+    })
+      .then(res => {
+        if (res.ok) {
+          import('./cloudSync')
+            .then(m => updated.forEach(p => m.dequeuePendingCbtPackageUpload(p.id)))
+            .catch(() => {});
+        }
+      })
+      .catch(() => {});
+  }
+
   return updated;
 }
 
@@ -1294,15 +1632,28 @@ export function saveStoredStudentCbtSession(
   }
 }
 
-export function resetStoredStudentCbtSession(examId: string, studentIdOrNisn: string) {
+const PENDING_CBT_RESETS_KEY = 'spentic_pending_cbt_resets_v1';
+const PENDING_CBT_UNLOCKS_KEY = 'spentic_pending_cbt_unlocks_v1';
+
+export function resetStoredStudentCbtSession(
+  examId: string,
+  studentIdOrNisn: string,
+  optionalSecondNisn?: string
+) {
   if (typeof window === 'undefined') return;
   try {
     const all = getStoredStudentCbtSessions();
+    const matchedStudentIds = new Set<string>([studentIdOrNisn]);
+    if (optionalSecondNisn) matchedStudentIds.add(optionalSecondNisn);
+
     pendingViolationLocks.delete(`${examId}_${studentIdOrNisn}`);
+    if (optionalSecondNisn) pendingViolationLocks.delete(`${examId}_${optionalSecondNisn}`);
 
     // 1. Direct delete by composite key
     const directKey = `${examId}_${studentIdOrNisn}`;
     if (all[directKey]) {
+      if (all[directKey].studentId) matchedStudentIds.add(all[directKey].studentId);
+      if (all[directKey].studentNisn) matchedStudentIds.add(all[directKey].studentNisn);
       delete all[directKey];
     }
 
@@ -1311,28 +1662,68 @@ export function resetStoredStudentCbtSession(examId: string, studentIdOrNisn: st
       const isStudentMatch = 
         sess.studentId === studentIdOrNisn || 
         sess.studentNisn === studentIdOrNisn || 
+        (optionalSecondNisn && (sess.studentId === optionalSecondNisn || sess.studentNisn === optionalSecondNisn)) ||
         k.includes(studentIdOrNisn) ||
         (sess.studentName && sess.studentName.toLowerCase().trim() === studentIdOrNisn.toLowerCase().trim());
 
       const isExamMatch = !examId || sess.examId === examId || k.startsWith(examId);
 
       if (isStudentMatch && isExamMatch) {
+        if (sess.studentId) matchedStudentIds.add(sess.studentId);
+        if (sess.studentNisn) matchedStudentIds.add(sess.studentNisn);
         pendingViolationLocks.delete(`${sess.examId}_${sess.studentId}`);
         if (sess.studentNisn) pendingViolationLocks.delete(`${sess.examId}_${sess.studentNisn}`);
         delete all[k];
       }
     }
 
+    // Rekam antrean reset secara sinkron di localStorage agar focus sync setelah confirm() tidak pernah mengembalikan sesi
+    const resetIdList = Array.from(matchedStudentIds).filter(Boolean);
+    const resetEntryKey = `${examId}_${resetIdList.sort().join('|')}`;
+    try {
+      const rawPend = localStorage.getItem(PENDING_CBT_RESETS_KEY);
+      const pendMap: Record<string, { examId: string; ids: string[]; ts: number }> = rawPend ? JSON.parse(rawPend) : {};
+      pendMap[resetEntryKey] = { examId, ids: resetIdList, ts: Date.now() };
+      localStorage.setItem(PENDING_CBT_RESETS_KEY, JSON.stringify(pendMap));
+    } catch {}
+
+    // Record reset guard in cloudSync as well
+    try {
+      import('./cloudSync').then(m => {
+        resetIdList.forEach(sid => m.recordResetCbtStudentSession(examId, sid));
+      }).catch(() => {});
+    } catch {}
+
     // Always persist and notify listeners
     localStorage.setItem(CBT_STUDENT_SESSIONS_KEY, JSON.stringify(all));
     window.dispatchEvent(new CustomEvent('cbtSessionsUpdated', { detail: { source: 'supervisor_reset', examId } }));
     window.dispatchEvent(new Event('storage'));
 
-    // Sync deletion to cloud database
+    // Sync deletion to cloud database for all matched IDs/NISNs
     try {
-      fetch(`/api/cbt/answers?examId=${encodeURIComponent(examId)}&studentId=${encodeURIComponent(studentIdOrNisn)}`, {
-        method: 'DELETE'
-      }).catch(() => {});
+      Promise.all(
+        resetIdList.map(sid =>
+          fetch(
+            `/api/cbt/answers?examId=${encodeURIComponent(examId)}&studentId=${encodeURIComponent(sid)}&nisn=${encodeURIComponent(optionalSecondNisn || sid)}`,
+            { method: 'DELETE', keepalive: true }
+          ).then(r => r.ok)
+        )
+      )
+        .then(results => {
+          if (results.every(Boolean)) {
+            try {
+              const rawPend = localStorage.getItem(PENDING_CBT_RESETS_KEY);
+              if (rawPend) {
+                const pendMap = JSON.parse(rawPend);
+                if (pendMap && pendMap[resetEntryKey]) {
+                  delete pendMap[resetEntryKey];
+                  localStorage.setItem(PENDING_CBT_RESETS_KEY, JSON.stringify(pendMap));
+                }
+              }
+            } catch {}
+          }
+        })
+        .catch(() => {});
     } catch {}
   } catch (e) {
     console.error('Failed resetting student CBT session', e);
@@ -1342,15 +1733,18 @@ export function resetStoredStudentCbtSession(examId: string, studentIdOrNisn: st
 export function unlockStoredStudentCbtSession(
   examId: string,
   studentIdOrNisn: string,
-  options?: { skipCloudPush?: boolean }
+  options?: { skipCloudPush?: boolean; studentNisn?: string }
 ) {
   if (typeof window === 'undefined') return;
   try {
     const all = getStoredStudentCbtSessions();
-    let unlockedSession: CbtStudentAnswerState | null = null;
+    const unlockedSessions: CbtStudentAnswerState[] = [];
+    const matchedStudentIds = new Set<string>([studentIdOrNisn]);
+    if (options?.studentNisn) matchedStudentIds.add(options.studentNisn);
     const unlockTs = Date.now();
 
     pendingViolationLocks.delete(`${examId}_${studentIdOrNisn}`);
+    if (options?.studentNisn) pendingViolationLocks.delete(`${examId}_${options.studentNisn}`);
 
     // 1. Direct key update if exists
     const directKey = `${examId}_${studentIdOrNisn}`;
@@ -1363,7 +1757,9 @@ export function unlockStoredStudentCbtSession(
         unlockedAt: unlockTs,
         violationSynced: false
       };
-      unlockedSession = all[directKey];
+      unlockedSessions.push(all[directKey]);
+      if (all[directKey].studentId) matchedStudentIds.add(all[directKey].studentId);
+      if (all[directKey].studentNisn) matchedStudentIds.add(all[directKey].studentNisn);
     }
 
     // 2. Comprehensive scan across all session objects
@@ -1371,6 +1767,7 @@ export function unlockStoredStudentCbtSession(
       const isStudentMatch = 
         sess.studentId === studentIdOrNisn || 
         sess.studentNisn === studentIdOrNisn || 
+        (options?.studentNisn && (sess.studentId === options.studentNisn || sess.studentNisn === options.studentNisn)) ||
         k.includes(studentIdOrNisn) ||
         (sess.studentName && sess.studentName.toLowerCase().trim() === studentIdOrNisn.toLowerCase().trim());
 
@@ -1387,7 +1784,9 @@ export function unlockStoredStudentCbtSession(
           unlockedAt: unlockTs,
           violationSynced: false
         };
-        unlockedSession = all[k];
+        unlockedSessions.push(all[k]);
+        if (sess.studentId) matchedStudentIds.add(sess.studentId);
+        if (sess.studentNisn) matchedStudentIds.add(sess.studentNisn);
       }
     }
 
@@ -1396,13 +1795,59 @@ export function unlockStoredStudentCbtSession(
     window.dispatchEvent(new CustomEvent('cbtSessionsUpdated', { detail: { source: 'supervisor_unlock', examId } }));
     window.dispatchEvent(new Event('storage'));
 
-    // Sync unlocked session to cloud database immediately
-    if (unlockedSession && !options?.skipCloudPush) {
-      fetch('/api/cbt/answers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(unlockedSession)
-      }).catch(() => {});
+    // Rekam antrean buka kunci secara sinkron di localStorage agar tidak terkunci kembali
+    if (unlockedSessions.length > 0 && !options?.skipCloudPush) {
+      try {
+        const rawPend = localStorage.getItem(PENDING_CBT_UNLOCKS_KEY);
+        const pendMap: Record<string, CbtStudentAnswerState> = rawPend ? JSON.parse(rawPend) : {};
+        for (const sess of unlockedSessions) {
+          pendMap[`${sess.examId}_${sess.studentId || sess.studentNisn}`] = sess;
+        }
+        localStorage.setItem(PENDING_CBT_UNLOCKS_KEY, JSON.stringify(pendMap));
+      } catch {}
+    }
+
+    // Record unlock in cloudSync guard so window.focus after alert() does not re-lock
+    try {
+      import('./cloudSync')
+        .then(m => {
+          for (const sid of matchedStudentIds) {
+            if (sid) m.recordUnlockedCbtStudentSession(examId, sid);
+          }
+        })
+        .catch(() => {});
+    } catch {}
+
+    // Sync unlocked session(s) to cloud database immediately
+    if (unlockedSessions.length > 0 && !options?.skipCloudPush) {
+      const seenPayloads = new Set<string>();
+      for (const sess of unlockedSessions) {
+        const keySig = `${sess.examId}_${sess.studentId}_${sess.studentNisn || ''}`;
+        if (seenPayloads.has(keySig)) continue;
+        seenPayloads.add(keySig);
+        const pendKey = `${sess.examId}_${sess.studentId || sess.studentNisn}`;
+        fetch('/api/cbt/answers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(sess),
+          keepalive: true
+        })
+          .then(res => {
+            if (res.ok) {
+              try {
+                const rawP = localStorage.getItem(PENDING_CBT_UNLOCKS_KEY);
+                if (rawP) {
+                  const pMap = JSON.parse(rawP);
+                  if (pMap && pMap[pendKey]) {
+                    delete pMap[pendKey];
+                    localStorage.setItem(PENDING_CBT_UNLOCKS_KEY, JSON.stringify(pMap));
+                  }
+                }
+              } catch {}
+            }
+          })
+          .catch(() => {});
+      }
     }
   } catch (e) {
     console.error('Failed unlocking student CBT session', e);
@@ -1420,15 +1865,39 @@ export function getStoredCbtRoomAttendances(): Record<string, CbtRoomAttendance>
   }
 }
 
-export function saveStoredCbtRoomAttendance(attendance: CbtRoomAttendance) {
+export function saveStoredCbtRoomAttendance(
+  attendance: CbtRoomAttendance,
+  options?: { skipCloudSync?: boolean; mergeRecordsOnly?: boolean }
+) {
   if (typeof window === 'undefined') return;
   try {
+    const normalizedDate = toLocalDateString(attendance.date || new Date());
+    const normalizedAttendance: CbtRoomAttendance = {
+      ...attendance,
+      date: normalizedDate
+    };
     const all = getStoredCbtRoomAttendances();
-    const key = `${attendance.roomName}_${attendance.examId}_${attendance.date}`;
-    all[key] = attendance;
+    const key = `${normalizedAttendance.roomName}_${normalizedAttendance.examId}_${normalizedDate}`;
+    all[key] = normalizedAttendance;
     localStorage.setItem(CBT_ROOM_ATTENDANCE_KEY, JSON.stringify(all));
+
+    if (!options?.skipCloudSync) {
+      try {
+        const pendingRaw = localStorage.getItem('spentic_pending_cbt_att_uploads_v1');
+        const pendingMap: Record<string, CbtRoomAttendance> = pendingRaw ? JSON.parse(pendingRaw) : {};
+        pendingMap[key] = normalizedAttendance;
+        localStorage.setItem('spentic_pending_cbt_att_uploads_v1', JSON.stringify(pendingMap));
+      } catch {}
+    }
+
     window.dispatchEvent(new Event('cbtAttendanceUpdated'));
     window.dispatchEvent(new Event('cbtRoomAttendancesUpdated'));
+
+    if (!options?.skipCloudSync) {
+      import('./cloudSync')
+        .then(m => m.pushCbtRoomAttendanceToCloud(normalizedAttendance, { mergeRecordsOnly: options?.mergeRecordsOnly }))
+        .catch(() => {});
+    }
   } catch (e) {
     console.error('Failed saving CBT room attendance', e);
   }
@@ -1486,14 +1955,14 @@ export function checkInRoomSupervisor(params: {
         .catch(() => {});
     } catch {}
 
-    // 2. Jika examId diberikan, update atau buat presensi aktif di CBT_ROOM_ATTENDANCE_KEY
+    // 2. Jika examId diberikan, update atau buat presensi aktif di CBT_ROOM_ATTENDANCE_KEY & sinkron ke MariaDB
     if (examId) {
-      const todayStr = new Date().toISOString().split('T')[0];
+      const todayStr = toLocalDateString(new Date());
       const allAtt = getStoredCbtRoomAttendances();
       const key = `${roomName}_${examId}_${todayStr}`;
       const existing = allAtt[key];
 
-      allAtt[key] = {
+      const updatedAtt: CbtRoomAttendance = {
         roomName,
         examId,
         examTitle: examTitle || existing?.examTitle || 'Ujian CBT',
@@ -1506,9 +1975,7 @@ export function checkInRoomSupervisor(params: {
         submittedAt: existing?.submittedAt
       };
 
-      localStorage.setItem(CBT_ROOM_ATTENDANCE_KEY, JSON.stringify(allAtt));
-      window.dispatchEvent(new Event('cbtAttendanceUpdated'));
-      window.dispatchEvent(new Event('cbtRoomAttendancesUpdated'));
+      saveStoredCbtRoomAttendance(updatedAtt);
     }
 
     return { success: true, message: `Berhasil check-in di ${roomName} sebagai ${cleanSup}` };
@@ -1532,7 +1999,7 @@ export function markStudentCbtAttendancePresent(params: {
 }): void {
   if (typeof window === 'undefined') return;
   const { roomName, examId, studentId, examTitle, token } = params;
-  const todayStr = params.date || new Date().toISOString().split('T')[0];
+  const todayStr = toLocalDateString(params.date || new Date());
   const allAtt = getStoredCbtRoomAttendances();
   const key = `${roomName}_${examId}_${todayStr}`;
   const existing = allAtt[key];
@@ -1540,7 +2007,7 @@ export function markStudentCbtAttendancePresent(params: {
   const currentRecords: Record<string, 'H' | 'S' | 'I' | 'A'> = existing?.records ? { ...existing.records } : {};
   currentRecords[studentId] = 'H'; // Otomatis tandai Hadir!
 
-  allAtt[key] = {
+  const updatedAtt: CbtRoomAttendance = {
     roomName,
     examId,
     examTitle: examTitle || existing?.examTitle || 'Ujian CBT',
@@ -1553,9 +2020,7 @@ export function markStudentCbtAttendancePresent(params: {
     submittedAt: existing?.submittedAt
   };
 
-  localStorage.setItem(CBT_ROOM_ATTENDANCE_KEY, JSON.stringify(allAtt));
-  window.dispatchEvent(new Event('cbtAttendanceUpdated'));
-  window.dispatchEvent(new Event('cbtRoomAttendancesUpdated'));
+  saveStoredCbtRoomAttendance(updatedAtt, { mergeRecordsOnly: true });
 }
 
 
@@ -1679,9 +2144,10 @@ export function registerEmergencyStudentToCbt(params: {
   gender: 'L' | 'P';
 }): Student {
   const all = getStoredStudents();
+  const cleanNisn = params.nisn.trim();
   
   // Periksa apakah NISN sudah ada
-  const existing = all.find(s => s.nisn === params.nisn);
+  const existing = all.find(s => s.nisn === cleanNisn);
   if (existing) {
     return existing;
   }
@@ -1689,7 +2155,7 @@ export function registerEmergencyStudentToCbt(params: {
   const newId = `st_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
   const newStudent: Student = {
     id: newId,
-    nisn: params.nisn.trim(),
+    nisn: cleanNisn,
     name: params.name.trim(),
     classId: params.classId,
     gender: params.gender
@@ -1698,5 +2164,70 @@ export function registerEmergencyStudentToCbt(params: {
   const updatedList = [newStudent, ...all];
   saveStoredStudents(updatedList); // Menyimpan dan menembakkan elearningStudentsUpdated
 
+  // Sinkronkan siswa baru ke tabel students di MariaDB secara langsung
+  if (typeof window !== 'undefined') {
+    fetch('/api/students', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newStudent)
+    }).catch(() => {});
+  }
+
   return newStudent;
+}
+
+export async function registerEmergencyStudentToCbtAsync(params: {
+  name: string;
+  nisn: string;
+  classId: string;
+  gender: 'L' | 'P';
+}): Promise<{ student: Student; syncedToDb: boolean }> {
+  const all = getStoredStudents();
+  const cleanNisn = params.nisn.trim();
+  const cleanName = params.name.trim();
+
+  const existingLocal = all.find(s => s.nisn === cleanNisn);
+  const candidateId = existingLocal?.id || `st_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+  let finalStudent: Student = existingLocal
+    ? { ...existingLocal, name: cleanName, classId: params.classId, gender: params.gender, status: 'Aktif' }
+    : {
+        id: candidateId,
+        nisn: cleanNisn,
+        name: cleanName,
+        classId: params.classId,
+        gender: params.gender,
+        status: 'Aktif'
+      };
+
+  let syncedToDb = false;
+  if (typeof window !== 'undefined') {
+    try {
+      const res = await fetch('/api/students', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(finalStudent)
+      });
+      if (res.ok) {
+        const json = await res.json();
+        syncedToDb = true;
+        if (json?.data?.id) {
+          finalStudent = {
+            ...finalStudent,
+            id: json.data.id,
+            nis: json.data.nis || finalStudent.nis
+          };
+        }
+      }
+    } catch {}
+  }
+
+  const latestAll = getStoredStudents();
+  const existsIdx = latestAll.findIndex(s => s.nisn === cleanNisn || s.id === finalStudent.id);
+  const updatedList =
+    existsIdx >= 0
+      ? latestAll.map((s, idx) => (idx === existsIdx ? finalStudent : s))
+      : [finalStudent, ...latestAll];
+  saveStoredStudents(updatedList);
+
+  return { student: finalStudent, syncedToDb };
 }

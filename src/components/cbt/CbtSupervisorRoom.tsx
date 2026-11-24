@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   CbtExamPackage,
   CBT_EXAM_ROOMS,
@@ -24,8 +24,10 @@ import {
   CbtScheduleSessionSlot,
   DEFAULT_SCHEDULE_SESSIONS,
   getSupervisorForSlot,
-  getStoredSupervisorSchedule
+  getStoredSupervisorSchedule,
+  toLocalDateString
 } from '@/lib/cbtData';
+import { syncCbtWithCloud } from '@/lib/cloudSync';
 import { Student } from '@/lib/elearningData';
 import { exportCbtRoomBapToExcel } from '@/lib/elearningExport';
 
@@ -52,6 +54,18 @@ export default function CbtSupervisorRoom({
   const [isCheckedInThisRoom, setIsCheckedInThisRoom] = useState<boolean>(false);
   const [lastSavedTime, setLastSavedTime] = useState<string>('');
   const [showSavedPulse, setShowSavedPulse] = useState<boolean>(false);
+  const isEditingNotesRef = useRef<boolean>(false);
+  const isEditingSupervisorRef = useRef<boolean>(false);
+
+  // Sinkronisasi berkala di latar belakang ke MariaDB selama Mode Pengawas aktif
+  useEffect(() => {
+    syncCbtWithCloud().catch(() => {});
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      syncCbtWithCloud().catch(() => {});
+    }, 8000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Helper Feedback Tersimpan Otomatis Real-time
   const triggerSaveFeedback = () => {
@@ -247,7 +261,7 @@ export default function CbtSupervisorRoom({
 
   // Auto-sync pengawas aktif secara real-time ke Posko Panitia secara tenang (quiet auto-sync)
   useEffect(() => {
-    if (!selectedExam || !currentTeacherName || currentTeacherName === 'Guru Pengawas Ruang') return;
+    if (!selectedExam || !currentTeacherName || currentTeacherName === 'Guru Pengawas Ruang' || !assignedScheduleEntry) return;
     checkInRoomSupervisor({
       roomName: selectedRoom,
       supervisorName: currentTeacherName.trim(),
@@ -256,7 +270,7 @@ export default function CbtSupervisorRoom({
       token: selectedExam.token,
       initialRecords: attendanceRecords
     });
-  }, [selectedRoom, selectedExam?.id, currentTeacherName]);
+  }, [selectedRoom, selectedExam?.id, currentTeacherName, assignedScheduleEntry]);
 
   // Auto-fill supervisor name for BAP signature
   useEffect(() => {
@@ -273,11 +287,11 @@ export default function CbtSupervisorRoom({
     return roomStudents.filter(s => s.classId === filterClassInRoom);
   }, [roomStudents, filterClassInRoom]);
 
-  // Load existing room attendance if any & verify check-in status
-  useEffect(() => {
+  // Fungsi sinkronisasi state presensi ruangan dari storage / MariaDB
+  const refreshRoomAttendanceState = useCallback((isBackgroundSync = false) => {
     if (!selectedExam) return;
 
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = toLocalDateString(new Date());
     const all = getStoredCbtRoomAttendances();
     const key = `${selectedRoom}_${selectedExam.id}_${todayStr}`;
     const saved = all[key];
@@ -311,10 +325,14 @@ export default function CbtSupervisorRoom({
         });
       }
       setAttendanceRecords(mergedRecords);
-      setBapNotes(saved.notes || '');
+      if (!isBackgroundSync || !isEditingNotesRef.current) {
+        setBapNotes(saved.notes || '');
+      }
       setIsBapSaved(Boolean(saved.isBapSubmitted));
-      setSupervisorNameInput(initialSupName);
-    } else {
+      if (!isBackgroundSync || !isEditingSupervisorRef.current) {
+        setSupervisorNameInput(initialSupName);
+      }
+    } else if (!isBackgroundSync) {
       // Default all students to Hadir (H)
       const initial: Record<string, 'H' | 'S' | 'I' | 'A'> = {};
       roomStudents.forEach(st => {
@@ -346,6 +364,22 @@ export default function CbtSupervisorRoom({
     setIsCheckedInThisRoom(isTeacherAlreadyActive);
   }, [selectedRoom, selectedExam, roomStudents, currentRoomObj, currentTeacherName]);
 
+  // Load existing room attendance if any & verify check-in status
+  useEffect(() => {
+    refreshRoomAttendanceState(false);
+  }, [refreshRoomAttendanceState]);
+
+  // Dengarkan event update presensi dari sinkronisasi MariaDB / tab lain
+  useEffect(() => {
+    const handleAttUpdated = () => refreshRoomAttendanceState(true);
+    window.addEventListener('cbtAttendanceUpdated', handleAttUpdated);
+    window.addEventListener('cbtRoomAttendancesUpdated', handleAttUpdated);
+    return () => {
+      window.removeEventListener('cbtAttendanceUpdated', handleAttUpdated);
+      window.removeEventListener('cbtRoomAttendancesUpdated', handleAttUpdated);
+    };
+  }, [refreshRoomAttendanceState]);
+
   // Live student exam sessions from storage
   const [studentSessions, setStudentSessions] = useState(() => getStoredStudentCbtSessions());
 
@@ -358,6 +392,8 @@ export default function CbtSupervisorRoom({
         handleUpdate();
         setPanitiaConfig(getStoredCbtPanitiaConfig());
         setPackages(getStoredCbtPackages());
+        setSupervisorSchedule(getStoredSupervisorSchedule());
+        refreshRoomAttendanceState(true);
       }
     };
     window.addEventListener('cbtSessionsUpdated', handleUpdate);
@@ -366,7 +402,7 @@ export default function CbtSupervisorRoom({
       window.removeEventListener('cbtSessionsUpdated', handleUpdate);
       window.removeEventListener('storage', handleStorage);
     };
-  }, []);
+  }, [refreshRoomAttendanceState]);
 
 
   // Update student attendance status (dengan auto-save presensi real-time ke storage & auto check-in)
@@ -377,9 +413,9 @@ export default function CbtSupervisorRoom({
     };
     setAttendanceRecords(nextRecords);
 
-    // Persist ke storage secara real-time agar jika guru logout / ganti tab / refresh, data presensi seluruh siswa tetap tersimpan!
+    // Persist ke storage & MariaDB secara real-time agar jika guru logout / ganti tab / refresh, data presensi seluruh siswa tetap tersimpan!
     if (selectedExam) {
-      const todayStr = new Date().toISOString().split('T')[0];
+      const todayStr = toLocalDateString(new Date());
       const supNameToUse = supervisorNameInput.trim() || currentTeacherName || 'Guru Pengawas Ruang';
       const key = `${selectedRoom}_${selectedExam.id}_${todayStr}`;
       const allAtt = getStoredCbtRoomAttendances();
@@ -415,11 +451,38 @@ export default function CbtSupervisorRoom({
     }
   };
 
+  // Auto-save Nama Pengawas Ruang secara Real-Time saat diedit
+  const handleSupervisorNameChange = (newName: string) => {
+    setSupervisorNameInput(newName);
+    if (selectedExam) {
+      const todayStr = toLocalDateString(new Date());
+      const supNameToUse = newName.trim() || currentTeacherName || 'Guru Pengawas Ruang';
+      const key = `${selectedRoom}_${selectedExam.id}_${todayStr}`;
+      const allAtt = getStoredCbtRoomAttendances();
+      const existing = allAtt[key];
+
+      const updatedAtt: CbtRoomAttendance = {
+        roomName: selectedRoom,
+        examId: selectedExam.id,
+        examTitle: selectedExam.title,
+        date: todayStr,
+        supervisorName: supNameToUse,
+        token: selectedExam.token,
+        records: attendanceRecords,
+        notes: bapNotes || existing?.notes || 'Ujian berlangsung tertib, aman, dan lancar tanpa kendala teknis.',
+        isBapSubmitted: Boolean(existing?.isBapSubmitted),
+        submittedAt: existing?.submittedAt
+      };
+      saveStoredCbtRoomAttendance(updatedAtt);
+      triggerSaveFeedback();
+    }
+  };
+
   // Auto-save Catatan Kejadian Khusus (BAP Notes) secara Real-Time
   const handleBapNotesChange = (newNotes: string) => {
     setBapNotes(newNotes);
     if (selectedExam) {
-      const todayStr = new Date().toISOString().split('T')[0];
+      const todayStr = toLocalDateString(new Date());
       const supNameToUse = supervisorNameInput.trim() || currentTeacherName || 'Guru Pengawas Ruang';
       const key = `${selectedRoom}_${selectedExam.id}_${todayStr}`;
       const allAtt = getStoredCbtRoomAttendances();
@@ -446,7 +509,7 @@ export default function CbtSupervisorRoom({
   const handleSaveBap = () => {
     if (!selectedExam) return;
 
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = toLocalDateString(new Date());
     const finalSupervisor = supervisorNameInput.trim() || currentTeacherName || 'Guru Pengawas Ruang';
     const data: CbtRoomAttendance = {
       roomName: selectedRoom,
@@ -491,7 +554,7 @@ export default function CbtSupervisorRoom({
   const handleExportBapExcel = () => {
     if (!selectedExam) return;
 
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = toLocalDateString(new Date());
     const finalSupervisor = supervisorNameInput.trim() || currentTeacherName || 'Guru Pengawas Ruang';
     exportCbtRoomBapToExcel({
       examTitle: selectedExam.title,
@@ -544,11 +607,34 @@ export default function CbtSupervisorRoom({
       saveStoredCbtPanitiaConfig({ ...latestConfig, rooms: updatedRooms });
     }
 
-    // Mark as Hadir
-    setAttendanceRecords(prev => ({
-      ...prev,
+    // Mark as Hadir & sinkronkan ke presensi ruangan di MariaDB
+    const nextRecords: Record<string, 'H' | 'S' | 'I' | 'A'> = {
+      ...attendanceRecords,
       [newStudent.id]: 'H'
-    }));
+    };
+    setAttendanceRecords(nextRecords);
+
+    if (selectedExam) {
+      const todayStr = toLocalDateString(new Date());
+      const supNameToUse = supervisorNameInput.trim() || currentTeacherName || 'Guru Pengawas Ruang';
+      const key = `${selectedRoom}_${selectedExam.id}_${todayStr}`;
+      const allAtt = getStoredCbtRoomAttendances();
+      const existing = allAtt[key];
+
+      saveStoredCbtRoomAttendance({
+        roomName: selectedRoom,
+        examId: selectedExam.id,
+        examTitle: selectedExam.title,
+        date: todayStr,
+        supervisorName: supNameToUse,
+        token: selectedExam.token,
+        records: nextRecords,
+        notes: bapNotes || existing?.notes || 'Ujian berlangsung tertib, aman, dan lancar tanpa kendala teknis.',
+        isBapSubmitted: Boolean(existing?.isBapSubmitted),
+        submittedAt: existing?.submittedAt
+      });
+      triggerSaveFeedback();
+    }
 
     // Reset and close
     setEmName('');
@@ -872,12 +958,13 @@ export default function CbtSupervisorRoom({
                 if (confirm(`Buka kunci presensi & BAP Ruang ${selectedRoom}?\n\nGunakan ini jika Anda perlu memperbaiki status kehadiran siswa atau catatan sebelum panitia menutup sesi.`)) {
                   setIsBapSaved(false);
                   if (selectedExam) {
-                    const todayStr = new Date().toISOString().split('T')[0];
+                    const todayStr = toLocalDateString(new Date());
                     const key = `${selectedRoom}_${selectedExam.id}_${todayStr}`;
                     const allAtt = getStoredCbtRoomAttendances();
                     if (allAtt[key]) {
                       allAtt[key] = { ...allAtt[key], isBapSubmitted: false };
                       saveStoredCbtRoomAttendance(allAtt[key]);
+                      triggerSaveFeedback();
                     }
                   }
                 }
@@ -952,11 +1039,17 @@ export default function CbtSupervisorRoom({
                 filteredRoomStudents.map((st, idx) => {
                   const currentStatus = attendanceRecords[st.id] || 'H';
                   
-                  // Check student live CBT session
+                  // Check student live CBT session for current exam
                   const sessionKey = `${selectedExam?.id}_${st.id}`;
-                  let session: CbtStudentAnswerState | undefined = studentSessions[sessionKey];
+                  const sessionKeyNisn = st.nisn ? `${selectedExam?.id}_${st.nisn}` : '';
+                  let session: CbtStudentAnswerState | undefined =
+                    studentSessions[sessionKey] || (sessionKeyNisn ? studentSessions[sessionKeyNisn] : undefined);
                   if (!session) {
-                    session = Object.values(studentSessions).find(s => s.studentId === st.id);
+                    session = Object.values(studentSessions).find(
+                      s =>
+                        (!selectedExam?.id || s.examId === selectedExam.id) &&
+                        (s.studentId === st.id || (st.nisn && (s.studentNisn === st.nisn || s.studentId === st.nisn)))
+                    );
                   }
 
                   return (
@@ -1163,7 +1256,7 @@ export default function CbtSupervisorRoom({
               {currentTeacherName && currentTeacherName !== 'Guru Pengawas Ruang' && supervisorNameInput !== currentTeacherName && (
                 <button
                   type="button"
-                  onClick={() => setSupervisorNameInput(currentTeacherName)}
+                  onClick={() => handleSupervisorNameChange(currentTeacherName)}
                   className="text-[10px] text-indigo-600 hover:text-indigo-800 font-bold underline cursor-pointer"
                   title="Klik untuk menggunakan nama akun Anda yang sedang login"
                 >
@@ -1174,7 +1267,9 @@ export default function CbtSupervisorRoom({
             <input
               type="text"
               value={supervisorNameInput}
-              onChange={(e) => setSupervisorNameInput(e.target.value)}
+              onFocus={() => { isEditingSupervisorRef.current = true; }}
+              onBlur={() => { isEditingSupervisorRef.current = false; }}
+              onChange={(e) => handleSupervisorNameChange(e.target.value)}
               placeholder="Contoh: Dra. Hj. Siti Rohmah, M.Pd."
               className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 text-xs font-semibold focus:outline-none focus:border-indigo-500"
             />
@@ -1190,6 +1285,8 @@ export default function CbtSupervisorRoom({
             <input
               type="text"
               value={bapNotes}
+              onFocus={() => { isEditingNotesRef.current = true; }}
+              onBlur={() => { isEditingNotesRef.current = false; }}
               onChange={(e) => handleBapNotesChange(e.target.value)}
               placeholder="Contoh: Ujian berlangsung tertib, aman, dan lancar tanpa kendala teknis..."
               className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 text-xs focus:outline-none focus:border-indigo-500"
@@ -1218,7 +1315,19 @@ export default function CbtSupervisorRoom({
                 </span>
                 <button
                   type="button"
-                  onClick={() => setIsBapSaved(false)}
+                  onClick={() => {
+                    setIsBapSaved(false);
+                    if (selectedExam) {
+                      const todayStr = toLocalDateString(new Date());
+                      const key = `${selectedRoom}_${selectedExam.id}_${todayStr}`;
+                      const allAtt = getStoredCbtRoomAttendances();
+                      if (allAtt[key]) {
+                        allAtt[key] = { ...allAtt[key], isBapSubmitted: false };
+                        saveStoredCbtRoomAttendance(allAtt[key]);
+                        triggerSaveFeedback();
+                      }
+                    }
+                  }}
                   className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition cursor-pointer flex items-center gap-1"
                 >
                   <span>🔓 Buka Kunci</span>

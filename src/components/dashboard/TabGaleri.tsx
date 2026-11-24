@@ -54,63 +54,9 @@ export function TabGaleri({
     });
   }, [galleryList, activeFilter, searchQuery]);
 
-  const handleReset = () => {
-    if (confirm('⚠️ Apakah Anda yakin ingin mereset seluruh galeri ke 8 foto dokumentasi standar sekolah? Data di database MariaDB akan disinkronkan kembali.')) {
-      if (onResetGallery) {
-        onResetGallery();
-      }
-      showToast('🔄 Galeri berhasil direset ke 8 foto dokumentasi standar di Database MariaDB!');
-    }
-  };
-
   return (
-    <div className="space-y-6 animate-[fadeIn_0.3s_ease-out]">
-      {/* Header */}
-      <div className="p-5 sm:p-6 rounded-2xl bg-white border-2 border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <h2 className="text-xl font-black text-slate-950 tracking-tight">Manajemen Galeri & Fasilitas</h2>
-            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-black bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
-              Live MariaDB
-            </span>
-            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-black bg-indigo-100 text-indigo-800 border border-indigo-300">
-              {galleryList.length} Foto
-            </span>
-            {isSyncing && (
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono text-slate-600 bg-slate-100 border border-slate-200 animate-pulse">
-                Menyinkronkan...
-              </span>
-            )}
-          </div>
-          <p className="text-xs text-slate-700 font-semibold mt-0.5">
-            Dokumentasi kegiatan belajar, kesiswaan, dan sarana sekolah (Tersinkron otomatis ke database cloud dan Landing Page)
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2.5 flex-wrap">
-          {onResetGallery && (
-            <button
-              type="button"
-              onClick={handleReset}
-              className="px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border border-slate-300 active:scale-98"
-              title="Kembalikan semua foto galeri ke foto bawaan (8 foto)"
-            >
-              <span>🔄 Reset ke Default</span>
-            </button>
-          )}
-
-          <button
-            type="button"
-            onClick={() => setIsAddOpen(true)}
-            className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-indigo-600/20 active:scale-98"
-          >
-            <span>+ Unggah Media Baru</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Toolbar Filter & Pencarian */}
+    <div className="space-y-4 animate-[fadeIn_0.3s_ease-out]">
+      {/* Toolbar Filter, Pencarian & Unggah Media */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 p-3.5 rounded-2xl bg-white border-2 border-slate-200 shadow-xs">
         {/* Category Filter Tabs */}
         <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl overflow-x-auto">
@@ -141,38 +87,36 @@ export function TabGaleri({
           })}
         </div>
 
-        {/* Search Input */}
-        <div className="relative min-w-[240px]">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">🔍</span>
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Cari judul dokumentasi..."
-            className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-slate-50 border border-slate-300 text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-indigo-600 focus:bg-white transition-all"
-          />
-          {searchQuery && (
-            <button
-              type="button"
-              onClick={() => setSearchQuery('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs"
-            >
-              ✕
-            </button>
-          )}
-        </div>
-      </div>
+        {/* Search & Add Button */}
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <div className="relative flex-1 sm:w-56">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">🔍</span>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Cari foto..."
+              className="w-full pl-8 pr-7 py-2 rounded-xl bg-slate-50 border border-slate-300 text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-indigo-600 focus:bg-white transition-all"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs cursor-pointer"
+              >
+                ✕
+              </button>
+            )}
+          </div>
 
-      {/* Upload Drag & Drop Area (Quick Trigger) */}
-      <div 
-        onClick={() => setIsAddOpen(true)}
-        className="p-6 sm:p-7 rounded-2xl border-2 border-dashed border-indigo-300 hover:border-indigo-500 bg-indigo-50/20 hover:bg-indigo-50/40 transition-all text-center cursor-pointer flex flex-col items-center justify-center gap-2 shadow-xs group"
-      >
-        <div className="w-11 h-11 rounded-2xl bg-indigo-100 group-hover:scale-105 border-2 border-indigo-300 flex items-center justify-center text-indigo-700 text-xl font-black transition-transform">
-          📁
+          <button
+            type="button"
+            onClick={() => setIsAddOpen(true)}
+            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-98 shrink-0"
+          >
+            <span>+ Unggah Foto</span>
+          </button>
         </div>
-        <p className="text-sm font-black text-slate-950">Klik di sini untuk mengunggah foto baru</p>
-        <p className="text-xs text-slate-700 font-mono font-semibold">Kompresi otomatis aktif — aman, cepat, dan anti-lag</p>
       </div>
 
       {/* Photo Grid */}

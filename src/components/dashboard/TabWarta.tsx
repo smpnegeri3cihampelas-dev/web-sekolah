@@ -29,57 +29,40 @@ export function TabWarta({ newsList, onOpenAdd, onOpenEdit, onDelete, onRefresh 
   }, [newsList, newsFilter, newsSearch]);
 
   return (
-    <div className="space-y-6 animate-[fadeIn_0.3s_ease-out]">
-      {/* CMS Header & Search */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 sm:p-6 rounded-2xl bg-white border-2 border-slate-200 shadow-sm">
-        <div>
-          <h2 className="text-xl font-black text-slate-950 tracking-tight">Manajemen Warta & Berita</h2>
-          <p className="text-xs text-slate-700 font-semibold mt-0.5">Kelola artikel warta yang tampil pada Bento Grid halaman utama dan halaman publik</p>
+    <div className="space-y-4 animate-[fadeIn_0.3s_ease-out]">
+      {/* Compact Action & Status Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl bg-white border-2 border-slate-200 shadow-xs">
+        <div className="flex items-center gap-2 flex-wrap text-xs font-bold">
+          <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-900 font-black border border-slate-200">
+            {newsList.length} Artikel
+          </span>
+          <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
+            {publishedCount} Terbit
+          </span>
+          {draftCount > 0 && (
+            <span className="px-3 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
+              {draftCount} Draf
+            </span>
+          )}
         </div>
 
-        <div className="flex items-center gap-2.5 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
           <a
             href="/warta"
             target="_blank"
             rel="noopener noreferrer"
-            className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 border-2 border-slate-300 text-xs font-extrabold transition-all flex items-center gap-1.5 cursor-pointer"
-            title="Buka halaman publik kumpulan warta berhalaman"
+            className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 text-xs font-extrabold transition-all flex items-center gap-1.5 cursor-pointer"
           >
             <span>🌐</span>
-            <span>Lihat Halaman Warta Publik</span>
+            <span>Lihat Publik</span>
           </a>
           <button
             type="button"
             onClick={onOpenAdd}
-            className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-indigo-600/20 active:scale-98"
+            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-98"
           >
-            <span>+ Tulis Warta Baru</span>
+            <span>+ Tulis Warta</span>
           </button>
-        </div>
-      </div>
-
-      {/* 3 Metric Cards: Live MariaDB Status */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="p-5 rounded-2xl bg-white border-2 border-slate-200 shadow-sm">
-          <div className="text-xs font-black text-slate-700 uppercase tracking-wider">Total Artikel Warta</div>
-          <div className="text-3xl font-black text-slate-950 mt-1">{newsList.length} Artikel</div>
-          <div className="text-xs text-slate-600 mt-1 font-semibold flex items-center gap-2">
-            <span className="text-emerald-700 font-bold">✅ {publishedCount} Diterbitkan</span>
-            <span className="text-slate-300">•</span>
-            <span className="text-amber-700 font-bold">📝 {draftCount} Draf</span>
-          </div>
-        </div>
-
-        <div className="p-5 rounded-2xl bg-white border-2 border-slate-200 shadow-sm">
-          <div className="text-xs font-black text-slate-700 uppercase tracking-wider">Kategori Berita</div>
-          <div className="text-3xl font-black text-indigo-700 mt-1">5 Kategori</div>
-          <div className="text-xs text-slate-600 mt-1 font-semibold truncate">Prestasi, Pengumuman, Inovasi, Akademik, Kegiatan</div>
-        </div>
-
-        <div className="p-5 rounded-2xl bg-white border-2 border-slate-200 shadow-sm">
-          <div className="text-xs font-black text-slate-700 uppercase tracking-wider">Status Sinkronisasi</div>
-          <div className="text-3xl font-black text-emerald-700 mt-1">Live MariaDB</div>
-          <div className="text-xs text-emerald-800 mt-1 font-bold">Tersinkron Database Cloud, Bento Grid & Halaman Publik</div>
         </div>
       </div>
 

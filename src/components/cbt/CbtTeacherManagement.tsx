@@ -6,6 +6,7 @@ import {
   CbtQuestion,
   CbtQuestionType,
   getStoredCbtPackages,
+  saveStoredCbtPackage,
   saveStoredCbtPackages,
   deleteStoredCbtPackage,
   getStoredStudentCbtSessions,
@@ -13,12 +14,16 @@ import {
   evaluateCbtPackageSchedule,
   toLocalDateString
 } from '@/lib/cbtData';
-import { Student, SCHOOL_CLASSES } from '@/lib/elearningData';
+import { Student, SCHOOL_CLASSES, parseTeacherSubjects, isSubjectMatchingSelected } from '@/lib/elearningData';
 import { exportCbtScoreLegerToExcel } from '@/lib/elearningExport';
+import { compressImage } from '@/lib/imageCompression';
+import { resolveCbtVideoSource, resolveCbtAudioSource } from './CbtStudentExamRoom';
 
 interface CbtTeacherManagementProps {
   teacherName: string;
   teacherSubject?: string;
+  activeSubject?: string;
+  onSelectSubject?: (subject: string) => void;
   teacherClasses?: string[];
   activeStudents: Student[];
 }
@@ -45,6 +50,8 @@ function formatIndonesianExamDate(dateStr?: string): string {
 export default function CbtTeacherManagement({
   teacherName,
   teacherSubject,
+  activeSubject,
+  onSelectSubject,
   teacherClasses,
   activeStudents
 }: CbtTeacherManagementProps) {
@@ -52,25 +59,62 @@ export default function CbtTeacherManagement({
   const [activeTab, setActiveTab] = useState<'packages' | 'scores'>('packages');
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
+  const availableTeacherSubjects = useMemo(
+    () => parseTeacherSubjects(teacherSubject),
+    [teacherSubject]
+  );
+
+  const effectiveActiveSubject = useMemo(() => {
+    if (activeSubject && availableTeacherSubjects.includes(activeSubject)) {
+      return activeSubject;
+    }
+    return availableTeacherSubjects[0] || teacherSubject || 'Informatika';
+  }, [activeSubject, availableTeacherSubjects, teacherSubject]);
+
   const showToast = (msg: string) => {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(null), 4000);
   };
 
-  // Filter packages strictly for this teacher / teacher's subject
+  const syncCbtFromCloudSilently = async () => {
+    try {
+      const { syncCbtWithCloud } = await import('@/lib/cloudSync');
+      await syncCbtWithCloud();
+      setPackages(getStoredCbtPackages());
+      setStudentSessions(getStoredStudentCbtSessions());
+    } catch {}
+  };
+
+  // Filter packages strictly for this teacher & active subject (if multi-subject teacher)
   const myPackages = useMemo(() => {
     return packages.filter(pkg => {
-      if (teacherSubject) {
-        const isSubjectMatch = pkg.subject?.toLowerCase().trim() === teacherSubject.toLowerCase().trim();
-        const isNameMatch = teacherName && pkg.teacherName?.toLowerCase().includes(teacherName.toLowerCase().split(',')[0].trim());
-        return isSubjectMatch || isNameMatch;
+      const pkgSubLow = (pkg.subject || '').toLowerCase().trim();
+      const isNameMatch = Boolean(
+        teacherName && pkg.teacherName?.toLowerCase().includes(teacherName.toLowerCase().split(',')[0].trim())
+      );
+      const isAnyTeacherSubMatch = Boolean(
+        teacherSubject &&
+        (pkgSubLow === teacherSubject.toLowerCase().trim() ||
+          availableTeacherSubjects.some(sub => sub.toLowerCase().trim() === pkgSubLow))
+      );
+
+      if (teacherSubject || teacherName) {
+        if (!isNameMatch && !isAnyTeacherSubMatch) return false;
       }
-      if (teacherName) {
-        return pkg.teacherName?.toLowerCase().includes(teacherName.toLowerCase().split(',')[0].trim());
+
+      if (availableTeacherSubjects.length > 1) {
+        return isSubjectMatchingSelected(
+          pkg.subject,
+          effectiveActiveSubject,
+          availableTeacherSubjects,
+          teacherSubject,
+          pkg.title
+        );
       }
+
       return true;
     });
-  }, [packages, teacherSubject, teacherName]);
+  }, [packages, teacherSubject, teacherName, availableTeacherSubjects, effectiveActiveSubject]);
 
   // Selected package for Question Editor or Score Ledger
   const [selectedPackageForEdit, setSelectedPackageForEdit] = useState<CbtExamPackage | null>(null);
@@ -85,8 +129,9 @@ export default function CbtTeacherManagement({
   // New package modal state
   const [showCreatePackageModal, setShowCreatePackageModal] = useState<boolean>(false);
   const [newTitle, setNewTitle] = useState<string>('');
-  const [newSubject, setNewSubject] = useState<string>(teacherSubject || 'Informatika');
+  const [newSubject, setNewSubject] = useState<string>(effectiveActiveSubject);
   const [newGrade, setNewGrade] = useState<'7' | '8' | '9'>('7');
+  const [newSemester, setNewSemester] = useState<CbtExamPackage['semester']>('Ganjil (PTS/STS)');
   const [selectedTargetClasses, setSelectedTargetClasses] = useState<string[]>(() => {
     const grade7Classes = SCHOOL_CLASSES.filter(c => c.id.startsWith('7')).map(c => c.id);
     return grade7Classes;
@@ -94,12 +139,18 @@ export default function CbtTeacherManagement({
   const [newDuration, setNewDuration] = useState<number>(60);
   const [newToken, setNewToken] = useState<string>('');
   const [newPassingGrade, setNewPassingGrade] = useState<number>(75);
-  const [newExamDate, setNewExamDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
+  const [newExamDate, setNewExamDate] = useState<string>(() => toLocalDateString(new Date()));
   const [newStartTime, setNewStartTime] = useState<string>('07:30');
   const [newEndTime, setNewEndTime] = useState<string>('09:00');
 
-  // Schedule modal state for updating existing package
+  // Schedule & Settings modal state for updating existing package
   const [scheduleModalPkg, setScheduleModalPkg] = useState<CbtExamPackage | null>(null);
+  const [editPkgTitle, setEditPkgTitle] = useState<string>('');
+  const [editPkgSubject, setEditPkgSubject] = useState<string>('');
+  const [editPkgToken, setEditPkgToken] = useState<string>('');
+  const [editPkgPassingGrade, setEditPkgPassingGrade] = useState<number>(75);
+  const [editPkgSemester, setEditPkgSemester] = useState<CbtExamPackage['semester']>('Ganjil (PTS/STS)');
+  const [editPkgTargetClasses, setEditPkgTargetClasses] = useState<string[]>([]);
   const [editSchedDate, setEditSchedDate] = useState<string>('');
   const [editSchedStartTime, setEditSchedStartTime] = useState<string>('07:30');
   const [editSchedEndTime, setEditSchedEndTime] = useState<string>('09:00');
@@ -107,6 +158,21 @@ export default function CbtTeacherManagement({
 
   const openScheduleModal = (pkg: CbtExamPackage) => {
     setScheduleModalPkg(pkg);
+    setEditPkgTitle(pkg.title || '');
+    const initialSub =
+      availableTeacherSubjects.length > 1 &&
+      (!pkg.subject || pkg.subject.toLowerCase().trim() === (teacherSubject || '').toLowerCase().trim())
+        ? effectiveActiveSubject
+        : (pkg.subject || effectiveActiveSubject);
+    setEditPkgSubject(initialSub);
+    setEditPkgToken(pkg.token || '');
+    setEditPkgPassingGrade(pkg.passingGrade || 75);
+    setEditPkgSemester(pkg.semester || 'Ganjil (PTS/STS)');
+    setEditPkgTargetClasses(
+      Array.isArray(pkg.targetClasses) && pkg.targetClasses.length > 0
+        ? pkg.targetClasses
+        : SCHOOL_CLASSES.filter(c => c.id.startsWith(String(pkg.gradeLevel || '7'))).map(c => c.id)
+    );
     const rawDate = toLocalDateString(pkg.examDate);
     setEditSchedDate(rawDate);
     setEditSchedStartTime(pkg.startTime || '07:30');
@@ -114,7 +180,7 @@ export default function CbtTeacherManagement({
     setEditSchedDuration(pkg.durationMinutes || 60);
   };
 
-  const handleSavePackageSchedule = (e: React.FormEvent) => {
+  const handleSavePackageSchedule = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!scheduleModalPkg) return;
 
@@ -124,25 +190,32 @@ export default function CbtTeacherManagement({
     }
 
     const cleanDate = toLocalDateString(editSchedDate);
+    const updatedPkg: CbtExamPackage = {
+      ...scheduleModalPkg,
+      title: editPkgTitle.trim() || scheduleModalPkg.title,
+      subject: editPkgSubject.trim() || scheduleModalPkg.subject,
+      token: (editPkgToken.trim() || scheduleModalPkg.token).toUpperCase(),
+      passingGrade: Number(editPkgPassingGrade) || 75,
+      semester: editPkgSemester || scheduleModalPkg.semester,
+      targetClasses: editPkgTargetClasses.length > 0 ? editPkgTargetClasses : scheduleModalPkg.targetClasses,
+      examDate: cleanDate,
+      startTime: editSchedStartTime,
+      endTime: editSchedEndTime,
+      durationMinutes: editSchedDuration,
+      status: 'active' as const,
+      emergencyPaused: false
+    };
 
-    const updated = packages.map(p => {
-      if (p.id === scheduleModalPkg.id) {
-        return {
-          ...p,
-          examDate: cleanDate,
-          startTime: editSchedStartTime,
-          endTime: editSchedEndTime,
-          durationMinutes: editSchedDuration,
-          status: 'active' as const
-        };
-      }
-      return p;
-    });
-
-    saveStoredCbtPackages(updated);
+    const updated = packages.map(p => (p.id === updatedPkg.id ? updatedPkg : p));
     setPackages(updated);
     setScheduleModalPkg(null);
-    showToast(`✓ Jadwal ujian berhasil disimpan: ${formatIndonesianExamDate(cleanDate)} (${editSchedStartTime} - ${editSchedEndTime} WIB)`);
+
+    const ok = await saveStoredCbtPackage(updatedPkg);
+    showToast(
+      ok
+        ? `✓ Pengaturan & jadwal paket berhasil disimpan ke MariaDB: ${formatIndonesianExamDate(cleanDate)} (${editSchedStartTime} - ${editSchedEndTime} WIB)`
+        : `✓ Pengaturan paket disimpan secara lokal & masuk antrean sinkronisasi MariaDB`
+    );
   };
 
   // Handle grade change and auto-set target classes
@@ -152,18 +225,20 @@ export default function CbtTeacherManagement({
     setSelectedTargetClasses(gradeClasses);
   };
 
-  // Keep newSubject synced if teacherSubject changes
+  // Keep newSubject synced if effectiveActiveSubject changes
   useEffect(() => {
-    if (teacherSubject) {
-      setNewSubject(teacherSubject);
+    if (effectiveActiveSubject) {
+      setNewSubject(effectiveActiveSubject);
     }
-  }, [teacherSubject]);
+  }, [effectiveActiveSubject]);
 
   const [studentSessions, setStudentSessions] = useState(() => getStoredStudentCbtSessions());
 
-  // Load packages on mount & subscribe to updates
+  // Load packages on mount, sync with MariaDB & subscribe to updates
   useEffect(() => {
     setPackages(getStoredCbtPackages());
+    setStudentSessions(getStoredStudentCbtSessions());
+    syncCbtFromCloudSilently();
 
     const handlePkgUpdate = () => {
       setPackages(getStoredCbtPackages());
@@ -190,11 +265,27 @@ export default function CbtTeacherManagement({
     };
   }, []);
 
-  // Set default selected package for scores when myPackages change
+  // Keep selectedPackageForEdit in sync when packages array updates from cloud sync
+  useEffect(() => {
+    if (!selectedPackageForEdit) return;
+    const latest = packages.find(p => p.id === selectedPackageForEdit.id);
+    if (latest && JSON.stringify(latest) !== JSON.stringify(selectedPackageForEdit)) {
+      setSelectedPackageForEdit(latest);
+    }
+  }, [packages, selectedPackageForEdit]);
+
+  // Set default selected package for scores & keep its reference fresh when myPackages change
   useEffect(() => {
     if (myPackages.length > 0) {
-      if (!selectedPackageForScores || !myPackages.some(p => p.id === selectedPackageForScores.id)) {
+      if (!selectedPackageForScores) {
         setSelectedPackageForScores(myPackages[0]);
+      } else {
+        const latestMatch = myPackages.find(p => p.id === selectedPackageForScores.id);
+        if (!latestMatch) {
+          setSelectedPackageForScores(myPackages[0]);
+        } else if (JSON.stringify(latestMatch) !== JSON.stringify(selectedPackageForScores)) {
+          setSelectedPackageForScores(latestMatch);
+        }
       }
     } else {
       setSelectedPackageForScores(null);
@@ -202,7 +293,7 @@ export default function CbtTeacherManagement({
   }, [myPackages, selectedPackageForScores]);
 
   // Create new package handler
-  const handleCreatePackage = (e: React.FormEvent) => {
+  const handleCreatePackage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim()) return;
 
@@ -217,58 +308,80 @@ export default function CbtTeacherManagement({
     const newPkg: CbtExamPackage = {
       id: newId,
       title: newTitle.trim(),
-      subject: teacherSubject || newSubject || 'Informatika',
+      subject: (availableTeacherSubjects.length > 1 ? newSubject : (teacherSubject || newSubject)) || 'Informatika',
       gradeLevel: newGrade,
       targetClasses: targetClasses,
-      semester: 'Ganjil (PTS/STS)',
+      semester: newSemester || 'Ganjil (PTS/STS)',
       academicYear: '2026/2027',
       durationMinutes: newDuration,
       token: generatedToken.toUpperCase(),
       passingGrade: newPassingGrade,
       totalQuestions: 0,
       status: 'active',
-      examDate: newExamDate || new Date().toISOString().split('T')[0],
+      examDate: toLocalDateString(newExamDate),
       startTime: newStartTime || '07:30',
       endTime: newEndTime || '09:00',
       emergencyPaused: false,
       teacherName: teacherName || 'Ichsanul Arifin, S.Kom.',
       instructions: 'Kerjakan ujian dengan jujur dan teliti. Patuhi seluruh tata tertib asesmen.',
-      createdAt: new Date().toISOString().split('T')[0],
+      createdAt: toLocalDateString(new Date()),
       questions: []
     };
 
     const updated = [newPkg, ...packages];
-    saveStoredCbtPackages(updated);
     setPackages(updated);
     setShowCreatePackageModal(false);
+    setNewTitle('');
+    setNewToken('');
     setSelectedPackageForEdit(newPkg); // Open editor immediately
+
+    const ok = await saveStoredCbtPackage(newPkg);
+    showToast(
+      ok
+        ? `✓ Paket ujian "${newPkg.title}" berhasil dibuat & tersimpan di MariaDB!`
+        : `✓ Paket ujian "${newPkg.title}" dibuat & masuk antrean sinkronisasi MariaDB`
+    );
   };
 
   // Toggle package status (Active / Draft)
-  const handleToggleStatus = (pkgId: string) => {
-    const updated = packages.map(p => {
-      if (p.id === pkgId) {
-        return { ...p, status: p.status === 'active' ? 'draft' : 'active' } as CbtExamPackage;
-      }
-      return p;
-    });
-    saveStoredCbtPackages(updated);
+  const handleToggleStatus = async (pkgId: string) => {
+    const target = packages.find(p => p.id === pkgId);
+    if (!target) return;
+    const nextStatus = target.status === 'active' ? 'draft' : 'active';
+    const updatedPkg: CbtExamPackage = {
+      ...target,
+      status: nextStatus,
+      emergencyPaused: nextStatus === 'draft' ? target.emergencyPaused : false
+    };
+    const updated = packages.map(p => (p.id === pkgId ? updatedPkg : p));
     setPackages(updated);
+    const ok = await saveStoredCbtPackage(updatedPkg);
+    showToast(
+      ok
+        ? `✓ Status paket diubah ke ${nextStatus === 'active' ? 'AKTIF' : 'DRAFT'} & tersimpan di MariaDB`
+        : `✓ Status paket diubah ke ${nextStatus === 'active' ? 'AKTIF' : 'DRAFT'}`
+    );
   };
 
   // Delete package
-  const handleDeletePackage = (pkgId: string) => {
-    if (confirm('Yakin ingin menghapus paket ujian ini beserta seluruh butir soalnya?')) {
-      deleteStoredCbtPackage(pkgId);
+  const handleDeletePackage = async (pkgId: string) => {
+    const target = packages.find(p => p.id === pkgId);
+    if (confirm(`Yakin ingin menghapus paket ujian "${target?.title || pkgId}" beserta seluruh butir soalnya dari database?`)) {
       const updated = packages.filter(p => p.id !== pkgId);
       setPackages(updated);
       if (selectedPackageForEdit?.id === pkgId) setSelectedPackageForEdit(null);
       if (selectedPackageForScores?.id === pkgId) setSelectedPackageForScores(null);
+      const ok = await deleteStoredCbtPackage(pkgId);
+      showToast(
+        ok
+          ? '🗑️ Paket ujian beserta seluruh butir soalnya berhasil dihapus dari database MariaDB.'
+          : '🗑️ Paket ujian dihapus dari cache lokal & antrean sinkronisasi.'
+      );
     }
   };
 
   // Save question to currently edited package
-  const handleSaveQuestion = (q: CbtQuestion) => {
+  const handleSaveQuestion = async (q: CbtQuestion) => {
     if (!selectedPackageForEdit) return;
 
     let updatedQuestions: CbtQuestion[];
@@ -282,6 +395,8 @@ export default function CbtTeacherManagement({
 
     // Re-index question numbers
     updatedQuestions = updatedQuestions.map((item, idx) => ({ ...item, number: idx + 1 }));
+    const savedIndex = updatedQuestions.findIndex(item => item.id === q.id);
+    const savedNumber = savedIndex >= 0 ? savedIndex + 1 : updatedQuestions.length;
 
     const updatedPkg: CbtExamPackage = {
       ...selectedPackageForEdit,
@@ -290,16 +405,22 @@ export default function CbtTeacherManagement({
     };
 
     const updatedAll = packages.map(p => p.id === updatedPkg.id ? updatedPkg : p);
-    saveStoredCbtPackages(updatedAll);
     setPackages(updatedAll);
     setSelectedPackageForEdit(updatedPkg);
     setEditingQuestion(null);
+
+    const ok = await saveStoredCbtPackage(updatedPkg);
+    showToast(
+      ok
+        ? `✓ Butir soal No. ${savedNumber} berhasil disimpan ke database MariaDB! (Total: ${updatedQuestions.length} soal)`
+        : `✓ Butir soal No. ${savedNumber} disimpan di cache lokal & masuk antrean sinkronisasi MariaDB`
+    );
   };
 
   // Delete question from currently edited package
-  const handleDeleteQuestion = (qId: string) => {
+  const handleDeleteQuestion = async (qId: string) => {
     if (!selectedPackageForEdit) return;
-    if (confirm('Hapus butir soal ini?')) {
+    if (confirm('Hapus butir soal ini dari paket ujian dan database?')) {
       const remaining = selectedPackageForEdit.questions
         .filter(q => q.id !== qId)
         .map((q, idx) => ({ ...q, number: idx + 1 }));
@@ -311,10 +432,29 @@ export default function CbtTeacherManagement({
       };
 
       const updatedAll = packages.map(p => p.id === updatedPkg.id ? updatedPkg : p);
-      saveStoredCbtPackages(updatedAll);
       setPackages(updatedAll);
       setSelectedPackageForEdit(updatedPkg);
+
+      const ok = await saveStoredCbtPackage(updatedPkg);
+      showToast(
+        ok
+          ? `🗑️ Butir soal berhasil dihapus & disinkronkan ke MariaDB (Sisa: ${remaining.length} soal)`
+          : `🗑️ Butir soal dihapus & masuk antrean sinkronisasi MariaDB`
+      );
     }
+  };
+
+  // Finish & explicitly sync currently edited package to MariaDB
+  const handleFinishEditingPackage = async () => {
+    if (!selectedPackageForEdit) return;
+    const pkgToSync = selectedPackageForEdit;
+    setSelectedPackageForEdit(null);
+    const ok = await saveStoredCbtPackage(pkgToSync);
+    showToast(
+      ok
+        ? `✓ Paket "${pkgToSync.title}" beserta ${pkgToSync.questions.length} butir soal berhasil disinkronkan ke MariaDB!`
+        : `✓ Paket "${pkgToSync.title}" disimpan & masuk antrean sinkronisasi MariaDB`
+    );
   };
 
   // Get student submission results for selected package
@@ -345,6 +485,9 @@ export default function CbtTeacherManagement({
 
       const score = session?.score ?? 0;
       const isPassed = session?.isPassed ?? false;
+      const isSubmitted = Boolean(session?.isSubmitted);
+      const isLocked = !isSubmitted && Number(session?.violationCount || 0) >= 1;
+      const isWorking = Boolean(session && !isSubmitted && !isLocked);
 
       return {
         studentId: student.id,
@@ -356,7 +499,10 @@ export default function CbtTeacherManagement({
         wrongCount: session?.wrongCount ?? 0,
         isPassed: isPassed,
         submittedAt: session?.submittedAt,
-        hasSubmitted: Boolean(session?.isSubmitted)
+        hasSubmitted: isSubmitted,
+        isLocked: isLocked,
+        isWorking: isWorking,
+        hasAnySession: Boolean(session)
       };
     }).sort((a, b) => b.score - a.score || a.studentName.localeCompare(b.studentName));
   }, [selectedPackageForScores, activeStudents, selectedScoreClass, studentSessions]);
@@ -395,7 +541,11 @@ export default function CbtTeacherManagement({
         <div className="inline-flex items-center gap-1 bg-slate-100/90 p-1 rounded-xl border border-slate-200/80 text-xs">
           <button
             type="button"
-            onClick={() => { setActiveTab('packages'); setSelectedPackageForEdit(null); }}
+            onClick={() => {
+              setActiveTab('packages');
+              setSelectedPackageForEdit(null);
+              syncCbtFromCloudSilently();
+            }}
             className={`px-3 py-1.5 rounded-lg font-bold transition cursor-pointer ${
               activeTab === 'packages' && !selectedPackageForEdit
                 ? 'bg-white text-indigo-700 shadow-xs border border-indigo-100/60'
@@ -406,7 +556,11 @@ export default function CbtTeacherManagement({
           </button>
           <button
             type="button"
-            onClick={() => { setActiveTab('scores'); setSelectedPackageForEdit(null); }}
+            onClick={() => {
+              setActiveTab('scores');
+              setSelectedPackageForEdit(null);
+              syncCbtFromCloudSilently();
+            }}
             className={`px-3 py-1.5 rounded-lg font-bold transition cursor-pointer ${
               activeTab === 'scores'
                 ? 'bg-white text-indigo-700 shadow-xs border border-indigo-100/60'
@@ -419,7 +573,10 @@ export default function CbtTeacherManagement({
 
         <button
           type="button"
-          onClick={() => setShowCreatePackageModal(true)}
+          onClick={() => {
+            setNewSubject(effectiveActiveSubject);
+            setShowCreatePackageModal(true);
+          }}
           className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-sm flex items-center gap-1.5 cursor-pointer self-start sm:self-auto"
         >
           <span>+ Buat Paket Ujian</span>
@@ -432,7 +589,7 @@ export default function CbtTeacherManagement({
           {myPackages.length === 0 ? (
             <div className="col-span-full p-8 rounded-2xl bg-white border border-slate-200/80 text-center space-y-3">
               <div className="text-3xl">📝</div>
-              <h3 className="font-bold text-slate-800 text-sm">Belum Ada Paket Ujian {teacherSubject || ''}</h3>
+              <h3 className="font-bold text-slate-800 text-sm">Belum Ada Paket Ujian {effectiveActiveSubject || ''}</h3>
               <p className="text-xs text-slate-500 max-w-md mx-auto">
                 Klik tombol <strong>"+ Buat Paket Ujian"</strong> untuk membuat soal asesmen CBT.
               </p>
@@ -596,7 +753,7 @@ export default function CbtTeacherManagement({
           {/* Editor Header */}
           <div className="p-4 sm:p-5 rounded-2xl bg-white border border-indigo-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setSelectedPackageForEdit(null)}
@@ -608,13 +765,17 @@ export default function CbtTeacherManagement({
                 <span className="text-xs font-bold text-indigo-700 font-mono">
                   Token: {selectedPackageForEdit.token}
                 </span>
+                <span className="text-xs text-slate-400">•</span>
+                <span className="text-xs font-bold text-emerald-700">
+                  {selectedPackageForEdit.questions.length} Butir Soal
+                </span>
               </div>
               <h3 className="text-base font-bold text-slate-900 mt-1">
                 Kelola Butir Soal: {selectedPackageForEdit.title}
               </h3>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={() => setEditingQuestion({
@@ -632,9 +793,9 @@ export default function CbtTeacherManagement({
               </button>
               <button
                 type="button"
-                onClick={() => setSelectedPackageForEdit(null)}
+                onClick={handleFinishEditingPackage}
                 className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-sm flex items-center gap-1.5 cursor-pointer"
-                title="Selesai dan kembali ke daftar paket"
+                title="Simpan paket beserta seluruh butir soal ke database MariaDB dan kembali ke daftar paket"
               >
                 <span>✓ Selesai &amp; Simpan Paket</span>
               </button>
@@ -658,7 +819,7 @@ export default function CbtTeacherManagement({
                   className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-3"
                 >
                   <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <span className="px-2.5 py-0.5 rounded-lg bg-slate-900 text-white font-mono font-bold text-xs">
                         No. {idx + 1}
                       </span>
@@ -668,7 +829,7 @@ export default function CbtTeacherManagement({
                       {q.mediaType && q.mediaType !== 'none' && (
                         <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                           {q.mediaType === 'image' && '🖼️ Bergambar'}
-                          {q.mediaType === 'audio' && '🎧 Audio Listening'}
+                          {q.mediaType === 'audio' && `🎧 Audio Listening (${q.audioMaxPlays || 3}x Putar)`}
                           {q.mediaType === 'video' && '🎬 Video'}
                         </span>
                       )}
@@ -692,13 +853,66 @@ export default function CbtTeacherManagement({
                     </div>
                   </div>
 
-                  <p className="text-xs text-slate-800 leading-relaxed font-medium">
+                  {/* Pratinjau Media Stimulus Soal */}
+                  {q.mediaType === 'image' && q.mediaUrl && (
+                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 flex flex-col sm:flex-row sm:items-center gap-3">
+                      <img
+                        src={q.mediaUrl}
+                        alt={q.mediaCaption || 'Stimulus Gambar'}
+                        className="max-h-36 w-auto rounded-lg object-contain border border-slate-200 bg-white"
+                      />
+                      {q.mediaCaption && (
+                        <span className="text-[11px] text-slate-600 italic">{q.mediaCaption}</span>
+                      )}
+                    </div>
+                  )}
+
+                  {q.mediaType === 'audio' && q.mediaUrl && (
+                    <div className="p-2.5 rounded-xl bg-indigo-50/60 border border-indigo-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="text-xs font-semibold text-indigo-900">
+                        🎧 {q.mediaCaption || 'Stimulus Audio Listening'} (Maks. {q.audioMaxPlays || 3}x putar)
+                      </div>
+                      <audio controls src={resolveCbtAudioSource(q.mediaUrl)} className="h-8 max-w-xs" />
+                    </div>
+                  )}
+
+                  {q.mediaType === 'video' && q.mediaUrl && (() => {
+                    const resolved = resolveCbtVideoSource(q.mediaUrl);
+                    return (
+                      <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 space-y-1.5">
+                        {resolved.mode === 'iframe' ? (
+                          <div className="w-full max-w-md aspect-video rounded-lg overflow-hidden">
+                            <iframe
+                              src={resolved.src}
+                              title={q.mediaCaption || 'Pratinjau Video Soal'}
+                              sandbox="allow-scripts allow-same-origin allow-presentation"
+                              className="w-full h-full border-0"
+                            />
+                          </div>
+                        ) : (
+                          <video
+                            controls
+                            playsInline
+                            controlsList="nodownload nofullscreen"
+                            disablePictureInPicture
+                            src={resolved.src}
+                            className="max-h-44 rounded-lg"
+                          />
+                        )}
+                        {q.mediaCaption && (
+                          <div className="text-[11px] text-slate-300 italic">{q.mediaCaption}</div>
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  <p className="text-xs text-slate-800 leading-relaxed font-medium whitespace-pre-line">
                     {q.question}
                   </p>
 
                   {/* Ringkasan Opsi */}
                   {q.type === 'pg' && q.options && (
-                    <div className="grid grid-cols-2 gap-2 text-[11px]">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
                       {q.options.map((opt, oIdx) => (
                         <div
                           key={oIdx}
@@ -716,7 +930,7 @@ export default function CbtTeacherManagement({
                   )}
 
                   {q.type === 'pg_kompleks' && q.options && (
-                    <div className="grid grid-cols-2 gap-2 text-[11px]">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
                       {q.options.map((opt, oIdx) => {
                         const isKey = (q.correctOptionIndices || []).includes(oIdx);
                         return (
@@ -780,7 +994,7 @@ export default function CbtTeacherManagement({
                   Rekapitulasi Nilai Asesmen & Leger Raport
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Tinjau perolehan skor nilai siswa dan unduh format Excel resmi.
+                  Tinjau perolehan skor nilai siswa dari database MariaDB dan unduh format Excel resmi.
                 </p>
               </div>
 
@@ -860,7 +1074,7 @@ export default function CbtTeacherManagement({
                     <th className="px-3 py-2.5">Nama Lengkap Siswa</th>
                     <th className="px-3 py-2.5 w-20 text-center">Kelas</th>
                     <th className="px-3 py-2.5 w-24 text-center">Nilai Akhir</th>
-                    <th className="px-3 py-2.5 w-28 text-center">Ketuntasan</th>
+                    <th className="px-3 py-2.5 w-28 text-center">Ketuntasan / Status</th>
                     <th className="px-3 py-2.5 w-28 text-center">Waktu Kumpul</th>
                     <th className="px-3 py-2.5 w-20 text-center">Aksi</th>
                   </tr>
@@ -899,6 +1113,14 @@ export default function CbtTeacherManagement({
                             }`}>
                               {res.isPassed ? '✓ TUNTAS' : '⚠️ REMEDIAL'}
                             </span>
+                          ) : res.isLocked ? (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800">
+                              🔒 TERKUNCI
+                            </span>
+                          ) : res.isWorking ? (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">
+                              ⏳ MENGERJAKAN
+                            </span>
                           ) : (
                             <span className="text-[10px] text-slate-400 font-medium italic">
                               Belum Mengikuti
@@ -915,17 +1137,19 @@ export default function CbtTeacherManagement({
                             : '-'}
                         </td>
                         <td className="px-3 py-2.5 text-center">
-                          {res.hasSubmitted ? (
+                          {res.hasAnySession ? (
                             <button
                               type="button"
                               onClick={() => {
                                 if (!selectedPackageForScores) return;
-                                if (confirm(`Reset sesi ujian untuk ${res.studentName}? Nilai dan jawaban sebelumnya akan dihapus sehingga siswa dapat mengikuti ujian kembali.`)) {
-                                  resetStoredStudentCbtSession(selectedPackageForScores.id, res.studentId);
+                                if (confirm(`Reset sesi ujian untuk ${res.studentName} dari database? Nilai dan jawaban sebelumnya akan dihapus sehingga siswa dapat mengikuti ujian kembali.`)) {
+                                  resetStoredStudentCbtSession(selectedPackageForScores.id, res.studentId, res.studentNisn);
+                                  setStudentSessions(getStoredStudentCbtSessions());
+                                  showToast(`🔄 Sesi ujian ${res.studentName} berhasil di-reset di database MariaDB!`);
                                 }
                               }}
                               className="px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-[10px] font-bold transition flex items-center justify-center gap-1 mx-auto cursor-pointer shadow-xs active:scale-95"
-                              title="Reset ujian siswa ini agar bisa mengulang"
+                              title="Reset ujian siswa ini di database agar bisa mengulang"
                             >
                               <span>🔄</span>
                               <span>Reset</span>
@@ -960,7 +1184,7 @@ export default function CbtTeacherManagement({
                     Buat Paket Ujian CBT Baru
                   </h3>
                   <p className="text-xs text-slate-500">
-                    Atur judul asesmen, rombel peserta, dan jam pelaksanaan secara terpadu.
+                    Atur judul asesmen, rombel peserta, dan jam pelaksanaan secara terpadu (tersinkron ke MariaDB).
                   </p>
                 </div>
               </div>
@@ -984,7 +1208,7 @@ export default function CbtTeacherManagement({
                 </div>
                 {teacherSubject && (
                   <span className="px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-bold text-[11px] shadow-xs">
-                    Mapel: {teacherSubject}
+                    Mapel: {availableTeacherSubjects.length > 1 ? newSubject : teacherSubject}
                   </span>
                 )}
               </div>
@@ -1003,7 +1227,7 @@ export default function CbtTeacherManagement({
                     <input
                       type="text"
                       required
-                      placeholder={teacherSubject ? `Contoh: Asesmen Tengah Semester (PTS) - ${teacherSubject}` : "Contoh: Asesmen Tengah Semester (PTS) - Informatika"}
+                      placeholder={`Contoh: Asesmen Tengah Semester (PTS) - ${availableTeacherSubjects.length > 1 ? newSubject : (teacherSubject || 'Informatika')}`}
                       value={newTitle}
                       onChange={(e) => setNewTitle(e.target.value)}
                       className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-semibold focus:outline-none focus:border-indigo-500"
@@ -1015,13 +1239,28 @@ export default function CbtTeacherManagement({
                       <label className="block font-bold text-slate-700 mb-1">
                         Mata Pelajaran:
                       </label>
-                      {teacherSubject ? (
+                      {availableTeacherSubjects.length > 1 ? (
+                        <select
+                          value={newSubject}
+                          onChange={(e) => {
+                            setNewSubject(e.target.value);
+                            if (onSelectSubject) onSelectSubject(e.target.value);
+                          }}
+                          className="w-full px-2.5 py-2 rounded-xl bg-indigo-50 border border-indigo-300 text-indigo-950 focus:outline-none focus:border-indigo-600 font-bold text-xs cursor-pointer"
+                        >
+                          {availableTeacherSubjects.map((sub) => (
+                            <option key={sub} value={sub}>
+                              {sub}
+                            </option>
+                          ))}
+                        </select>
+                      ) : teacherSubject ? (
                         <div className="w-full px-3 py-2 rounded-xl bg-indigo-50/70 border border-indigo-200 text-indigo-900 font-bold flex items-center justify-between text-xs">
-                          <span className="flex items-center gap-1.5">
+                          <span className="flex items-center gap-1.5 truncate">
                             <span>💻</span>
-                            <span>{teacherSubject}</span>
+                            <span className="truncate">{teacherSubject}</span>
                           </span>
-                          <span className="text-[10px] bg-indigo-600 text-white px-2 py-0.5 rounded font-semibold shadow-2xs">
+                          <span className="text-[10px] bg-indigo-600 text-white px-2 py-0.5 rounded font-semibold shadow-2xs shrink-0">
                             Mapel Anda
                           </span>
                         </div>
@@ -1036,23 +1275,41 @@ export default function CbtTeacherManagement({
                           <option value="Matematika">Matematika</option>
                           <option value="Bahasa Indonesia">Bahasa Indonesia</option>
                           <option value="Bahasa Inggris">Bahasa Inggris</option>
+                          <option value="Ilmu Pengetahuan Sosial (IPS)">Ilmu Pengetahuan Sosial (IPS)</option>
+                          <option value="Pendidikan Agama Islam (PABP)">Pendidikan Agama Islam (PABP)</option>
+                          <option value="PPKn">PPKn</option>
+                          <option value="Seni Budaya (SBK)">Seni Budaya (SBK)</option>
+                          <option value="PJOK">PJOK</option>
+                          <option value="Bahasa Sunda">Bahasa Sunda</option>
                         </select>
                       )}
                     </div>
 
                     <div>
                       <label className="block font-bold text-slate-700 mb-1">
-                        Tingkat Kelas:
+                        Tingkat &amp; Jenis Asesmen:
                       </label>
-                      <select
-                        value={newGrade}
-                        onChange={(e) => handleGradeChange(e.target.value as any)}
-                        className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-indigo-500 font-medium"
-                      >
-                        <option value="7">Kelas 7</option>
-                        <option value="8">Kelas 8</option>
-                        <option value="9">Kelas 9</option>
-                      </select>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <select
+                          value={newGrade}
+                          onChange={(e) => handleGradeChange(e.target.value as any)}
+                          className="w-full px-2.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-indigo-500 font-bold"
+                        >
+                          <option value="7">Kelas 7</option>
+                          <option value="8">Kelas 8</option>
+                          <option value="9">Kelas 9</option>
+                        </select>
+                        <select
+                          value={newSemester}
+                          onChange={(e) => setNewSemester(e.target.value as any)}
+                          className="w-full px-2 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-indigo-500 font-medium text-[11px]"
+                        >
+                          <option value="Ganjil (PTS/STS)">PTS Ganjil</option>
+                          <option value="Ganjil (PAS/SAS)">PAS Ganjil</option>
+                          <option value="Genap (PTS/STS)">PTS Genap</option>
+                          <option value="Genap (PAT/SAT)">PAT Genap</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
 
@@ -1215,7 +1472,7 @@ export default function CbtTeacherManagement({
                   <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 text-[11px] text-slate-500 leading-relaxed flex items-center gap-2">
                     <span className="text-base flex-shrink-0">💡</span>
                     <span>
-                      Setelah disimpan, Anda akan langsung diarahkan ke <strong>Editor Soal</strong> untuk mengisi butir pertanyaan (PG, PG Kompleks, Benar/Salah, Menjodohkan, atau Audio Listening).
+                      Setelah disimpan, paket ujian langsung tercatat di <strong>MariaDB</strong> dan Anda diarahkan ke <strong>Editor Soal</strong> untuk mengisi butir pertanyaan.
                     </span>
                   </div>
 
@@ -1246,10 +1503,10 @@ export default function CbtTeacherManagement({
         </div>
       )}
 
-      {/* MODAL ATUR JADWAL & JAM SPESIFIK PAKET UJIAN GURU */}
+      {/* MODAL ATUR JADWAL, JAM & PENGATURAN PAKET UJIAN GURU */}
       {scheduleModalPkg && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-5 shadow-2xl border border-slate-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-5 sm:p-6 space-y-4 shadow-2xl border border-slate-200 my-auto">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-200 text-indigo-700 flex items-center justify-center text-xl font-bold">
@@ -1257,10 +1514,10 @@ export default function CbtTeacherManagement({
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-slate-900">
-                    Atur Jadwal & Waktu Pelaksanaan Ujian
+                    Pengaturan &amp; Jadwal Pelaksanaan Ujian
                   </h3>
                   <p className="text-xs text-slate-500 truncate max-w-xs">
-                    {scheduleModalPkg.title} ({scheduleModalPkg.subject})
+                    {scheduleModalPkg.subject} • Kelas {scheduleModalPkg.gradeLevel}
                   </p>
                 </div>
               </div>
@@ -1273,19 +1530,159 @@ export default function CbtTeacherManagement({
               </button>
             </div>
 
-            <form onSubmit={handleSavePackageSchedule} className="space-y-4 text-xs">
-              {/* Tanggal */}
+            <form onSubmit={handleSavePackageSchedule} className="space-y-3.5 text-xs">
+              {/* Nama Paket */}
               <div>
                 <label className="block font-bold text-slate-700 mb-1">
-                  Tanggal Pelaksanaan Ujian:
+                  Judul Paket Ujian:
                 </label>
                 <input
-                  type="date"
+                  type="text"
                   required
-                  value={editSchedDate}
-                  onChange={(e) => setEditSchedDate(e.target.value)}
+                  value={editPkgTitle}
+                  onChange={(e) => setEditPkgTitle(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-semibold focus:outline-none focus:border-indigo-500 text-xs"
                 />
+              </div>
+
+              {availableTeacherSubjects.length > 1 && (
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">
+                    Mata Pelajaran Paket Ujian:
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {availableTeacherSubjects.map((sub) => {
+                      const isSel = editPkgSubject === sub;
+                      return (
+                        <button
+                          key={sub}
+                          type="button"
+                          onClick={() => setEditPkgSubject(sub)}
+                          className={`py-2 px-3 rounded-xl border text-xs font-bold transition text-left cursor-pointer flex items-center gap-1.5 ${
+                            isSel
+                              ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-2xs'
+                              : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
+                          }`}
+                        >
+                          <span>{isSel ? '●' : '○'}</span>
+                          <span className="truncate">{sub}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Token, KKM, Semester */}
+              <div className="grid grid-cols-3 gap-2.5">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">
+                    Token Ujian:
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editPkgToken}
+                    onChange={(e) => setEditPkgToken(e.target.value.toUpperCase())}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-indigo-700 font-mono font-bold focus:outline-none focus:border-indigo-500 text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">
+                    KKM:
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    required
+                    value={editPkgPassingGrade}
+                    onChange={(e) => setEditPkgPassingGrade(Number(e.target.value))}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-bold focus:outline-none focus:border-indigo-500 text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">
+                    Semester:
+                  </label>
+                  <select
+                    value={editPkgSemester}
+                    onChange={(e) => setEditPkgSemester(e.target.value as any)}
+                    className="w-full px-2.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-semibold focus:outline-none focus:border-indigo-500 text-xs"
+                  >
+                    <option value="Ganjil (PTS/STS)">PTS Ganjil</option>
+                    <option value="Ganjil (PAS/SAS)">PAS Ganjil</option>
+                    <option value="Genap (PTS/STS)">PTS Genap</option>
+                    <option value="Genap (PAT/SAT)">PAT Genap</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Rombel Sasaran */}
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
+                <label className="block font-bold text-slate-700 text-[11px]">
+                  Rombel Sasaran ({editPkgTargetClasses.length} Kelas):
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {SCHOOL_CLASSES.filter(c =>
+                    scheduleModalPkg.gradeLevel === 'Semua'
+                      ? true
+                      : c.id.startsWith(String(scheduleModalPkg.gradeLevel || '7'))
+                  ).map(c => {
+                    const isSelected = editPkgTargetClasses.includes(c.id);
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => {
+                          if (isSelected) {
+                            if (editPkgTargetClasses.length === 1) return;
+                            setEditPkgTargetClasses(editPkgTargetClasses.filter(id => id !== c.id));
+                          } else {
+                            setEditPkgTargetClasses([...editPkgTargetClasses, c.id].sort());
+                          }
+                        }}
+                        className={`px-2 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer ${
+                          isSelected
+                            ? 'bg-indigo-600 text-white'
+                            : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        {isSelected ? '✓ ' : '+ '}{c.id}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Tanggal & Durasi */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">
+                    Tanggal Pelaksanaan Ujian:
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={editSchedDate}
+                    onChange={(e) => setEditSchedDate(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-semibold focus:outline-none focus:border-indigo-500 text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">
+                    Durasi Pengerjaan (Menit):
+                  </label>
+                  <input
+                    type="number"
+                    min={10}
+                    max={240}
+                    required
+                    value={editSchedDuration}
+                    onChange={(e) => setEditSchedDuration(Number(e.target.value))}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-bold focus:outline-none focus:border-indigo-500 text-xs"
+                  />
+                </div>
               </div>
 
               {/* Jam Mulai & Jam Selesai */}
@@ -1317,27 +1714,8 @@ export default function CbtTeacherManagement({
                 </div>
               </div>
 
-              {/* Durasi Pengerjaan */}
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">
-                  Durasi Pengerjaan Siswa (Menit):
-                </label>
-                <input
-                  type="number"
-                  min={10}
-                  max={240}
-                  required
-                  value={editSchedDuration}
-                  onChange={(e) => setEditSchedDuration(Number(e.target.value))}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-bold focus:outline-none focus:border-indigo-500 text-xs"
-                />
-                <span className="text-[10px] text-slate-400 mt-1 block">
-                  Siswa memiliki waktu pengerjaan maksimal {editSchedDuration} menit di dalam ruang ujian sebelum jawaban otomatis dikumpulkan.
-                </span>
-              </div>
-
               <div className="p-3 rounded-xl bg-indigo-50 border border-indigo-200 text-[11px] text-indigo-900 leading-relaxed">
-                💡 Perubahan jadwal dan jam sesi ini akan langsung tersinkron secara otomatis ke kartu ujian siswa dan ruang pengawas.
+                💡 Perubahan jadwal, token, dan jam sesi ini langsung tersinkron otomatis ke database MariaDB, kartu ujian siswa, dan ruang pengawas.
               </div>
 
               <div className="pt-2 flex items-center justify-end gap-2">
@@ -1352,7 +1730,7 @@ export default function CbtTeacherManagement({
                   type="submit"
                   className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold cursor-pointer shadow-md shadow-indigo-600/20"
                 >
-                  Simpan Jadwal Paket ✓
+                  Simpan Pengaturan &amp; Jadwal ✓
                 </button>
               </div>
             </form>
@@ -1398,7 +1776,9 @@ function QuestionEditorModal({
   const [mediaType, setMediaType] = useState<'none' | 'image' | 'audio' | 'video'>(initialQuestion.mediaType || 'none');
   const [mediaUrl, setMediaUrl] = useState<string>(initialQuestion.mediaUrl || '');
   const [mediaCaption, setMediaCaption] = useState<string>(initialQuestion.mediaCaption || '');
+  const [audioMaxPlays, setAudioMaxPlays] = useState<number>(initialQuestion.audioMaxPlays || 3);
   const [scoreWeight, setScoreWeight] = useState<number>(initialQuestion.scoreWeight || 20);
+  const [isCompressingMedia, setIsCompressingMedia] = useState<boolean>(false);
 
   // PG Options
   const [options, setOptions] = useState<string[]>(initialQuestion.options || ['Opsi A', 'Opsi B', 'Opsi C', 'Opsi D']);
@@ -1421,10 +1801,56 @@ function QuestionEditorModal({
     ]
   );
 
+  const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsCompressingMedia(true);
+    try {
+      const compressed = await compressImage(file, 1000, 0.78);
+      setMediaUrl(compressed);
+      if (!mediaCaption.trim()) {
+        setMediaCaption(file.name.replace(/\.[^/.]+$/, ''));
+      }
+    } catch {
+      alert('Gagal memproses berkas gambar.');
+    } finally {
+      setIsCompressingMedia(false);
+    }
+  };
+
+  const handleAudioFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 3.5 * 1024 * 1024) {
+      alert('Ukuran file audio maksimal 3.5 MB agar dapat disimpan langsung ke database. Untuk file lebih besar, silakan tempelkan URL MP3.');
+      return;
+    }
+    setIsCompressingMedia(true);
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setMediaUrl(reader.result);
+        if (!mediaCaption.trim()) {
+          setMediaCaption(file.name.replace(/\.[^/.]+$/, ''));
+        }
+      }
+      setIsCompressingMedia(false);
+    };
+    reader.onerror = () => {
+      alert('Gagal membaca file audio.');
+      setIsCompressingMedia(false);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!qText.trim()) {
       alert('Teks pertanyaan tidak boleh kosong.');
+      return;
+    }
+    if (qType === 'pg_kompleks' && correctPgIndices.length === 0) {
+      alert('Pilih minimal satu kunci jawaban benar untuk soal PG Kompleks.');
       return;
     }
 
@@ -1435,8 +1861,9 @@ function QuestionEditorModal({
       question: qText.trim(),
       scoreWeight: scoreWeight,
       mediaType: mediaType,
-      mediaUrl: mediaType !== 'none' ? mediaUrl.trim() : undefined,
-      mediaCaption: mediaType !== 'none' ? mediaCaption.trim() : undefined
+      mediaUrl: mediaType !== 'none' && mediaUrl.trim() ? mediaUrl.trim() : undefined,
+      mediaCaption: mediaType !== 'none' && mediaCaption.trim() ? mediaCaption.trim() : undefined,
+      audioMaxPlays: mediaType === 'audio' ? Number(audioMaxPlays) || 3 : undefined
     };
 
     if (qType === 'pg') {
@@ -1465,10 +1892,10 @@ function QuestionEditorModal({
               Editor Butir Soal No. {initialQuestion.number}
             </h3>
             <p className="text-xs text-slate-500">
-              Pilih tipe soal dan lampirkan stimulus media sesuai kebutuhan materi.
+              Pilih tipe soal dan lampirkan stimulus media sesuai kebutuhan materi (tersinkron ke MariaDB).
             </p>
           </div>
-          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600 font-bold text-sm">
+          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600 font-bold text-sm cursor-pointer">
             ✕
           </button>
         </div>
@@ -1532,11 +1959,11 @@ function QuestionEditorModal({
 
           {/* 2. Media Stimulus (Gambar / Audio / Video) */}
           <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <label className="font-bold text-slate-700">
                 2. Lampiran Media Stimulus (Opsional):
               </label>
-              <div className="flex items-center gap-1.5">
+              <div className="flex flex-wrap items-center gap-1.5">
                 {(['none', 'image', 'audio', 'video'] as const).map(m => (
                   <button
                     key={m}
@@ -1558,26 +1985,137 @@ function QuestionEditorModal({
             </div>
 
             {mediaType !== 'none' && (
-              <div className="space-y-2 pt-1">
+              <div className="space-y-2.5 pt-1">
+                {mediaType === 'image' && (
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                    <label className="px-3 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 font-bold text-xs cursor-pointer inline-flex items-center gap-1.5 shrink-0">
+                      <span>📤 Upload Gambar dari Perangkat</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageFileChange}
+                        className="hidden"
+                      />
+                    </label>
+                    <span className="text-[11px] text-slate-400">atau tempelkan tautan URL gambar di bawah:</span>
+                  </div>
+                )}
+
+                {mediaType === 'audio' && (
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <label className="px-3 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 font-bold text-xs cursor-pointer inline-flex items-center gap-1.5 shrink-0">
+                      <span>📤 Upload Audio MP3 (Maks 3.5MB)</span>
+                      <input
+                        type="file"
+                        accept="audio/*"
+                        onChange={handleAudioFileChange}
+                        className="hidden"
+                      />
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-bold text-slate-600">Batas Putar Siswa:</span>
+                      <select
+                        value={audioMaxPlays}
+                        onChange={(e) => setAudioMaxPlays(Number(e.target.value))}
+                        className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-900 font-bold text-xs"
+                      >
+                        <option value={1}>1 Kali</option>
+                        <option value={2}>2 Kali</option>
+                        <option value={3}>3 Kali (Default)</option>
+                        <option value={5}>5 Kali</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+
+                {isCompressingMedia && (
+                  <div className="text-xs font-bold text-indigo-600 animate-pulse">
+                    ⏳ Memproses berkas media untuk disimpan ke database...
+                  </div>
+                )}
+
                 <div>
                   <span className="text-[11px] text-slate-500 block mb-1">
-                    URL Media (Tautan Gambar / Audio MP3 / Video):
+                    URL / Data Media ({mediaType === 'image' ? 'Gambar' : mediaType === 'audio' ? 'Audio MP3' : 'Video'}):
                   </span>
-                  <input
-                    type="url"
-                    placeholder="https://contoh-domain.com/audio-listening.mp3"
-                    value={mediaUrl}
-                    onChange={(e) => setMediaUrl(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-800 focus:outline-none focus:border-indigo-500"
-                  />
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      placeholder={
+                        mediaType === 'image'
+                          ? 'https://contoh-domain.com/gambar-soal.jpg atau upload dari perangkat'
+                          : mediaType === 'audio'
+                          ? 'https://contoh-domain.com/audio-listening.mp3 atau link Google Drive MP3'
+                          : 'https://youtu.be/... atau link Google Drive Video / file .mp4'
+                      }
+                      value={mediaUrl.startsWith('data:') ? '[Berkas Media Terunggah Siap Disimpan ke Database]' : mediaUrl}
+                      readOnly={mediaUrl.startsWith('data:')}
+                      onChange={(e) => setMediaUrl(e.target.value)}
+                      className="flex-1 px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-800 focus:outline-none focus:border-indigo-500"
+                    />
+                    {mediaUrl && (
+                      <button
+                        type="button"
+                        onClick={() => setMediaUrl('')}
+                        className="px-2.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold cursor-pointer"
+                        title="Hapus lampiran media"
+                      >
+                        Hapus
+                      </button>
+                    )}
+                  </div>
                 </div>
+
+                {mediaType === 'image' && mediaUrl && (
+                  <div className="p-2 rounded-xl bg-white border border-slate-200 flex items-center justify-center">
+                    <img
+                      src={mediaUrl}
+                      alt="Pratinjau Stimulus"
+                      className="max-h-40 w-auto object-contain rounded-lg"
+                    />
+                  </div>
+                )}
+
+                {mediaType === 'audio' && mediaUrl && (
+                  <div className="p-2 rounded-xl bg-white border border-slate-200">
+                    <audio controls src={resolveCbtAudioSource(mediaUrl)} className="w-full h-9" />
+                  </div>
+                )}
+
+                {mediaType === 'video' && mediaUrl && (() => {
+                  const resolved = resolveCbtVideoSource(mediaUrl);
+                  return (
+                    <div className="p-2 rounded-xl bg-slate-950 border border-slate-200">
+                      {resolved.mode === 'iframe' ? (
+                        <div className="w-full aspect-video max-h-52 mx-auto rounded-lg overflow-hidden">
+                          <iframe
+                            src={resolved.src}
+                            title="Pratinjau Video Stimulus"
+                            sandbox="allow-scripts allow-same-origin allow-presentation"
+                            className="w-full h-full border-0"
+                          />
+                        </div>
+                      ) : (
+                        <video
+                          controls
+                          playsInline
+                          controlsList="nodownload nofullscreen"
+                          disablePictureInPicture
+                          src={resolved.src}
+                          className="w-full max-h-52 mx-auto rounded-lg"
+                        />
+                      )}
+                    </div>
+                  );
+                })()}
+
                 <div>
                   <span className="text-[11px] text-slate-500 block mb-1">
                     Keterangan / Judul Stimulus Media:
                   </span>
                   <input
                     type="text"
-                    placeholder="Contoh: Audio Section 1: Percakapan di Perpustakaan"
+                    placeholder="Contoh: Perhatikan gambar jaringan komputer berikut / Audio Section 1"
                     value={mediaCaption}
                     onChange={(e) => setMediaCaption(e.target.value)}
                     className="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-800 focus:outline-none focus:border-indigo-500"
@@ -1728,6 +2266,16 @@ function QuestionEditorModal({
                   >
                     {st.correctAnswer ? '✓ BENAR' : '✗ SALAH'}
                   </button>
+                  {statements.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => setStatements(statements.filter((_, i) => i !== idx))}
+                      className="px-2 py-1.5 rounded-lg bg-white hover:bg-rose-50 text-rose-600 border border-slate-200 text-xs cursor-pointer"
+                      title="Hapus baris pernyataan"
+                    >
+                      ✕
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
@@ -1774,6 +2322,16 @@ function QuestionEditorModal({
                     }}
                     className="w-1/2 px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-900"
                   />
+                  {pairs.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => setPairs(pairs.filter((_, i) => i !== idx))}
+                      className="px-2 py-1.5 rounded-lg bg-white hover:bg-rose-50 text-rose-600 border border-slate-200 text-xs cursor-pointer"
+                      title="Hapus pasangan"
+                    >
+                      ✕
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
@@ -1783,7 +2341,7 @@ function QuestionEditorModal({
           {/* Footer Save - Always Fixed at the Bottom */}
           <div className="pt-3 border-t border-slate-200 flex items-center justify-between gap-2 flex-shrink-0 bg-white">
             <span className="text-[11px] text-slate-400 font-medium hidden sm:inline">
-              💡 Pastikan tipe &amp; kunci jawaban terisi sebelum menyimpan.
+              💡 Setiap butir soal yang disimpan langsung tersinkron ke MariaDB.
             </span>
             <div className="flex items-center gap-2">
               <button
@@ -1795,7 +2353,8 @@ function QuestionEditorModal({
               </button>
               <button
                 type="submit"
-                className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold cursor-pointer shadow-md shadow-indigo-600/20 text-xs transition flex items-center gap-1.5"
+                disabled={isCompressingMedia}
+                className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold cursor-pointer shadow-md shadow-indigo-600/20 text-xs transition flex items-center gap-1.5"
               >
                 <span>💾</span>
                 <span>Simpan Butir Soal Ini ✓</span>

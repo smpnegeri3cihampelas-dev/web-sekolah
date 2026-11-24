@@ -47,7 +47,7 @@ export function saveStoredWarta(items: WartaItem[]): WartaItem[] {
 export async function syncWartaWithCloud(): Promise<WartaItem[]> {
   if (typeof window === 'undefined') return DEFAULT_WARTA;
   try {
-    const res = await fetch('/api/warta');
+    const res = await fetch('/api/warta', { cache: 'no-store' });
     if (!res.ok) return getStoredWarta();
     const json = await res.json();
     if (json.success && Array.isArray(json.data) && json.data.length > 0) {

@@ -16,6 +16,7 @@ import {
   resetStoredStudentCbtSession,
   unlockStoredStudentCbtSession,
   getStoredCbtRoomAttendances,
+  saveStoredCbtRoomAttendance,
   getStudentsForRoom,
   updateRoomMetadata,
   splitTwoClassesAcrossTwoRooms,
@@ -23,7 +24,7 @@ import {
   getEmptySchoolRooms,
   getPureClassSchoolRooms,
   autoCrossSplitClasses7And8,
-  registerEmergencyStudentToCbt,
+  registerEmergencyStudentToCbtAsync,
   evaluateCbtPackageSchedule,
   updateCbtPackageSchedule,
   toggleCbtEmergencyPause,
@@ -38,7 +39,9 @@ import {
   getSupervisorForSlot,
   generateSessionsFromExamPackages
 } from '@/lib/cbtData';
-import { Student, SCHOOL_CLASSES, DEMO_TEACHERS } from '@/lib/elearningData';
+import { Student, TeacherUser, SCHOOL_CLASSES, DEMO_TEACHERS, syncStudentsWithCloud } from '@/lib/elearningData';
+import { syncSchoolWithCloud } from '@/lib/schoolData';
+import { syncCbtWithCloud } from '@/lib/cloudSync';
 import {
   exportCbtSchoolRekapBapToExcel,
   exportCbtRoomBapToExcel,
@@ -121,14 +124,22 @@ const FastSearchInput = React.memo(function FastSearchInput({
 
 interface CbtPanitiaCommandCenterProps {
   activeStudents: Student[];
+  activeTeachers?: TeacherUser[];
   onOpenRoomView?: (roomLabel: string) => void;
 }
 
 export default function CbtPanitiaCommandCenter({
   activeStudents,
+  activeTeachers,
   onOpenRoomView
 }: CbtPanitiaCommandCenterProps) {
-  // Panitia Config State (17 Official Pure Rooms + 2 Labs)
+  const teacherList = useMemo<TeacherUser[]>(
+    () => (activeTeachers && activeTeachers.length > 0 ? activeTeachers : DEMO_TEACHERS),
+    [activeTeachers]
+  );
+  const lastCloudSyncAtRef = useRef<number>(0);
+
+  // Panitia Config State (17 Official Pure Rooms)
   const [config, setConfig] = useState<CbtPanitiaConfig>(() => getStoredCbtPanitiaConfig());
 
   // Packages & Sessions
@@ -190,6 +201,14 @@ export default function CbtPanitiaCommandCenter({
   const [schedStartTime, setSchedStartTime] = useState<string>('07:30');
   const [schedEndTime, setSchedEndTime] = useState<string>('09:00');
   const [schedDuration, setSchedDuration] = useState<number>(60);
+  const [schedAcademicYear, setSchedAcademicYear] = useState<string>(() => config.academicYear || '2026/2027');
+  const [schedSemester, setSchedSemester] = useState<string>(() => config.semester || 'PTS / STS Ganjil');
+
+  // State Edit BAP oleh Panitia (di modal Pratinjau BAP)
+  const [bapEditSupervisor, setBapEditSupervisor] = useState<string>('');
+  const [bapEditNotes, setBapEditNotes] = useState<string>('');
+  const [isEditingBapDoc, setIsEditingBapDoc] = useState<boolean>(false);
+  const [isSubmittingEmergency, setIsSubmittingEmergency] = useState<boolean>(false);
 
   // ==========================================
   // ROOM ARRANGEMENT STATE (Penyusunan Ruangan)
@@ -270,6 +289,17 @@ export default function CbtPanitiaCommandCenter({
     window.addEventListener('cbtRoomsSyncStatus', handleRoomsSync);
     window.addEventListener('storage', handleStorage);
 
+    // Sinkronisasi otomatis dengan MariaDB saat Panitia membuka dashboard & berkala tiap 8 detik
+    const runCloudSync = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      lastCloudSyncAtRef.current = Date.now();
+      syncCbtWithCloud().catch(() => {});
+      syncStudentsWithCloud().catch(() => {});
+      syncSchoolWithCloud().catch(() => {});
+    };
+    runCloudSync();
+    const syncInterval = setInterval(runCloudSync, 8000);
+
     return () => {
       window.removeEventListener('cbtPackagesUpdated', handlePkgs);
       window.removeEventListener('cbtSessionsUpdated', handleSessions);
@@ -279,6 +309,7 @@ export default function CbtPanitiaCommandCenter({
       window.removeEventListener('cbtSupervisorScheduleUpdated', handleSchedule);
       window.removeEventListener('cbtRoomsSyncStatus', handleRoomsSync);
       window.removeEventListener('storage', handleStorage);
+      clearInterval(syncInterval);
     };
   }, []);
 
@@ -318,6 +349,12 @@ export default function CbtPanitiaCommandCenter({
     }
 
     const roomId = `ruang-${Date.now().toString(36)}`;
+    const matchedStudents = newRoomClasses.length > 0
+      ? activeStudents.filter(s => newRoomClasses.includes(s.classId))
+      : [];
+    const matchedStudentIds = matchedStudents.map(s => s.id);
+    const matchedIdSet = new Set(matchedStudentIds);
+
     const labelSuffix = newRoomClasses.length > 0
       ? `Kelas ${newRoomClasses.join(' & ')}`
       : 'Kosong / Kustom';
@@ -326,13 +363,27 @@ export default function CbtPanitiaCommandCenter({
       id: roomId,
       name: trimmedName,
       classes: newRoomClasses,
-      capacity: newRoomCapacity > 0 ? newRoomCapacity : 36,
+      capacity: Math.max(newRoomCapacity > 0 ? newRoomCapacity : 36, matchedStudentIds.length || 36),
       label: `${trimmedName} (${labelSuffix})`,
       supervisorName: newRoomSupervisor.trim() || 'Guru Pengawas',
-      assignedStudentIds: []
+      assignedStudentIds: matchedStudentIds
     };
 
-    const updatedRooms = [...config.rooms, newRoom];
+    // Jika rombel dipilih, bersihkan siswa tersebut dari ruangan lama agar tidak ganda
+    const cleanedExistingRooms = matchedIdSet.size > 0
+      ? config.rooms.map(r => {
+          const studentsHere = getStudentsForRoom(r, activeStudents);
+          const hasOverlap = studentsHere.some(s => matchedIdSet.has(s.id));
+          if (!hasOverlap) return r;
+          const remaining = studentsHere.filter(s => !matchedIdSet.has(s.id));
+          return {
+            ...updateRoomMetadata(r, remaining),
+            assignedStudentIds: remaining.map(s => s.id)
+          };
+        })
+      : config.rooms;
+
+    const updatedRooms = [...cleanedExistingRooms, newRoom];
     const updatedConfig: CbtPanitiaConfig = {
       ...config,
       rooms: updatedRooms
@@ -342,52 +393,75 @@ export default function CbtPanitiaCommandCenter({
     setConfig(updatedConfig);
     setSelectedArrangementRoomId(roomId);
     setShowAddRoomModal(false);
-    showAlert(`🎉 Ruangan "${trimmedName}" berhasil ditambahkan! Silakan atur siswa.`);
+    showAlert(`🎉 Ruangan "${trimmedName}" berhasil ditambahkan & tersimpan ke database!${matchedStudentIds.length > 0 ? ` (${matchedStudentIds.length} siswa otomatis dialokasikan)` : ''}`);
   };
 
-  // Emergency Student Registration (Terkoneksi langsung ke Master Siswa & Ruang Ujian CBT)
-  const handleRegisterEmergencyStudent = (e: React.FormEvent) => {
+  // Emergency Student Registration (Terkoneksi langsung ke Master Siswa MariaDB & Ruang Ujian CBT)
+  const handleRegisterEmergencyStudent = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmittingEmergency) return;
     const trimmedName = emName.trim();
     const trimmedNisn = emNisn.trim();
     if (!trimmedName || !trimmedNisn) {
       alert('Nama dan NISN wajib diisi.');
       return;
     }
-
-    const newStudent = registerEmergencyStudentToCbt({
-      name: trimmedName,
-      nisn: trimmedNisn,
-      classId: emClass,
-      gender: emGender
-    });
-
-    const targetRoom = config.rooms.find(r => r.id === emTargetRoomId) || config.rooms[0];
-    if (targetRoom) {
-      const updatedRooms = config.rooms.map(r => {
-        if (r.id === targetRoom.id) {
-          const currentIds = r.assignedStudentIds || [];
-          if (!currentIds.includes(newStudent.id)) {
-            return {
-              ...r,
-              assignedStudentIds: [...currentIds, newStudent.id]
-            };
-          }
-        }
-        return r;
-      });
-      const updatedConfig = { ...config, rooms: updatedRooms };
-      saveStoredCbtPanitiaConfig(updatedConfig);
-      setConfig(updatedConfig);
+    if (/\s/.test(trimmedNisn) || !/^\d{10}$/.test(trimmedNisn)) {
+      alert('NISN harus tepat 10 digit angka tanpa spasi!');
+      return;
     }
 
-    setEmName('');
-    setEmNisn('');
-    setShowEmergencyModal(false);
-    showAlert(`🎉 Siswa "${newStudent.name}" (NISN: ${newStudent.nisn}) berhasil didaftarkan dan langsung masuk ke ${targetRoom?.name || 'Ruang Ujian'} serta Master Data Sekolah!`);
+    setIsSubmittingEmergency(true);
+    try {
+      const { student: newStudent } = await registerEmergencyStudentToCbtAsync({
+        name: trimmedName,
+        nisn: trimmedNisn,
+        classId: emClass,
+        gender: emGender
+      });
+
+      const targetRoom = config.rooms.find(r => r.id === emTargetRoomId) || config.rooms[0];
+      if (targetRoom) {
+        const updatedRooms = config.rooms.map(r => {
+          const currentIds = Array.isArray(r.assignedStudentIds) ? r.assignedStudentIds : [];
+          if (r.id === targetRoom.id) {
+            const nextIds = currentIds.includes(newStudent.id) ? currentIds : [...currentIds, newStudent.id];
+            const nextClasses = Array.from(new Set([...(r.classes || []), newStudent.classId])).sort();
+            const labelSuffix = nextClasses.length > 1
+              ? `Campur ${nextClasses.join(' & ')}`
+              : nextClasses.length === 1
+              ? `Kelas ${nextClasses[0]}`
+              : 'Kosong';
+            return {
+              ...r,
+              classes: nextClasses,
+              label: `${r.name} (${labelSuffix})`,
+              assignedStudentIds: nextIds
+            };
+          }
+          if (currentIds.includes(newStudent.id)) {
+            return {
+              ...r,
+              assignedStudentIds: currentIds.filter(id => id !== newStudent.id)
+            };
+          }
+          return r;
+        });
+        const updatedConfig = { ...config, rooms: updatedRooms };
+        saveStoredCbtPanitiaConfig(updatedConfig);
+        setConfig(updatedConfig);
+      }
+
+      setEmName('');
+      setEmNisn('');
+      setShowEmergencyModal(false);
+      showAlert(`🎉 Siswa "${newStudent.name}" (NISN: ${newStudent.nisn}) berhasil didaftarkan ke database MariaDB & masuk ke ${targetRoom?.name || 'Ruang Ujian'}!`);
+    } finally {
+      setIsSubmittingEmergency(false);
+    }
   };
 
-  // Delete Room Handler
+  // Delete Room Handler (Sinkron hapus ke MariaDB cbt_exam_rooms)
   const handleDeleteRoom = (roomId: string) => {
     const targetRoom = config.rooms.find(r => r.id === roomId);
     if (!targetRoom) return;
@@ -407,8 +481,21 @@ export default function CbtPanitiaCommandCenter({
       rooms: updatedRooms
     };
 
-    saveStoredCbtPanitiaConfig(updatedConfig);
+    saveStoredCbtPanitiaConfig(updatedConfig, { forceEmpty: updatedRooms.every(r => (!r.assignedStudentIds || r.assignedStudentIds.length === 0) && (!r.classes || r.classes.length === 0)) });
+    fetch(`/api/cbt/rooms?id=${encodeURIComponent(roomId)}`, { method: 'DELETE' }).catch(() => {});
     setConfig(updatedConfig);
+
+    // Perbarui jadwal pengawas jika sebelumnya sudah diatur panitia
+    if (supervisorSchedule.entries.some(e => e.roomId === roomId)) {
+      const nextSched: CbtSupervisorSchedule = {
+        ...supervisorSchedule,
+        entries: supervisorSchedule.entries.filter(e => e.roomId !== roomId)
+      };
+      setSupervisorSchedule(nextSched);
+      if (supervisorSchedule.isUserEdited) {
+        saveStoredSupervisorSchedule(nextSched);
+      }
+    }
 
     if (selectedArrangementRoomId === roomId) {
       setSelectedArrangementRoomId(updatedRooms[0]?.id || '');
@@ -417,7 +504,7 @@ export default function CbtPanitiaCommandCenter({
       setEditingRoom(null);
     }
 
-    showAlert(`🗑️ Ruangan "${targetRoom.name}" berhasil dihapus.`);
+    showAlert(`🗑️ Ruangan "${targetRoom.name}" berhasil dihapus dari sistem & database.`);
   };
 
   // Open Edit Modal for a Room (Ganti Pengawas, Nama, Kapasitas, Rombel)
@@ -426,7 +513,7 @@ export default function CbtPanitiaCommandCenter({
     setEditRoomName(room.name);
     setEditRoomCapacity(room.capacity || 36);
     setEditRoomClasses([...room.classes]);
-    const latestAtt = attendancesByRoomMap.get(room.name)?.[0];
+    const latestAtt = getRoomAttendances(room)[0];
     const initialSup = (latestAtt?.supervisorName && latestAtt.supervisorName !== 'Guru Pengawas Ruang' && latestAtt.supervisorName.trim() !== '')
       ? latestAtt.supervisorName
       : (room.supervisorName || 'Guru Pengawas');
@@ -446,6 +533,12 @@ export default function CbtPanitiaCommandCenter({
       return;
     }
 
+    const hadManualStudents = Array.isArray(editingRoom.assignedStudentIds) && editingRoom.assignedStudentIds.length > 0;
+    const autoAssignedIds = !hadManualStudents && editRoomClasses.length > 0
+      ? activeStudents.filter(s => editRoomClasses.includes(s.classId)).map(s => s.id)
+      : (editingRoom.assignedStudentIds || []);
+    const autoIdSet = !hadManualStudents && autoAssignedIds.length > 0 ? new Set(autoAssignedIds) : null;
+
     const updatedRooms = config.rooms.map(r => {
       if (r.id === editingRoom.id) {
         const labelSuffix = editRoomClasses.length > 0 ? editRoomClasses.join(' & ') : 'Kosong / Kustom';
@@ -454,8 +547,21 @@ export default function CbtPanitiaCommandCenter({
           name: trimmedName,
           capacity: capacityVal,
           classes: editRoomClasses,
-          label: `${trimmedName} (${labelSuffix})`
+          label: `${trimmedName} (${labelSuffix})`,
+          supervisorName: editRoomSupervisor.trim() || r.supervisorName || 'Guru Pengawas',
+          assignedStudentIds: autoAssignedIds
         };
+      }
+      if (autoIdSet) {
+        const studentsHere = getStudentsForRoom(r, activeStudents);
+        const hasOverlap = studentsHere.some(s => autoIdSet.has(s.id));
+        if (hasOverlap) {
+          const remaining = studentsHere.filter(s => !autoIdSet.has(s.id));
+          return {
+            ...updateRoomMetadata(r, remaining),
+            assignedStudentIds: remaining.map(s => s.id)
+          };
+        }
       }
       return r;
     });
@@ -468,11 +574,28 @@ export default function CbtPanitiaCommandCenter({
     saveStoredCbtPanitiaConfig(updatedConfig);
     setConfig(updatedConfig);
 
+    // Jika nama ruangan berubah, selaraskan pada jadwal pengawas di database
+    if (editingRoom.name !== trimmedName && supervisorSchedule.entries.some(en => en.roomId === editingRoom.id)) {
+      const labelSuffix = editRoomClasses.length > 0 ? editRoomClasses.join(' & ') : 'Kosong / Kustom';
+      const nextSched: CbtSupervisorSchedule = {
+        ...supervisorSchedule,
+        entries: supervisorSchedule.entries.map(en =>
+          en.roomId === editingRoom.id
+            ? { ...en, roomName: trimmedName, roomLabel: `${trimmedName} (${labelSuffix})` }
+            : en
+        )
+      };
+      setSupervisorSchedule(nextSched);
+      if (supervisorSchedule.isUserEdited) {
+        saveStoredSupervisorSchedule(nextSched);
+      }
+    }
+
     setEditingRoom(null);
-    showAlert(`Pengaturan ${trimmedName} berhasil diperbarui!`);
+    showAlert(`Pengaturan ${trimmedName} berhasil diperbarui & tersimpan ke database!`);
   };
 
-  // Simpan Jadwal Waktu Sesi Ujian (Tanggal, Jam Mulai, Jam Selesai, Durasi) - Bisa Per Mapel atau Serentak
+  // Simpan Jadwal Waktu Sesi Ujian (Tanggal, Jam Mulai, Jam Selesai, Durasi, Tahun Ajaran, Semester) - Sinkron MariaDB
   const handleSaveSchedule = (e: React.FormEvent) => {
     e.preventDefault();
     if (schedStartTime >= schedEndTime) {
@@ -485,28 +608,33 @@ export default function CbtPanitiaCommandCenter({
       examDate: toLocalDateString(schedDate),
       startTime: schedStartTime,
       endTime: schedEndTime,
-      durationMinutes: Number(schedDuration) || 60
+      durationMinutes: Number(schedDuration) || 60,
+      academicYear: schedAcademicYear.trim() || config.academicYear || '2026/2027',
+      semester: schedSemester.trim() || config.semester || 'PTS / STS Ganjil'
     });
     setPackages(updated);
+    setConfig(getStoredCbtPanitiaConfig());
     setShowScheduleModal(false);
     const targetPkg = packages.find(p => p.id === selectedSchedPackageId);
-    const targetLabel = isAll ? 'Semua Mata Pelajaran' : `Mata Pelajaran ${targetPkg?.subject || 'Terpilih'}`;
-    showAlert(`✓ Jadwal Asesmen Berhasil Diperbarui!\n\nTarget: ${targetLabel}\nTanggal: ${schedDate}\nJam Sesi: ${schedStartTime} - ${schedEndTime} WIB\nDurasi: ${schedDuration} Menit\nSistem otomatis mengaktifkan ujian saat jam tiba!`);
+    const targetLabel = isAll ? 'Semua Mata Pelajaran (Pengaturan Global Posko)' : `Mata Pelajaran ${targetPkg?.subject || 'Terpilih'}`;
+    showAlert(`✓ Jadwal Asesmen Berhasil Disimpan ke Database!\n\nTarget: ${targetLabel}\nTanggal: ${schedDate}\nJam Sesi: ${schedStartTime} - ${schedEndTime} WIB\nDurasi: ${schedDuration} Menit`);
   };
 
-  // Toggle Jeda Darurat Manual (Emergency Pause)
+  // Toggle Jeda Darurat Manual (Emergency Pause) - Sinkron ke MariaDB (school_settings + cbt_exam_packages)
+  const isGlobalOrAnyPaused = Boolean(config.globalEmergencyPaused) || packages.some(p => p.emergencyPaused || p.status === 'draft');
   const handleEmergencyPauseToggle = () => {
-    const isAnyPaused = packages.some(p => p.emergencyPaused || p.status === 'draft');
-    if (!isAnyPaused) {
+    if (!isGlobalOrAnyPaused) {
       const reason = prompt('Masukkan alasan jeda darurat (misal: Listrik padam sementara / kendala teknis jaringan):', 'Kendala teknis / listrik padam sementara');
       if (reason === null) return;
       const updated = toggleCbtEmergencyPause(true, reason);
       setPackages(updated);
-      showAlert('⏸️ JEDA DARURAT DIAKTIFKAN!\n\nSeluruh paket soal ujian telah dibekukan sementara. Pengerjaan siswa dihentikan dan sisa waktu pengerjaan siswa aman tidak berkurang.');
+      setConfig(getStoredCbtPanitiaConfig());
+      showAlert('⏸️ JEDA DARURAT DIAKTIFKAN & TERSIMPAN KE DATABASE!\n\nSeluruh sesi ujian telah dibekukan sementara. Pengerjaan siswa dihentikan dan sisa waktu siswa aman tidak berkurang.');
     } else {
       if (confirm('Cabut Jeda Darurat dan lanjutkan jadwal asesmen normal? Siswa akan dapat melanjutkan pengerjaan kembali.')) {
         const updated = toggleCbtEmergencyPause(false);
         setPackages(updated);
+        setConfig(getStoredCbtPanitiaConfig());
         showAlert('▶️ Jeda darurat dicabut! Ujian kembali berjalan otomatis mengikuti jam jadwal.');
       }
     }
@@ -521,21 +649,43 @@ export default function CbtPanitiaCommandCenter({
   const deferredPickerSearchQuery = useDeferredValue(pickerSearchQuery);
   const deferredRoomStudentSearch = useDeferredValue(roomStudentSearch);
 
-  // Inverted Map of studentId -> CbtStudentAnswerState[] (O(1) instant lookup)
+  // Inverted Map of studentId OR studentNisn -> CbtStudentAnswerState[] (O(1) instant lookup)
   const sessionsByStudentId = useMemo(() => {
     const map = new Map<string, CbtStudentAnswerState[]>();
     const sessionList = Object.values(studentSessions);
-    for (let i = 0; i < sessionList.length; i++) {
-      const s = sessionList[i];
-      let arr = map.get(s.studentId);
+    const addToKey = (key: string | undefined, sess: CbtStudentAnswerState) => {
+      if (!key) return;
+      let arr = map.get(key);
       if (!arr) {
         arr = [];
-        map.set(s.studentId, arr);
+        map.set(key, arr);
       }
-      arr.push(s);
+      if (!arr.some(ex => ex.examId === sess.examId && (ex.studentId === sess.studentId || ex.studentNisn === sess.studentNisn))) {
+        arr.push(sess);
+      }
+    };
+    for (let i = 0; i < sessionList.length; i++) {
+      const s = sessionList[i];
+      addToKey(s.studentId, s);
+      if (s.studentNisn && s.studentNisn !== s.studentId) {
+        addToKey(s.studentNisn, s);
+      }
     }
     return map;
   }, [studentSessions]);
+
+  const validPackageIdSet = useMemo(() => new Set(packages.map(p => p.id)), [packages]);
+
+  const getStudentSessions = useCallback((student: Pick<Student, 'id' | 'nisn'>): CbtStudentAnswerState[] => {
+    const byId = sessionsByStudentId.get(student.id) || [];
+    const byNisn = student.nisn ? (sessionsByStudentId.get(student.nisn) || []) : [];
+    const mergedMap = new Map<string, CbtStudentAnswerState>();
+    for (const s of [...byId, ...byNisn]) {
+      if (validPackageIdSet.size > 0 && !validPackageIdSet.has(s.examId)) continue;
+      mergedMap.set(s.examId, s);
+    }
+    return Array.from(mergedMap.values());
+  }, [sessionsByStudentId, validPackageIdSet]);
 
   // Pre-computed Map of roomId -> Student[] (O(1) instant lookup)
   const roomStudentsMap = useMemo(() => {
@@ -549,7 +699,6 @@ export default function CbtPanitiaCommandCenter({
 
   // Pre-computed room statistics for Monitoring Tab (O(1) instant lookup)
   const roomStatusStatsMap = useMemo(() => {
-    const validPkgIds = new Set(packages.map(p => p.id));
     const map = new Map<string, { submitted: number; inProgress: number; notStarted: number; total: number }>();
     for (let i = 0; i < config.rooms.length; i++) {
       const room = config.rooms[i];
@@ -559,8 +708,7 @@ export default function CbtPanitiaCommandCenter({
       let notStarted = 0;
 
       for (let j = 0; j < students.length; j++) {
-        const rawList = sessionsByStudentId.get(students[j].id) || [];
-        const sessList = validPkgIds.size > 0 ? rawList.filter(s => validPkgIds.has(s.examId)) : rawList;
+        const sessList = getStudentSessions(students[j]);
         if (sessList.length === 0) {
           notStarted++;
         } else if (sessList.some(s => s.isSubmitted)) {
@@ -572,7 +720,7 @@ export default function CbtPanitiaCommandCenter({
       map.set(room.id, { submitted, inProgress, notStarted, total: students.length });
     }
     return map;
-  }, [config.rooms, roomStudentsMap, sessionsByStudentId, packages]);
+  }, [config.rooms, roomStudentsMap, getStudentSessions]);
 
   // Pre-computed class student counts for dropdown options (O(1) instant lookup)
   const classCountMap = useMemo(() => {
@@ -872,11 +1020,15 @@ export default function CbtPanitiaCommandCenter({
   // Total BAP Submitted Count (reactive across tabs)
   const totalBapSubmittedCount = roomBapSummaryData.submittedCount;
 
-  // Batched Filter & Tab Handlers (prevents cascading re-renders)
+  // Batched Filter & Tab Handlers (prevents cascading re-renders & syncs fresh MariaDB state on tab change)
   const handleTabSwitch = (tab: 'monitoring' | 'schedule' | 'arrangement' | 'search' | 'susulan' | 'bap') => {
     startTransition(() => {
       setActiveTab(tab);
     });
+    if (Date.now() - lastCloudSyncAtRef.current > 3000) {
+      lastCloudSyncAtRef.current = Date.now();
+      syncCbtWithCloud().catch(() => {});
+    }
   };
 
   const handleSearchQueryChange = (q: string) => {
@@ -918,8 +1070,8 @@ export default function CbtPanitiaCommandCenter({
 
   // Paket ujian guru untuk tanggal jadwal aktif
   const scheduledDateExamPackages = useMemo(() => {
-    const targetDate = supervisorSchedule.examDate || new Date().toISOString().split('T')[0];
-    return packages.filter(p => !p.examDate || p.examDate === targetDate);
+    const targetDate = supervisorSchedule.examDate || toLocalDateString(new Date());
+    return packages.filter(p => !p.examDate || toLocalDateString(p.examDate) === targetDate);
   }, [packages, supervisorSchedule.examDate]);
 
   const scheduleRows = useMemo(() => {
@@ -995,7 +1147,7 @@ export default function CbtPanitiaCommandCenter({
     entries: CbtSupervisorScheduleEntry[]
   ) => {
     const newSchedule: CbtSupervisorSchedule = {
-      examDate: supervisorSchedule.examDate || new Date().toISOString().split('T')[0],
+      examDate: supervisorSchedule.examDate || toLocalDateString(new Date()),
       sessions,
       entries,
       isUserEdited: true
@@ -1034,7 +1186,7 @@ export default function CbtPanitiaCommandCenter({
   };
 
   const handleAutoRotateSchedule = () => {
-    const teacherNames = DEMO_TEACHERS.map(t => t.name);
+    const teacherNames = teacherList.map(t => t.name);
     if (teacherNames.length === 0 || uniqueSchoolRooms.length === 0) return;
 
     const fisherYatesShuffle = (items: string[]): string[] => {
@@ -1292,7 +1444,7 @@ export default function CbtPanitiaCommandCenter({
     printCbtRoomBapDocument(buildSingleRoomDocPayload(targetRoom));
   };
 
-  // Search Tab KPI Stats (O(1) lookups per student)
+  // Search Tab KPI Stats (O(1) lookups per student — matching Header & Monitoring)
   const searchKpiStats = useMemo(() => {
     const total = activeStudents.length;
     let inProgress = 0;
@@ -1300,8 +1452,8 @@ export default function CbtPanitiaCommandCenter({
     let hasSession = 0;
 
     for (let i = 0; i < activeStudents.length; i++) {
-      const sessList = sessionsByStudentId.get(activeStudents[i].id);
-      if (sessList && sessList.length > 0) {
+      const sessList = getStudentSessions(activeStudents[i]);
+      if (sessList.length > 0) {
         hasSession++;
         if (sessList.some(s => !s.isSubmitted)) {
           inProgress++;
@@ -1318,17 +1470,20 @@ export default function CbtPanitiaCommandCenter({
       hasSession,
       noSession: Math.max(0, total - hasSession)
     };
-  }, [activeStudents, sessionsByStudentId]);
+  }, [activeStudents, getStudentSessions]);
 
-  // Seluruh Siswa yang Berhak Ujian Susulan (Status S / I di presensi ruangan)
+  // Seluruh Siswa yang Berhak Ujian Susulan (Status S / I di presensi ruangan MariaDB)
   const susulanStudentsList = useMemo(() => {
     const list: Array<{
       student: Student;
       status: 'S' | 'I';
       roomName: string;
+      examId: string;
       examTitle: string;
       notes: string;
       date: string;
+      sourceAttendance: CbtRoomAttendance;
+      susulanSession?: CbtStudentAnswerState;
     }> = [];
 
     const seen = new Set<string>();
@@ -1340,15 +1495,20 @@ export default function CbtPanitiaCommandCenter({
           const key = `${stId}_${att.examId || 'cbt'}`;
           if (!seen.has(key)) {
             seen.add(key);
-            const st = activeStudents.find(s => s.id === stId);
+            const st = activeStudents.find(s => s.id === stId || s.nisn === stId);
             if (st) {
+              const stSessions = getStudentSessions(st);
+              const matchedSession = stSessions.find(s => s.examId === att.examId) || stSessions.find(s => s.isSubmitted);
               list.push({
                 student: st,
                 status: stStatus,
                 roomName: att.roomName || 'Ruang Ujian',
+                examId: att.examId || 'cbt',
                 examTitle: att.examTitle || 'Ujian CBT',
                 notes: att.notes || '-',
-                date: att.date || new Date().toISOString().split('T')[0]
+                date: toLocalDateString(att.date || new Date()),
+                sourceAttendance: att,
+                susulanSession: matchedSession
               });
             }
           }
@@ -1357,13 +1517,96 @@ export default function CbtPanitiaCommandCenter({
     });
 
     return list.sort((a, b) => a.student.classId.localeCompare(b.student.classId) || a.student.name.localeCompare(b.student.name));
-  }, [roomAttendances, activeStudents]);
+  }, [roomAttendances, activeStudents, getStudentSessions]);
+
+  // Panitia tandai peserta susulan sudah hadir/menyelesaikan susulan -> langsung update cbt_room_attendances di MariaDB
+  const handleMarkSusulanCompleted = (item: {
+    student: Student;
+    sourceAttendance: CbtRoomAttendance;
+    roomName: string;
+    examTitle: string;
+  }) => {
+    if (!confirm(`Tandai "${item.student.name}" sebagai HADIR / SELESAI SUSULAN untuk "${item.examTitle}" di ${item.roomName}?\n\nPerubahan langsung disimpan ke database MariaDB.`)) {
+      return;
+    }
+    const updatedRecords = { ...(item.sourceAttendance.records || {}) };
+    if (updatedRecords[item.student.id] !== undefined) updatedRecords[item.student.id] = 'H';
+    if (item.student.nisn && updatedRecords[item.student.nisn] !== undefined) updatedRecords[item.student.nisn] = 'H';
+    updatedRecords[item.student.id] = 'H';
+
+    saveStoredCbtRoomAttendance({
+      ...item.sourceAttendance,
+      records: updatedRecords
+    });
+    setRoomAttendances(getStoredCbtRoomAttendances());
+    showAlert(`✅ Status "${item.student.name}" berhasil diperbarui menjadi Hadir / Selesai Susulan di database!`);
+  };
+
+  // Panitia simpan / sahkan / buka kembali BAP suatu ruangan -> langsung ke cbt_room_attendances di MariaDB
+  const handleSavePanitiaBapUpdate = (
+    targetRoom: CbtExamRoomConfig,
+    opts: { isBapSubmitted: boolean; supervisorName?: string; notes?: string }
+  ) => {
+    const summary = roomBapSummaryData.byRoomId.get(targetRoom.id);
+    const existingAtt = summary?.latestAttendance || getRoomAttendances(targetRoom)[0];
+    const roomStudents = summary?.students || roomStudentsMap.get(targetRoom.id) || [];
+    const todayStr = getTodayWibDateStr();
+    const defaultExam = packages[0];
+
+    const records: Record<string, 'H' | 'S' | 'I' | 'A'> = { ...(existingAtt?.records || {}) };
+    roomStudents.forEach(st => {
+      if (!records[st.id]) records[st.id] = 'H';
+    });
+
+    const finalSupervisor =
+      (opts.supervisorName && opts.supervisorName.trim()) ||
+      existingAtt?.supervisorName ||
+      targetRoom.supervisorName ||
+      'Guru Pengawas Ruang';
+
+    const finalNotes =
+      opts.notes !== undefined
+        ? opts.notes.trim()
+        : (existingAtt?.notes || 'Ujian berlangsung tertib, aman, dan lancar tanpa kendala teknis.');
+
+    const updatedAtt: CbtRoomAttendance = {
+      roomName: existingAtt?.roomName || targetRoom.name,
+      examId: existingAtt?.examId || defaultExam?.id || 'cbt-panitia-bap',
+      examTitle: existingAtt?.examTitle || defaultExam?.title || 'Asesmen Berbasis Komputer (CBT)',
+      date: existingAtt?.date ? toLocalDateString(existingAtt.date) : todayStr,
+      supervisorName: finalSupervisor,
+      token: existingAtt?.token || defaultExam?.token || '',
+      records,
+      notes: finalNotes || 'Ujian berlangsung tertib, aman, dan lancar tanpa kendala teknis.',
+      isBapSubmitted: opts.isBapSubmitted,
+      submittedAt: opts.isBapSubmitted ? (existingAtt?.submittedAt || new Date().toISOString()) : undefined
+    };
+
+    saveStoredCbtRoomAttendance(updatedAtt);
+    setRoomAttendances(getStoredCbtRoomAttendances());
+
+    // Juga selaraskan supervisorName pada ruangan jika pengawas valid
+    if (finalSupervisor && finalSupervisor !== 'Guru Pengawas' && finalSupervisor !== 'Guru Pengawas Ruang') {
+      fetch('/api/cbt/rooms', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roomId: targetRoom.id, roomName: targetRoom.name, supervisorName: finalSupervisor })
+      }).catch(() => {});
+    }
+
+    setIsEditingBapDoc(false);
+    showAlert(
+      opts.isBapSubmitted
+        ? `✅ BAP ${targetRoom.name} berhasil disahkan & disimpan ke database MariaDB!`
+        : `↩️ Status BAP ${targetRoom.name} berhasil dibuka kembali untuk revisi pengawas di database!`
+    );
+  };
 
   const handleExportSusulanExcel = () => {
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = getTodayWibDateStr();
     exportCbtSusulanListToExcel({
-      academicYear: '2026/2027',
-      semester: 'PTS / STS Ganjil',
+      academicYear: config.academicYear || '2026/2027',
+      semester: config.semester || 'PTS / STS Ganjil',
       date: todayStr,
       students: susulanStudentsList.map((item, idx) => ({
         no: idx + 1,
@@ -1408,8 +1651,8 @@ export default function CbtPanitiaCommandCenter({
 
       if (!matchRoom) return false;
 
-      // Student sessions via O(1) Map lookup
-      const sessions = sessionsByStudentId.get(st.id) || [];
+      // Student sessions via O(1) Map lookup (matching studentId & NISN)
+      const sessions = getStudentSessions(st);
       const hasSession = sessions.length > 0;
 
       if (selectedStatusFilter === 'in_progress') {
@@ -1424,7 +1667,7 @@ export default function CbtPanitiaCommandCenter({
 
       return true;
     });
-  }, [activeTab, activeStudents, deferredSearchQuery, selectedGradeFilter, selectedRoomFilter, selectedStatusFilter, studentRoomMap, sessionsByStudentId]);
+  }, [activeTab, activeStudents, deferredSearchQuery, selectedGradeFilter, selectedRoomFilter, selectedStatusFilter, studentRoomMap, getStudentSessions]);
 
   const totalSearchPages = Math.max(1, Math.ceil(filteredStudents.length / (searchPageSize === 9999 ? filteredStudents.length || 1 : searchPageSize)));
   const paginatedStudents = useMemo(() => {
@@ -1865,9 +2108,10 @@ export default function CbtPanitiaCommandCenter({
             <div className="text-left sm:text-right pr-2.5 border-r border-white/10">
               <span className="block text-[10px] text-indigo-300 font-medium">Sesi Asesmen Hari Ini:</span>
               <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                <span className={`w-2 h-2 rounded-full ${isGlobalOrAnyPaused ? 'bg-rose-400 animate-pulse' : 'bg-emerald-400 animate-ping'}`} />
                 <span className="text-xs font-black text-amber-300">
-                  {packages[0]?.startTime || '07:30'} - {packages[0]?.endTime || '09:00'} WIB
+                  {packages[0]?.startTime || config.defaultStartTime || '07:30'} - {packages[0]?.endTime || config.defaultEndTime || '09:00'} WIB
+                  {isGlobalOrAnyPaused ? ' (Dijeda)' : ''}
                 </span>
               </div>
             </div>
@@ -1876,23 +2120,30 @@ export default function CbtPanitiaCommandCenter({
             <button
               type="button"
               onClick={() => {
+                setSchedAcademicYear(config.academicYear || '2026/2027');
+                setSchedSemester(config.semester || 'PTS / STS Ganjil');
                 if (packages.length > 0) {
-                  setSchedDate(toLocalDateString(packages[0].examDate));
-                  setSchedStartTime(packages[0].startTime || '07:30');
-                  setSchedEndTime(packages[0].endTime || '09:00');
-                  setSchedDuration(packages[0].durationMinutes || 60);
+                  setSchedDate(toLocalDateString(packages[0].examDate || config.defaultExamDate || getTodayWibDateStr()));
+                  setSchedStartTime(packages[0].startTime || config.defaultStartTime || '07:30');
+                  setSchedEndTime(packages[0].endTime || config.defaultEndTime || '09:00');
+                  setSchedDuration(packages[0].durationMinutes || config.defaultDurationMinutes || 60);
+                } else {
+                  setSchedDate(toLocalDateString(config.defaultExamDate || getTodayWibDateStr()));
+                  setSchedStartTime(config.defaultStartTime || '07:30');
+                  setSchedEndTime(config.defaultEndTime || '09:00');
+                  setSchedDuration(config.defaultDurationMinutes || 60);
                 }
                 setShowScheduleModal(true);
               }}
               className="px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition shadow-md shadow-amber-400/20 flex items-center gap-1.5 cursor-pointer active:scale-95"
-              title="Atur Tanggal, Jam Mulai, Jam Selesai, dan Durasi Ujian"
+              title="Atur Tanggal, Jam Mulai, Jam Selesai, Durasi, dan Identitas Sesi Ujian"
             >
               <span>⚙️</span>
               <span>Atur Jam &amp; Jadwal</span>
             </button>
 
             {/* Tombol Jeda Darurat (Emergency Override) */}
-            {packages.some(p => p.emergencyPaused || p.status === 'draft') ? (
+            {isGlobalOrAnyPaused ? (
               <button
                 type="button"
                 onClick={handleEmergencyPauseToggle}
@@ -1959,7 +2210,7 @@ export default function CbtPanitiaCommandCenter({
                 <span className="text-xs font-black text-white truncate">
                   {unassignedStudentsCount === 0 ? '✓ 100% Siap' : `${unassignedStudentsCount} Belum Diplot`}
                 </span>
-                <span className="text-[10px] text-indigo-300 font-medium">(17 Ruang)</span>
+                <span className="text-[10px] text-indigo-300 font-medium">({uniqueSchoolRooms.length} Ruang)</span>
               </div>
             </div>
           </div>
@@ -2087,17 +2338,32 @@ export default function CbtPanitiaCommandCenter({
                 </span>
                 <input
                   type="date"
-                  value={supervisorSchedule.examDate || new Date().toISOString().split('T')[0]}
-                  onChange={(e) => {
+                  value={supervisorSchedule.examDate || toLocalDateString(new Date())}
+                  onChange={async (e) => {
                     const newDate = e.target.value;
                     if (!newDate) return;
+                    try {
+                      localStorage.setItem('cbt_active_schedule_date', newDate);
+                    } catch {}
                     const schedForDate = getStoredSupervisorSchedule(newDate);
                     setSupervisorSchedule(schedForDate);
+                    // Tarik data tanggal terpilih dari MariaDB agar selalu sinkron lintas perangkat
+                    try {
+                      const res = await fetch(`/api/cbt/schedules?date=${encodeURIComponent(newDate)}`, { cache: 'no-store' });
+                      if (res.ok) {
+                        const json = await res.json();
+                        const dbSched = Array.isArray(json?.data) ? json.data[0] : null;
+                        if (dbSched && Array.isArray(dbSched.entries) && dbSched.entries.length > 0) {
+                          saveStoredSupervisorSchedule(dbSched, { skipCloudSync: true });
+                          setSupervisorSchedule(getStoredSupervisorSchedule(newDate));
+                        }
+                      }
+                    } catch {}
                   }}
                   className="px-2.5 py-1 rounded-xl border border-slate-300 text-xs font-bold text-slate-800 bg-slate-50 focus:outline-none focus:border-indigo-500 cursor-pointer shadow-2xs"
                 />
                 <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-md">
-                  {new Date((supervisorSchedule.examDate || new Date().toISOString().split('T')[0]) + 'T00:00:00').toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                  {new Date((supervisorSchedule.examDate || toLocalDateString(new Date())) + 'T00:00:00').toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                 </span>
                 <span className="text-xs text-slate-400">•</span>
                 <span className="text-xs font-semibold text-slate-600">
@@ -2129,7 +2395,7 @@ export default function CbtPanitiaCommandCenter({
                 title="Deteksi paket soal terbit hari ini untuk jam & mapel sesi tanpa mengacak ulang pengawas"
               >
                 <span>⚡</span>
-                <span>Sinkronkan dari Guru</span>
+                <span>Tarik Sesi Paket Guru</span>
               </button>
               <button
                 type="button"
@@ -2318,8 +2584,8 @@ export default function CbtPanitiaCommandCenter({
                                   }`}
                                 >
                                   <option value="">-- Pilih Guru Pengawas (Belum Diatur) --</option>
-                                  {DEMO_TEACHERS.map(t => (
-                                    <option key={t.nip || t.name} value={t.name}>
+                                  {teacherList.map(t => (
+                                    <option key={`${t.nip}_${t.name}`} value={t.name}>
                                       {t.name} ({t.subject})
                                     </option>
                                   ))}
@@ -2375,10 +2641,10 @@ export default function CbtPanitiaCommandCenter({
                   type="button"
                   onClick={handleManualSaveSchedule}
                   className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-md shadow-emerald-600/20 flex items-center gap-1.5 cursor-pointer active:scale-95"
-                  title="Klik untuk memastikan jadwal tersimpan dan tersinkronkan"
+                  title="Simpan jadwal pengawas ruang ke database"
                 >
                   <span>💾</span>
-                  <span>Simpan &amp; Sinkronkan</span>
+                  <span>Simpan Jadwal</span>
                 </button>
               </div>
             </div>
@@ -2418,23 +2684,13 @@ export default function CbtPanitiaCommandCenter({
                     <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 font-extrabold text-xs border border-amber-200/80">
                       {config.rooms.length} Ruang • {activeStudents.length} Siswa Terdaftar
                     </span>
-                    {roomsSyncStatus === 'syncing' && (
-                      <span className="px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-bold text-[11px] border border-indigo-200 animate-pulse">
-                        ⏳ Menyimpan ke MariaDB...
-                      </span>
-                    )}
-                    {roomsSyncStatus === 'synced' && (
-                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold text-[11px] border border-emerald-200">
-                        ☁️ Tersimpan di Database
-                      </span>
-                    )}
                     {roomsSyncStatus === 'error' && (
                       <button
                         type="button"
                         onClick={() => saveStoredCbtPanitiaConfig(config)}
                         className="px-2.5 py-0.5 rounded-full bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-[11px] border border-rose-300 cursor-pointer"
                       >
-                        ⚠️ Gagal Sinkron — Klik Simpan Ulang
+                        ⚠️ Gagal Simpan — Klik Coba Lagi
                       </button>
                     )}
                   </div>
@@ -3327,10 +3583,6 @@ export default function CbtPanitiaCommandCenter({
                   <span>📺</span>
                   <span>Monitoring Live {config.rooms.length} Ruang Ujian</span>
                 </h2>
-                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
-                  Live Sync
-                </span>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
                 Pantauan real-time presensi pengawas, pengerjaan {activeStudents.length} peserta, dan penyerahan BAP.
@@ -3791,11 +4043,7 @@ export default function CbtPanitiaCommandCenter({
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {paginatedStudents.map(st => {
-                      const sessions = sessionsByStudentId.get(st.id) || [];
-                      // Deduplicate sessions by examId to ensure no duplicates
-                      const uniqueSessions = Array.from(
-                        new Map(sessions.map(s => [s.examId, s])).values()
-                      );
+                      const uniqueSessions = getStudentSessions(st);
 
                       // Determine official room based on actual assignment
                       const assignedRoom = studentRoomMap.get(st.id);
@@ -3849,33 +4097,41 @@ export default function CbtPanitiaCommandCenter({
                                 const sess = uniqueSessions[0];
                                 const pkg = packages.find(p => p.id === sess.examId);
                                 const subjectName = pkg?.subject || pkg?.title || 'Ujian';
+                                const isLocked = !sess.isSubmitted && Number(sess.violationCount || 0) >= 1;
                                 return (
-                                  <span
-                                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold inline-flex items-center gap-1 ${
-                                      sess.isSubmitted
-                                        ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                                        : 'bg-amber-50 text-amber-800 border border-amber-200 animate-pulse'
-                                    }`}
-                                    title={`${pkg?.title || subjectName}: ${sess.isSubmitted ? 'Sudah Selesai' : 'Sedang Mengerjakan'}`}
-                                  >
-                                    <span>{sess.isSubmitted ? '✓' : '⏳'}</span>
-                                    <span>{subjectName}</span>
-                                    <span className="text-[9px] opacity-75">
-                                      ({sess.isSubmitted ? 'Selesai' : 'Aktif'})
+                                  <div className="flex flex-wrap items-center gap-1">
+                                    <span
+                                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold inline-flex items-center gap-1 ${
+                                        sess.isSubmitted
+                                          ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                                          : isLocked
+                                          ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                                          : 'bg-amber-50 text-amber-800 border border-amber-200 animate-pulse'
+                                      }`}
+                                      title={`${pkg?.title || subjectName}: ${sess.isSubmitted ? 'Sudah Selesai' : isLocked ? 'Terkunci Pelanggaran' : 'Sedang Mengerjakan'}`}
+                                    >
+                                      <span>{sess.isSubmitted ? '✓' : isLocked ? '🔒' : '⏳'}</span>
+                                      <span>{subjectName}</span>
+                                      <span className="text-[9px] opacity-75">
+                                        ({sess.isSubmitted ? 'Selesai' : isLocked ? 'Terkunci' : 'Aktif'})
+                                      </span>
                                     </span>
-                                  </span>
+                                  </div>
                                 );
                               })()
                             ) : (
                               (() => {
                                 const allSubmitted = uniqueSessions.every(s => s.isSubmitted);
                                 const activeCount = uniqueSessions.filter(s => !s.isSubmitted).length;
+                                const lockedCount = uniqueSessions.filter(s => !s.isSubmitted && Number(s.violationCount || 0) >= 1).length;
                                 return (
                                   <div className="flex items-center gap-1.5">
                                     <span
                                       className={`px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap inline-flex items-center gap-1 ${
                                         allSubmitted
                                           ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                                          : lockedCount > 0
+                                          ? 'bg-rose-100 text-rose-800 border border-rose-300'
                                           : 'bg-amber-50 text-amber-800 border border-amber-200 animate-pulse'
                                       }`}
                                       title={uniqueSessions.map(s => {
@@ -3883,10 +4139,12 @@ export default function CbtPanitiaCommandCenter({
                                         return `${p?.subject || p?.title || 'Ujian'}: ${s.isSubmitted ? 'Selesai' : 'Aktif'}`;
                                       }).join(' | ')}
                                     >
-                                      <span>{allSubmitted ? '✓' : '⏳'}</span>
+                                      <span>{allSubmitted ? '✓' : lockedCount > 0 ? '🔒' : '⏳'}</span>
                                       <span>
                                         {allSubmitted
                                           ? `${uniqueSessions.length} Mapel Selesai`
+                                          : lockedCount > 0
+                                          ? `${lockedCount} Terkunci (${uniqueSessions.length} Mapel)`
                                           : `${activeCount} Aktif (${uniqueSessions.length} Mapel)`}
                                       </span>
                                     </span>
@@ -3904,23 +4162,40 @@ export default function CbtPanitiaCommandCenter({
                                 const pkg = packages.find(p => p.id === sess.examId);
                                 const subjectName = pkg?.subject || pkg?.title || 'Sesi';
                                 const examTitle = pkg?.title || subjectName;
+                                const isLocked = !sess.isSubmitted && Number(sess.violationCount || 0) >= 1;
 
                                 return (
-                                  <button
-                                    key={sess.examId}
-                                    type="button"
-                                    onClick={() => {
-                                      if (confirm(`Yakin ingin mereset sesi ujian "${examTitle}" untuk siswa "${st.name}"?\n\nSiswa akan dapat mengerjakan kembali dari awal.`)) {
-                                        resetStoredStudentCbtSession(sess.examId, st.id);
-                                        showAlert(`Sesi ujian ${subjectName} untuk ${st.name} berhasil di-reset!`);
-                                      }
-                                    }}
-                                    title={`Reset sesi ujian ${examTitle} untuk ${st.name}`}
-                                    className="px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold text-xs transition cursor-pointer active:scale-95 inline-flex items-center gap-1 shadow-2xs"
-                                  >
-                                    <span>🔄</span>
-                                    <span>Reset Sesi</span>
-                                  </button>
+                                  <div className="inline-flex items-center gap-1.5 justify-end flex-wrap">
+                                    {isLocked && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          unlockStoredStudentCbtSession(sess.examId, st.id, { studentNisn: st.nisn });
+                                          showAlert(`🔓 Kunci ujian ${subjectName} untuk ${st.name} berhasil dibuka & tersimpan ke database!`);
+                                        }}
+                                        title={`Buka kunci pelanggaran ujian ${examTitle} untuk ${st.name}`}
+                                        className="px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-800 font-bold text-xs transition cursor-pointer active:scale-95 inline-flex items-center gap-1 shadow-2xs"
+                                      >
+                                        <span>🔓</span>
+                                        <span>Buka Kunci</span>
+                                      </button>
+                                    )}
+                                    <button
+                                      key={sess.examId}
+                                      type="button"
+                                      onClick={() => {
+                                        if (confirm(`Yakin ingin mereset sesi ujian "${examTitle}" untuk siswa "${st.name}"?\n\nSiswa akan dapat mengerjakan kembali dari awal.`)) {
+                                          resetStoredStudentCbtSession(sess.examId, st.id, st.nisn);
+                                          showAlert(`Sesi ujian ${subjectName} untuk ${st.name} berhasil di-reset di database!`);
+                                        }
+                                      }}
+                                      title={`Reset sesi ujian ${examTitle} untuk ${st.name}`}
+                                      className="px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold text-xs transition cursor-pointer active:scale-95 inline-flex items-center gap-1 shadow-2xs"
+                                    >
+                                      <span>🔄</span>
+                                      <span>Reset Sesi</span>
+                                    </button>
+                                  </div>
                                 );
                               })()
                             ) : (
@@ -4200,9 +4475,14 @@ export default function CbtPanitiaCommandCenter({
                         <td className="py-2.5 px-4 text-right whitespace-nowrap">
                           <button
                             type="button"
-                            onClick={() => setPreviewBapRoom(item.room)}
+                            onClick={() => {
+                              setPreviewBapRoom(item.room);
+                              setIsEditingBapDoc(false);
+                              setBapEditSupervisor(item.hasAssignedSupervisor ? item.supervisor : '');
+                              setBapEditNotes(item.latestAttendance?.notes || 'Ujian berlangsung tertib, aman, dan lancar tanpa kendala teknis.');
+                            }}
                             className="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 font-bold text-[11px] transition cursor-pointer active:scale-95 inline-flex items-center gap-1.5"
-                            title={`Buka surat resmi BAP, Download Word (.doc), Excel (.xlsx), atau Cetak PDF ${item.room.name}`}
+                            title={`Buka surat resmi BAP, Edit/Sahkan BAP, Download Word (.doc), Excel (.xlsx), atau Cetak PDF ${item.room.name}`}
                           >
                             <span>📄</span>
                             <span>Buka Dokumen</span>
@@ -4394,7 +4674,8 @@ export default function CbtPanitiaCommandCenter({
                       <th className="px-3.5 py-3 w-32">Ruang Asal</th>
                       <th className="px-3.5 py-3">Mata Pelajaran</th>
                       <th className="px-3.5 py-3 w-32 text-center">Status Alasan</th>
-                      <th className="px-3.5 py-3">Catatan Pengawas</th>
+                      <th className="px-3.5 py-3">Status Susulan &amp; Catatan</th>
+                      <th className="px-3.5 py-3 text-right">Aksi Panitia</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -4439,8 +4720,34 @@ export default function CbtPanitiaCommandCenter({
                             </span>
                           )}
                         </td>
-                        <td className="px-3.5 py-3 text-slate-500 text-[11px] italic">
-                          {item.notes || '-'}
+                        <td className="px-3.5 py-3 text-slate-500 text-[11px]">
+                          <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
+                            {item.susulanSession?.isSubmitted ? (
+                              <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-bold text-[10px] border border-emerald-200">
+                                ✓ Sudah Ujian (Skor: {item.susulanSession.score ?? 0})
+                              </span>
+                            ) : item.susulanSession ? (
+                              <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 font-bold text-[10px] border border-amber-200 animate-pulse">
+                                ⏳ Sedang Mengerjakan
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 font-semibold text-[10px]">
+                                📋 Menunggu Susulan
+                              </span>
+                            )}
+                            <span className="text-[10px] text-slate-400 font-mono">{item.date}</span>
+                          </div>
+                          <span className="italic block truncate max-w-xs">{item.notes || '-'}</span>
+                        </td>
+                        <td className="px-3.5 py-3 text-right whitespace-nowrap">
+                          <button
+                            type="button"
+                            onClick={() => handleMarkSusulanCompleted(item)}
+                            className="px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 font-bold text-[11px] transition cursor-pointer active:scale-95"
+                            title="Tandai peserta sudah hadir/selesai susulan dan simpan ke database"
+                          >
+                            ✓ Tandai Hadir
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -4653,6 +4960,11 @@ export default function CbtPanitiaCommandCenter({
                     className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-amber-500 font-semibold"
                     placeholder="Pilih atau ketik pengawas"
                   />
+                  <datalist id="panitia-teachers-list">
+                    {teacherList.map(t => (
+                      <option key={`${t.nip}_${t.name}`} value={t.name} />
+                    ))}
+                  </datalist>
                 </div>
               </div>
 
@@ -4868,11 +5180,7 @@ export default function CbtPanitiaCommandCenter({
       {/* 6D. MODAL KELOLA & RESET SESI SPESIFIK SISWA */}
       {resetModalStudent && (() => {
         const st = resetModalStudent;
-        const currentSessions = Array.from(
-          new Map(
-            (sessionsByStudentId.get(st.id) || []).map(s => [s.examId, s])
-          ).values()
-        );
+        const currentSessions = getStudentSessions(st);
         const assignedRoom = studentRoomMap.get(st.id);
 
         return (
@@ -4990,9 +5298,8 @@ export default function CbtPanitiaCommandCenter({
                               type="button"
                               onClick={() => {
                                 const targetExamId = sess.examId || '';
-                                unlockStoredStudentCbtSession(targetExamId, st.id);
-                                if (st.nisn && st.nisn !== st.id) unlockStoredStudentCbtSession(targetExamId, st.nisn);
-                                showAlert(`Kunci ujian untuk ${st.name} berhasil dibuka (pelanggaran di-reset ke 0)!`);
+                                unlockStoredStudentCbtSession(targetExamId, st.id, { studentNisn: st.nisn });
+                                showAlert(`Kunci ujian untuk ${st.name} berhasil dibuka & tersimpan ke database!`);
                               }}
                               className="shrink-0 whitespace-nowrap px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-800 font-bold text-xs transition cursor-pointer active:scale-95 flex items-center gap-1.5 shadow-2xs"
                               title="Buka kunci ujian siswa tanpa menghapus jawaban yang sudah dikerjakan"
@@ -5006,9 +5313,8 @@ export default function CbtPanitiaCommandCenter({
                             type="button"
                             onClick={() => {
                               if (confirm(`Yakin ingin mereset sesi ujian "${examTitle}" untuk siswa "${st.name}"?\n\nSiswa akan dapat mengerjakan kembali mata pelajaran ini dari awal.`)) {
-                                resetStoredStudentCbtSession(sess.examId, st.id);
-                                if (st.nisn && st.nisn !== st.id) resetStoredStudentCbtSession(sess.examId, st.nisn);
-                                showAlert(`Sesi ${subjectName} untuk ${st.name} berhasil di-reset!`);
+                                resetStoredStudentCbtSession(sess.examId, st.id, st.nisn);
+                                showAlert(`Sesi ${subjectName} untuk ${st.name} berhasil di-reset di database!`);
                                 if (currentSessions.length <= 1) {
                                   setResetModalStudent(null);
                                 }
@@ -5034,10 +5340,9 @@ export default function CbtPanitiaCommandCenter({
                     onClick={() => {
                       if (confirm(`Yakin ingin mereset SEMUA (${currentSessions.length}) sesi ujian untuk siswa "${st.name}"?\n\nSemua mata pelajaran yang telah dikerjakan akan dikosongkan kembali dari awal.`)) {
                         currentSessions.forEach(sess => {
-                          resetStoredStudentCbtSession(sess.examId, st.id);
-                          if (st.nisn && st.nisn !== st.id) resetStoredStudentCbtSession(sess.examId, st.nisn);
+                          resetStoredStudentCbtSession(sess.examId, st.id, st.nisn);
                         });
-                        showAlert(`Semua (${currentSessions.length}) sesi ujian untuk ${st.name} berhasil di-reset!`);
+                        showAlert(`Semua (${currentSessions.length}) sesi ujian untuk ${st.name} berhasil di-reset di database!`);
                         setResetModalStudent(null);
                       }
                     }}
@@ -5089,9 +5394,12 @@ export default function CbtPanitiaCommandCenter({
                   </div>
                   <div className="flex items-center gap-3 mt-1.5 text-xs text-slate-500">
                     <span>Pengawas: <strong className="text-slate-800">
-                      {(attendancesByRoomMap.get(room.name)?.[0]?.supervisorName && attendancesByRoomMap.get(room.name)?.[0]?.supervisorName !== 'Guru Pengawas Ruang')
-                        ? attendancesByRoomMap.get(room.name)?.[0]?.supervisorName
-                        : (room.supervisorName || 'Guru Pengawas')}
+                      {(() => {
+                        const att0 = getRoomAttendances(room)[0];
+                        return (att0?.supervisorName && att0.supervisorName !== 'Guru Pengawas Ruang')
+                          ? att0.supervisorName
+                          : (room.supervisorName || 'Guru Pengawas');
+                      })()}
                     </strong></span>
                     <span>•</span>
                     <span>Kapasitas: <strong className="text-slate-800">{room.capacity} Kursi</strong></span>
@@ -5142,13 +5450,11 @@ export default function CbtPanitiaCommandCenter({
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {studentsInRoom.map((st, idx) => {
-                        const rawSessions = sessionsByStudentId.get(st.id) || [];
-                        const sessions = packagesMap.size > 0
-                          ? rawSessions.filter(s => packagesMap.has(s.examId))
-                          : rawSessions;
+                        const sessions = getStudentSessions(st);
                         const hasSubmitted = sessions.some(s => s.isSubmitted);
                         const hasInProgress = sessions.some(s => !s.isSubmitted);
-                        const hasLocked = sessions.some(s => !s.isSubmitted && (s.violationCount || 0) >= 1);
+                        const lockedSess = sessions.find(s => !s.isSubmitted && (s.violationCount || 0) >= 1);
+                        const hasLocked = Boolean(lockedSess);
 
                         return (
                           <tr key={st.id} className="hover:bg-slate-50 transition">
@@ -5176,17 +5482,32 @@ export default function CbtPanitiaCommandCenter({
                             </td>
                             <td className="py-2.5 px-3 text-right">
                               {sessions.length > 0 ? (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setPreviewMonitoringRoom(null);
-                                    setResetModalStudent(st);
-                                  }}
-                                  className="px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-[10px] transition cursor-pointer"
-                                  title="Reset sesi ujian siswa ini"
-                                >
-                                  🔄 Reset
-                                </button>
+                                <div className="inline-flex items-center gap-1 justify-end">
+                                  {lockedSess && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        unlockStoredStudentCbtSession(lockedSess.examId, st.id, { studentNisn: st.nisn });
+                                        showAlert(`🔓 Kunci ujian ${st.name} berhasil dibuka & disimpan ke database!`);
+                                      }}
+                                      className="px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-800 font-bold text-[10px] transition cursor-pointer"
+                                      title="Buka kunci pelanggaran ujian siswa ini"
+                                    >
+                                      🔓 Buka
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setPreviewMonitoringRoom(null);
+                                      setResetModalStudent(st);
+                                    }}
+                                    className="px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-[10px] transition cursor-pointer"
+                                    title="Kelola & reset sesi ujian siswa ini"
+                                  >
+                                    🔄 Reset
+                                  </button>
+                                </div>
                               ) : (
                                 <span className="text-[10px] text-slate-400">-</span>
                               )}
@@ -5220,6 +5541,8 @@ export default function CbtPanitiaCommandCenter({
       {/* 6F. MODAL PRATINJAU DOKUMEN RESMI BERITA ACARA PELAKSANAAN (BAP) */}
       {previewBapRoom && (() => {
         const room = previewBapRoom;
+        const summary = roomBapSummaryData.byRoomId.get(room.id);
+        const isRoomBapSubmitted = Boolean(summary?.isSubmitted);
         const payload = buildSingleRoomDocPayload(room);
         const { weekdayDate, dateOnly } = formatWibLongDate();
 
@@ -5233,6 +5556,19 @@ export default function CbtPanitiaCommandCenter({
                   <span className="font-bold text-slate-900 text-sm">Dokumen Resmi Berita Acara</span>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingBapDoc(v => !v)}
+                    className={`px-3 py-1.5 rounded-xl font-bold text-xs transition cursor-pointer flex items-center gap-1 shadow-xs active:scale-95 ${
+                      isEditingBapDoc
+                        ? 'bg-amber-500 text-slate-950'
+                        : 'bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900'
+                    }`}
+                    title="Edit pengawas, catatan BAP, atau ubah status pengesahan BAP ke database"
+                  >
+                    <span>✏️</span>
+                    <span>{isEditingBapDoc ? 'Tutup Editor' : 'Edit & Sahkan'}</span>
+                  </button>
                   <button
                     type="button"
                     onClick={() => handleExportSingleRoomBapWord(room)}
@@ -5262,7 +5598,10 @@ export default function CbtPanitiaCommandCenter({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setPreviewBapRoom(null)}
+                    onClick={() => {
+                      setIsEditingBapDoc(false);
+                      setPreviewBapRoom(null);
+                    }}
                     className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center font-bold cursor-pointer transition text-sm"
                     title="Tutup Pratinjau"
                   >
@@ -5270,6 +5609,75 @@ export default function CbtPanitiaCommandCenter({
                   </button>
                 </div>
               </div>
+
+              {/* PANITIA BAP EDITOR PANEL (Direct MariaDB Sync) */}
+              {isEditingBapDoc && (
+                <div className="p-4 rounded-2xl bg-amber-50/90 border border-amber-300 space-y-3 text-xs print:hidden">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-black text-amber-950">🛠️ Kelola &amp; Sahkan BAP {room.name}</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${isRoomBapSubmitted ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-200 text-amber-900'}`}>
+                      {isRoomBapSubmitted ? '✓ Sudah Terkirim' : '⏳ Belum Disahkan'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">Guru Pengawas Ruang:</label>
+                      <select
+                        value={bapEditSupervisor}
+                        onChange={e => setBapEditSupervisor(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl bg-white border border-amber-300 text-slate-900 font-semibold text-xs focus:outline-none focus:border-amber-500"
+                      >
+                        <option value="">-- Pilih Guru Pengawas --</option>
+                        {teacherList.map(t => (
+                          <option key={`${t.nip}_${t.name}`} value={t.name}>
+                            {t.name} ({t.subject})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">Catatan Kejadian Selama Ujian:</label>
+                      <input
+                        type="text"
+                        value={bapEditNotes}
+                        onChange={e => setBapEditNotes(e.target.value)}
+                        placeholder="Ujian berlangsung tertib, aman, dan lancar..."
+                        className="w-full px-3 py-2 rounded-xl bg-white border border-amber-300 text-slate-900 font-medium text-xs focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
+                    {isRoomBapSubmitted && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleSavePanitiaBapUpdate(room, {
+                            isBapSubmitted: false,
+                            supervisorName: bapEditSupervisor,
+                            notes: bapEditNotes
+                          })
+                        }
+                        className="px-3.5 py-2 rounded-xl bg-white hover:bg-rose-50 border border-rose-300 text-rose-700 font-bold text-xs transition cursor-pointer"
+                      >
+                        ↩️ Buka Kembali untuk Revisi
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleSavePanitiaBapUpdate(room, {
+                          isBapSubmitted: true,
+                          supervisorName: bapEditSupervisor,
+                          notes: bapEditNotes
+                        })
+                      }
+                      className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-sm cursor-pointer"
+                    >
+                      ✓ Simpan &amp; Sahkan BAP ke Database
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* AUTHENTIC OFFICIAL BAP SHEET */}
               <div className="border border-slate-300 rounded-2xl p-6 sm:p-8 bg-white text-slate-900 space-y-5 text-xs shadow-inner">
@@ -5712,9 +6120,10 @@ export default function CbtPanitiaCommandCenter({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-md shadow-indigo-600/20 cursor-pointer active:scale-95"
+                  disabled={isSubmittingEmergency}
+                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white font-bold text-xs transition shadow-md shadow-indigo-600/20 cursor-pointer active:scale-95"
                 >
-                  Simpan & Daftarkan Siswa ✓
+                  {isSubmittingEmergency ? '⏳ Menyimpan ke Database...' : 'Simpan & Daftarkan Siswa ✓'}
                 </button>
               </div>
             </form>
@@ -5786,6 +6195,39 @@ export default function CbtPanitiaCommandCenter({
                     ? '💡 Pengaturan jam di bawah akan diterapkan serentak ke semua mata pelajaran.'
                     : `💡 Pengaturan jam di bawah khusus berlaku untuk mata pelajaran ${packages.find(p => p.id === selectedSchedPackageId)?.subject}.`}
                 </p>
+              </div>
+
+              {/* IDENTITAS POSKO: TAHUN AJARAN & SEMESTER (Disimpan ke MariaDB school_settings) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">
+                    🏫 Tahun Ajaran:
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={schedAcademicYear}
+                    onChange={(e) => setSchedAcademicYear(e.target.value)}
+                    placeholder="2026/2027"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-bold focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">
+                    📚 Periode / Semester Asesmen:
+                  </label>
+                  <select
+                    value={schedSemester}
+                    onChange={(e) => setSchedSemester(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-bold focus:outline-none focus:border-amber-500 cursor-pointer"
+                  >
+                    <option value="PTS / STS Ganjil">PTS / STS Ganjil</option>
+                    <option value="PAS / SAS Ganjil">PAS / SAS Ganjil</option>
+                    <option value="PTS / STS Genap">PTS / STS Genap</option>
+                    <option value="PAT / SAT Genap">PAT / SAT Genap</option>
+                    <option value="Asesmen Sumatif Akhir Jenjang (ASAJ)">Asesmen Sumatif Akhir Jenjang (ASAJ)</option>
+                  </select>
+                </div>
               </div>
 
               <div>

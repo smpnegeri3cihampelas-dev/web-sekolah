@@ -6,7 +6,7 @@ import { Student, SCHOOL_CLASSES } from '@/lib/elearningData';
 interface AddStudentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAdd: (data: { name: string; nisn: string; nis: string; classId: string }) => void;
+  onAdd: (data: { name: string; nisn: string; nis: string; classId: string; gender: string }) => void;
   showToast: (msg: string) => void;
 }
 
@@ -15,6 +15,7 @@ export function AddStudentModal({ isOpen, onClose, onAdd, showToast }: AddStuden
   const [nisn, setNisn] = useState('');
   const [nis, setNis] = useState('');
   const [classId, setClassId] = useState('7-A');
+  const [gender, setGender] = useState<'L' | 'P'>('L');
 
   useEffect(() => {
     if (isOpen) {
@@ -22,6 +23,7 @@ export function AddStudentModal({ isOpen, onClose, onAdd, showToast }: AddStuden
       setNisn('');
       setNis('');
       setClassId('7-A');
+      setGender('L');
     }
   }, [isOpen]);
 
@@ -38,7 +40,8 @@ export function AddStudentModal({ isOpen, onClose, onAdd, showToast }: AddStuden
       name: name.trim(),
       nisn: nisn.trim() || `01${Math.floor(10000000 + Math.random() * 90000000)}`,
       nis: nis.trim(),
-      classId
+      classId,
+      gender
     });
     onClose();
   };
@@ -108,19 +111,32 @@ export function AddStudentModal({ isOpen, onClose, onAdd, showToast }: AddStuden
             </div>
           </div>
 
-          <div>
-            <label className="text-slate-800 block mb-1 font-extrabold">Kelas / Rombongan Belajar *</label>
-            <select
-              value={classId}
-              onChange={(e) => setClassId(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-slate-950 font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 cursor-pointer shadow-xs"
-            >
-              {SCHOOL_CLASSES.map(cls => (
-                <option key={cls.id} value={cls.id}>
-                  {cls.name}
-                </option>
-              ))}
-            </select>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-slate-800 block mb-1 font-extrabold">Kelas / Rombel *</label>
+              <select
+                value={classId}
+                onChange={(e) => setClassId(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-slate-950 font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 cursor-pointer shadow-xs"
+              >
+                {SCHOOL_CLASSES.map(cls => (
+                  <option key={cls.id} value={cls.id}>
+                    {cls.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-slate-800 block mb-1 font-extrabold">Jenis Kelamin *</label>
+              <select
+                value={gender}
+                onChange={(e) => setGender(e.target.value as 'L' | 'P')}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-slate-950 font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 cursor-pointer shadow-xs"
+              >
+                <option value="L">Laki-laki (L)</option>
+                <option value="P">Perempuan (P)</option>
+              </select>
+            </div>
           </div>
 
           <div className="pt-3 flex items-center justify-end gap-2.5 border-t-2 border-slate-200">
@@ -148,7 +164,7 @@ interface EditStudentModalProps {
   isOpen: boolean;
   student: Student | null;
   onClose: () => void;
-  onSave: (id: string, data: { name: string; nisn: string; nis: string; classId: string }) => void;
+  onSave: (id: string, data: { name: string; nisn: string; nis: string; classId: string; gender: string; password?: string }) => void;
   onDelete?: (id: string, name: string) => void;
   showToast: (msg: string) => void;
 }
@@ -158,6 +174,8 @@ export function EditStudentModal({ isOpen, student, onClose, onSave, onDelete, s
   const [nisn, setNisn] = useState('');
   const [nis, setNis] = useState('');
   const [classId, setClassId] = useState('7-A');
+  const [gender, setGender] = useState<'L' | 'P'>('L');
+  const [password, setPassword] = useState('siswa123');
 
   useEffect(() => {
     if (student) {
@@ -165,6 +183,8 @@ export function EditStudentModal({ isOpen, student, onClose, onSave, onDelete, s
       setNisn(student.nisn || '');
       setNis(student.nis || '');
       setClassId(student.classId || '7-A');
+      setGender(student.gender === 'P' ? 'P' : 'L');
+      setPassword(student.password || 'siswa123');
     }
   }, [student]);
 
@@ -181,7 +201,9 @@ export function EditStudentModal({ isOpen, student, onClose, onSave, onDelete, s
       name: name.trim(),
       nisn: nisn.trim(),
       nis: nis.trim(),
-      classId
+      classId,
+      gender,
+      password: password.trim() || 'siswa123'
     });
     onClose();
   };
@@ -247,19 +269,54 @@ export function EditStudentModal({ isOpen, student, onClose, onSave, onDelete, s
             </div>
           </div>
 
-          <div>
-            <label className="text-slate-800 block mb-1 font-extrabold">Kelas / Rombel *</label>
-            <select
-              value={classId}
-              onChange={(e) => setClassId(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-slate-950 font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 cursor-pointer shadow-xs"
-            >
-              {SCHOOL_CLASSES.map(cls => (
-                <option key={cls.id} value={cls.id}>
-                  {cls.name}
-                </option>
-              ))}
-            </select>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-slate-800 block mb-1 font-extrabold">Kelas / Rombel *</label>
+              <select
+                value={classId}
+                onChange={(e) => setClassId(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-slate-950 font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 cursor-pointer shadow-xs"
+              >
+                {SCHOOL_CLASSES.map(cls => (
+                  <option key={cls.id} value={cls.id}>
+                    {cls.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-slate-800 block mb-1 font-extrabold">Jenis Kelamin *</label>
+              <select
+                value={gender}
+                onChange={(e) => setGender(e.target.value as 'L' | 'P')}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-slate-950 font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 cursor-pointer shadow-xs"
+              >
+                <option value="L">Laki-laki (L)</option>
+                <option value="P">Perempuan (P)</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label className="text-slate-800 font-extrabold flex items-center gap-1.5">
+                <span>🔑 Kata Sandi Akun Siswa</span>
+              </label>
+              <button
+                type="button"
+                onClick={() => setPassword('siswa123')}
+                className="px-2.5 py-0.5 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 font-bold text-[11px] cursor-pointer transition-colors"
+              >
+                Reset ke siswa123
+              </button>
+            </div>
+            <input
+              type="text"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="siswa123"
+              className="w-full px-3.5 py-2 rounded-xl bg-white border border-slate-300 text-slate-950 font-mono font-bold focus:outline-none focus:border-indigo-600 shadow-xs"
+            />
           </div>
 
           <div className="pt-3 flex items-center justify-between border-t-2 border-slate-200">

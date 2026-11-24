@@ -39,35 +39,35 @@ export function TabOverview({
           {
             label: 'Siswa Aktif',
             value: `${activeCount}`,
-            desc: `${totalStudents} Total ${keluarCount > 0 ? `· ${keluarCount} Keluar` : '· 17 Rombel'}`,
+            desc: `${totalStudents} Total${keluarCount > 0 ? ` · ${keluarCount} Keluar` : ''}`,
             icon: '🎒',
             onClick: () => onNavigateTab('siswa')
           },
           {
-            label: 'Pimpinan & Guru',
+            label: 'Pimpinan & GTK',
             value: `${leadersList.length + teachersList.length}`,
             desc: `${leadersList.length} Pimpinan · ${teachersList.length} Guru`,
             icon: '👨‍🏫',
             onClick: () => onNavigateTab('pimpinan')
           },
           {
-            label: 'Warta Terbit',
+            label: 'Warta',
             value: `${newsList.length}`,
-            desc: 'Artikel Berita Aktif',
+            desc: 'Artikel Berita',
             icon: '📰',
             onClick: () => onNavigateTab('warta')
           },
           {
-            label: 'Agenda Sekolah',
+            label: 'Agenda Kaldik',
             value: `${agendaList.length}`,
-            desc: 'Kegiatan Terjadwal',
+            desc: 'Kegiatan Resmi',
             icon: '📅',
             onClick: () => onNavigateTab('agenda')
           },
           {
             label: 'Galeri Foto',
             value: `${galleryList.length}`,
-            desc: 'Dokumentasi Sekolah',
+            desc: 'Dokumentasi',
             icon: '📸',
             onClick: () => onNavigateTab('galeri')
           }
@@ -88,76 +88,73 @@ export function TabOverview({
             <div className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight mb-1">
               {stat.value}
             </div>
-            <div className="text-[11px] font-semibold text-slate-700 truncate">
+            <div className="text-[11px] font-semibold text-slate-600 truncate">
               {stat.desc}
             </div>
           </div>
         ))}
       </div>
 
-      {/* Main Grid: Data Pokok Sekolah & Agenda Terdekat */}
+      {/* Main Grid: Profil Sekolah & Agenda Terdekat */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
-        {/* Left Column: Data Pokok Singkat */}
-        <div className="lg:col-span-7 space-y-6">
+        {/* Left Column: Identitas Singkat */}
+        <div className="lg:col-span-7">
           <div className="p-5 sm:p-6 rounded-2xl bg-white border-2 border-slate-200 shadow-sm space-y-4">
             <div className="flex items-center justify-between pb-3 border-b-2 border-slate-100">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-700 font-bold text-sm">
+                <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-200 flex items-center justify-center text-sm">
                   🏫
                 </div>
                 <div>
-                  <h3 className="text-sm font-black text-slate-950 tracking-tight">Status Operasional Sekolah</h3>
-                  <p className="text-[11px] text-slate-600 font-bold">{identity.schoolName} · Akreditasi {identity.akreditasi}</p>
+                  <h3 className="text-sm font-black text-slate-950 tracking-tight">{identity.schoolName}</h3>
+                  <p className="text-[11px] text-slate-500 font-semibold">{identity.region}</p>
                 </div>
               </div>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
-                ● Aktif & Berjalan
-              </span>
+              <button
+                type="button"
+                onClick={() => onNavigateTab('pengaturan')}
+                className="text-xs font-bold text-indigo-600 hover:text-indigo-800 cursor-pointer shrink-0"
+              >
+                Edit Profil →
+              </button>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
               <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                <span className="text-[10px] text-slate-600 font-bold uppercase tracking-wider block mb-0.5">NPSN</span>
+                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-0.5">NPSN</span>
                 <span className="text-xs font-mono font-black text-slate-900">{identity.npsn}</span>
               </div>
               <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                <span className="text-[10px] text-slate-600 font-bold uppercase tracking-wider block mb-0.5">Bentuk Pendidikan</span>
-                <span className="text-xs font-black text-slate-900">SMP Negeri</span>
+                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-0.5">Akreditasi</span>
+                <span className="text-xs font-black text-slate-900 truncate block">{identity.akreditasi}</span>
               </div>
               <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                <span className="text-[10px] text-slate-600 font-bold uppercase tracking-wider block mb-0.5">Status Sekolah</span>
-                <span className="text-xs font-black text-emerald-700">Negeri</span>
+                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-0.5">Kurikulum</span>
+                <span className="text-xs font-black text-slate-900">Merdeka</span>
               </div>
               <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                <span className="text-[10px] text-slate-600 font-bold uppercase tracking-wider block mb-0.5">Kurikulum</span>
-                <span className="text-xs font-black text-slate-900">Kurikulum Merdeka</span>
-              </div>
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                <span className="text-[10px] text-slate-600 font-bold uppercase tracking-wider block mb-0.5">Tahun Ajaran</span>
+                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-0.5">Tahun Ajaran</span>
                 <span className="text-xs font-mono font-black text-indigo-700">2026/2027</span>
               </div>
               <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                <span className="text-[10px] text-slate-600 font-bold uppercase tracking-wider block mb-0.5">Total Rombel</span>
-                <span className="text-xs font-mono font-black text-slate-900">17 Rombel</span>
+                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-0.5">Rombel</span>
+                <span className="text-xs font-mono font-black text-slate-900">17 Kelas</span>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-0.5">Telepon</span>
+                <span className="text-xs font-mono font-bold text-slate-900 truncate block">{identity.phone || '-'}</span>
               </div>
             </div>
 
-            <div className="pt-2 flex items-center justify-between text-xs text-slate-600 font-semibold border-t border-slate-100">
-              <span className="truncate max-w-[280px] sm:max-w-md">Alamat: {identity.address || 'Kp. Sukawangi RT 02/09, Situwangi, Bandung Barat'}</span>
-              <button
-                type="button"
-                onClick={() => onNavigateTab('pimpinan')}
-                className="text-indigo-600 hover:text-indigo-800 font-bold cursor-pointer"
-              >
-                Kelola Data Pokok →
-              </button>
+            <div className="pt-2 text-xs text-slate-600 font-medium border-t border-slate-100 truncate">
+              📍 {identity.address || 'Kp. Sukawangi RT 02/09, Desa Situwangi, Kec. Cihampelas, Bandung Barat'}
             </div>
           </div>
         </div>
 
         {/* Right Column: Agenda Mendatang */}
-        <div className="lg:col-span-5 space-y-6">
+        <div className="lg:col-span-5">
           <div className="p-5 sm:p-6 rounded-2xl bg-white border-2 border-slate-200 shadow-sm space-y-4">
             <div className="flex items-center justify-between pb-3 border-b-2 border-slate-100">
               <div className="flex items-center gap-2">
@@ -169,7 +166,7 @@ export function TabOverview({
                 onClick={() => onNavigateTab('agenda')}
                 className="text-xs font-bold text-indigo-600 hover:text-indigo-800 cursor-pointer"
               >
-                Lihat Semua ({agendaList.length}) →
+                Semua ({agendaList.length}) →
               </button>
             </div>
 

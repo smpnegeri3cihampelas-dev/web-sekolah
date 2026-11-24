@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { isTendikOrTu } from '@/lib/schoolConstants';
 
 export async function POST(req: Request) {
   try {
@@ -74,6 +75,12 @@ export async function POST(req: Request) {
 
         if (teachers && teachers.length > 0) {
           const t = teachers[0];
+          if (isTendikOrTu(t)) {
+            return NextResponse.json({
+              success: false,
+              message: 'Staf Tata Usaha (TU) tidak memerlukan akun login E-Learning.'
+            }, { status: 403 });
+          }
           const customPass = t.password && t.password !== 'guru123' ? t.password : null;
           const isValidPass = customPass ? password === customPass : password === 'guru123';
           if (isValidPass) {
@@ -105,15 +112,32 @@ export async function POST(req: Request) {
       admin: 'admin123',
       guru: 'guru123',
       guru_mapel: 'guru123',
+      piket: 'piket123',
       guru_piket: 'piket123',
       panitia: 'panitia123',
       siswa: 'siswa123'
     };
     const roleDefault = defaultPasswordMap[user.role] || 'admin123';
-    const expectedPassword = user.password || roleDefault;
+    let expectedPassword = user.password || roleDefault;
 
-    // Verifikasi kata sandi ketat: HANYA 1 kata sandi yang sah sesuai database
-    if (password !== expectedPassword) {
+    // Jika role guru_mapel, periksa juga tabel teachers (tempat password terbaru guru disimpan)
+    if (user.role === 'guru_mapel') {
+      try {
+        const tRows = await query<any[]>(
+          'SELECT password, subject, nip, name FROM teachers WHERE username = ? OR (nip IS NOT NULL AND nip != "-" AND nip = ?) LIMIT 1',
+          [cleanUsername, user.identifier || '']
+        );
+        if (tRows && tRows.length > 0 && tRows[0].password) {
+          expectedPassword = tRows[0].password;
+          if (tRows[0].subject) user.subject = tRows[0].subject;
+          if (tRows[0].nip) user.identifier = tRows[0].nip;
+          if (tRows[0].name) user.name = tRows[0].name;
+        }
+      } catch {}
+    }
+
+    // Verifikasi kata sandi ketat: sesuai database
+    if (password !== expectedPassword && !(user.password && password === user.password)) {
       return NextResponse.json({
         success: false,
         message: 'Kata sandi tidak sesuai! Silakan periksa kembali.'
@@ -121,7 +145,13 @@ export async function POST(req: Request) {
     }
 
     // Role check if specified
-    if (role && user.role !== role && !(role === 'guru' && user.role === 'guru_mapel')) {
+    const isRoleMatch =
+      !role ||
+      user.role === role ||
+      (role === 'guru' && user.role === 'guru_mapel') ||
+      (role === 'piket' && user.role === 'guru_piket');
+
+    if (!isRoleMatch) {
       return NextResponse.json({
         success: false,
         message: `Akun ini tidak memiliki hak akses sebagai ${role}.`
@@ -159,6 +189,159 @@ export async function POST(req: Request) {
 export async function PUT(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));
+
+    // Action: Ganti kata sandi mandiri untuk Guru Mapel, Meja Piket, Panitia, atau Siswa
+    if (body.action === 'change_password') {
+      const { role, username, nipOrNisn, name, currentPassword, newPassword } = body;
+      const cleanCur = String(currentPassword || '').trim();
+      const cleanNew = String(newPassword || '').trim();
+
+      if (!cleanCur || !cleanNew || cleanNew.length < 4) {
+        return NextResponse.json(
+          { success: false, message: 'Kata sandi baru minimal 4 karakter!' },
+          { status: 400 }
+        );
+      }
+
+      if (role === 'guru_piket' || role === 'piket') {
+        const uRows = await query<any[]>(
+          `SELECT id, password FROM users WHERE role = 'guru_piket' OR LOWER(username) = 'piket' LIMIT 1`
+        );
+        const dbPass = uRows?.[0]?.password || 'piket123';
+        if (cleanCur !== dbPass) {
+          return NextResponse.json(
+            { success: false, message: 'Kata sandi saat ini salah!' },
+            { status: 401 }
+          );
+        }
+        if (uRows && uRows.length > 0) {
+          await query(`UPDATE users SET password = ? WHERE id = ?`, [cleanNew, uRows[0].id]);
+        } else {
+          await query(
+            `INSERT INTO users (username, password, name, role, identifier, subject, status)
+             VALUES ('piket', ?, 'Stasiun Meja Piket Utama', 'guru_piket', 'POSKO-PIKET', 'Pusat Monitoring Rombel', 'active')`,
+            [cleanNew]
+          );
+        }
+        return NextResponse.json({
+          success: true,
+          message: 'Kata sandi Stasiun Meja Piket berhasil diperbarui di database MariaDB!'
+        });
+      }
+
+      if (role === 'panitia') {
+        const uRows = await query<any[]>(
+          `SELECT id, password FROM users WHERE role = 'panitia' OR LOWER(username) = 'panitia' LIMIT 1`
+        );
+        const dbPass = uRows?.[0]?.password || 'panitia123';
+        if (cleanCur !== dbPass) {
+          return NextResponse.json(
+            { success: false, message: 'Kata sandi saat ini salah!' },
+            { status: 401 }
+          );
+        }
+        if (uRows && uRows.length > 0) {
+          await query(`UPDATE users SET password = ? WHERE id = ?`, [cleanNew, uRows[0].id]);
+        } else {
+          await query(
+            `INSERT INTO users (username, password, name, role, identifier, subject, status)
+             VALUES ('panitia', ?, 'Panitia Asesmen CBT', 'panitia', 'PANITIA-CBT', 'Pusat Kendali Ujian', 'active')`,
+            [cleanNew]
+          );
+        }
+        return NextResponse.json({
+          success: true,
+          message: 'Kata sandi Panitia CBT berhasil diperbarui di database MariaDB!'
+        });
+      }
+
+      if (role === 'guru_mapel' || role === 'guru') {
+        const cleanUser = String(username || '').trim().toLowerCase();
+        const cleanNipNoSpace = String(nipOrNisn || '').replace(/\s+/g, '');
+        const cleanName = String(name || '').trim();
+
+        const [tRows, uRows] = await Promise.all([
+          query<any[]>(
+            `SELECT id, username, nip, name, password FROM teachers
+             WHERE LOWER(username) = ?
+                OR (? != '' AND ? != '-' AND REPLACE(nip, ' ', '') = ?)
+                OR LOWER(name) = LOWER(?)
+             LIMIT 1`,
+            [cleanUser, cleanNipNoSpace, cleanNipNoSpace, cleanNipNoSpace, cleanName]
+          ),
+          query<any[]>(
+            `SELECT id, username, identifier, name, password FROM users
+             WHERE role = 'guru_mapel'
+               AND (LOWER(username) = ?
+                    OR (? != '' AND ? != '-' AND REPLACE(identifier, ' ', '') = ?)
+                    OR LOWER(name) = LOWER(?))
+             LIMIT 1`,
+            [cleanUser, cleanNipNoSpace, cleanNipNoSpace, cleanNipNoSpace, cleanName]
+          )
+        ]);
+
+        const teacherPass = tRows?.[0]?.password || '';
+        const userPass = uRows?.[0]?.password || '';
+        const dbPass = teacherPass || userPass || 'guru123';
+
+        const isCurrentValid =
+          cleanCur === dbPass ||
+          (teacherPass && cleanCur === teacherPass) ||
+          (userPass && cleanCur === userPass);
+
+        if (!isCurrentValid) {
+          return NextResponse.json(
+            { success: false, error: 'Kata sandi saat ini salah! Masukkan sandi Anda dengan benar.' },
+            { status: 401 }
+          );
+        }
+
+        if (tRows && tRows.length > 0) {
+          await query(`UPDATE teachers SET password = ? WHERE id = ?`, [cleanNew, tRows[0].id]);
+        }
+        if (uRows && uRows.length > 0) {
+          await query(`UPDATE users SET password = ? WHERE id = ?`, [cleanNew, uRows[0].id]);
+        } else {
+          await query(
+            `UPDATE users SET password = ?
+             WHERE role = 'guru_mapel' AND (LOWER(username) = ? OR LOWER(name) = LOWER(?))`,
+            [cleanNew, cleanUser, cleanName]
+          ).catch(() => {});
+        }
+
+        return NextResponse.json({
+          success: true,
+          message: 'Kata sandi akun guru berhasil diperbarui di database MariaDB!'
+        });
+      }
+
+      if (role === 'siswa') {
+        const cleanNisn = String(nipOrNisn || username || '').trim();
+        const sRows = await query<any[]>(
+          `SELECT id, password FROM students WHERE nisn = ? LIMIT 1`,
+          [cleanNisn]
+        );
+        if (!sRows || sRows.length === 0) {
+          return NextResponse.json(
+            { success: false, message: 'Data siswa tidak ditemukan di database!' },
+            { status: 404 }
+          );
+        }
+        const dbPass = sRows[0].password || 'siswa123';
+        if (cleanCur !== dbPass) {
+          return NextResponse.json(
+            { success: false, message: 'Kata sandi saat ini salah!' },
+            { status: 401 }
+          );
+        }
+        await query(`UPDATE students SET password = ? WHERE id = ?`, [cleanNew, sRows[0].id]);
+        return NextResponse.json({
+          success: true,
+          message: 'Kata sandi siswa berhasil diperbarui di database MariaDB!'
+        });
+      }
+    }
+
     if (body.action === 'sync_all_tables') {
       // 1. Sync admin, panitia, piket in users table
       await query(`UPDATE users SET password = 'admin123' WHERE role = 'admin'`);

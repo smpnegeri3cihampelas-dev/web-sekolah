@@ -1,13 +1,27 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 
+async function syncClassesTotalStudents() {
+  try {
+    await query(`
+      UPDATE classes c
+      SET c.total_students = (
+        SELECT COUNT(*) FROM students s
+        WHERE s.class_id = c.id AND (s.status IS NULL OR s.status != 'Keluar')
+      )
+    `);
+  } catch (e) {
+    console.warn('Could not sync classes.total_students:', e);
+  }
+}
+
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const classId = searchParams.get('classId');
     const search = searchParams.get('q');
 
-    let sql = 'SELECT id, student_id, nis, nisn, name, class_id, gender, status, exit_reason, exit_date, exit_marked_by FROM students WHERE 1=1';
+    let sql = 'SELECT id, student_id, nis, nisn, name, class_id, gender, status, exit_reason, exit_date, exit_marked_by, password FROM students WHERE 1=1';
     const params: any[] = [];
 
     if (classId) {
@@ -75,6 +89,8 @@ export async function PATCH(req: Request) {
       );
     }
 
+    await syncClassesTotalStudents();
+
     // Audit trail logging
     try {
       await query(
@@ -116,13 +132,27 @@ export async function POST(req: Request) {
 
         if (!name || !nisn) continue;
 
-        await query(
-          `INSERT INTO students (student_id, nis, nisn, name, class_id, gender, password, status)
-           VALUES (?, ?, ?, ?, ?, ?, 'siswa123', ?)
-           ON DUPLICATE KEY UPDATE name = VALUES(name), class_id = VALUES(class_id), nisn = VALUES(nisn), status = VALUES(status)`,
-          [studentId, nis, nisn, name, classId, gender, status]
+        const existing = await query<any[]>(
+          `SELECT id FROM students WHERE nisn = ? OR student_id = ? LIMIT 1`,
+          [nisn, studentId]
         );
+
+        if (existing.length > 0) {
+          await query(
+            `UPDATE students SET student_id = ?, nis = COALESCE(?, nis), nisn = ?, name = ?, class_id = ?, gender = ?, status = ? WHERE id = ?`,
+            [studentId, nis, nisn, name, classId, gender, status, existing[0].id]
+          );
+        } else {
+          await query(
+            `INSERT INTO students (student_id, nis, nisn, name, class_id, gender, password, status)
+             VALUES (?, ?, ?, ?, ?, ?, 'siswa123', ?)
+             ON DUPLICATE KEY UPDATE name = VALUES(name), class_id = VALUES(class_id), nisn = VALUES(nisn), gender = VALUES(gender), status = VALUES(status)`,
+            [studentId, nis, nisn, name, classId, gender, status]
+          );
+        }
       }
+
+      await syncClassesTotalStudents();
 
       return NextResponse.json({
         success: true,
@@ -151,9 +181,10 @@ export async function POST(req: Request) {
       // Update existing student
       const existing = existingNisn[0];
       await query(
-        `UPDATE students SET name = ?, class_id = ?, nis = COALESCE(?, nis), status = 'Aktif' WHERE id = ?`,
-        [cleanName, cleanClass, cleanNis, existing.id]
+        `UPDATE students SET name = ?, class_id = ?, nis = COALESCE(?, nis), gender = COALESCE(?, gender), status = 'Aktif' WHERE id = ?`,
+        [cleanName, cleanClass, cleanNis, gender || null, existing.id]
       );
+      await syncClassesTotalStudents();
 
       return NextResponse.json({
         success: true,
@@ -184,6 +215,7 @@ export async function POST(req: Request) {
        VALUES (?, ?, ?, ?, ?, ?, 'siswa123', ?)`,
       [generatedStudentId, cleanNis, cleanNisn, cleanName, cleanClass, gender || '-', status || 'Aktif']
     );
+    await syncClassesTotalStudents();
 
     const newStudent = {
       id: generatedStudentId,
@@ -239,6 +271,7 @@ export async function PUT(req: Request) {
        WHERE student_id = ? OR id = ? OR nisn = ?`,
       [name || null, nisn || null, cleanNis, classId || null, gender || null, password || null, targetId || '', targetId || 0, nisn || '']
     );
+    await syncClassesTotalStudents();
 
     return NextResponse.json({
       success: true,
@@ -275,8 +308,37 @@ export async function DELETE(req: Request) {
         }
       }
 
-      // Reset all remaining students to 'Aktif'
-      await query(`UPDATE students SET status = 'Aktif', exit_reason = NULL, exit_date = NULL, exit_marked_by = NULL`);
+      // Restore all 535 official students (both existing and any previously deleted ones)
+      const existingNisnMap = new Map<string, number>();
+      for (const r of currentRows) {
+        const n = String(r.nisn || '').trim();
+        if (officialNisns.has(n)) existingNisnMap.set(n, r.id);
+      }
+
+      for (const s of officialList) {
+        const cleanNisn = String(s.nisn || '').trim();
+        const cleanNis = s.nis ? String(s.nis).trim() : null;
+        const cleanClass = String(s.classId || s.class_id || '7-A').trim();
+        const cleanName = String(s.name || '').trim();
+        const cleanGender = s.gender || '-';
+        const cleanStudentId = s.id || `${cleanClass.replace('-', '')}-01`;
+        const dbId = existingNisnMap.get(cleanNisn);
+
+        if (dbId) {
+          await query(
+            `UPDATE students SET student_id = ?, nis = ?, name = ?, class_id = ?, gender = ?, status = 'Aktif', exit_reason = NULL, exit_date = NULL, exit_marked_by = NULL, password = 'siswa123' WHERE id = ?`,
+            [cleanStudentId, cleanNis, cleanName, cleanClass, cleanGender, dbId]
+          );
+        } else {
+          await query(
+            `INSERT INTO students (student_id, nis, nisn, name, class_id, gender, password, status)
+             VALUES (?, ?, ?, ?, ?, ?, 'siswa123', 'Aktif')`,
+            [cleanStudentId, cleanNis, cleanNisn, cleanName, cleanClass, cleanGender]
+          );
+        }
+      }
+
+      await syncClassesTotalStudents();
 
       return NextResponse.json({
         success: true,
@@ -294,6 +356,7 @@ export async function DELETE(req: Request) {
       `DELETE FROM students WHERE student_id = ? OR id = ? OR nisn = ?`,
       [studentId || '', id || 0, nisn || '']
     );
+    await syncClassesTotalStudents();
 
     return NextResponse.json({
       success: true,

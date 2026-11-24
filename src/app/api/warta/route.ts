@@ -9,7 +9,38 @@ export async function GET() {
       await query(`ALTER TABLE warta MODIFY COLUMN src LONGTEXT, MODIFY COLUMN content LONGTEXT, MODIFY COLUMN excerpt TEXT`);
     } catch {}
 
-    const rows = await query<any[]>('SELECT * FROM warta ORDER BY id DESC');
+    let rows = await query<any[]>('SELECT * FROM warta ORDER BY id DESC');
+    if (!rows || rows.length === 0) {
+      for (const item of DEFAULT_WARTA) {
+        await query(
+          `INSERT INTO warta (id, title, category, date, views, src, excerpt, content, status, author)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE
+             title = VALUES(title),
+             category = VALUES(category),
+             date = VALUES(date),
+             views = VALUES(views),
+             src = VALUES(src),
+             excerpt = VALUES(excerpt),
+             content = VALUES(content),
+             status = VALUES(status),
+             author = VALUES(author)`,
+          [
+            item.id,
+            item.title,
+            item.category,
+            item.date,
+            item.views || '1',
+            item.src,
+            item.excerpt || '',
+            item.content || '',
+            item.status || 'Published',
+            item.author || 'Admin Humas'
+          ]
+        );
+      }
+      rows = await query<any[]>('SELECT * FROM warta ORDER BY id DESC');
+    }
     const items = rows.map(r => ({
       id: Number(r.id),
       title: r.title,

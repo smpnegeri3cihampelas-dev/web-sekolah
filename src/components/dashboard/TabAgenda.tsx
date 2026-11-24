@@ -26,8 +26,7 @@ export function TabAgenda({
   onResetAgenda,
   onUpdatePdfInfo,
   onResetPdfInfo,
-  showToast,
-  isSyncing = false
+  showToast
 }: TabAgendaProps) {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<AgendaItem | null>(null);
@@ -106,15 +105,6 @@ export function TabAgenda({
     return filteredList.slice(startIndex, startIndex + pageSize);
   }, [filteredList, currentPage, pageSize]);
 
-  const handleReset = () => {
-    if (confirm('⚠️ Apakah Anda yakin ingin mereset seluruh agenda kembali ke 27 Kaldik Resmi PDF (SK Kepala Sekolah)? Data di database MariaDB akan disinkronkan kembali.')) {
-      if (onResetAgenda) {
-        onResetAgenda();
-      }
-      showToast('🔄 Agenda berhasil direset ke Kaldik Resmi (27 agenda) di Database MariaDB!');
-    }
-  };
-
   const handlePdfFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -159,101 +149,27 @@ export function TabAgenda({
   };
 
   return (
-    <div className="space-y-6 animate-[fadeIn_0.3s_ease-out]">
-      {/* Header */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-5 sm:p-6 rounded-2xl bg-white border-2 border-slate-200 shadow-sm">
-        <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-xl font-black text-slate-950 tracking-tight">Manajemen Kalender & Agenda</h2>
-            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-black bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
-              Live MariaDB
+    <div className="space-y-4 animate-[fadeIn_0.3s_ease-out]">
+      {/* CARD KELOLA DOKUMEN PDF KALDIK (Ringkas & Padat) */}
+      <div className="p-4 sm:p-5 rounded-2xl bg-white border-2 border-slate-200 shadow-xs space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <span className="text-lg">📑</span>
+            <h3 className="text-sm font-black text-slate-950">Dokumen PDF Kalender</h3>
+            <span className="text-[11px] font-mono text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded-lg border border-slate-200 truncate max-w-[200px]" title={pdfInfo?.fileName}>
+              {pdfInfo?.fileName || 'kalender-akademik-smpn3.pdf'}
             </span>
           </div>
-          <p className="text-xs text-slate-700 font-semibold mt-0.5">
-            Jadwal kegiatan akademik, ujian CBT, dan agenda resmi (Tersinkron otomatis ke database cloud dan Kalender Beranda)
-          </p>
-        </div>
 
-        <div className="flex items-center gap-2.5 flex-wrap">
-          {onResetAgenda && (
-            <button
-              type="button"
-              onClick={handleReset}
-              className="px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border border-slate-300 active:scale-98"
-              title="Kembalikan semua agenda ke Kaldik Resmi PDF SMPN 3 Cihampelas di Database"
-            >
-              <span>🔄 Reset ke Kaldik Resmi (27)</span>
-            </button>
-          )}
-
-          <button
-            type="button"
-            onClick={() => setIsAddOpen(true)}
-            className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-indigo-600/20 active:scale-98"
-          >
-            <span>+ Tambah Agenda Baru</span>
-          </button>
-        </div>
-      </div>
-
-      {/* 3 Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="p-5 rounded-2xl bg-white border-2 border-slate-200 shadow-sm">
-          <div className="text-xs font-black text-slate-700 uppercase tracking-wider">Semester 1 (Ganjil)</div>
-          <div className="text-3xl font-black text-slate-950 mt-1">{sem1Count} Agenda</div>
-          <div className="text-xs text-slate-600 mt-1 font-semibold flex items-center gap-1.5">
-            <span className="text-indigo-700 font-bold">📅 Juli – Desember 2026</span>
-          </div>
-        </div>
-
-        <div className="p-5 rounded-2xl bg-white border-2 border-slate-200 shadow-sm">
-          <div className="text-xs font-black text-slate-700 uppercase tracking-wider">Semester 2 (Genap)</div>
-          <div className="text-3xl font-black text-indigo-700 mt-1">{sem2Count} Agenda</div>
-          <div className="text-xs text-slate-600 mt-1 font-semibold flex items-center gap-1.5">
-            <span className="text-indigo-700 font-bold">📅 Januari – Juli 2027</span>
-          </div>
-        </div>
-
-        <div className="p-5 rounded-2xl bg-white border-2 border-slate-200 shadow-sm">
-          <div className="text-xs font-black text-slate-700 uppercase tracking-wider">Status Sinkronisasi</div>
-          <div className="text-3xl font-black text-emerald-700 mt-1 flex items-center gap-2">
-            <span>Live MariaDB</span>
-            {isSyncing && <span className="text-xs font-normal text-slate-500 animate-spin">⏳</span>}
-          </div>
-          <div className="text-xs text-emerald-800 mt-1 font-bold">Tersinkron Database Cloud, Landing Page & Kalender Akademik</div>
-        </div>
-      </div>
-
-      {/* CARD KELOLA DOKUMEN PDF KALDIK */}
-      <div className="p-5 sm:p-6 rounded-2xl bg-white border-2 border-slate-200 shadow-sm space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
-          <div className="flex items-start gap-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-rose-50 border-2 border-rose-200 text-rose-600 flex items-center justify-center text-2xl shrink-0">
-              📑
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-base font-black text-slate-950">File Dokumen PDF Kalender Resmi</h3>
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-black bg-rose-50 text-rose-700 border border-rose-200">
-                  Unduhan Pengunjung
-                </span>
-              </div>
-              <p className="text-xs text-slate-600 font-semibold mt-0.5">
-                Dokumen ini otomatis diunduh saat pengunjung klik tombol <strong>&ldquo;Unduh PDF Asli&rdquo;</strong> di Kalender Beranda.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap">
             <a
               href={pdfInfo?.url || '/kalender-akademik-smpn3.pdf'}
               target="_blank"
               rel="noopener noreferrer"
               download={pdfInfo?.fileName || 'Kalender-Pendidikan-SMPN-3-Cihampelas-2026-2027.pdf'}
-              className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition-all flex items-center gap-1.5 border border-slate-300 cursor-pointer shadow-2xs"
+              className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold border border-slate-300 cursor-pointer"
             >
-              <span>👁️ Pratinjau / Unduh File Aktif</span>
+              👁️ Pratinjau
             </a>
 
             {onResetPdfInfo && (
@@ -261,82 +177,53 @@ export function TabAgenda({
                 type="button"
                 onClick={() => {
                   onResetPdfInfo();
-                  showToast('🔄 Dokumen PDF dikembalikan ke file server bawaan di Database.');
+                  showToast('🔄 Dokumen PDF dikembalikan ke berkas bawaan.');
                 }}
-                className="px-3 py-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-600 text-xs font-semibold transition-all border border-slate-200 cursor-pointer"
-                title="Kembalikan tautan ke file PDF bawaan server"
+                className="px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-600 text-xs font-bold border border-slate-200 cursor-pointer"
               >
-                Reset Bawaan
+                Reset
               </button>
             )}
+
+            <button
+              type="button"
+              onClick={() => setIsAddOpen(true)}
+              className="px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold transition-all flex items-center gap-1 cursor-pointer shadow-sm active:scale-98"
+            >
+              <span>+ Tambah Agenda</span>
+            </button>
           </div>
         </div>
 
-        {/* 2 Opsi Penggantian Dokumen PDF */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-1">
-          {/* Opsi 1: Upload File PDF */}
-          <div className="p-4 rounded-xl bg-slate-50/80 border border-slate-200 space-y-2.5">
-            <div className="flex items-center gap-2">
-              <span className="text-base">📤</span>
-              <h4 className="text-xs font-black text-slate-900">Opsi 1: Upload File PDF Langsung</h4>
-            </div>
-            <p className="text-[11px] text-slate-600 font-medium leading-relaxed">
-              Pilih file PDF kalender bertanda tangan dari komputer/laptop/HP Anda. File langsung tersimpan di Database MariaDB & aktif di Beranda.
-            </p>
-            <div className="pt-1 flex items-center gap-3">
-              <label className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold cursor-pointer transition-all shadow-xs active:scale-98">
-                <span>📁 Pilih Berkas PDF Baru</span>
-                <input
-                  type="file"
-                  accept="application/pdf"
-                  className="hidden"
-                  onChange={handlePdfFileUpload}
-                />
-              </label>
-              <span className="text-[11px] text-slate-600 font-mono truncate max-w-[200px]" title={pdfInfo?.fileName}>
-                {pdfInfo?.fileName || 'kalender-akademik-smpn3.pdf'}
-              </span>
-            </div>
-          </div>
-
-          {/* Opsi 2: Link Google Drive / Cloud */}
-          <div className="p-4 rounded-xl bg-slate-50/80 border border-slate-200 space-y-2.5">
-            <div className="flex items-center gap-2">
-              <span className="text-base">🔗</span>
-              <h4 className="text-xs font-black text-slate-900">Opsi 2: Tautkan Link Google Drive / Cloud</h4>
-            </div>
-            <p className="text-[11px] text-slate-600 font-medium leading-relaxed">
-              Jika file disimpan di Google Drive sekolah atau link cloud, masukkan link berbagi publik dokumen tersebut.
-            </p>
-            <form onSubmit={handleSavePdfLink} className="pt-1 flex items-center gap-2">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 pt-2 border-t border-slate-100">
+          <div className="flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200">
+            <span className="text-xs font-bold text-slate-800">Upload File PDF:</span>
+            <label className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold cursor-pointer transition-all shadow-xs active:scale-98">
+              <span>📁 Pilih Berkas</span>
               <input
-                type="url"
-                value={pdfLinkInput}
-                onChange={(e) => setPdfLinkInput(e.target.value)}
-                placeholder="https://drive.google.com/file/d/... atau https://..."
-                className="flex-1 px-3 py-1.5 rounded-xl bg-white border border-slate-300 text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-indigo-600"
+                type="file"
+                accept="application/pdf"
+                className="hidden"
+                onChange={handlePdfFileUpload}
               />
-              <button
-                type="submit"
-                className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-98 shrink-0"
-              >
-                Simpan
-              </button>
-            </form>
+            </label>
           </div>
-        </div>
 
-        {/* Petunjuk Server / cPanel Hostinger */}
-        <div className="p-3.5 rounded-xl bg-indigo-50/70 border border-indigo-200 text-xs text-indigo-950 flex items-start gap-2.5">
-          <span className="text-base shrink-0">💡</span>
-          <div className="space-y-0.5 text-[11px]">
-            <p className="font-bold">
-              Lokasi File Permanen di Server (Hostinger / cPanel):
-            </p>
-            <p className="text-indigo-900 leading-relaxed">
-              Anda juga bisa menaruh atau menimpa file fisik secara langsung di folder: <code className="bg-white/80 px-1.5 py-0.5 rounded text-indigo-950 font-mono font-bold">public/kalender-akademik-smpn3.pdf</code> melalui File Manager Hostinger atau Git. File tersebut adalah sumber utama berkas unduhan website.
-            </p>
-          </div>
+          <form onSubmit={handleSavePdfLink} className="flex items-center gap-2">
+            <input
+              type="url"
+              value={pdfLinkInput}
+              onChange={(e) => setPdfLinkInput(e.target.value)}
+              placeholder="Atau tautkan link Google Drive PDF..."
+              className="flex-1 px-3 py-2 rounded-xl bg-slate-50 border border-slate-300 text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-indigo-600 focus:bg-white"
+            />
+            <button
+              type="submit"
+              className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-98 shrink-0"
+            >
+              Simpan Link
+            </button>
+          </form>
         </div>
       </div>
 

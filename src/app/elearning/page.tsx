@@ -30,7 +30,9 @@ import {
   AuthUserSession,
   MONTH_NAMES,
   updateStudentExitStatus,
-  syncStudentsWithCloud
+  syncStudentsWithCloud,
+  parseTeacherSubjects,
+  isSubjectMatchingSelected
 } from '@/lib/elearningData';
 import {
   saveSubmissionFile,
@@ -64,7 +66,7 @@ import {
   markStudentCbtAttendancePresent,
   evaluateCbtPackageSchedule
 } from '@/lib/cbtData';
-import { getStoredSchoolData, syncSchoolWithCloud } from '@/lib/schoolData';
+import { getStoredSchoolData, syncSchoolWithCloud, isTendikOrTu } from '@/lib/schoolData';
 
 function getLocalDateYmd(d = new Date()): string {
   const y = d.getFullYear();
@@ -1074,6 +1076,7 @@ interface PiketMonthlyReportSectionProps {
   classStudentExitCounts?: Record<string, number>;
   piketDutyTeacher: string;
   onExportExcel: (classId: string, month: number, year: number) => void;
+  onExportSemesterExcel?: () => void;
 }
 
 const PiketMonthlyReportSection = React.memo(function PiketMonthlyReportSection({
@@ -1086,6 +1089,7 @@ const PiketMonthlyReportSection = React.memo(function PiketMonthlyReportSection(
   classStudentExitCounts,
   piketDutyTeacher,
   onExportExcel,
+  onExportSemesterExcel,
 }: PiketMonthlyReportSectionProps) {
   const [selectedClassId, setSelectedClassId] = useState<string>(initialClassId);
   const [selectedMonth, setSelectedMonth] = useState<number>(() => initialMonth || (new Date().getMonth() + 1));
@@ -1239,24 +1243,29 @@ const PiketMonthlyReportSection = React.memo(function PiketMonthlyReportSection(
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={() => onExportExcel(selectedClassId, selectedMonth, selectedYear)}
               className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-sm flex items-center gap-2 cursor-pointer"
+              title="Unduh matriks presensi bulanan kelas terpilih (.xlsx)"
             >
               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/>
               </svg>
-              <span>Export Excel (.xlsx)</span>
+              <span>Export Matriks Kelas (.xlsx)</span>
             </button>
-            <button
-              type="button"
-              onClick={() => window.print()}
-              className="px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-semibold text-xs transition flex items-center gap-1.5 cursor-pointer shadow-xs"
-            >
-              <span>🖨️ Cetak</span>
-            </button>
+            {onExportSemesterExcel && (
+              <button
+                type="button"
+                onClick={onExportSemesterExcel}
+                className="px-3.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                title="Unduh rekapitulasi kehadiran 1 semester seluruh 17 rombel (.xlsx)"
+              >
+                <span>📊</span>
+                <span>Rekap Semester 17 Rombel (.xlsx)</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -1824,7 +1833,7 @@ export default function ELearningPage() {
   // Dynamic Teachers List (synced with getStoredSchoolData and dashboard additions)
   const [allTeachers, setAllTeachers] = useState<TeacherUser[]>(DEMO_TEACHERS);
   const mapSchoolTeachers = useCallback((stored: ReturnType<typeof getStoredSchoolData>['teachers']): TeacherUser[] => {
-    return (stored || []).map(st => {
+    return (stored || []).filter(st => !isTendikOrTu(st)).map(st => {
       const cleanStNip = (st.nip || '').replace(/\s+/g, '');
       const existingDemo = DEMO_TEACHERS.find(dt =>
         dt.name.toLowerCase() === st.name.toLowerCase() ||
@@ -1899,27 +1908,91 @@ export default function ELearningPage() {
     return activeTeachers[0] || DEMO_TEACHERS[0];
   }, [loggedInTeacher, currentUser, activeTeachers]);
 
-  // Isolasi ketat sesi presensi per akun guru (NIP -> Nama Lengkap -> Mapel jika sesi lawas kosong)
+  // Daftar mata pelajaran yang diampu guru (mendukung guru 1 akun > 1 mapel seperti Bu Wiwin: PABP & Bahasa Sunda)
+  const availableTeacherSubjects = useMemo(
+    () => parseTeacherSubjects(currentTeacher?.subject),
+    [currentTeacher?.subject]
+  );
+
+  const [selectedTeacherSubject, setSelectedTeacherSubject] = useState<string>('');
+
+  useEffect(() => {
+    if (availableTeacherSubjects.length > 0 && !availableTeacherSubjects.includes(selectedTeacherSubject)) {
+      setSelectedTeacherSubject(availableTeacherSubjects[0]);
+    }
+  }, [availableTeacherSubjects, selectedTeacherSubject]);
+
+  const activeTeacherSubject = useMemo(() => {
+    if (availableTeacherSubjects.length > 1) {
+      return availableTeacherSubjects.includes(selectedTeacherSubject)
+        ? selectedTeacherSubject
+        : availableTeacherSubjects[0];
+    }
+    return currentTeacher?.subject || 'Guru Mata Pelajaran';
+  }, [availableTeacherSubjects, selectedTeacherSubject, currentTeacher?.subject]);
+
+  const effectiveTeacher: TeacherUser = useMemo(() => ({
+    ...currentTeacher,
+    subject: activeTeacherSubject
+  }), [currentTeacher, activeTeacherSubject]);
+
+  // Isolasi ketat sesi presensi per akun guru & per mapel aktif (NIP -> Nama Lengkap -> Mapel)
   const isTeacherSession = useCallback((s: SubjectSession, teacher?: TeacherUser | null): boolean => {
     if (!teacher) return false;
     const tNipClean = (teacher.nip || '').replace(/\s+/g, '');
     const sNipClean = (s.teacherNip || '').replace(/\s+/g, '');
 
+    let isSameTeacher = false;
     if (tNipClean && tNipClean !== '-' && sNipClean && sNipClean !== '-') {
-      return tNipClean === sNipClean;
+      isSameTeacher = tNipClean === sNipClean;
+    } else if (s.teacherName && teacher.name) {
+      isSameTeacher = s.teacherName.toLowerCase().trim() === teacher.name.toLowerCase().trim();
+    } else {
+      isSameTeacher = Boolean(
+        s.subject &&
+        teacher.subject &&
+        s.subject.toLowerCase().trim() === teacher.subject.toLowerCase().trim()
+      );
     }
-    if (s.teacherName && teacher.name) {
-      return s.teacherName.toLowerCase().trim() === teacher.name.toLowerCase().trim();
-    }
-    return Boolean(
-      s.subject &&
-      teacher.subject &&
-      s.subject.toLowerCase().trim() === teacher.subject.toLowerCase().trim()
-    );
-  }, []);
 
-  // Duty officer at Pos Meja Piket for the day (from official roster)
-  const [piketDutyTeacher, setPiketDutyTeacher] = useState<string>('Rohidin, S.Pd.');
+    if (!isSameTeacher) return false;
+
+    const teacherSubjects = parseTeacherSubjects(teacher.subject);
+    if (teacherSubjects.length > 1) {
+      return isSubjectMatchingSelected(
+        s.subject,
+        activeTeacherSubject,
+        teacherSubjects,
+        teacher.subject
+      );
+    }
+
+    return true;
+  }, [activeTeacherSubject]);
+
+  // Duty officer at Pos Meja Piket for the day (synced with MariaDB school_settings & piket_journal)
+  const [piketDutyTeacher, setPiketDutyTeacher] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('spentic_piket_duty_teacher_v1') || 'Rohidin, S.Pd.';
+    }
+    return 'Rohidin, S.Pd.';
+  });
+
+  const handleChangePiketOfficer = useCallback((newOfficer: string) => {
+    setPiketDutyTeacher(newOfficer);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('spentic_piket_duty_teacher_v1', newOfficer);
+    }
+    fetch('/api/elearning/sessions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'update_piket_officer',
+        piketDutyTeacher: newOfficer,
+        date: getLocalDateYmd(),
+      }),
+    }).catch(() => {});
+  }, []);
   
   // Stored Subject Sessions (for multi-session per mapel logging & exports)
   const [sessions, setSessions] = useState<SubjectSession[]>([]);
@@ -2017,33 +2090,51 @@ export default function ELearningPage() {
       setSessions(storedSess);
       setAssignments(getStoredAssignments());
       setSubmissions(getStoredSubmissions());
+      if (typeof window !== 'undefined') {
+        const savedOfficer = localStorage.getItem('spentic_piket_duty_teacher_v1');
+        if (savedOfficer) setPiketDutyTeacher(savedOfficer);
+      }
     };
     loadData();
 
     const handleDataUpdate = () => loadData();
+    const handleOfficerUpdate = () => {
+      if (typeof window !== 'undefined') {
+        const savedOfficer = localStorage.getItem('spentic_piket_duty_teacher_v1');
+        if (savedOfficer) setPiketDutyTeacher(savedOfficer);
+      }
+    };
     window.addEventListener('elearningAttendanceUpdated', handleDataUpdate);
     window.addEventListener('elearningSessionsUpdated', handleDataUpdate);
     window.addEventListener('elearningAssignmentsUpdated', handleDataUpdate);
     window.addEventListener('elearningSubmissionsUpdated', handleDataUpdate);
+    window.addEventListener('elearningPiketOfficerUpdated', handleOfficerUpdate);
 
-    // Auto sync on tab focus & periodic sync every 25 seconds
+    // Auto sync on tab focus & periodic sync every 10 seconds
     const handleFocusSync = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
       try {
         import('@/lib/cloudSync').then(m => {
           m.syncElearningWithCloud();
           m.syncCbtWithCloud();
         }).catch(() => {});
         syncSchoolWithCloud().catch(() => {});
+        syncStudentsWithCloud().then(cloudList => {
+          if (cloudList && cloudList.length > 0) {
+            setAllStudents(cloudList);
+          }
+        }).catch(() => {});
       } catch {}
     };
     window.addEventListener('focus', handleFocusSync);
-    const syncTimer = setInterval(handleFocusSync, 25000);
+    const syncTimer = setInterval(handleFocusSync, 10000);
 
     return () => {
       window.removeEventListener('elearningAttendanceUpdated', handleDataUpdate);
       window.removeEventListener('elearningSessionsUpdated', handleDataUpdate);
       window.removeEventListener('elearningAssignmentsUpdated', handleDataUpdate);
       window.removeEventListener('elearningSubmissionsUpdated', handleDataUpdate);
+      window.removeEventListener('elearningPiketOfficerUpdated', handleOfficerUpdate);
       window.removeEventListener('focus', handleFocusSync);
       clearInterval(syncTimer);
     };
@@ -2060,8 +2151,8 @@ export default function ELearningPage() {
     const todayStr = getLocalDateYmd();
     const studentsInClass = activeStudents.filter(s => s.classId === selectedClassId);
     
-    // Look up this specific teacher's session for this class today (strict per-teacher isolation)
-    const teacherKey = `${currentTeacher.nip}_${currentTeacher.name}_${currentTeacher.subject}`;
+    // Look up this specific teacher's session for this class today (strict per-teacher & per-subject isolation)
+    const teacherKey = `${currentTeacher.nip}_${currentTeacher.name}_${activeTeacherSubject}`;
     const mySession = sessions.find(s => 
       s.date === todayStr && 
       s.classId === selectedClassId && 
@@ -2115,7 +2206,7 @@ export default function ELearningPage() {
     prevSelectedClassForWorkingRef.current = selectedClassId;
     prevTeacherKeyForWorkingRef.current = teacherKey;
     prevLoadedSessionKeyRef.current = currentSessionKey;
-  }, [selectedClassId, currentTeacher, isTeacherSession, sessions, activeStudents]);
+  }, [selectedClassId, currentTeacher, activeTeacherSubject, isTeacherSession, sessions, activeStudents]);
 
   // Authentication & Session Management
   const handleLogin = (user: AuthUserSession) => {
@@ -2142,21 +2233,9 @@ export default function ELearningPage() {
         console.error(e);
       }
     }
-    // Record login in database activity_logs
-    try {
-      fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: user.nipOrNisn || user.name,
-          password: user.role === 'guru_piket' ? 'piket123' : user.role === 'panitia' ? 'panitia123' : user.role === 'siswa' ? 'siswa123' : 'guru123',
-          role: user.role
-        })
-      }).catch(() => {});
-    } catch {}
-
     // Immediate background Cloud Synchronization on login
     try {
+      syncSchoolWithCloud().catch(() => {});
       syncStudentsWithCloud().then(list => {
         if (list && list.length > 0) setAllStudents(list);
       }).catch(() => {});
@@ -2273,9 +2352,27 @@ export default function ELearningPage() {
         return;
       }
 
-      const isValidPass = customPassword
-        ? (trimmedPass === customPassword || (teacher.password ? trimmedPass === teacher.password : false))
-        : (trimmedPass === 'guru123');
+      let isValidPass = false;
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: teacherUsername,
+            password: trimmedPass,
+            role: 'guru_mapel'
+          })
+        });
+        if (res.ok) {
+          isValidPass = true;
+        }
+      } catch {}
+
+      if (!isValidPass) {
+        isValidPass = customPassword
+          ? (trimmedPass === customPassword || (teacher.password ? trimmedPass === teacher.password : false))
+          : (trimmedPass === 'guru123');
+      }
 
       if (!isValidPass) {
         setLoginErrorMessage('Kata sandi salah.');
@@ -2304,16 +2401,31 @@ export default function ELearningPage() {
         return;
       }
 
-      let customPiketPass = '';
-      if (typeof window !== 'undefined') {
-        try {
-          customPiketPass = localStorage.getItem('smpn3_piket_password') || '';
-        } catch {}
+      let isValidPiket = false;
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: 'piket',
+            password: trimmedPass,
+            role: 'guru_piket'
+          })
+        });
+        if (res.ok) {
+          isValidPiket = true;
+        }
+      } catch {
+        let customPiketPass = '';
+        if (typeof window !== 'undefined') {
+          try {
+            customPiketPass = localStorage.getItem('smpn3_piket_password') || '';
+          } catch {}
+        }
+        isValidPiket = customPiketPass
+          ? (trimmedPass === customPiketPass)
+          : (trimmedPass === 'piket123');
       }
-
-      const isValidPiket = customPiketPass
-        ? (trimmedPass === customPiketPass)
-        : (trimmedPass === 'piket123');
 
       if (!isValidPiket) {
         setLoginErrorMessage('Kata sandi salah.');
@@ -2341,16 +2453,36 @@ export default function ELearningPage() {
         return;
       }
 
-      let customPanitiaPass = '';
-      if (typeof window !== 'undefined') {
-        try {
-          customPanitiaPass = localStorage.getItem('smpn3_panitia_password') || '';
-        } catch {}
+      let isValidPass = false;
+      let dbPanitiaUser: { name?: string; identifier?: string; subject?: string } | null = null;
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: 'panitia',
+            password: trimmedPass,
+            role: 'panitia'
+          })
+        });
+        if (res.ok) {
+          isValidPass = true;
+          const json = await res.json().catch(() => null);
+          if (json?.user) {
+            dbPanitiaUser = json.user;
+          }
+        }
+      } catch {
+        let customPanitiaPass = '';
+        if (typeof window !== 'undefined') {
+          try {
+            customPanitiaPass = localStorage.getItem('smpn3_panitia_password') || '';
+          } catch {}
+        }
+        isValidPass = customPanitiaPass
+          ? (trimmedPass === customPanitiaPass)
+          : (trimmedPass === 'panitia123');
       }
-
-      const isValidPass = customPanitiaPass
-        ? (trimmedPass === customPanitiaPass)
-        : (trimmedPass === 'panitia123');
 
       if (!isValidPass) {
         setLoginErrorMessage('Kata sandi salah.');
@@ -2360,9 +2492,9 @@ export default function ELearningPage() {
       setLoginErrorMessage('');
       handleLogin({
         role: 'panitia',
-        name: 'Panitia Asesmen CBT (Posko Pusat)',
-        nipOrNisn: 'PANITIA-CBT',
-        subject: 'Pusat Kendali Ujian'
+        name: dbPanitiaUser?.name || 'Panitia Asesmen CBT (Posko Pusat)',
+        nipOrNisn: dbPanitiaUser?.identifier || 'PANITIA-CBT',
+        subject: dbPanitiaUser?.subject || 'Pusat Kendali Ujian CBT'
       });
       showToast('🏛️ Selamat datang di Pusat Komando Panitia Ujian CBT!', 'success');
     } else if (loginRole === 'siswa') {
@@ -2396,21 +2528,36 @@ export default function ELearningPage() {
         return;
       }
 
-      let customPass = student.password || '';
-      if (typeof window !== 'undefined') {
-        try {
-          const raw = localStorage.getItem('smpn3_student_passwords');
-          if (raw) {
-            const map = JSON.parse(raw);
-            const fromStorage = map[student.nisn] || (cleanInput ? map[cleanInput] : '') || '';
-            if (fromStorage) customPass = fromStorage;
-          }
-        } catch {}
+      let isValidSiswa = false;
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: cleanInput,
+            password: trimmedPass,
+            role: 'siswa'
+          })
+        });
+        if (res.ok) {
+          isValidSiswa = true;
+        }
+      } catch {
+        let customPass = student.password || '';
+        if (typeof window !== 'undefined') {
+          try {
+            const raw = localStorage.getItem('smpn3_student_passwords');
+            if (raw) {
+              const map = JSON.parse(raw);
+              const fromStorage = map[student.nisn] || (cleanInput ? map[cleanInput] : '') || '';
+              if (fromStorage) customPass = fromStorage;
+            }
+          } catch {}
+        }
+        isValidSiswa = customPass && customPass !== 'siswa123'
+          ? (trimmedPass === customPass)
+          : (trimmedPass === 'siswa123');
       }
-
-      const isValidSiswa = customPass && customPass !== 'siswa123'
-        ? (trimmedPass === customPass)
-        : (trimmedPass === 'siswa123');
 
       if (!isValidSiswa) {
         setLoginErrorMessage('Kata sandi salah.');
@@ -2573,13 +2720,17 @@ export default function ELearningPage() {
       ? teacherNipClean
       : (getTeacherUsername(currentTeacher) || currentTeacher.name.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() || 'guru');
     const finalNotes = { ...workingNotes, ...workingNotesRef.current };
+    const subjectSlug = activeTeacherSubject.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const sessionId = availableTeacherSubjects.length > 1
+      ? `${today}_${selectedClassId}_${teacherIdentityKey}_${subjectSlug}`
+      : `${today}_${selectedClassId}_${teacherIdentityKey}`;
 
     // 1. Save individual isolated session log for this teacher & mapel
     const newSession: SubjectSession = {
-      id: `${today}_${selectedClassId}_${teacherIdentityKey}`,
+      id: sessionId,
       classId: selectedClassId,
       date: today,
-      subject: currentTeacher.subject,
+      subject: activeTeacherSubject,
       teacherName: currentTeacher.name,
       teacherNip: currentTeacher.nip,
       submittedAt: timeString,
@@ -2597,7 +2748,7 @@ export default function ELearningPage() {
     updatedData[selectedClassId] = {
       classId: selectedClassId,
       date: today,
-      subject: currentTeacher.subject,
+      subject: activeTeacherSubject,
       teacherName: currentTeacher.name,
       teacherNip: currentTeacher.nip,
       isSubmitted: true,
@@ -2609,7 +2760,7 @@ export default function ELearningPage() {
     saveStoredAttendance(updatedData);
     setAttendanceData(updatedData);
 
-    showToast(`Presensi ${currentTeacher.subject} kelas ${selectedClassId} berhasil disimpan (${timeString})!`, 'success');
+    showToast(`Presensi ${activeTeacherSubject} kelas ${selectedClassId} berhasil disimpan (${timeString})!`, 'success');
   };
 
   // Export Mapel Attendance to Excel (.xlsx) - Jurnal Harian
@@ -2633,7 +2784,7 @@ export default function ELearningPage() {
     exportMapelAttendanceToExcel({
       classId: classToExport,
       className: cls?.name || `Kelas ${classToExport}`,
-      subject: currentTeacher.subject,
+      subject: activeTeacherSubject,
       teacherName: currentTeacher.name,
       teacherNip: currentTeacher.nip,
       date: dateToExport,
@@ -2642,7 +2793,7 @@ export default function ELearningPage() {
       notes: notesToExport
     });
 
-    showToast(`File Excel Jurnal Presensi ${currentTeacher.subject} (${classToExport} - ${dateToExport}) berhasil diunduh!`, 'success');
+    showToast(`File Excel Jurnal Presensi ${activeTeacherSubject} (${classToExport} - ${dateToExport}) berhasil diunduh!`, 'success');
   };
 
   // Export Monthly Calendar Matrix (Tgl 1 s/d 31) to Excel (.xlsx)
@@ -2660,7 +2811,7 @@ export default function ELearningPage() {
     exportMonthlyAttendanceMatrixToExcel({
       classId: reportClassId,
       className: cls?.name || `Kelas ${reportClassId}`,
-      subject: currentTeacher.subject,
+      subject: activeTeacherSubject,
       teacherName: currentTeacher.name,
       teacherNip: currentTeacher.nip,
       year: reportYear,
@@ -2671,7 +2822,7 @@ export default function ELearningPage() {
       sessions: teacherSessionsForClass
     });
 
-    showToast(`File Excel Matriks Bulanan ${monthName} ${reportYear} (${currentTeacher.subject} - ${reportClassId}) berhasil diunduh!`, 'success');
+    showToast(`File Excel Matriks Bulanan ${monthName} ${reportYear} (${activeTeacherSubject} - ${reportClassId}) berhasil diunduh!`, 'success');
   };
 
   // Export Semester Attendance Recap (P1 - P16) to Excel (.xlsx)
@@ -2703,7 +2854,7 @@ export default function ELearningPage() {
     exportSemesterAttendanceToExcel({
       classId: targetClassId,
       className: cls?.name || `Kelas ${targetClassId}`,
-      subject: currentTeacher.subject,
+      subject: activeTeacherSubject,
       teacherName: currentTeacher.name,
       teacherNip: currentTeacher.nip,
       semesterName: semesterFullName,
@@ -2712,7 +2863,7 @@ export default function ELearningPage() {
       sessions: targetSemesterSessions
     });
 
-    showToast(`File Rekap ${semesterFullName} (P1-P16) ${currentTeacher.subject} (${targetClassId}) berhasil diunduh!`, 'success');
+    showToast(`File Rekap ${semesterFullName} (P1-P16) ${activeTeacherSubject} (${targetClassId}) berhasil diunduh!`, 'success');
   };
 
   // Export Monthly Calendar Matrix for Meja Piket (.xlsx)
@@ -2746,7 +2897,7 @@ export default function ELearningPage() {
 
   // Export School Daily Attendance to Excel (.xlsx) for Meja Piket
   const handleExportPiketExcel = () => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getLocalDateYmd();
     exportSchoolDailyAttendanceToExcel({
       date: today,
       classes: SCHOOL_CLASSES,
@@ -2780,19 +2931,33 @@ export default function ELearningPage() {
     const cleanCurrentNip = (currentTeacher?.nip || '').replace(/\s+/g, '');
     const cleanAsgNip = (asg.teacherNip || '').replace(/\s+/g, '');
     
+    let isOwnedByTeacher = false;
     // 1. Verifikasi kecocokan NIP jika keduanya memiliki NIP valid
     if (cleanCurrentNip && cleanAsgNip && cleanCurrentNip !== '-' && cleanAsgNip !== '-') {
-      return cleanCurrentNip === cleanAsgNip;
+      isOwnedByTeacher = cleanCurrentNip === cleanAsgNip;
+    } else if (asg.teacherName && currentTeacher?.name) {
+      // 2. Verifikasi kecocokan Nama Lengkap Guru
+      isOwnedByTeacher = asg.teacherName.toLowerCase().trim() === currentTeacher.name.toLowerCase().trim();
+    } else if (asg.subject && currentTeacher?.subject) {
+      // 3. Fallback Mapel jika data tugas awal tidak memiliki nama/NIP eksplisit
+      isOwnedByTeacher =
+        asg.subject.toLowerCase().trim() === currentTeacher.subject.toLowerCase().trim() ||
+        availableTeacherSubjects.some(sub => sub.toLowerCase().trim() === asg.subject.toLowerCase().trim());
     }
-    // 2. Verifikasi kecocokan Nama Lengkap Guru
-    if (asg.teacherName && currentTeacher?.name) {
-      return asg.teacherName.toLowerCase().trim() === currentTeacher.name.toLowerCase().trim();
+
+    if (!isOwnedByTeacher) return false;
+
+    if (availableTeacherSubjects.length > 1) {
+      return isSubjectMatchingSelected(
+        asg.subject,
+        activeTeacherSubject,
+        availableTeacherSubjects,
+        currentTeacher?.subject,
+        asg.title
+      );
     }
-    // 3. Fallback Mapel jika data tugas awal tidak memiliki nama/NIP eksplisit
-    if (asg.subject && currentTeacher?.subject) {
-      return asg.subject.toLowerCase().trim() === currentTeacher.subject.toLowerCase().trim();
-    }
-    return false;
+
+    return true;
   };
 
   const generateMockNotebookSvg = (subject: string, studentName: string, title: string) => {
@@ -3097,28 +3262,63 @@ export default function ELearningPage() {
     e.preventDefault();
     const now = new Date();
     const timeString = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB';
-    const today = now.toISOString().split('T')[0];
+    const today = getLocalDateYmd();
+
+    const studentsInClass = activeStudents.filter(s => s.classId === piketSelectedClass);
+    const classSessionsToday = sessions.filter(s => s.date === today && s.classId === piketSelectedClass);
+    const existingPiketSession = classSessionsToday.find(s => s.id.endsWith('_PIKET') || (s.subject || '').toLowerCase().includes('piket'));
 
     const currentSession = attendanceData[piketSelectedClass] || {
       classId: piketSelectedClass,
       date: today,
-      subject: 'Jam Pelajaran',
-      teacherName: 'Guru Jam Pertama',
+      subject: 'Presensi Meja Piket',
+      teacherName: `${piketDutyTeacher} (Guru Piket)`,
       teacherNip: '-',
       isSubmitted: true,
       records: {},
       notes: {},
     };
 
-    const updatedRecords = { ...currentSession.records, [piketSelectedStudentId]: piketActionStatus };
-    const updatedNotes = { ...currentSession.notes, [piketSelectedStudentId]: `${piketActionNote} (via Meja Piket jam ${timeString} - Petugas: ${piketDutyTeacher})` };
+    const fullClassRecords: Record<string, AttendanceStatus> = {};
+    const fullClassNotes: Record<string, string> = {
+      ...(existingPiketSession?.notes || {}),
+      ...(currentSession.date === today ? (currentSession.notes || {}) : {}),
+    };
+
+    studentsInClass.forEach(st => {
+      if (st.status === 'Keluar') {
+        fullClassRecords[st.id] = 'K';
+      } else if (existingPiketSession?.records?.[st.id]) {
+        fullClassRecords[st.id] = existingPiketSession.records[st.id];
+      } else if (currentSession.date === today && currentSession.records?.[st.id]) {
+        fullClassRecords[st.id] = currentSession.records[st.id];
+      } else {
+        // Check if any subject session today recorded an anomaly
+        let foundStatus: AttendanceStatus = 'H';
+        for (const cs of classSessionsToday) {
+          const rec = cs.records?.[st.id];
+          if (rec && rec !== 'H') {
+            foundStatus = rec;
+            if (cs.notes?.[st.id] && !fullClassNotes[st.id]) {
+              fullClassNotes[st.id] = cs.notes[st.id];
+            }
+            break;
+          }
+        }
+        fullClassRecords[st.id] = foundStatus;
+      }
+    });
+
+    fullClassRecords[piketSelectedStudentId] = piketActionStatus;
+    fullClassNotes[piketSelectedStudentId] = `${piketActionNote} (via Meja Piket jam ${timeString} - Petugas: ${piketDutyTeacher})`;
 
     const updatedData = {
       ...attendanceData,
       [piketSelectedClass]: {
         ...currentSession,
-        records: updatedRecords,
-        notes: updatedNotes,
+        date: today,
+        records: fullClassRecords,
+        notes: fullClassNotes,
         isSubmitted: true,
         submittedAt: currentSession.submittedAt || timeString,
       }
@@ -3126,13 +3326,28 @@ export default function ELearningPage() {
 
     saveStoredAttendance(updatedData);
     setAttendanceData(updatedData);
-    showToast(`Status siswa berhasil diubah via Meja Piket & terupdate otomatis di kelas!`, 'success');
+
+    // Sync directly to MariaDB subject_sessions, attendance_records & piket_journal
+    saveSubjectSession({
+      id: `${today}_${piketSelectedClass}_PIKET`,
+      classId: piketSelectedClass,
+      date: today,
+      subject: 'Presensi Meja Piket',
+      teacherName: `${piketDutyTeacher} (Guru Piket)`,
+      teacherNip: '-',
+      submittedAt: timeString,
+      records: fullClassRecords,
+      notes: fullClassNotes,
+    });
+    setSessions(getStoredSessions());
+
+    showToast(`Status siswa berhasil disimpan ke database & terupdate di seluruh kelas!`, 'success');
   };
 
   // Open class modal with interactive state for Piket
   const handleOpenPiketClassModal = (classId: string) => {
     setDetailModalClassId(classId);
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = getLocalDateYmd();
     const session = attendanceData[classId];
     const isTodaySession = session && session.date === todayStr;
     const classSessions = sessions.filter(s => s.date === todayStr && s.classId === classId);
@@ -3209,11 +3424,11 @@ export default function ELearningPage() {
     if (!detailModalClassId) return;
     const now = new Date();
     const timeString = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB';
-    const today = now.toISOString().split('T')[0];
+    const today = getLocalDateYmd();
     const finalNotes = { ...piketModalNotes, ...piketModalNotesRef.current };
 
     const currentSession = attendanceData[detailModalClassId];
-    const subject = currentSession?.subject || 'Jam Pertama (Inval)';
+    const subject = currentSession?.subject || 'Presensi Meja Piket (Inval)';
 
     const updatedData = {
       ...attendanceData,
@@ -3222,7 +3437,7 @@ export default function ELearningPage() {
         date: today,
         subject: subject,
         teacherName: `${piketDutyTeacher} (Guru Piket / Inval)`,
-        teacherNip: '19780214 200501 2 008',
+        teacherNip: '-',
         isSubmitted: true,
         submittedAt: timeString,
         records: piketModalRecords,
@@ -3232,7 +3447,22 @@ export default function ELearningPage() {
 
     saveStoredAttendance(updatedData);
     setAttendanceData(updatedData);
-    showToast(`Presensi Kelas ${detailModalClassId} berhasil disimpan & disahkan oleh ${piketDutyTeacher}!`, 'success');
+
+    // Sync directly to MariaDB subject_sessions, attendance_records & piket_journal
+    saveSubjectSession({
+      id: `${today}_${detailModalClassId}_PIKET`,
+      classId: detailModalClassId,
+      date: today,
+      subject: subject,
+      teacherName: `${piketDutyTeacher} (Guru Piket / Inval)`,
+      teacherNip: '-',
+      submittedAt: timeString,
+      records: piketModalRecords,
+      notes: finalNotes,
+    });
+    setSessions(getStoredSessions());
+
+    showToast(`Presensi Kelas ${detailModalClassId} berhasil disimpan ke database & disahkan oleh ${piketDutyTeacher}!`, 'success');
     setDetailModalClassId(null); // Tutup pop-up otomatis setelah berhasil simpan
   };
 
@@ -3261,7 +3491,8 @@ export default function ELearningPage() {
 
     SCHOOL_CLASSES.forEach(cls => {
       const session = attendanceData[cls.id];
-      const isTodaySession = session && session.date === todayStr && session.isSubmitted;
+      const classSessions = sessions.filter(s => s.date === todayStr && s.classId === cls.id);
+      const isTodaySubmitted = classSessions.length > 0 || Boolean(session && session.date === todayStr && session.isSubmitted);
       const students = activeStudents.filter(s => s.classId === cls.id);
       
       students.forEach(st => {
@@ -3269,7 +3500,24 @@ export default function ELearningPage() {
         if (st.status === 'Keluar') {
           return; // Already counted in keluar
         }
-        const status = isTodaySession ? (session?.records?.[st.id] || 'H') : null;
+        let status: AttendanceStatus = 'H';
+        if (isTodaySubmitted) {
+          const piketSess = classSessions.find(s => s.id.endsWith('_PIKET') || (s.subject || '').toLowerCase().includes('piket'));
+          if (piketSess?.records?.[st.id]) {
+            status = piketSess.records[st.id];
+          } else {
+            for (const cs of classSessions) {
+              const rec = cs.records?.[st.id];
+              if (rec && rec !== 'H') {
+                status = rec;
+                break;
+              }
+            }
+            if (status === 'H' && session && session.date === todayStr && session.records?.[st.id]) {
+              status = session.records[st.id];
+            }
+          }
+        }
         if (status === 'H') hadir++;
         else if (status === 'S') sakit++;
         else if (status === 'I') izin++;
@@ -3281,7 +3529,7 @@ export default function ELearningPage() {
     });
 
     return { totalAssigned, hadir, sakit, izin, alpa, terlambat, keluar };
-  }, [currentUser?.role, attendanceData, activeStudents, todayStr]);
+  }, [currentUser?.role, attendanceData, sessions, activeStudents, todayStr]);
 
   const currentClassStudents = useMemo(() => 
     activeStudents.filter(s => s.classId === selectedClassId),
@@ -3735,8 +3983,8 @@ export default function ELearningPage() {
                 <ELearningClock />
               </div>
 
-              {/* Teacher Account Settings & Change Password */}
-              {(currentUser.role === 'guru_mapel' || currentUser.role === 'guru_piket') && (
+              {/* Account Settings & Change Password (Guru, Piket, Panitia, Siswa) */}
+              {(currentUser.role === 'guru_mapel' || currentUser.role === 'guru_piket' || currentUser.role === 'panitia' || currentUser.role === 'siswa') && (
                 <button
                   type="button"
                   onClick={() => setIsTeacherSettingsOpen(true)}
@@ -4071,7 +4319,7 @@ export default function ELearningPage() {
             {/* Top Bar: Title & Clean Sub-tabs */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-indigo-100/80">
               <div>
-                <h1 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                <h1 className="text-xl font-bold text-slate-900 tracking-tight flex flex-wrap items-center gap-2">
                   <span>
                     {activeMenu === 'presensi' && 'Presensi KBM'}
                     {activeMenu === 'laporan' && 'Rekap Kehadiran'}
@@ -4079,9 +4327,32 @@ export default function ELearningPage() {
                     {activeMenu === 'cbt' && 'Bank Soal CBT'}
                     {activeMenu === 'pengawas' && 'Mode Pengawas'}
                   </span>
-                  <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
-                    {currentTeacher.subject}
-                  </span>
+                  {availableTeacherSubjects.length > 1 ? (
+                    <div className="inline-flex items-center gap-1 p-0.5 rounded-xl bg-indigo-50/90 border border-indigo-200">
+                      {availableTeacherSubjects.map((sub) => {
+                        const isSelected = activeTeacherSubject === sub;
+                        return (
+                          <button
+                            key={sub}
+                            type="button"
+                            onClick={() => setSelectedTeacherSubject(sub)}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                              isSelected
+                                ? 'bg-indigo-600 text-white shadow-2xs'
+                                : 'text-indigo-700 hover:bg-indigo-100/70'
+                            }`}
+                            title={`Beralih ke mata pelajaran ${sub}`}
+                          >
+                            {formatShortSubject(sub)}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                      {currentTeacher.subject}
+                    </span>
+                  )}
                 </h1>
                 <p className="text-xs text-slate-500 mt-0.5">
                   {currentTeacher.name}{currentTeacher.nip && currentTeacher.nip !== '-' ? ` • NIP. ${currentTeacher.nip}` : ''}
@@ -4131,7 +4402,10 @@ export default function ELearningPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setActiveMenu('cbt')}
+                  onClick={() => {
+                    setActiveMenu('cbt');
+                    import('@/lib/cloudSync').then(m => m.syncCbtWithCloud()).catch(() => {});
+                  }}
                   className={`px-3 py-2 sm:py-1.5 rounded-lg transition-all cursor-pointer text-center sm:whitespace-nowrap ${
                     activeMenu === 'cbt' 
                       ? 'bg-white text-indigo-700 font-bold shadow-xs border border-indigo-100/60' 
@@ -4142,7 +4416,10 @@ export default function ELearningPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setActiveMenu('pengawas')}
+                  onClick={() => {
+                    setActiveMenu('pengawas');
+                    import('@/lib/cloudSync').then(m => m.syncCbtWithCloud()).catch(() => {});
+                  }}
                   className={`col-span-2 sm:col-span-1 px-3 py-2 sm:py-1.5 rounded-lg transition-all cursor-pointer text-center sm:whitespace-nowrap ${
                     activeMenu === 'pengawas' 
                       ? 'bg-white text-indigo-700 font-bold shadow-xs border border-indigo-100/60' 
@@ -4469,11 +4746,7 @@ export default function ELearningPage() {
                     <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight flex flex-wrap items-center gap-2">
                       <span>Rekapitulasi Presensi</span>
                       <span className="text-xs px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 font-semibold">
-                        {currentTeacher.subject}
-                      </span>
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                        Live MariaDB
+                        {activeTeacherSubject}
                       </span>
                     </h2>
                     <p className="text-xs text-slate-500 mt-0.5">
@@ -4482,19 +4755,6 @@ export default function ELearningPage() {
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        import('@/lib/cloudSync').then(async m => {
-                          await m.syncElearningWithCloud();
-                          showToast('Rekap kehadiran berhasil disinkronkan dari database MariaDB!', 'success');
-                        }).catch(() => {});
-                      }}
-                      className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 font-semibold text-xs transition flex items-center gap-1.5 cursor-pointer shadow-xs"
-                      title="Tarik pembaruan data presensi terbaru dari database MariaDB"
-                    >
-                      <span>🔄 Sinkronkan</span>
-                    </button>
                     <button
                       type="button"
                       onClick={() => {
@@ -4515,15 +4775,6 @@ export default function ELearningPage() {
                       <span>
                         {reportMode === 'harian' ? 'Export Jurnal (.xlsx)' : reportMode === 'bulanan' ? 'Export Matriks (.xlsx)' : 'Export Semester (.xlsx)'}
                       </span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => window.print()}
-                      className="px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-semibold text-xs transition flex items-center gap-1.5 cursor-pointer shadow-xs"
-                      title="Cetak laporan presensi"
-                    >
-                      <span>🖨️ Cetak</span>
                     </button>
                   </div>
                 </div>
@@ -4746,7 +4997,7 @@ export default function ELearningPage() {
                     students={studentsInReport}
                     reportClassId={reportClassId}
                     reportDate={reportDate}
-                    currentTeacher={currentTeacher}
+                    currentTeacher={effectiveTeacher}
                     dailyReportData={dailyReportData}
                   />
                 </div>
@@ -4759,7 +5010,7 @@ export default function ELearningPage() {
                     reportClassId={reportClassId}
                     monthName={monthName}
                     reportYear={reportYear}
-                    currentTeacher={currentTeacher}
+                    currentTeacher={effectiveTeacher}
                     daysInfoList={daysInfoList}
                     monthlyReportData={monthlyReportData}
                   />
@@ -4771,7 +5022,7 @@ export default function ELearningPage() {
                     isActive={reportMode === 'semester'}
                     students={studentsInReport}
                     reportClassId={reportClassId}
-                    currentTeacher={currentTeacher}
+                    currentTeacher={effectiveTeacher}
                     semesterReportData={semesterReportData}
                     semesterName={semesterFullName}
                   />
@@ -4803,7 +5054,7 @@ export default function ELearningPage() {
                     </span>
                     <span className="inline-flex items-center gap-1.5 text-slate-400">
                       <span className="font-mono text-slate-300">-</span>
-                      <span>Tidak ada jam KBM {currentTeacher.subject}</span>
+                      <span>Tidak ada jam KBM {activeTeacherSubject}</span>
                     </span>
                   </div>
                 </div>
@@ -4843,29 +5094,10 @@ export default function ELearningPage() {
                       <span className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 font-bold text-xs border border-indigo-100">
                         {myTasks.length} Tugas
                       </span>
-
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                        Live MariaDB
-                      </span>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          import('@/lib/cloudSync').then(async m => {
-                            await m.syncElearningWithCloud();
-                            showToast('Daftar Materi, Tugas & pengumpulan siswa disinkronkan dari MariaDB!', 'success');
-                          }).catch(() => {});
-                        }}
-                        className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 font-semibold text-xs transition flex items-center gap-1.5 cursor-pointer shadow-xs"
-                        title="Tarik data tugas & pengumpulan terbaru dari MariaDB"
-                      >
-                        <span>🔄 Sinkronkan</span>
-                      </button>
-
-                      {myTasks.length > 0 && (
+                    {myTasks.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
                         <button
                           type="button"
                           onClick={() => setIsCreateAsgModalOpen(true)}
@@ -4873,8 +5105,8 @@ export default function ELearningPage() {
                         >
                           <span>+ Buat Tugas Baru</span>
                         </button>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* My Assignments List */}
@@ -5007,6 +5239,8 @@ export default function ELearningPage() {
               <CbtTeacherManagement
                 teacherName={currentTeacher.name}
                 teacherSubject={currentTeacher.subject}
+                activeSubject={activeTeacherSubject}
+                onSelectSubject={setSelectedTeacherSubject}
                 teacherClasses={currentTeacher.classes}
                 activeStudents={activeStudents}
               />
@@ -5054,8 +5288,8 @@ export default function ELearningPage() {
                     <span className="text-slate-500 font-medium">Petugas:</span>
                     <select
                       value={piketDutyTeacher}
-                      onChange={(e) => setPiketDutyTeacher(e.target.value)}
-                      className="bg-transparent text-emerald-700 font-bold focus:outline-none cursor-pointer max-w-[200px] truncate"
+                      onChange={(e) => handleChangePiketOfficer(e.target.value)}
+                      className="bg-transparent text-emerald-700 font-bold focus:outline-none cursor-pointer max-w-[220px] truncate"
                     >
                       {activeTeachers.map((teacher) => (
                         <option key={`${teacher.name}_${teacher.nip}`} value={teacher.name} className="bg-white text-slate-900">
@@ -5064,22 +5298,6 @@ export default function ELearningPage() {
                       ))}
                     </select>
                   </div>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const stored = getStoredAttendance();
-                      setAttendanceData(stored);
-                      const storedSess = getStoredSessions();
-                      setSessions(storedSess);
-                      showToast('Data kehadiran diperbarui!', 'success');
-                    }}
-                    className="p-2 sm:px-3 sm:py-1.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-semibold text-xs transition flex items-center gap-1.5 cursor-pointer shadow-sm"
-                    title="Muat ulang data presensi terbaru"
-                  >
-                    <span>🔄</span>
-                    <span className="hidden sm:inline">Refresh</span>
-                  </button>
                 </div>
               </div>
 
@@ -5111,32 +5329,32 @@ export default function ELearningPage() {
                   </button>
                 </div>
 
-                {/* Right Contextual Actions */}
-                <div className="flex items-center gap-2">
-                  {piketViewTab === 'live' && (
+                {/* Right Contextual Actions (Shown on Live Hari Ini tab; Matriks Bulanan has its own contextual export bar) */}
+                {piketViewTab === 'live' && (
+                  <div className="flex flex-wrap items-center gap-2">
                     <button
                       type="button"
                       onClick={handleExportPiketExcel}
-                      className="px-3.5 py-1.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-semibold text-xs transition flex items-center gap-1.5 cursor-pointer shadow-xs"
-                      title="Unduh rekapitulasi presensi harian seluruh rombel hari ini (.xlsx)"
+                      className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                      title="Unduh rekapitulasi presensi harian seluruh 17 rombel hari ini (.xlsx)"
                     >
-                      <svg className="w-3.5 h-3.5 text-slate-500" viewBox="0 0 24 24" fill="currentColor">
+                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/>
                       </svg>
-                      <span>Export Harian (.xlsx)</span>
+                      <span>Export Harian 17 Rombel (.xlsx)</span>
                     </button>
-                  )}
 
-                  <button
-                    type="button"
-                    onClick={handleExportSchoolSemesterExcel}
-                    className="px-3.5 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer shadow-xs"
-                    title="Unduh rekapitulasi kehadiran 1 semester seluruh sekolah (.xlsx)"
-                  >
-                    <span>📥</span>
-                    <span>Rekap Semester</span>
-                  </button>
-                </div>
+                    <button
+                      type="button"
+                      onClick={handleExportSchoolSemesterExcel}
+                      className="px-3.5 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                      title="Unduh rekapitulasi kehadiran 1 semester seluruh 17 rombel (.xlsx)"
+                    >
+                      <span>📊</span>
+                      <span>Rekap Semester 17 Rombel (.xlsx)</span>
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -5513,6 +5731,7 @@ export default function ELearningPage() {
                 classStudentExitCounts={classStudentExitCounts}
                 piketDutyTeacher={piketDutyTeacher}
                 onExportExcel={handleExportPiketMonthlyMatrixExcel}
+                onExportSemesterExcel={handleExportSchoolSemesterExcel}
               />
             )}
 
@@ -5851,6 +6070,7 @@ export default function ELearningPage() {
         {currentUser?.role === 'panitia' && (
           <CbtPanitiaCommandCenter
             activeStudents={activeStudents}
+            activeTeachers={activeTeachers}
             onOpenRoomView={(roomName) => {
               // Quick action if needed
             }}
@@ -6460,6 +6680,7 @@ export default function ELearningPage() {
           <CreateAssignmentModal
             currentTeacher={currentTeacher}
             defaultClass={selectedClassId === 'ALL' ? '7-A' : selectedClassId}
+            defaultSubject={activeTeacherSubject}
             onClose={() => setIsCreateAsgModalOpen(false)}
             onSubmit={handleCreateAssignment}
             showToast={showToast}
@@ -6495,30 +6716,11 @@ export default function ELearningPage() {
                         Kelas {asg.targetClass}
                       </span>
                       <span className="text-xs text-slate-500 font-medium">Tenggat: {asg.dueDate}</span>
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-bold">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                        Live MariaDB
-                      </span>
                     </div>
                     <h3 className="text-base font-bold text-slate-900">{asg.title}</h3>
                     <p className="text-xs text-slate-500">{asg.description}</p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        showToast('Menyinkronkan pengumpulan tugas siswa dari MariaDB...', 'info');
-                        try {
-                          const { syncElearningWithCloud } = await import('@/lib/cloudSync');
-                          await syncElearningWithCloud();
-                          showToast('Data pengumpulan & nilai siswa berhasil disinkronkan!', 'success');
-                        } catch {}
-                      }}
-                      className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 font-bold text-xs transition cursor-pointer flex items-center gap-1"
-                    >
-                      <span>🔄</span>
-                      <span className="hidden sm:inline">Sinkronkan</span>
-                    </button>
                     <button
                       type="button"
                       onClick={() => {
@@ -7123,7 +7325,16 @@ export default function ELearningPage() {
         <TeacherSettingsModal
           isOpen={isTeacherSettingsOpen}
           onClose={() => setIsTeacherSettingsOpen(false)}
-          currentUser={currentUser}
+          currentUser={
+            currentUser?.role === 'guru_mapel' && loggedInTeacher
+              ? {
+                  ...currentUser,
+                  name: loggedInTeacher.name || currentUser.name,
+                  nipOrNisn: loggedInTeacher.nip || currentUser.nipOrNisn,
+                  subject: loggedInTeacher.subject || currentUser.subject,
+                }
+              : currentUser
+          }
           showToast={showToast}
         />
 

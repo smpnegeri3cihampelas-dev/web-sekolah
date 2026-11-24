@@ -8,6 +8,8 @@ interface TabPengaturanProps {
   onResetStudents?: () => void;
   onResetAgenda?: () => void;
   onResetGallery?: () => void;
+  onResetWarta?: () => void;
+  onAfterMasterReset?: () => void;
   showToast: (msg: string) => void;
 }
 
@@ -16,6 +18,8 @@ export function TabPengaturan({
   onResetStudents,
   onResetAgenda,
   onResetGallery,
+  onResetWarta,
+  onAfterMasterReset,
   showToast 
 }: TabPengaturanProps) {
   const {
@@ -128,14 +132,13 @@ export function TabPengaturan({
   };
 
   const handleMasterReset = async () => {
-    if (confirm('⚠️ PERINGATAN BESAR: Apakah Anda yakin ingin mereset SELURUH data website (Identitas, Password Admin, GTK, Siswa, Agenda, dan Galeri) kembali ke setelan default awal sekolah di Database MariaDB?')) {
+    if (confirm('⚠️ PERINGATAN BESAR: Apakah Anda yakin ingin mereset SELURUH data website (Identitas, Password Admin, Warta, GTK, Siswa, Agenda, dan Galeri) kembali ke setelan default awal sekolah di Database MariaDB?')) {
       showToast('⏳ Memproses pemulihan data master website di Database MariaDB...');
       const ok = await executeMasterReset();
       if (ok) {
-        onResetSchoolData();
-        if (onResetStudents) onResetStudents();
-        if (onResetAgenda) onResetAgenda();
-        if (onResetGallery) onResetGallery();
+        if (onAfterMasterReset) {
+          onAfterMasterReset();
+        }
         showToast('🔄 Seluruh modul website berhasil direset ke setelan standar sekolah di Database MariaDB!');
       } else {
         showToast('⚠️ Master reset selesai dengan catatan sebagian modul.');
@@ -144,153 +147,125 @@ export function TabPengaturan({
   };
 
   return (
-    <div className="space-y-6 animate-[fadeIn_0.3s_ease-out]">
-      {/* Header */}
-      <div className="p-5 sm:p-6 rounded-2xl bg-white border-2 border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <h2 className="text-xl font-black text-slate-950 tracking-tight">Pengaturan & Pemeliharaan Web</h2>
-            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-black bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
-              Live MariaDB
-            </span>
+    <div className="space-y-5 animate-[fadeIn_0.3s_ease-out]">
+      {/* 1. Identitas Sekolah */}
+      <div className="p-5 sm:p-6 rounded-2xl bg-white border-2 border-slate-200 shadow-xs space-y-4">
+        <div className="flex items-center justify-between flex-wrap gap-2 pb-3 border-b border-slate-100">
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm sm:text-base font-black text-slate-950">Identitas Sekolah</h3>
             {isSyncing && (
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono text-slate-600 bg-slate-100 border border-slate-200 animate-pulse">
-                Menyinkronkan...
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono text-slate-500 bg-slate-100 animate-pulse">
+                Sinkronisasi...
               </span>
             )}
           </div>
-          <p className="text-xs text-slate-700 font-semibold mt-0.5">
-            Identitas resmi lembaga, manajemen kata sandi masuk admin, dan pusat pemulihan data master (Tersinkron otomatis ke MariaDB)
-          </p>
-        </div>
-        <span className="self-start sm:self-auto px-3 py-1 rounded-full text-[11px] font-mono font-black bg-indigo-50 text-indigo-900 border border-indigo-200 flex items-center gap-1.5">
-          <span>⚡</span>
-          <span>Database Aktif & Tersinkron</span>
-        </span>
-      </div>
-
-      {/* 1. School Master Data */}
-      <div className="p-6 rounded-2xl bg-white border-2 border-slate-200 shadow-sm space-y-4">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <div>
-            <h3 className="text-base font-black text-slate-950 pb-1">
-              Identitas Resmi Sekolah
-            </h3>
-            <p className="text-xs text-slate-600 font-semibold">
-              Data pokok kelembagaan dan akreditasi resmi SMP Negeri 3 Cihampelas di Database MariaDB
-            </p>
-          </div>
           {identity.updatedAt && (
-            <span className="text-[10px] font-mono font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200">
+            <span className="text-[11px] font-mono font-bold text-slate-500">
               Diperbarui: {identity.updatedAt}
             </span>
           )}
         </div>
         
-        <form onSubmit={handleSaveIdentity} className="space-y-4 text-xs pt-2 border-t-2 border-slate-100">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <form onSubmit={handleSaveIdentity} className="space-y-4 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div>
-              <label className="text-slate-800 font-black block mb-1.5 text-xs">Nama Satuan Pendidikan *</label>
+              <label className="text-slate-700 font-bold block mb-1 text-xs">Nama Sekolah *</label>
               <input 
                 type="text" 
                 value={schoolName}
                 onChange={(e) => setSchoolName(e.target.value)}
                 required
-                className="w-full px-3.5 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-slate-950 font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 shadow-xs"
+                className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-300 text-slate-950 font-bold focus:outline-none focus:border-indigo-600 focus:bg-white"
               />
             </div>
             <div>
-              <label className="text-slate-800 font-black block mb-1.5 text-xs">NPSN (Nomor Pokok Sekolah Nasional) *</label>
+              <label className="text-slate-700 font-bold block mb-1 text-xs">NPSN *</label>
               <input 
                 type="text" 
                 value={npsn}
                 onChange={(e) => setNpsn(e.target.value)}
                 required
-                className="w-full px-3.5 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-slate-950 font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 shadow-xs font-mono"
+                className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-300 text-slate-950 font-bold focus:outline-none focus:border-indigo-600 focus:bg-white font-mono"
               />
             </div>
             <div>
-              <label className="text-slate-800 font-black block mb-1.5 text-xs">Status Akreditasi *</label>
+              <label className="text-slate-700 font-bold block mb-1 text-xs">Akreditasi *</label>
               <input 
                 type="text" 
                 value={akreditasi}
                 onChange={(e) => setAkreditasi(e.target.value)}
                 required
-                className="w-full px-3.5 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-slate-950 font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 shadow-xs"
+                className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-300 text-slate-950 font-bold focus:outline-none focus:border-indigo-600 focus:bg-white"
               />
             </div>
             <div>
-              <label className="text-slate-800 font-black block mb-1.5 text-xs">Kecamatan / Kabupaten *</label>
+              <label className="text-slate-700 font-bold block mb-1 text-xs">Wilayah *</label>
               <input 
                 type="text" 
                 value={region}
                 onChange={(e) => setRegion(e.target.value)}
                 required
-                className="w-full px-3.5 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-slate-950 font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 shadow-xs"
+                className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-300 text-slate-950 font-bold focus:outline-none focus:border-indigo-600 focus:bg-white"
               />
             </div>
-            <div>
-              <label className="text-slate-800 font-black block mb-1.5 text-xs">Alamat Kampus Lengkap</label>
+            <div className="sm:col-span-2">
+              <label className="text-slate-700 font-bold block mb-1 text-xs">Alamat Lengkap</label>
               <input 
                 type="text" 
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
                 placeholder="Kp. Sukawangi RT 02 / RW 09, Desa Situwangi..."
-                className="w-full px-3.5 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-slate-950 font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 shadow-xs"
+                className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-300 text-slate-950 font-bold focus:outline-none focus:border-indigo-600 focus:bg-white"
               />
             </div>
             <div>
-              <label className="text-slate-800 font-black block mb-1.5 text-xs">Email Resmi Sekolah</label>
+              <label className="text-slate-700 font-bold block mb-1 text-xs">Email Resmi</label>
               <input 
                 type="email" 
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="info@smpn3cihampelas.sch.id"
-                className="w-full px-3.5 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-slate-950 font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 shadow-xs font-mono"
+                className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-300 text-slate-950 font-bold focus:outline-none focus:border-indigo-600 focus:bg-white font-mono"
               />
             </div>
             <div>
-              <label className="text-slate-800 font-black block mb-1.5 text-xs">Nomor Telepon / WhatsApp Resmi</label>
+              <label className="text-slate-700 font-bold block mb-1 text-xs">Telepon / WhatsApp</label>
               <input 
                 type="text" 
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="0812-3456-7890"
-                className="w-full px-3.5 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-slate-950 font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 shadow-xs font-mono"
+                className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-300 text-slate-950 font-bold focus:outline-none focus:border-indigo-600 focus:bg-white font-mono"
               />
             </div>
           </div>
 
-          <div className="flex items-center gap-2 pt-2">
+          <div className="flex items-center gap-2 pt-1">
             <button
               type="submit"
               disabled={isSavingIdentity}
-              className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold transition-all cursor-pointer shadow-sm active:scale-98 disabled:opacity-50 flex items-center gap-1.5"
+              className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold transition-all cursor-pointer shadow-sm active:scale-98 disabled:opacity-50"
             >
-              <span>💾</span>
-              <span>{isSavingIdentity ? 'Menyimpan ke MariaDB...' : 'Simpan Perubahan Identitas'}</span>
+              {isSavingIdentity ? 'Menyimpan...' : '💾 Simpan Identitas'}
             </button>
             <button
               type="button"
               onClick={handleResetIdentityOnly}
-              className="px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all cursor-pointer border border-slate-300"
+              className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all cursor-pointer border border-slate-300"
             >
-              Reset Identitas Bawaan
+              Reset Standar
             </button>
           </div>
         </form>
       </div>
 
       {/* 2. Password Change */}
-      <div className="p-6 rounded-2xl bg-white border-2 border-slate-200 shadow-sm space-y-4">
-        <div className="flex items-center justify-between flex-wrap gap-2">
+      <div className="p-5 sm:p-6 rounded-2xl bg-white border-2 border-slate-200 shadow-xs space-y-4">
+        <div className="flex items-center justify-between flex-wrap gap-2 pb-3 border-b border-slate-100">
           <div>
-            <h3 className="text-base font-black text-slate-950 pb-1">
-              Keamanan & Kata Sandi Admin
-            </h3>
-            <p className="text-xs text-slate-600 font-semibold">
-              Perbarui kata sandi untuk masuk ke Dashboard Portal Admin (Password bawaan sistem: <code className="bg-slate-100 px-1.5 py-0.5 rounded font-mono text-indigo-700 font-bold">admin123</code>)
+            <h3 className="text-sm sm:text-base font-black text-slate-950">Kata Sandi Admin</h3>
+            <p className="text-[11px] text-slate-500 font-semibold">
+              Bawaan sistem: <code className="bg-slate-100 px-1.5 py-0.5 rounded font-mono text-indigo-700 font-bold">admin123</code>
             </p>
           </div>
           <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-black border ${
@@ -298,15 +273,15 @@ export function TabPengaturan({
               ? 'bg-amber-50 text-amber-900 border-amber-300' 
               : 'bg-slate-100 text-slate-700 border-slate-300'
           }`}>
-            {hasCustomPassword ? '● Password Kustom Aktif di MariaDB' : '● Password Default (admin123)'}
+            {hasCustomPassword ? '● Sandi Kustom Aktif' : '● Sandi Bawaan'}
           </span>
         </div>
         
-        <form onSubmit={handleSavePassword} className="space-y-4 text-xs pt-2 border-t-2 border-slate-100">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <form onSubmit={handleSavePassword} className="space-y-4 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-slate-800 font-black text-xs">Kata Sandi Baru *</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-slate-700 font-bold text-xs">Kata Sandi Baru *</label>
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
@@ -320,139 +295,136 @@ export function TabPengaturan({
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Minimal 6 karakter..." 
-                className="w-full px-3.5 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-slate-950 font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 shadow-xs"
+                className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-300 text-slate-950 font-bold focus:outline-none focus:border-indigo-600 focus:bg-white"
               />
             </div>
             <div>
-              <label className="text-slate-800 font-black block mb-1.5 text-xs">Ulangi Konfirmasi Kata Sandi *</label>
+              <label className="text-slate-700 font-bold block mb-1 text-xs">Konfirmasi Kata Sandi *</label>
               <input 
                 type={showPassword ? 'text' : 'password'} 
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Ketik ulang kata sandi baru..." 
-                className="w-full px-3.5 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-slate-950 font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 shadow-xs"
+                placeholder="Ulangi kata sandi baru..." 
+                className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-300 text-slate-950 font-bold focus:outline-none focus:border-indigo-600 focus:bg-white"
               />
             </div>
           </div>
 
-          <div className="flex items-center gap-2 pt-2 flex-wrap">
+          <div className="flex items-center gap-2 pt-1 flex-wrap">
             <button
               type="submit"
               disabled={isSavingPassword}
-              className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold transition-all cursor-pointer shadow-sm active:scale-98 disabled:opacity-50 flex items-center gap-1.5"
+              className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold transition-all cursor-pointer shadow-sm active:scale-98 disabled:opacity-50"
             >
-              <span>🔑</span>
-              <span>{isSavingPassword ? 'Menyimpan ke MariaDB...' : 'Perbarui Kata Sandi di MariaDB'}</span>
+              {isSavingPassword ? 'Menyimpan...' : '🔑 Simpan Kata Sandi'}
             </button>
             {hasCustomPassword && (
               <button
                 type="button"
                 onClick={handleResetPassword}
-                className="px-3.5 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-800 text-xs font-bold transition-all cursor-pointer border border-rose-300"
+                className="px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-800 text-xs font-bold transition-all cursor-pointer border border-rose-300"
               >
-                Kembalikan ke Password Default (admin123)
+                Reset ke Bawaan
               </button>
             )}
           </div>
         </form>
       </div>
 
-      {/* 3. Centralized Maintenance Hub */}
-      <div className="p-6 rounded-2xl bg-white border-2 border-slate-200 shadow-sm space-y-4">
-        <div>
-          <h3 className="text-base font-black text-slate-950 pb-1">
-            Pusat Pemeliharaan & Reset Data Sekolah
-          </h3>
-          <p className="text-xs text-slate-600 font-semibold leading-relaxed">
-            Gunakan tombol berikut jika Anda membutuhkan pemulihan data master ke kondisi resmi standar sekolah di Database MariaDB:
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2 border-t-2 border-slate-100">
-          {/* Reset GTK */}
+      {/* 3. Reset Data Modul */}
+      <div className="p-5 sm:p-6 rounded-2xl bg-white border-2 border-slate-200 shadow-xs space-y-4">
+        <div className="flex items-center justify-between flex-wrap gap-3 pb-3 border-b border-slate-100">
+          <div>
+            <h3 className="text-sm sm:text-base font-black text-slate-950">Pemulihan & Reset Data</h3>
+            <p className="text-[11px] text-slate-500 font-semibold">Kembalikan data modul ke kondisi standar awal sekolah</p>
+          </div>
           <button
             type="button"
-            onClick={() => {
-              if (confirm('🔄 Reset seluruh data Pimpinan & Guru ke 36 GTK resmi di Database MariaDB?')) {
-                onResetSchoolData();
-                showToast('🔄 Data Pimpinan & Guru berhasil direset di Database MariaDB!');
-              }
-            }}
-            className="p-3.5 rounded-xl bg-slate-50 hover:bg-slate-100 border-2 border-slate-200 text-left transition-all cursor-pointer active:scale-98 group"
+            onClick={handleMasterReset}
+            className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 shadow-sm active:scale-98"
           >
-            <span className="text-xl block mb-1 group-hover:scale-110 transition-transform">👨‍🏫</span>
-            <span className="text-xs font-black text-slate-900 block">Reset GTK & Guru</span>
-            <span className="text-[11px] text-slate-500 font-medium">Pulihkan 36 data GTK di MariaDB</span>
+            <span>⚠️ Reset Semua Modul</span>
           </button>
+        </div>
 
-          {/* Reset Siswa */}
-          {onResetStudents && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
+          {onResetWarta && (
             <button
               type="button"
               onClick={() => {
-                if (confirm('🔄 Reset seluruh Data Siswa ke 535 siswa (17 rombel) di Database MariaDB?')) {
-                  onResetStudents();
-                  showToast('🔄 Data Siswa & Rombel berhasil direset di Database MariaDB!');
+                if (confirm('🔄 Reset seluruh artikel Warta & Berita ke 7 artikel awal?')) {
+                  onResetWarta();
+                  showToast('🔄 Warta & Berita berhasil direset!');
                 }
               }}
-              className="p-3.5 rounded-xl bg-slate-50 hover:bg-slate-100 border-2 border-slate-200 text-left transition-all cursor-pointer active:scale-98 group"
+              className="p-3 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-left transition-all cursor-pointer active:scale-98"
             >
-              <span className="text-xl block mb-1 group-hover:scale-110 transition-transform">🎒</span>
-              <span className="text-xs font-black text-slate-900 block">Reset Siswa & Rombel</span>
-              <span className="text-[11px] text-slate-500 font-medium">Pulihkan 535 data siswa di MariaDB</span>
+              <span className="text-lg block mb-0.5">📰</span>
+              <span className="text-xs font-black text-slate-900 block">Reset Warta</span>
+              <span className="text-[11px] text-slate-500 font-medium">7 artikel awal</span>
             </button>
           )}
 
-          {/* Reset Agenda */}
+          <button
+            type="button"
+            onClick={() => {
+              if (confirm('🔄 Reset seluruh data Pimpinan & Guru ke setelan resmi?')) {
+                onResetSchoolData();
+                showToast('🔄 Data Pimpinan & Guru berhasil direset!');
+              }
+            }}
+            className="p-3 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-left transition-all cursor-pointer active:scale-98"
+          >
+            <span className="text-lg block mb-0.5">👨‍🏫</span>
+            <span className="text-xs font-black text-slate-900 block">Reset GTK</span>
+            <span className="text-[11px] text-slate-500 font-medium">Pimpinan & Guru</span>
+          </button>
+
+          {onResetStudents && (
+            <button
+              type="button"
+              onClick={() => onResetStudents()}
+              className="p-3 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-left transition-all cursor-pointer active:scale-98"
+            >
+              <span className="text-lg block mb-0.5">🎒</span>
+              <span className="text-xs font-black text-slate-900 block">Reset Siswa</span>
+              <span className="text-[11px] text-slate-500 font-medium">535 siswa · 17 rombel</span>
+            </button>
+          )}
+
           {onResetAgenda && (
             <button
               type="button"
               onClick={() => {
-                if (confirm('🔄 Reset Kalender Akademik ke 27 Kaldik SK resmi di Database MariaDB?')) {
+                if (confirm('🔄 Reset Kalender Akademik ke 27 Kaldik resmi?')) {
                   onResetAgenda();
-                  showToast('🔄 Kalender Akademik berhasil direset di Database MariaDB!');
+                  showToast('🔄 Kalender Akademik berhasil direset!');
                 }
               }}
-              className="p-3.5 rounded-xl bg-slate-50 hover:bg-slate-100 border-2 border-slate-200 text-left transition-all cursor-pointer active:scale-98 group"
+              className="p-3 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-left transition-all cursor-pointer active:scale-98"
             >
-              <span className="text-xl block mb-1 group-hover:scale-110 transition-transform">📅</span>
-              <span className="text-xs font-black text-slate-900 block">Reset Kaldik Resmi</span>
-              <span className="text-[11px] text-slate-500 font-medium">Pulihkan 27 Kaldik SK di MariaDB</span>
+              <span className="text-lg block mb-0.5">📅</span>
+              <span className="text-xs font-black text-slate-900 block">Reset Kaldik</span>
+              <span className="text-[11px] text-slate-500 font-medium">27 agenda resmi</span>
             </button>
           )}
 
-          {/* Reset Galeri */}
           {onResetGallery && (
             <button
               type="button"
               onClick={() => {
-                if (confirm('🔄 Reset Galeri Foto ke 8 foto dokumentasi standar di Database MariaDB?')) {
+                if (confirm('🔄 Reset Galeri Foto ke 8 foto dokumentasi standar?')) {
                   onResetGallery();
-                  showToast('🔄 Galeri Foto berhasil direset di Database MariaDB!');
+                  showToast('🔄 Galeri Foto berhasil direset!');
                 }
               }}
-              className="p-3.5 rounded-xl bg-slate-50 hover:bg-slate-100 border-2 border-slate-200 text-left transition-all cursor-pointer active:scale-98 group"
+              className="p-3 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-left transition-all cursor-pointer active:scale-98"
             >
-              <span className="text-xl block mb-1 group-hover:scale-110 transition-transform">📸</span>
-              <span className="text-xs font-black text-slate-900 block">Reset Galeri Foto</span>
-              <span className="text-[11px] text-slate-500 font-medium">Pulihkan 8 foto standar di MariaDB</span>
+              <span className="text-lg block mb-0.5">📸</span>
+              <span className="text-xs font-black text-slate-900 block">Reset Galeri</span>
+              <span className="text-[11px] text-slate-500 font-medium">8 foto standar</span>
             </button>
           )}
-        </div>
-
-        {/* Master Reset Button */}
-        <div className="pt-3 border-t border-slate-100 flex items-center justify-between flex-wrap gap-3">
-          <p className="text-[11px] text-slate-500 font-medium">
-            Tindakan reset akan mengembalikan data master di database cloud MariaDB ke cetak biru master sekolah.
-          </p>
-          <button
-            type="button"
-            onClick={handleMasterReset}
-            className="px-4 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 border-2 border-rose-300 text-rose-800 text-xs font-black transition-all cursor-pointer flex items-center gap-2 shadow-xs active:scale-98"
-          >
-            <span>⚠️</span>
-            <span>Reset Seluruh Modul Sekaligus (Database MariaDB)</span>
-          </button>
         </div>
       </div>
     </div>

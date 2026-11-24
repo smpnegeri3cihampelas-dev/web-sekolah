@@ -96,14 +96,14 @@ export default function DashboardPage() {
     };
   }, []);
 
-  const handleAddStudent = async (data: { name: string; nisn: string; nis: string; classId: string }) => {
+  const handleAddStudent = async (data: { name: string; nisn: string; nis: string; classId: string; gender?: string }) => {
     const newStudent: Student = {
       id: `${data.classId.replace('-', '')}-${String(studentsList.length + 1).padStart(2, '0')}`,
       name: data.name,
       nisn: data.nisn,
       nis: data.nis,
       classId: data.classId,
-      gender: '-'
+      gender: (data.gender as 'L' | 'P') || 'L'
     };
     const updated = [newStudent, ...studentsList];
     saveStoredStudents(updated);
@@ -128,10 +128,19 @@ export default function DashboardPage() {
     }
   };
 
-  const handleEditStudent = async (id: string, data: { name: string; nisn: string; nis: string; classId: string }) => {
-    const updated = studentsList.map(s => s.id === id ? { ...s, ...data } : s);
+  const handleEditStudent = async (id: string, data: { name: string; nisn: string; nis: string; classId: string; gender?: string; password?: string }) => {
+    const updated = studentsList.map(s => s.id === id ? { ...s, ...data, gender: (data.gender as 'L' | 'P') || s.gender, password: data.password || s.password || 'siswa123' } : s);
     saveStoredStudents(updated);
     setStudentsList(updated);
+    if (typeof window !== 'undefined' && data.password && data.nisn) {
+      try {
+        const raw = localStorage.getItem('smpn3_student_passwords');
+        const map = raw ? JSON.parse(raw) : {};
+        map[data.nisn] = data.password;
+        if (data.name) map[data.name] = data.password;
+        localStorage.setItem('smpn3_student_passwords', JSON.stringify(map));
+      } catch {}
+    }
     showToast(`✅ Data siswa "${data.name}" berhasil diperbarui!`);
 
     try {
@@ -210,6 +219,7 @@ export default function DashboardPage() {
     addWarta, 
     updateWarta, 
     deleteWarta,
+    resetWarta,
     refreshWarta 
   } = useWartaData();
 
@@ -235,8 +245,19 @@ export default function DashboardPage() {
   } = useSchoolData();
 
   const handleSaveLeader = (leaderId: number, data: Partial<Leader>) => {
+    const targetLeader = leaders.find(l => l.id === leaderId);
     const updated = leaders.map(l => l.id === leaderId ? { ...l, ...data } : l);
     saveLeaders(updated);
+    if (data.photo && targetLeader) {
+      const oldNameLow = targetLeader.name.toLowerCase();
+      const newNameLow = (data.name || targetLeader.name).toLowerCase();
+      const syncedTeachers = teachers.map(t =>
+        (t.name.toLowerCase() === oldNameLow || t.name.toLowerCase() === newNameLow)
+          ? { ...t, photo: data.photo! }
+          : t
+      );
+      saveTeachers(syncedTeachers);
+    }
     saveLeaderCloud(leaderId, data);
     showToast('Profil pimpinan berhasil disimpan ke database cloud!');
   };
@@ -252,14 +273,25 @@ export default function DashboardPage() {
     showToast(`Menyimpan guru "${newTData.name}" ke database...`);
     const dbId = await addTeacherCloud(newTData);
     if (dbId) {
-      saveTeachers([{ ...newT, id: dbId }, ...teachers]);
+      await refreshSchoolData();
       showToast(`✅ Guru "${newTData.name}" berhasil tersimpan ke database cloud!`);
     }
   };
 
   const handleSaveTeacher = (teacherId: number, data: Partial<Teacher>) => {
+    const targetTeacher = teachers.find(t => t.id === teacherId);
     const updated = teachers.map(t => t.id === teacherId ? { ...t, ...data } : t);
     saveTeachers(updated);
+    if (data.photo && targetTeacher) {
+      const oldNameLow = targetTeacher.name.toLowerCase();
+      const newNameLow = (data.name || targetTeacher.name).toLowerCase();
+      const syncedLeaders = leaders.map(l =>
+        (l.name.toLowerCase() === oldNameLow || l.name.toLowerCase() === newNameLow)
+          ? { ...l, photo: data.photo! }
+          : l
+      );
+      saveLeaders(syncedLeaders);
+    }
     saveTeacherCloud(teacherId, data);
     showToast('✅ Data guru berhasil diperbarui di database cloud!');
   };
@@ -295,7 +327,8 @@ export default function DashboardPage() {
     deleteAgenda, 
     resetAgenda,
     updatePdfInfo,
-    resetPdfInfo
+    resetPdfInfo,
+    refreshFromCloud: refreshAgenda
   } = useAgendaData();
 
   const handleAddAgenda = (data: { name: string; date: string; category: string; semester?: string }) => {
@@ -325,7 +358,8 @@ export default function DashboardPage() {
     addGallery,
     updateGallery,
     deleteGallery,
-    resetGallery
+    resetGallery,
+    refreshFromCloud: refreshGallery
   } = useGalleryData();
 
   const handleAddGallery = (data: { title: string; category: string; src: string; desc?: string }) => {
@@ -437,7 +471,7 @@ export default function DashboardPage() {
                 },
                 {
                   id: 'warta',
-                  label: 'Kelola Warta',
+                  label: 'Warta & Berita',
                   icon: (
                     <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                       <path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2" />
@@ -448,7 +482,7 @@ export default function DashboardPage() {
                 },
                 {
                   id: 'siswa',
-                  label: 'Data Siswa & Rombel',
+                  label: 'Siswa & Rombel',
                   icon: (
                     <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                       <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
@@ -461,7 +495,7 @@ export default function DashboardPage() {
                 },
                 {
                   id: 'pimpinan',
-                  label: 'Pimpinan & Guru (GTK)',
+                  label: 'Pimpinan & GTK',
                   icon: (
                     <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                       <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
@@ -487,7 +521,7 @@ export default function DashboardPage() {
                 },
                 {
                   id: 'galeri',
-                  label: 'Galeri & Fasilitas',
+                  label: 'Galeri Foto',
                   icon: (
                     <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                       <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
@@ -499,7 +533,7 @@ export default function DashboardPage() {
                 },
                 {
                   id: 'pengaturan',
-                  label: 'Pengaturan Web',
+                  label: 'Pengaturan',
                   icon: (
                     <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                       <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
@@ -600,17 +634,17 @@ export default function DashboardPage() {
               </button>
 
               <div>
-                <h1 className="text-base sm:text-lg font-black text-slate-950 tracking-tight capitalize flex items-center gap-2">
-                  {activeTab === 'overview' && 'Ringkasan Sistem & Konten'}
-                  {activeTab === 'warta' && 'Manajemen Warta & Berita'}
-                  {activeTab === 'siswa' && 'Manajemen Data Siswa & Rombel'}
-                  {activeTab === 'pimpinan' && 'Manajemen Pimpinan & Guru (GTK)'}
-                  {activeTab === 'agenda' && 'Kalender & Agenda Akademik'}
-                  {activeTab === 'galeri' && 'Manajemen Galeri & Fasilitas'}
-                  {activeTab === 'pengaturan' && 'Pengaturan Profil & Website'}
+                <h1 className="text-base sm:text-lg font-black text-slate-950 tracking-tight flex items-center gap-2">
+                  {activeTab === 'overview' && 'Ringkasan Sistem'}
+                  {activeTab === 'warta' && 'Warta & Berita'}
+                  {activeTab === 'siswa' && 'Data Siswa & Rombel'}
+                  {activeTab === 'pimpinan' && 'Pimpinan & Dewan Guru'}
+                  {activeTab === 'agenda' && 'Kalender Akademik'}
+                  {activeTab === 'galeri' && 'Galeri & Fasilitas'}
+                  {activeTab === 'pengaturan' && 'Pengaturan & Reset Data'}
                 </h1>
-                <p className="text-xs text-slate-600 font-semibold hidden sm:block">
-                  Sistem Informasi & Manajemen Konten {identity.schoolName || 'SMP Negeri 3 Cihampelas'}
+                <p className="text-xs text-slate-500 font-semibold hidden sm:block">
+                  {identity.schoolName || 'SMP Negeri 3 Cihampelas'}
                 </p>
               </div>
             </div>
@@ -731,6 +765,20 @@ export default function DashboardPage() {
                 onResetStudents={handleResetStudents}
                 onResetAgenda={resetAgenda}
                 onResetGallery={resetGallery}
+                onResetWarta={resetWarta}
+                onAfterMasterReset={() => {
+                  saveStoredStudents(INITIAL_STUDENTS);
+                  setStudentsList(INITIAL_STUDENTS);
+                  refreshSchoolData();
+                  syncStudentsWithCloud().then(cloudStudents => {
+                    if (cloudStudents && cloudStudents.length > 0) {
+                      setStudentsList(cloudStudents);
+                    }
+                  }).catch(() => {});
+                  refreshAgenda();
+                  refreshGallery();
+                  refreshWarta();
+                }}
                 showToast={showToast}
               />
             )}

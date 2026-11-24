@@ -100,6 +100,48 @@ function formatWibTime(isoString?: string): string {
   );
 }
 
+export function resolveCbtVideoSource(rawUrl: string): { mode: 'iframe' | 'video'; src: string } {
+  const url = (rawUrl || '').trim();
+  if (!url) return { mode: 'video', src: '' };
+
+  // 1. YouTube (youtube.com/watch?v=..., youtu.be/..., youtube.com/embed/..., youtube.com/shorts/...)
+  const ytMatch = url.match(
+    /(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/|live\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/
+  );
+  if (ytMatch && ytMatch[1]) {
+    return {
+      mode: 'iframe',
+      src: `https://www.youtube-nocookie.com/embed/${ytMatch[1]}?rel=0&modestbranding=1&fs=0&playsinline=1&disablekb=1`
+    };
+  }
+
+  // 2. Google Drive Video (drive.google.com/file/d/ID/... or drive.google.com/open?id=ID)
+  const gdMatch =
+    url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/) ||
+    url.match(/drive\.google\.com\/open\?id=([a-zA-Z0-9_-]+)/);
+  if (gdMatch && gdMatch[1]) {
+    return {
+      mode: 'iframe',
+      src: `https://drive.google.com/file/d/${gdMatch[1]}/preview`
+    };
+  }
+
+  // 3. Direct Video File (.mp4, .webm, .ogg, data:video/...)
+  return { mode: 'video', src: url };
+}
+
+export function resolveCbtAudioSource(rawUrl: string): string {
+  const url = (rawUrl || '').trim();
+  if (!url) return '';
+  const gdMatch =
+    url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/) ||
+    url.match(/drive\.google\.com\/open\?id=([a-zA-Z0-9_-]+)/);
+  if (gdMatch && gdMatch[1]) {
+    return `https://docs.google.com/uc?export=download&id=${gdMatch[1]}`;
+  }
+  return url;
+}
+
 interface CbtStudentExamRoomProps {
   exam: CbtExamPackage;
   student: Student;
@@ -348,6 +390,7 @@ export default function CbtStudentExamRoom({
   const [fullscreenOverlayReady, setFullscreenOverlayReady] = useState<boolean>(() => checkFullscreenActive());
   const wasFullscreenRef = useRef<boolean>(checkFullscreenActive());
   const fullscreenGraceUntilRef = useRef<number>(0);
+  const mediaInteractGraceUntilRef = useRef<number>(0);
 
   // Time remaining in seconds
   const totalDurationSeconds = Math.max(60, (exam.durationMinutes || 60) * 60);
@@ -1131,6 +1174,16 @@ export default function CbtStudentExamRoom({
       triggerViolation('Menutup atau Meninggalkan Halaman Ujian CBT');
     };
 
+    const isFocusInsideAllowedMediaIframe = () => {
+      if (typeof document === 'undefined') return false;
+      const activeEl = document.activeElement;
+      return Boolean(
+        activeEl &&
+        activeEl.tagName === 'IFRAME' &&
+        activeEl.getAttribute('data-cbt-media-iframe') === 'true'
+      );
+    };
+
     // 3. Deteksi saat jendela browser kehilangan fokus (Alt+Tab, klik aplikasi luar)
     const handleWindowBlur = () => {
       if (isExamCompletedRef.current || isExamPausedRef.current || isLockedRef.current) return;
@@ -1139,6 +1192,7 @@ export default function CbtStudentExamRoom({
         return;
       }
       if (Date.now() < fullscreenGraceUntilRef.current) return;
+      if (isFocusInsideAllowedMediaIframe() || Date.now() < mediaInteractGraceUntilRef.current) return;
       triggerViolation('Jendela Kehilangan Fokus (Membuka Aplikasi / Jendela Lain)');
     };
 
@@ -1151,6 +1205,7 @@ export default function CbtStudentExamRoom({
         return;
       }
       if (Date.now() < fullscreenGraceUntilRef.current) return;
+      if (isFocusInsideAllowedMediaIframe() || Date.now() < mediaInteractGraceUntilRef.current) return;
       if (!document.hasFocus()) {
         triggerViolation('Jendela Tidak Aktif (Membuka Aplikasi Lain di Depan Layar)');
       }
@@ -1937,7 +1992,7 @@ export default function CbtStudentExamRoom({
                 {/* Audio Element & Controls */}
                 <audio
                   ref={audioRef}
-                  src={currentQuestion.mediaUrl}
+                  src={resolveCbtAudioSource(currentQuestion.mediaUrl)}
                   onEnded={() => setIsPlayingAudio(false)}
                   className="hidden"
                 />
@@ -1965,22 +2020,52 @@ export default function CbtStudentExamRoom({
               </div>
             )}
 
-            {currentQuestion.mediaType === 'video' && currentQuestion.mediaUrl && (
-              <div className="relative z-10 space-y-2">
-                <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-950">
-                  <video
-                    src={currentQuestion.mediaUrl}
-                    controls
-                    controlsList="nodownload"
-                    disablePictureInPicture
-                    className="w-full max-h-80 mx-auto"
-                  />
+            {currentQuestion.mediaType === 'video' && currentQuestion.mediaUrl && (() => {
+              const resolvedVideo = resolveCbtVideoSource(currentQuestion.mediaUrl);
+              return (
+                <div
+                  className="relative z-10 space-y-2"
+                  onPointerDown={() => {
+                    mediaInteractGraceUntilRef.current = Date.now() + 1500;
+                  }}
+                  onMouseEnter={() => {
+                    mediaInteractGraceUntilRef.current = Date.now() + 1500;
+                  }}
+                >
+                  <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-950 relative">
+                    {resolvedVideo.mode === 'iframe' ? (
+                      <div className="relative w-full aspect-video max-h-80 mx-auto">
+                        <iframe
+                          data-cbt-media-iframe="true"
+                          src={resolvedVideo.src}
+                          title={currentQuestion.mediaCaption || 'Video Stimulus Soal CBT'}
+                          sandbox="allow-scripts allow-same-origin allow-presentation"
+                          allow="accelerometer; autoplay; encrypted-media; gyroscope"
+                          className="w-full h-full border-0"
+                        />
+                        {/* Pelindung sudut kanan atas agar tombol pop-out / buka tab baru di Google Drive atau YouTube tidak bisa diklik */}
+                        <div
+                          className="absolute top-0 right-0 w-16 h-14 z-20 cursor-default"
+                          title="Pemutar Video Terkunci di Dalam Ruang Ujian CBT"
+                        />
+                      </div>
+                    ) : (
+                      <video
+                        src={resolvedVideo.src}
+                        controls
+                        playsInline
+                        controlsList="nodownload nofullscreen noremoteplayback"
+                        disablePictureInPicture
+                        className="w-full max-h-80 mx-auto"
+                      />
+                    )}
+                  </div>
+                  {currentQuestion.mediaCaption && (
+                    <p className="text-xs text-slate-500 italic text-center">{currentQuestion.mediaCaption}</p>
+                  )}
                 </div>
-                {currentQuestion.mediaCaption && (
-                  <p className="text-xs text-slate-500 italic text-center">{currentQuestion.mediaCaption}</p>
-                )}
-              </div>
-            )}
+              );
+            })()}
 
             {/* TEKS SOAL */}
             <div className={`relative z-10 text-slate-800 leading-relaxed font-normal whitespace-pre-line ${fontSizeClass}`}>

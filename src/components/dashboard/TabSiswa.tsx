@@ -1,14 +1,22 @@
 'use client';
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Student, SCHOOL_CLASSES, updateStudentExitStatus } from '@/lib/elearningData';
+import { Student, SCHOOL_CLASSES, updateStudentExitStatus, syncStudentsWithCloud } from '@/lib/elearningData';
 import { downloadStudentTemplateExcel } from '@/lib/elearningExport';
 import { AddStudentModal, EditStudentModal } from './StudentModals';
 
+function getLocalDateStr(): string {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 interface TabSiswaProps {
   studentsList: Student[];
-  onAddStudent: (data: { name: string; nisn: string; nis: string; classId: string }) => void;
-  onEditStudent: (id: string, data: { name: string; nisn: string; nis: string; classId: string }) => void;
+  onAddStudent: (data: { name: string; nisn: string; nis: string; classId: string; gender?: string }) => void;
+  onEditStudent: (id: string, data: { name: string; nisn: string; nis: string; classId: string; gender?: string; password?: string }) => void;
   onDeleteStudent: (id: string, name: string) => void;
   onImportStudents: (imported: Student[]) => void;
   onResetStudents: () => void;
@@ -46,7 +54,7 @@ export function TabSiswa({
   const [exitModalStudent, setExitModalStudent] = useState<Student | null>(null);
   const [exitReasonType, setExitReasonType] = useState<string>('Pindah / Mutasi ke Sekolah Lain');
   const [exitCustomReason, setExitCustomReason] = useState<string>('');
-  const [exitDateInput, setExitDateInput] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [exitDateInput, setExitDateInput] = useState<string>(getLocalDateStr());
   const [isSubmittingExit, setIsSubmittingExit] = useState<boolean>(false);
 
   // Modal Konfirmasi Pulihkan Status Aktif oleh Admin
@@ -100,6 +108,7 @@ export function TabSiswa({
         exitDate: exitDateInput,
         exitMarkedBy: 'Administrator Sekolah'
       });
+      syncStudentsWithCloud().catch(() => {});
       showToast(`🚪 Siswa "${exitModalStudent.name}" berhasil ditandai KELUAR SEKOLAH! Data tersinkron ke Guru & Piket.`);
       setExitModalStudent(null);
     } catch (e) {
@@ -119,6 +128,7 @@ export function TabSiswa({
         nisn: restoreModalStudent.nisn,
         status: 'Aktif'
       });
+      syncStudentsWithCloud().catch(() => {});
       showToast(`✅ Siswa "${restoreModalStudent.name}" berhasil dipulihkan menjadi SISWA AKTIF!`);
       setRestoreModalStudent(null);
     } catch (e) {
@@ -231,24 +241,28 @@ export function TabSiswa({
   };
 
   return (
-    <div className="space-y-6 animate-[fadeIn_0.3s_ease-out]">
-      {/* Header Action Card */}
-      <div className="p-5 sm:p-6 rounded-2xl bg-white border-2 border-slate-200 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 border-2 border-indigo-200 text-indigo-800 text-[10px] font-mono font-black uppercase mb-2">
-            <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse" />
-            Database Peserta Didik
-          </div>
-          <h2 className="text-xl font-black text-slate-950 tracking-tight">
-            Data Siswa & Rombongan Belajar <span className="font-extrabold text-indigo-700">(2026/2027)</span>
-          </h2>
-          <p className="text-xs text-slate-700 font-semibold mt-0.5">
-            Kelola daftar resmi peserta didik. Seluruh data di sini otomatis tersinkronisasi ke modul Presensi Guru, Meja Piket & Database Cloud.
-          </p>
+    <div className="space-y-4 animate-[fadeIn_0.3s_ease-out]">
+      {/* Compact Top Summary & Action Bar */}
+      <div className="p-4 rounded-2xl bg-white border-2 border-slate-200 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+        <div className="flex items-center gap-2 flex-wrap text-xs font-bold">
+          <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-900 font-black border border-slate-200">
+            {studentsList.length} Siswa
+          </span>
+          <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
+            {aktifCount} Aktif
+          </span>
+          {keluarCount > 0 && (
+            <span className="px-3 py-1 rounded-full bg-rose-50 text-rose-800 border border-rose-200">
+              {keluarCount} Keluar
+            </span>
+          )}
+          <span className="px-3 py-1 rounded-full bg-indigo-50 text-indigo-800 border border-indigo-200">
+            {SCHOOL_CLASSES.length} Rombel
+          </span>
         </div>
 
-        {/* Actions: Download Template, Upload Excel, Add Student, Reset */}
-        <div className="flex flex-wrap items-center gap-2.5">
+        {/* Actions: Download Template, Upload Excel, Add Student */}
+        <div className="flex flex-wrap items-center gap-2">
           <input 
             type="file" 
             ref={fileInputRef} 
@@ -260,111 +274,59 @@ export function TabSiswa({
           <button
             type="button"
             onClick={downloadStudentTemplateExcel}
-            className="px-4 py-2.5 rounded-xl bg-white hover:bg-slate-100 border-2 border-slate-300 text-slate-900 text-xs font-extrabold transition-all flex items-center gap-2 cursor-pointer shadow-xs active:scale-98"
-            title="Unduh format tabel Excel kosong untuk diisi data siswa baru"
+            className="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-100 border border-slate-300 text-slate-800 text-xs font-extrabold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-98"
           >
             <span>📥</span>
-            <span>Format Template Excel</span>
+            <span>Template Excel</span>
           </button>
 
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold transition-all flex items-center gap-2 cursor-pointer shadow-md shadow-emerald-600/20 active:scale-98"
-            title="Upload file Excel daftar siswa baru (.xlsx)"
+            className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-98"
           >
             <span>📤</span>
-            <span>Import File Excel (.xlsx)</span>
+            <span>Import Excel</span>
           </button>
 
           <button
             type="button"
             onClick={() => setIsAddModalOpen(true)}
-            className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-indigo-600/20 active:scale-98"
+            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-98"
           >
             <span>+ Tambah Siswa</span>
           </button>
-
-          <button
-            type="button"
-            onClick={onResetStudents}
-            className="p-2.5 rounded-xl bg-white hover:bg-rose-50 hover:text-rose-700 text-slate-700 border-2 border-slate-300 transition-all text-xs cursor-pointer shadow-xs active:scale-98 font-bold"
-            title="Reset kembali ke data 535 siswa awal"
-          >
-            🔄
-          </button>
-        </div>
-      </div>
-
-      {/* 3 Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="p-5 rounded-2xl bg-white border-2 border-slate-200 shadow-sm">
-          <div className="text-xs font-black text-slate-700 uppercase tracking-wider">Total Siswa Terdaftar</div>
-          <div className="text-3xl font-black text-slate-950 mt-1">{studentsList.length}</div>
-          <div className="text-xs text-slate-600 mt-1 font-semibold flex items-center gap-2">
-            <span className="text-emerald-700 font-bold">✅ {aktifCount} Siswa Aktif</span>
-            <span className="text-slate-300">•</span>
-            <span className="text-rose-700 font-bold">🚪 {keluarCount} Keluar / Mutasi</span>
-          </div>
-        </div>
-
-        <div className="p-5 rounded-2xl bg-white border-2 border-slate-200 shadow-sm">
-          <div className="text-xs font-black text-slate-700 uppercase tracking-wider">Rombongan Belajar</div>
-          <div className="text-3xl font-black text-indigo-700 mt-1">{SCHOOL_CLASSES.length} Kelas</div>
-          <div className="text-xs text-slate-600 mt-1 font-semibold">7-A s/d 7-F, 8-A s/d 8-F, 9-A s/d 9-E</div>
-        </div>
-
-        <div className="p-5 rounded-2xl bg-white border-2 border-slate-200 shadow-sm">
-          <div className="text-xs font-black text-slate-700 uppercase tracking-wider">Status Sinkronisasi</div>
-          <div className="text-3xl font-black text-emerald-700 mt-1">Live MariaDB</div>
-          <div className="text-xs text-emerald-800 mt-1 font-bold">Tersinkron Guru, Piket & Database Cloud</div>
         </div>
       </div>
 
       {/* Filter & Search Bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-4 rounded-2xl bg-white border-2 border-slate-200 shadow-xs">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full md:w-auto">
-          {/* Select Class Filter */}
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <span className="text-xs font-black text-slate-800 uppercase tracking-wider mr-1 whitespace-nowrap">
-              Kelas:
-            </span>
-            <select
-              value={studentClassFilter}
-              onChange={(e) => setStudentClassFilter(e.target.value)}
-              className="w-full sm:w-auto px-3.5 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-slate-950 text-xs font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 cursor-pointer shadow-xs"
-            >
-              <option value="ALL">
-                Semua Kelas ({aktifCount} Aktif{keluarCount > 0 ? ` · ${keluarCount} Keluar` : ''})
-              </option>
-              {SCHOOL_CLASSES.map(cls => {
-                const cList = studentsList.filter(s => s.classId === cls.id);
-                const cAktif = cList.filter(s => s.status !== 'Keluar').length;
-                const cKeluar = cList.filter(s => s.status === 'Keluar').length;
-                return (
-                  <option key={cls.id} value={cls.id}>
-                    {cls.name} ({cAktif} Aktif{cKeluar > 0 ? ` · ${cKeluar} Keluar` : ''})
-                  </option>
-                );
-              })}
-            </select>
-          </div>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-3.5 rounded-2xl bg-white border-2 border-slate-200 shadow-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 w-full md:w-auto">
+          <select
+            value={studentClassFilter}
+            onChange={(e) => setStudentClassFilter(e.target.value)}
+            className="w-full sm:w-auto px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-300 text-slate-950 text-xs font-bold focus:outline-none focus:border-indigo-600 focus:bg-white cursor-pointer"
+          >
+            <option value="ALL">Semua Kelas ({SCHOOL_CLASSES.length})</option>
+            {SCHOOL_CLASSES.map(cls => {
+              const cAktif = studentsList.filter(s => s.classId === cls.id && s.status !== 'Keluar').length;
+              return (
+                <option key={cls.id} value={cls.id}>
+                  {cls.name} ({cAktif} Aktif)
+                </option>
+              );
+            })}
+          </select>
 
-          {/* Select Status Filter */}
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <span className="text-xs font-black text-slate-800 uppercase tracking-wider mr-1 whitespace-nowrap">
-              Status:
-            </span>
-            <select
-              value={studentStatusFilter}
-              onChange={(e) => setStudentStatusFilter(e.target.value as any)}
-              className="w-full sm:w-auto px-3.5 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-slate-950 text-xs font-bold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 cursor-pointer shadow-xs"
-            >
-              <option value="ALL">Semua Status ({studentsList.length})</option>
-              <option value="AKTIF">Hanya Siswa Aktif ({aktifCount})</option>
-              <option value="KELUAR">Hanya Siswa Keluar / Mutasi ({keluarCount})</option>
-            </select>
-          </div>
+          <select
+            value={studentStatusFilter}
+            onChange={(e) => setStudentStatusFilter(e.target.value as any)}
+            className="w-full sm:w-auto px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-300 text-slate-950 text-xs font-bold focus:outline-none focus:border-indigo-600 focus:bg-white cursor-pointer"
+          >
+            <option value="ALL">Semua Status</option>
+            <option value="AKTIF">Siswa Aktif ({aktifCount})</option>
+            <option value="KELUAR">Siswa Keluar ({keluarCount})</option>
+          </select>
         </div>
 
         {/* Search Input */}
@@ -374,7 +336,7 @@ export function TabSiswa({
             value={studentSearch}
             onChange={(e) => setStudentSearch(e.target.value)}
             placeholder="Cari nama siswa atau NISN..."
-            className="w-full pl-8 pr-4 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-xs font-bold text-slate-950 placeholder:text-slate-400 focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 shadow-xs"
+            className="w-full pl-8 pr-4 py-2 rounded-xl bg-slate-50 border border-slate-300 text-xs font-bold text-slate-950 placeholder:text-slate-400 focus:outline-none focus:border-indigo-600 focus:bg-white"
           />
           <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-bold">
             🔍
@@ -385,29 +347,29 @@ export function TabSiswa({
       {/* Students Table / Cards Container */}
       <div className="rounded-2xl bg-white border-2 border-slate-200 overflow-hidden shadow-sm">
         {/* Header Toolbar with View Mode Toggle */}
-        <div className="p-3.5 bg-slate-100 border-b-2 border-slate-200 flex flex-wrap items-center justify-between gap-2.5 text-xs text-slate-800 font-bold">
+        <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-700 font-bold">
           <div className="flex items-center gap-2 flex-wrap">
             <span>
-              Menampilkan <span className="font-black text-slate-950">{filteredStudents.length}</span> dari {studentsList.length} siswa
+              Daftar Siswa {filteredStudents.length !== studentsList.length ? `(${filteredStudents.length} cocok)` : ''}
             </span>
             {studentClassFilter !== 'ALL' && (
-              <span className="px-2.5 py-0.5 rounded font-mono font-black text-xs bg-indigo-100 text-indigo-900 border border-indigo-300">
-                Kelas: {studentClassFilter}
+              <span className="px-2 py-0.5 rounded font-mono font-black text-[11px] bg-indigo-100 text-indigo-900 border border-indigo-200">
+                {studentClassFilter}
               </span>
             )}
             {studentStatusFilter !== 'ALL' && (
-              <span className={`px-2.5 py-0.5 rounded font-mono font-black text-xs border ${
+              <span className={`px-2 py-0.5 rounded font-mono font-black text-[11px] border ${
                 studentStatusFilter === 'KELUAR' 
-                  ? 'bg-rose-100 text-rose-900 border-rose-300' 
-                  : 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                  ? 'bg-rose-100 text-rose-900 border-rose-200' 
+                  : 'bg-emerald-100 text-emerald-900 border-emerald-200'
               }`}>
-                Status: {studentStatusFilter}
+                {studentStatusFilter}
               </span>
             )}
           </div>
 
           {/* View Mode Toggle Button */}
-          <div className="flex items-center gap-1 bg-slate-200/90 p-1 rounded-xl">
+          <div className="flex items-center gap-1 bg-slate-200/80 p-0.5 rounded-xl">
             <button
               type="button"
               onClick={() => setViewMode('card')}
@@ -538,7 +500,7 @@ export function TabSiswa({
                             setExitModalStudent(st);
                             setExitReasonType('Pindah / Mutasi ke Sekolah Lain');
                             setExitCustomReason('');
-                            setExitDateInput(new Date().toISOString().split('T')[0]);
+                            setExitDateInput(getLocalDateStr());
                           }}
                           className="flex-1 py-1.5 px-3 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 text-xs font-bold transition flex items-center justify-center gap-1 active:scale-98"
                         >
@@ -646,7 +608,7 @@ export function TabSiswa({
                                 setExitModalStudent(st);
                                 setExitReasonType('Pindah / Mutasi ke Sekolah Lain');
                                 setExitCustomReason('');
-                                setExitDateInput(new Date().toISOString().split('T')[0]);
+                                setExitDateInput(getLocalDateStr());
                               }}
                               className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 transition cursor-pointer"
                               title="Tandai siswa keluar / mutasi sekolah"
