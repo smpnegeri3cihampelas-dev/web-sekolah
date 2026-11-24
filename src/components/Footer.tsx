@@ -29,9 +29,8 @@ export default function Footer() {
                 />
               </div>
               <div className="flex flex-col">
-                <span className="text-xl sm:text-2xl font-semibold tracking-tight text-white flex items-center gap-2 group-hover:text-indigo-200 transition-colors">
+                <span className="text-xl sm:text-2xl font-semibold tracking-tight text-white flex items-center group-hover:text-indigo-200 transition-colors">
                   {identity.schoolName || 'SMPN 3 Cihampelas'}
-                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-indigo-400 shadow-[0_0_8px_#6366f1]" />
                 </span>
                 <div className="flex gap-2.5 items-center mt-0.5">
                   <span className="text-[10px] tracking-widest text-indigo-400 uppercase font-mono">Berkarakter RIGAS</span>

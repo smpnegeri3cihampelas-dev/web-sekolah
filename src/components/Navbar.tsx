@@ -184,14 +184,13 @@ export default function Navbar() {
             </div>
             <div className="flex flex-col">
               <span
-                className={`text-xs sm:text-base font-semibold tracking-tight flex items-center gap-1.5 sm:gap-2 whitespace-nowrap transition-colors duration-300 ${
+                className={`text-xs sm:text-base font-semibold tracking-tight flex items-center whitespace-nowrap transition-colors duration-300 ${
                   isPastHero
                     ? 'text-slate-900'
                     : 'text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]'
                 }`}
               >
                 {identity.schoolName || 'SMPN 3 Cihampelas'}
-                <span className="inline-block w-1.5 h-1.5 rounded-full bg-indigo-500 shadow-[0_0_8px_#6366f1]" />
               </span>
             </div>
           </a>
@@ -282,7 +281,6 @@ export default function Navbar() {
                   <span className="text-[10px] font-semibold tracking-[0.2em] uppercase text-indigo-700">
                     Portal Sistem Terpadu
                   </span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 shadow-[0_0_8px_#6366f1]" />
                 </div>
 
                 <div className="flex flex-col gap-1">
